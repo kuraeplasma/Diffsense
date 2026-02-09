@@ -73,7 +73,7 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Health check endpoint
-app.get('/api/health', (req, res) => {
+app.get('/health', (req, res) => {
     res.json({
         status: 'ok',
         timestamp: new Date().toISOString(),
@@ -83,8 +83,8 @@ app.get('/api/health', (req, res) => {
 });
 
 // API routes (Protected by Auth Middleware)
-app.use('/api/contracts', authMiddleware, contractRoutes);
-app.use('/api/db', authMiddleware, dbRoutes);
+app.use('/contracts', authMiddleware, contractRoutes);
+app.use('/db', authMiddleware, dbRoutes);
 
 // Static files (PDF Uploads)
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
@@ -100,21 +100,27 @@ app.use((req, res) => {
 // Error handling middleware (must be last)
 app.use(errorHandler);
 
-// Start server
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-    logger.info(`DIFFsense Backend API started on port ${PORT}`);
-    logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
-    logger.info(`Allowed origins: ${allowedOrigins.join(', ')}`);
-});
+const functions = require('firebase-functions');
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
-    logger.info('SIGTERM signal received: closing HTTP server');
-    process.exit(0);
-});
+if (require.main === module) {
+    const PORT = process.env.PORT || 3001;
+    app.listen(PORT, () => {
+        logger.info(`DIFFsense Backend API started on port ${PORT}`);
+        logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+        logger.info(`Allowed origins: ${allowedOrigins.join(', ')}`);
+    });
 
-process.on('SIGINT', () => {
-    logger.info('SIGINT signal received: closing HTTP server');
-    process.exit(0);
-});
+    process.on('SIGTERM', () => {
+        logger.info('SIGTERM signal received: closing HTTP server');
+        process.exit(0);
+    });
+
+    process.on('SIGINT', () => {
+        logger.info('SIGINT signal received: closing HTTP server');
+        process.exit(0);
+    });
+}
+
+// Export as Cloud Function
+exports.api = functions.https.onRequest(app);

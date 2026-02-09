@@ -5,7 +5,10 @@ import { getIdToken } from './auth.js';
  * バックエンドAPIとの通信を担当
  */
 export const aiService = {
-    API_BASE: 'http://localhost:3001/api',
+    // API Base URL (Local vs Cloud)
+    API_BASE: (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+        ? 'http://localhost:3001'
+        : 'https://us-central1-diffsense-9a718.cloudfunctions.net/api',
 
     /**
      * 契約書を解析

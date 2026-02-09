@@ -50,19 +50,29 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
         let pdfUrl = null;
         let pdfStoragePath = null;
         if (method === 'pdf') {
-            const fs = require('fs');
-            const path = require('path');
-            const uploadsDir = path.join(__dirname, '..', '..', 'uploads');
-            if (!fs.existsSync(uploadsDir)) {
-                fs.mkdirSync(uploadsDir, { recursive: true });
-            }
-            const filePath = path.join(uploadsDir, `${contractId}.pdf`);
-
+            const { bucket } = require('../firebase');
             const base64Data = source.replace(/^data:application\/pdf;base64,/, '');
-            fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
+            const buffer = Buffer.from(base64Data, 'base64');
 
-            pdfUrl = `http://localhost:3001/uploads/${contractId}.pdf`;
-            pdfStoragePath = `contracts/uploads/${contractId}/${Date.now()}.pdf`;
+            // Storage path: contracts/{contractId}/{timestamp}.pdf
+            pdfStoragePath = `contracts/${contractId}/${Date.now()}.pdf`;
+            const file = bucket.file(pdfStoragePath);
+
+            // Upload to Firebase Storage
+            await file.save(buffer, {
+                metadata: { contentType: 'application/pdf' }
+            });
+
+            // Generate Signed URL (valid for 1 year)
+            // Note: In production, client should fetch fresh URL dynamically via SDK
+            const [signedUrl] = await file.getSignedUrl({
+                action: 'read',
+                expires: Date.now() + 31536000000 // 1 year
+            });
+
+            pdfUrl = signedUrl;
+            logger.info(`PDF uploaded to Firebase Storage: ${pdfStoragePath}`);
+
         } else if (method === 'url') {
             pdfUrl = source;
             pdfStoragePath = source;
