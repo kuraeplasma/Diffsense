@@ -8,7 +8,7 @@ export const aiService = {
     // API Base URL (Local vs Cloud)
     API_BASE: (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
         ? 'http://localhost:3001'
-        : 'https://us-central1-diffsense-9a718.cloudfunctions.net/api',
+        : 'https://api-qf37m5ba2q-uc.a.run.app',
 
     /**
      * 契約書を解析
