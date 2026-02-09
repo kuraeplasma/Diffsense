@@ -4,14 +4,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>プライバシーポリシー - DiffSense</title>
+    <title>プライバシーポリシー - DIFFsense</title>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Noto+Sans+JP:wght@300;400;500;700&family=Noto+Serif+JP:wght@400;500;700&family=Shippori+Mincho:wght@400;500;700&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css?v=20260207-5">
     <style>
         .legal-header {
             padding-top: 120px;
@@ -79,28 +81,34 @@
     <!-- Header -->
     <header class="header">
         <div class="container header-container">
-            <a href="index.html" class="logo">DiffSense</a>
+            <a href="index.html" class="logo">
+                <i class="fa-solid fa-scale-balanced"></i>DIFFsense
+            </a>
             <button class="menu-toggle" aria-label="メニューを開く">
                 <span></span>
                 <span></span>
                 <span></span>
             </button>
-            <div class="nav">
+            <nav class="nav">
                 <a href="index.html#problem">課題</a>
                 <a href="index.html#features">機能</a>
                 <a href="index.html#pricing">料金</a>
-                <a href="index.html#contact" class="btn btn-primary btn-sm">お問い合わせ</a>
-            </div>
+                <div class="auth-buttons">
+                    <a href="login.html" class="btn btn-login">ログイン</a>
+                    <a href="signup.html" class="btn btn-primary btn-sm">無料ではじめる</a>
+                </div>
+            </nav>
         </div>
     </header>
 
-    <div class="container">
+    <div class="container legal-container">
         <div class="legal-header">
             <h1>プライバシーポリシー</h1>
         </div>
         <div class="legal-content">
             <h2>1. 取得する情報</h2>
-            <p>当社は、本サービスの提供にあたり、以下の情報を取得します。</p>
+            <p>SpaceGleam株式会社（以下「当社」）は、当社が提供する「DIFFsense」（以下「本サービス」）における、ユーザーの個人情報の取扱いについて、以下のとおりプライバシーポリシー（以下「本ポリシー」）を定めます。
+            </p>
             <ul>
                 <li>ユーザー登録情報（メールアドレス等）</li>
                 <li>アップロードされた契約書PDF</li>

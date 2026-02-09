@@ -1,60 +1,36 @@
 import { dbService } from './db-service.js';
+import { aiService } from './ai-service.js';
 
-// --- Static Content (Still used for UI structure/details) ---
-const STATIC_CONTENT = {
-    diffDetails: {
-        1: {
-            title: "クラウドサービス利用規約 (SaaS) - 2026.01.29版",
-            summary: "サービス提供事業者が「損害賠償の上限」を「利用料の3ヶ月分」から「1ヶ月分」に縮小する変更を行いました。また、データバックアップの保証条項が削除されています。",
-            riskLevel: 3,
-            riskReason: "損害賠償額の大幅な減額およびデータ保全義務の免責が含まれており、当社にとって著しく不利な変更であるため。",
-            changes: [
-                {
-                    type: "modification",
-                    section: "第15条（損害賠償）",
-                    old: "甲が乙に支払う損害賠償の額は、当該損害が発生した月の利用料金の【3ヶ月分】を上限とする。",
-                    new: "甲が乙に支払う損害賠償の額は、当該損害が発生した月の利用料金の【1ヶ月分】を上限とする。"
-                },
-                {
-                    type: "deletion",
-                    section: "第18条（データの保全）",
-                    old: "当社は、ユーザーのデータを毎日1回バックアップし、障害発生時には直近のバックアップ地点まで復旧するものとします。",
-                    new: "(削除されました)"
-                }
-            ]
-        }
-    }
-};
+// --- Static Content ---
+// --- Static Content ---
+// (Deleted: Backend integration completed)
 
 // --- View Renderers ---
 const Views = {
     // 1. Dashboard Overview
     dashboard: () => {
         const stats = dbService.getStats();
-        const currentFilter = app.dashboardFilter || 'pending';
+        const currentFilter = window.app ? window.app.dashboardFilter : 'pending';
         const filteredItems = dbService.getFilteredContracts(currentFilter);
 
-        // Dynamic Title
         let sectionTitle = "要確認アイテム (優先度順)";
         if (currentFilter === 'pending') sectionTitle = "未処理のアイテム (新着・変更検知)";
         if (currentFilter === 'risk') sectionTitle = "リスク要判定アイテム";
         if (currentFilter === 'total') sectionTitle = "全監視対象（最新順）";
 
         const tableRows = filteredItems.length > 0 ? filteredItems.slice(0, 10).map(c => {
-            // Risk Badge logic
             let riskBadgeClass = 'badge-neutral';
             if (c.risk_level === 'High') riskBadgeClass = 'badge-danger';
             else if (c.risk_level === 'Medium') riskBadgeClass = 'badge-warning';
             else if (c.risk_level === 'Low') riskBadgeClass = 'badge-success';
 
-            // Status Badge logic
             let statusBadge = '';
             if (c.status === '未解析') statusBadge = '<span class="badge badge-info">未解析 (新規)</span>';
             else if (c.status === '未確認') statusBadge = '<span class="badge badge-warning">要確認 (変更)</span>';
             else if (c.status === '確認済') statusBadge = '<span class="badge badge-neutral"><i class="fa-solid fa-check"></i> 確認済</span>';
 
             return `
-                <tr onclick="app.navigate('diff', ${c.id})">
+                <tr onclick="window.app.navigate('diff', ${c.id})">
                     <td><span class="badge ${riskBadgeClass}">${c.risk_level}</span></td>
                     <td class="col-name" title="${c.name}">${c.name}</td>
                     <td>${c.last_updated_at}</td>
@@ -66,15 +42,15 @@ const Views = {
 
         return `
             <div class="stats-grid">
-                <div class="stat-card ${currentFilter === 'pending' ? 'active' : ''}" onclick="app.setDashboardFilter('pending')">
+                <div class="stat-card ${currentFilter === 'pending' ? 'active' : ''}" onclick="window.app.setDashboardFilter('pending')">
                     <div class="stat-label ${currentFilter === 'pending' ? 'text-warning' : ''}"><i class="fa-regular fa-square-check"></i> 未処理</div>
                     <div class="stat-value">${stats.pending}件</div>
                 </div>
-                <div class="stat-card ${currentFilter === 'risk' ? 'active' : ''}" onclick="app.setDashboardFilter('risk')">
+                <div class="stat-card ${currentFilter === 'risk' ? 'active' : ''}" onclick="window.app.setDashboardFilter('risk')">
                     <div class="stat-label ${currentFilter === 'risk' ? 'text-danger' : ''}"><i class="fa-solid fa-triangle-exclamation"></i> リスク要判定</div>
                     <div class="stat-value">${stats.highRisk}件</div>
                 </div>
-                <div class="stat-card ${currentFilter === 'total' ? 'active' : ''}" onclick="app.setDashboardFilter('total')">
+                <div class="stat-card ${currentFilter === 'total' ? 'active' : ''}" onclick="window.app.setDashboardFilter('total')">
                     <div class="stat-label"><i class="fa-solid fa-satellite-dish"></i> 監視中</div>
                     <div class="stat-value text-muted">${stats.total}</div>
                 </div>
@@ -103,10 +79,10 @@ const Views = {
     // 2. Contract List
     contracts: (params) => {
         const page = params?.page || 1;
-        const query = params?.query || "";
         const pageSize = 10;
+        const appFilters = window.app ? window.app.filters : {};
 
-        const { items, totalPages, totalItems } = dbService.getPaginatedContracts(page, pageSize, query);
+        const { items, totalPages, totalItems } = dbService.getPaginatedContracts(page, pageSize, params);
 
         const rows = items.map(c => {
             let riskBadge = '';
@@ -120,7 +96,7 @@ const Views = {
                 : '<span class="badge badge-warning">未確認</span>';
 
             return `
-                <tr onclick="app.navigate('diff', ${c.id})">
+                <tr onclick="window.app.navigate('diff', ${c.id})">
                     <td class="col-name" title="${c.name}">${c.name}</td>
                     <td>${c.type}</td>
                     <td>${c.last_updated_at}</td>
@@ -135,14 +111,48 @@ const Views = {
             <div class="flex justify-between items-center mb-md">
                 <h2 class="page-title" style="margin-bottom:0;">契約・規約管理</h2>
                 <div class="flex gap-sm">
-                   <div style="position:relative;">
+                   <button class="btn-dashboard" onclick="window.app.exportCSV()"><i class="fa-solid fa-download"></i> CSV出力</button>
+                </div>
+            </div>
+
+            <div class="filter-bar mb-md">
+                <div class="flex flex-wrap gap-md items-center">
+                    <div style="position:relative; flex:1; min-width:250px;">
                         <i class="fa-solid fa-magnifying-glass" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:#999;"></i>
                         <input type="text" id="contract-search" placeholder="契約名・種別・担当者で検索..." 
-                               value="${query}"
-                               style="padding:8px 12px 8px 36px; border:1px solid #ddd; border-radius:4px; width:300px; font-size:13px;"
-                               oninput="app.searchContracts(this.value)">
-                   </div>
-                   <button class="btn-dashboard" onclick="app.exportCSV()"><i class="fa-solid fa-download"></i> CSV出力</button>
+                               value="${appFilters.query || ''}"
+                               style="padding:8px 12px 8px 36px; border:1px solid #ddd; border-radius:4px; width:100%; font-size:13px;"
+                               oninput="window.app.updateFilter('query', this.value)">
+                    </div>
+                    
+                    <div class="flex gap-sm items-center">
+                        <span class="text-muted" style="font-size:12px;">リスク:</span>
+                        <select onchange="window.app.updateFilter('risk', this.value)" style="padding:6px 8px; border:1px solid #ddd; border-radius:4px; font-size:13px;">
+                            <option value="all" ${appFilters.risk === 'all' ? 'selected' : ''}>すべて</option>
+                            <option value="High" ${appFilters.risk === 'High' ? 'selected' : ''}>High</option>
+                            <option value="Medium" ${appFilters.risk === 'Medium' ? 'selected' : ''}>Med</option>
+                            <option value="Low" ${appFilters.risk === 'Low' ? 'selected' : ''}>Low</option>
+                        </select>
+                    </div>
+
+                    <div class="flex gap-sm items-center">
+                        <span class="text-muted" style="font-size:12px;">状態:</span>
+                        <select onchange="window.app.updateFilter('status', this.value)" style="padding:6px 8px; border:1px solid #ddd; border-radius:4px; font-size:13px;">
+                            <option value="all" ${appFilters.status === 'all' ? 'selected' : ''}>すべて</option>
+                            <option value="未確認" ${appFilters.status === '未確認' ? 'selected' : ''}>未確認</option>
+                            <option value="確認済" ${appFilters.status === '確認済' ? 'selected' : ''}>確認済</option>
+                        </select>
+                    </div>
+
+                    <div class="flex gap-sm items-center">
+                        <span class="text-muted" style="font-size:12px;">種別:</span>
+                        <select onchange="window.app.updateFilter('type', this.value)" style="padding:6px 8px; border:1px solid #ddd; border-radius:4px; font-size:13px;">
+                            <option value="all" ${appFilters.type === 'all' ? 'selected' : ''}>すべて</option>
+                            <option value="利用規約" ${appFilters.type === '利用規約' ? 'selected' : ''}>利用規約</option>
+                            <option value="秘密保持契約書" ${appFilters.type === '秘密保持契約書' ? 'selected' : ''}>秘密保持契約書</option>
+                            <option value="業務委託契約書" ${appFilters.type === '業務委託契約書' ? 'selected' : ''}>業務委託契約書</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
@@ -165,9 +175,9 @@ const Views = {
             <div class="flex justify-between items-center mt-md">
                 <div class="text-muted" style="font-size:13px;">全 ${totalItems} 件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, totalItems)} 件を表示</div>
                 <div class="flex gap-sm">
-                    <button class="btn-dashboard" ${page <= 1 ? 'disabled' : ''} onclick="app.changePage(${page - 1})">前へ</button>
+                    <button class="btn-dashboard" ${page <= 1 ? 'disabled' : ''} onclick="window.app.changePage(${page - 1})">前へ</button>
                     <div style="display:flex; align-items:center; padding:0 12px; font-size:13px; font-weight:600;">${page} / ${totalPages || 1}</div>
-                    <button class="btn-dashboard" ${page >= totalPages ? 'disabled' : ''} onclick="app.changePage(${page + 1})">次へ</button>
+                    <button class="btn-dashboard" ${page >= totalPages ? 'disabled' : ''} onclick="window.app.changePage(${page + 1})">次へ</button>
                 </div>
             </div>
 `;
@@ -176,22 +186,50 @@ const Views = {
     // 3. Diff Details
     diff: (id) => {
         const contract = dbService.getContractById(id);
-        const diffData = STATIC_CONTENT.diffDetails[id] || {
-            title: `${contract.name} - 詳細分析`,
-            summary: "このドキュメントの最新の変更要約をAIが生成しています...",
-            riskLevel: contract.risk_level === 'High' ? 3 : (contract.risk_level === 'Medium' ? 2 : 1),
-            riskReason: "特定の変更箇所において、リスク要因が検知されました。詳細を確認してください。",
-            changes: [
-                {
-                    type: "modification",
-                    section: "一般条項",
-                    old: "従前の規定がここに表示されます。",
-                    new: "新しい規定がここに表示されます。"
-                }
-            ]
-        };
+        const activeTab = window.app ? window.app.activeDetailTab : 'diff';
 
-        const changesHtml = diffData.changes.map(c => `
+        // AI解析結果があればそれを使用、なければ静的コンテンツまたはデフォルト
+        const hasAIResults = contract.ai_summary || contract.ai_changes;
+
+        let diffData;
+        if (hasAIResults) {
+            // AI解析結果を使用
+            diffData = {
+                title: `${contract.name} - AI解析結果`,
+                summary: contract.ai_summary || 'AI解析が完了しました',
+                riskLevel: contract.risk_level === 'High' ? 3 : (contract.risk_level === 'Medium' ? 2 : 1),
+                riskReason: contract.ai_risk_reason || 'リスク判定が完了しました',
+                changes: contract.ai_changes || []
+            };
+        } else {
+            // デフォルトデータ
+            diffData = {
+                title: `${contract.name} - 詳細分析`,
+                summary: contract.status === '未解析'
+                    ? 'このドキュメントはまだAI解析されていません。新規登録から解析を実行してください。'
+                    : 'このドキュメントの最新の変更要約をAIが生成しています...',
+                riskLevel: contract.risk_level === 'High' ? 3 : (contract.risk_level === 'Medium' ? 2 : 1),
+                riskReason: contract.status === '未解析'
+                    ? 'AI解析が未実行です'
+                    : '特定の変更箇所において、リスク要因が検知されました。詳細を確認してください。',
+                changes: []
+            };
+        }
+
+        // デバッグ情報の表示（ユーザー要件：検証用）
+        const debugInfoHtml = `
+            <div class="debug-info-panel" style="margin-bottom: 20px; padding: 10px; background: #f8f9fa; border: 1px dashed #ccc; font-size: 11px; color: #555;">
+                <strong>🛠 デバッグ情報 (検証用)</strong><br>
+                Contract ID: ${contract.id}<br>
+                Source Type: ${contract.source_type || 'Unknown'}<br>
+                Storage Path: ${contract.pdf_storage_path || 'N/A'}<br>
+                Extracted Length: ${contract.extracted_text_length || 0} chars<br>
+                SHA-256 Hash: ${contract.extracted_text_hash || 'Not Calculated'}<br>
+                Updated At: ${contract.last_updated_at}
+            </div>
+        `;
+
+        const changesHtml = (diffData.changes.length > 0 ? diffData.changes : []).map(c => `
             <div style="margin-bottom: 24px; border:1px solid #eee; border-radius:4px; overflow:hidden;">
                 <div style="background:#f0f0f0; padding:8px 12px; font-weight:600; font-size:12px; border-bottom:1px solid #eee;">
                     ${c.section} <span style="font-weight:normal; color:#666; margin-left:8px;">(${c.type === 'modification' ? '変更' : '削除'})</span>
@@ -200,45 +238,118 @@ const Views = {
                     <div class="diff-pane diff-left"><span class="diff-del">${c.old}</span></div>
                     <div class="diff-pane diff-right"><span class="diff-add">${c.new}</span></div>
                 </div>
+                ${(c.impact || c.concern) ? `
+                <div style="background:#fff8e1; padding:10px 12px; border-top:1px solid #ffeeba; font-size:12px; color:#5c3a00;">
+                    ${c.impact ? `<div style="margin-bottom:4px;"><strong><i class="fa-solid fa-scale-balanced"></i> 法的影響:</strong> ${c.impact}</div>` : ''}
+                    ${c.concern ? `<div><strong><i class="fa-solid fa-triangle-exclamation"></i> 懸念点:</strong> ${c.concern}</div>` : ''}
+                </div>
+                ` : ''}
             </div>
     `).join('');
 
         return `
-            <div style="margin-bottom:16px;">
-                <a onclick="app.navigate('dashboard')" style="color:#666; font-size:12px; cursor:pointer;"><i class="fa-solid fa-arrow-left"></i> ダッシュボードに戻る</a>
-            </div>
-            
-            <div class="flex justify-between items-start mb-md">
-                <div>
-                     <h2 class="page-title" style="margin-bottom:8px;">${diffData.title}</h2>
-                     <div class="flex gap-sm">
-                        <span class="badge ${contract.risk_level === 'High' ? 'badge-danger' : 'badge-warning'}">Risk Level: ★${diffData.riskLevel}</span>
-                        <span class="badge ${contract.status === '確認済' ? 'badge-neutral' : 'badge-warning'}">${contract.status}</span>
-                     </div>
+            <div class="detail-split-container">
+                <!-- Breadcrumb & Top Actions -->
+                <div class="detail-split-header flex justify-between items-center">
+                    <div class="flex items-center gap-md">
+                        <a onclick="window.app.navigate('dashboard')" style="color:#666; font-size:12px; cursor:pointer;" title="戻る">
+                            <i class="fa-solid fa-arrow-left"></i>
+                        </a>
+                        <h2 style="font-size:18px; font-weight:700; color:var(--text-main); margin:0;">${diffData.title}</h2>
+                        <div class="flex gap-sm">
+                            ${(() => {
+                if (contract.status === '未解析') return `<span class="badge badge-neutral" style="color:#aaa;">-</span>`;
+
+                if (contract.risk_level === 'High') return `<span class="badge badge-danger">High</span>`;
+                if (contract.risk_level === 'Medium') return `<span class="badge badge-warning">Med</span>`;
+                if (contract.risk_level === 'Low') return `<span class="badge badge-success">Low</span>`;
+
+                return `<span class="badge badge-success">No</span>`;
+            })()}                   <span class="badge ${contract.status === '確認済' ? 'badge-neutral' : 'badge-warning'}">${contract.status}</span>
+                        </div>
+                        <div style="font-size:12px; color:#666; margin-top:4px;">
+                            ${contract.source_url ? `<i class="fa-solid fa-link"></i> <a href="${contract.source_url}" target="_blank" style="color:#2196F3; text-decoration:underline;">${contract.source_url}</a>` : ''}
+                            ${contract.original_filename && !contract.original_filename.startsWith('http') ? `<i class="fa-solid fa-file-pdf"></i> Original File: ${contract.original_filename}` : ''}
+                        </div>
+                    </div>
+                    <div class="flex gap-sm">
+                        <button class="btn-dashboard" onclick="window.app.showHistoryModal(${id})"><i class="fa-solid fa-clock-rotate-left"></i> 履歴・メモ</button>
+                        <button class="btn-dashboard" style="background:#fff;"><i class="fa-solid fa-share-nodes"></i> 共有</button>
+                        ${contract.status === '未処理'
+                ? ''
+                : contract.status === '未確認'
+                    ? `<button class="btn-dashboard btn-primary-action" onclick="window.app.confirmContract(${id})"><i class="fa-solid fa-check"></i> 確認済みにする</button>`
+                    : `<button class="btn-dashboard" disabled><i class="fa-solid fa-check"></i> 確認済み</button>`}
+                    </div>
                 </div>
-                <div class="flex gap-sm">
-                    <button class="btn-dashboard"><i class="fa-solid fa-share-nodes"></i> 共有</button>
-                    ${contract.status === '未確認'
-                ? `<button class="btn-dashboard btn-primary-action" onclick="app.confirmContract(${id})"><i class="fa-solid fa-check"></i> 確認済みにする</button>`
-                : `<button class="btn-dashboard" disabled><i class="fa-solid fa-check"></i> 確認済み</button>`}
+
+                <div class="detail-split-body">
+                    <!-- Left Pane: Analysis & Diffs -->
+                    <div class="pane">
+                        </div>
+                        <div class="pane-scroll-area" style="max-height: 150px; overflow-y: auto; border-bottom: 1px solid #eee;">
+                            ${contract.history && contract.history.length > 0
+                ? contract.history.slice().reverse().map(h => `
+                                    <div class="history-item" onclick="window.app.viewHistory(${id}, ${h.version})" style="padding:8px 12px; border-bottom:1px solid #eee; cursor:pointer; font-size:12px; display:flex; justify-content:space-between; align-items:center;">
+                                        <span><i class="fa-solid fa-clock-rotate-left" style="color:#ccc; margin-right:6px;"></i> Version ${h.version} <span class="text-muted" style="margin-left:8px;">${h.date}</span></span>
+                                    </div>
+                                `).join('')
+                : '<div class="text-muted p-md text-center">履歴はありません</div>'
+            }
+                        </div>
+                        
+                        <div class="pane-header">
+                            <span><i class="fa-solid fa-magnifying-glass-chart"></i> AI解析・差分判定</span>
+                            <span class="text-muted" style="font-weight:normal; font-size:11px;">最終解析: ${contract.last_analyzed_at || '-'}</span>
+                        </div>
+                        <div class="pane-scroll-area">
+                            <div class="analysis-section-title">
+                                <i class="fa-solid fa-circle-exclamation text-warning"></i> 検知された重要な変更点
+                            </div>
+                            <div style="margin-bottom:32px;">
+                                ${changesHtml}
+                            </div>
+
+                            <div class="analysis-section-title">
+                                <i class="fa-solid fa-robot text-primary"></i> AIリスク要約
+                            </div>
+
+                            <div class="ai-summary" style="margin-bottom:32px;">
+                                <div class="risk-level ${contract.risk_level === 'High' ? 'text-danger' : 'text-warning'}">判定：${contract.risk_level}</div>
+                                <p style="margin-bottom:12px; font-weight:600;">${diffData.riskReason}</p>
+                                <p class="text-muted">${diffData.summary}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Pane: Original Document -->
+                    <div class="pane">
+                        <div class="pane-header" style="display:flex; justify-content:space-between; align-items:center;">
+                            <span><i class="fa-solid fa-file-contract"></i> 比較対象の原本データ</span>
+                            <button class="btn-upload-version" onclick="window.app.uploadNewVersion(${id})">
+                                <i class="fa-solid fa-cloud-arrow-up"></i> 新しいバージョンをアップロード
+                            </button>
+                        </div>
+                        <div class="tabs-row">
+                            <button class="tab-item ${activeTab === 'diff' ? 'active' : ''}" onclick="window.app.setDetailTab('diff')">差分表示</button>
+                            <button class="tab-item ${activeTab === 'original' ? 'active' : ''}" onclick="window.app.setDetailTab('original')">原本全文</button>
+                        </div>
+
+                        <div class="pane-scroll-area document-pane-bg" style="${activeTab === 'original' && contract.pdf_url ? 'padding:0; overflow:hidden;' : ''}">
+                            <div id="diff-notice-area"></div>
+                                ${activeTab === 'original' && contract.pdf_url
+                ? `<iframe src="${contract.pdf_url}${contract.pdf_url.includes('?') ? '&' : '?'}t=${Date.now()}" style="width:100%; height:100%; border:none;"></iframe>`
+                : `<div class="document-paper">
+                                    <div class="document-content">
+                                        ${activeTab === 'diff'
+                    ? '<div id="diff-content-placeholder" class="text-center p-md"><div class="custom-loader"></div><br>差分を表示中...<br><span style="font-size:11px;color:#999;">(端末内で処理しています。AI解析のカウントはされません)</span></div>'
+                    : (contract.original_content || (contract.source_type === 'URL' ? '<div class="text-center text-muted" style="padding:40px;">URLから取り込んだコンテンツです。<br><a href="' + (contract.pdf_storage_path || '#') + '" target="_blank">元のページを開く <i class="fa-solid fa-external-link-alt"></i></a></div>' : '原本データがありません'))}
+                                    </div>
+                                </div>`
+            }
+                        </div>
+                    </div>
                 </div>
-            </div>
-
-            <!-- AI Summary -->
-            <div class="ai-summary">
-                <div class="risk-level ${contract.risk_level === 'High' ? 'text-danger' : 'text-warning'}"><i class="fa-solid fa-robot"></i> AIリスク判定：${contract.risk_level === 'High' ? '要警戒' : '要確認'}</div>
-                <p style="margin-bottom:12px; font-weight:600;">${diffData.riskReason}</p>
-                <p class="text-muted">${diffData.summary}</p>
-            </div>
-
-            <div style="margin-bottom:16px; font-weight:600;">検知された変更箇所</div>
-            ${changesHtml}
-
-            <!-- Memos -->
-            <div style="margin-top:32px; padding-top:24px; border-top:1px solid #eee;">
-                <h3 style="font-size:14px; margin-bottom:12px;">社内メモ</h3>
-                <textarea id="memo-input" style="width:100%; border:1px solid #ddd; padding:8px; border-radius:4px; font-family:inherit;" rows="3" placeholder="確認事項や法務部への相談内容を入力..."></textarea>
-                <button class="btn-dashboard mt-md" onclick="app.addMemo(${id})">メモを追加</button>
             </div>
 `;
     },
@@ -252,7 +363,7 @@ const Views = {
                 <td class="col-name" title="${h.target_name}">${h.target_name}</td>
                 <td><span class="badge badge-success">${h.action}</span></td>
                 <td>${h.actor}</td>
-                <td><button class="btn-dashboard" style="padding:2px 8px; font-size:11px;" onclick="alert('詳細ログ機能は開発中です')">詳細</button></td>
+                <td><button class="btn-dashboard" style="padding:2px 8px; font-size:11px;" onclick="window.app.showToast('ℹ️ 詳細ログ機能は開発中です', 'info')">詳細</button></td>
             </tr>
     `).join('');
 
@@ -283,21 +394,21 @@ const Views = {
                 <td class="col-name" title="${m.name}">${m.name}</td>
                 <td>${m.email}</td>
                 <td>
-                    <select onchange="app.updateUserRole('${m.email}', this.value)" style="border:1px solid #ddd; padding:4px; border-radius:4px;">
+                    <select onchange="window.app.updateUserRole('${m.email}', this.value)" style="border:1px solid #ddd; padding:4px; border-radius:4px;">
                         <option value="管理者" ${m.role === '管理者' ? 'selected' : ''}>管理者</option>
                         <option value="承認者" ${m.role === '承認者' ? 'selected' : ''}>承認者</option>
                         <option value="閲覧のみ" ${m.role === '閲覧のみ' ? 'selected' : ''}>閲覧のみ</option>
                     </select>
                 </td>
                 <td>${m.last_active_at}</td>
-                <td><button class="btn-dashboard" onclick="alert('編集機能は開発中です')">編集</button></td>
+                <td><button class="btn-dashboard" onclick="window.app.showToast('ℹ️ 編集機能は開発中です', 'info')">編集</button></td>
             </tr>
     `).join('');
 
         return `
             <div class="flex justify-between items-center mb-md">
                 <h2 class="page-title" style="margin-bottom:0;">チーム管理</h2>
-                <button class="btn-dashboard btn-primary-action" onclick="app.showInviteModal()"><i class="fa-solid fa-user-plus"></i> メンバー招待</button>
+                <button class="btn-dashboard btn-primary-action" onclick="window.app.showInviteModal()"><i class="fa-solid fa-user-plus"></i> メンバー招待</button>
             </div>
     <div class="table-container">
         <table class="data-table team-table">
@@ -336,12 +447,12 @@ class RegistrationFlow {
         if (openBtn) openBtn.onclick = () => this.open();
         if (closeBtn) closeBtn.onclick = () => this.close();
 
-        // Close on overlay click
-        this.modal.onclick = (e) => {
-            if (e.target === this.modal) this.close();
-        };
+        if (this.modal) {
+            this.modal.onclick = (e) => {
+                if (e.target === this.modal) this.close();
+            };
+        }
 
-        // Handle File Input Change
         if (this.fileInput) {
             this.fileInput.onchange = (e) => this.handleFileSelect(e.target.files[0]);
         }
@@ -350,16 +461,24 @@ class RegistrationFlow {
     open() {
         this.currentStep = 1;
         this.tempData = {};
-        this.modal.classList.add('active');
+
+        // 先にレンダリング
         this.renderStep();
+
+        // 次のフレームで表示（描画のちらつき防止＆滑らかさ向上）
+        requestAnimationFrame(() => {
+            if (this.modal) this.modal.classList.add('active');
+        });
     }
 
     close() {
-        this.modal.classList.remove('active');
-        if (this.fileInput) this.fileInput.value = ''; // Reset file input
+        if (this.modal) this.modal.classList.remove('active');
+        if (this.fileInput) this.fileInput.value = '';
     }
 
     renderStep() {
+        if (!this.modalBody) return;
+
         if (this.currentStep === 1) {
             this.modalTitle.textContent = "新規登録 - 登録方法の選択";
             this.modalBody.innerHTML = `
@@ -369,9 +488,10 @@ class RegistrationFlow {
                     <div class="reg-method-info">
                         <h4>PDFをアップロード</h4>
                         <p>ファイルをここにドロップするか、クリックして選択</p>
+                        <p style="font-size:11px; color:#ff9800; margin-top:4px;">※スキャンした画像PDFやパスワード付きPDFは文字を抽出できない場合があります</p>
                     </div>
                 </div>
-                <div class="reg-method-card" onclick="app.registration.nextStep(2, {method: 'url'})">
+                <div class="reg-method-card" onclick="window.app.registration.nextStep(2, {method: 'url'})">
                     <div class="reg-method-icon"><i class="fa-solid fa-globe"></i></div>
                     <div class="reg-method-info">
                         <h4>URLを登録 (Web規約)</h4>
@@ -409,8 +529,8 @@ class RegistrationFlow {
                         ${isPdf ? 'readonly style="background:#f5f5f5; cursor:not-allowed;"' : ''}>
                 </div>
                 <div class="reg-actions">
-                    <button class="btn-dashboard" onclick="app.registration.nextStep(1)">戻る</button>
-                    <button class="btn-dashboard btn-primary-action" onclick="app.registration.submit()">登録する</button>
+                    <button class="btn-dashboard" onclick="window.app.registration.nextStep(1)">戻る</button>
+                    <button class="btn-dashboard btn-primary-action" onclick="window.app.registration.submit()">登録する</button>
                 </div>
             `;
         } else if (this.currentStep === 3) {
@@ -422,7 +542,7 @@ class RegistrationFlow {
                     <p>「${this.tempData.name}」を監視対象として登録しました。ダッシュボードから確認できます。</p>
                 </div>
                 <div class="reg-actions">
-                    <button class="btn-dashboard btn-primary-action" onclick="app.registration.close()">ダッシュボードへ</button>
+                    <button class="btn-dashboard btn-primary-action" onclick="window.app.registration.close()">ダッシュボードへ</button>
                 </div>
             `;
         }
@@ -432,10 +552,8 @@ class RegistrationFlow {
         const cardPdf = document.getElementById('reg-card-pdf');
         if (!cardPdf) return;
 
-        // Click to select
         cardPdf.onclick = () => this.fileInput.click();
 
-        // Drag & Drop
         cardPdf.ondragover = (e) => {
             e.preventDefault();
             cardPdf.classList.add('drop-active');
@@ -462,7 +580,8 @@ class RegistrationFlow {
         this.nextStep(2, {
             method: 'pdf',
             fileName: file.name,
-            fileSize: file.size
+            fileSize: file.size,
+            fileData: file  // ファイルオブジェクトを保持
         });
     }
 
@@ -472,12 +591,14 @@ class RegistrationFlow {
         this.renderStep();
     }
 
-    submit() {
+    async submit() {
         const nameInput = document.getElementById('reg-name');
         const typeInput = document.getElementById('reg-type');
+        const sourceInput = document.getElementById('reg-source');
 
         const name = nameInput ? nameInput.value : "";
         const type = typeInput ? typeInput.value : "";
+        const source = sourceInput ? sourceInput.value : "";
 
         if (!name) {
             alert('管理名を入力してください');
@@ -486,24 +607,158 @@ class RegistrationFlow {
 
         this.tempData.name = name;
         this.tempData.type = type;
+        this.tempData.source = source;
 
-        // Add to DB
-        dbService.addContract({
-            name: this.tempData.name,
-            type: this.tempData.type
-        });
+        // ローディング表示（抽出中）
+        const isPdf = this.tempData.method === 'pdf';
+        const loadingText = isPdf ? 'PDFを取り込み中...' : 'URLから規約を解析中...';
+        const loadingSubText = isPdf ? '解析準備をしています' : 'Webサイトから詳細を取得しています';
 
-        // Show success
-        this.nextStep(3);
+        const loadingMsg = document.createElement('div');
+        loadingMsg.id = 'reg-loading';
+        loadingMsg.style.cssText = 'position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:white; padding:30px; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,0.3); z-index:10005; text-align:center; min-width:300px;';
+        loadingMsg.innerHTML = `<div class="custom-loader"></div><br><strong>${loadingText}</strong><br><span style="font-size:12px; color:#666;">${loadingSubText}</span>`;
+        document.body.appendChild(loadingMsg);
 
-        // Refresh dashboard background
-        if (this.app.currentView === 'dashboard' || this.app.currentView === 'contracts') {
-            this.app.navigate(this.app.currentView);
+        // 背景を暗くするオーバーレイ
+        const overlay = document.createElement('div');
+        overlay.id = 'reg-overlay';
+        overlay.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10004;';
+        document.body.appendChild(overlay);
+
+        // UI描画を確実にするための短い遅延
+        await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 50)));
+
+        try {
+            // DBに登録
+            const newContract = dbService.addContract({
+                name: this.tempData.name || (this.tempData.method === 'pdf' ? this.tempData.fileData.name : 'Web規約'),
+                type: this.tempData.type, // デフォルト
+                sourceUrl: this.tempData.method === 'url' ? this.tempData.source : '',
+                originalFilename: this.tempData.method === 'pdf' ? this.tempData.fileData.name : ''
+            });
+            // 2. テキスト抽出を実行（失敗しても登録は維持する）
+            try {
+                await this.extractTextOnly(newContract.id);
+            } catch (extractError) {
+                console.error('Text Extraction Failed (Non-fatal):', extractError);
+                // 失敗時はステータスを更新しておく（ユーザーには後で通知）
+                // NOTE: dbService側で自動的に '未処理' になっているはずだが、エラー情報を残すならここで更新
+            }
+
+            // 3. 完了処理
+            if (document.getElementById('reg-loading')) document.getElementById('reg-loading').remove();
+            if (document.getElementById('reg-overlay')) document.getElementById('reg-overlay').remove();
+
+            this.close();
+
+            // 4. 詳細ページへ遷移（差分結果をすぐに見せる）
+            this.app.activeDetailTab = 'diff';
+            this.app.navigate('diff', newContract.id);
+            this.app.showToast('✅ 読み込み完了<br><small>※AI解析用テキストは「差分表示」で確認できます</small>', 'success', 5000);
+
+        } catch (error) {
+            console.error('Registration Error:', error);
+            if (document.getElementById('reg-loading')) document.getElementById('reg-loading').remove();
+            if (document.getElementById('reg-overlay')) document.getElementById('reg-overlay').remove();
+            this.app.showToast(`❌ 登録中にエラーが発生しました: ${error.message}`, 'error', 6000);
+        }
+    }
+
+    async extractTextOnly(contractId) {
+        try {
+            let sourceData = this.tempData.source;
+
+            // PDFの場合はFileReaderでBase64に変換
+            if (this.tempData.method === 'pdf' && this.tempData.fileData) {
+                sourceData = await aiService.convertFileToBase64(this.tempData.fileData);
+            }
+
+            // バックエンドAPIにテキスト抽出リクエスト
+            const result = await aiService.analyzeContract(
+                contractId,
+                this.tempData.method,
+                sourceData,
+                null  // previousVersion なし
+            );
+
+            if (result.success) {
+                // 抽出されたテキストのみを保存（AI解析結果は保存しない）
+                dbService.updateContractText(contractId, {
+                    extractedText: result.data.extractedText,
+                    extractedTextHash: result.data.extractedTextHash,
+                    extractedTextLength: result.data.extractedTextLength,
+                    sourceType: result.data.sourceType,
+                    pdfStoragePath: result.data.pdfStoragePath,
+                    pdfUrl: result.data.pdfUrl,
+                    status: '未処理'  // 差分がまだないので未処理
+                });
+
+                console.log('Text extraction completed');
+                return true;
+            } else {
+                throw new Error(result.error || 'テキスト抽出に失敗しました');
+            }
+
+        } catch (error) {
+            console.error('テキスト抽出エラー:', error);
+
+            // 登録失敗にするのではなく、未解析ステータス（デフォルト）のままにする、
+            // または解析失敗のフラグを立てる（現在は警告表示で対応）
+            console.warn(`テキスト抽出に失敗（非致命的）: ${error.message}`);
+        }
+    }
+
+    async startAIAnalysis(contractId) {
+        try {
+            console.log(`Starting AI analysis for contract ${contractId}`);
+
+            let sourceData = this.tempData.source;
+
+            // PDFの場合はFileReaderでBase64に変換
+            if (this.tempData.method === 'pdf' && this.tempData.fileData) {
+                sourceData = await aiService.convertFileToBase64(this.tempData.fileData);
+            }
+
+            // バックエンドAPIに解析リクエスト
+            const result = await aiService.analyzeContract(
+                contractId,
+                this.tempData.method,
+                sourceData,
+                null  // previousVersion は将来の機能
+            );
+
+            if (result.success) {
+                // 解析結果をDBに保存
+                dbService.updateContractAnalysis(contractId, {
+                    extractedText: result.data.extractedText,
+                    changes: result.data.changes,
+                    riskLevel: result.data.riskLevel,
+                    riskReason: result.data.riskReason,
+                    summary: result.data.summary,
+                    status: '未確認'  // 解析完了、確認待ち
+                });
+
+                // UIを更新
+                if (this.app.currentView === 'dashboard' || this.app.currentView === 'contracts') {
+                    this.app.navigate(this.app.currentView);
+                }
+
+            } else {
+                this.app.showToast(`✅ ${result.data.riskReason || '読み込み完了'}<br><small>※AIによる詳細解析が一部制限されている可能性があります</small>`, 'warning', 6000);
+            }
+
+        } catch (error) {
+            console.error('AI解析エラー:', error);
+
+            // エラーステータスに更新
+            dbService.updateContractStatus(contractId, '解析失敗');
+
+            // ユーザーにエラーを通知
+            this.app.showToast(`❌ AI解析中にエラーが発生しました: ${error.message}`, 'error', 6000);
         }
     }
 }
-
-
 
 // --- App Logic ---
 class DashboardApp {
@@ -511,26 +766,50 @@ class DashboardApp {
         this.currentView = 'dashboard';
         this.mainContent = document.getElementById('app-content');
         this.pageTitle = document.getElementById('page-header-title');
+        this.currentViewParams = null;
 
         // Navigation State
         this.searchQuery = "";
         this.currentPage = 1;
-        this.dashboardFilter = "pending"; // Default filter
+        this.dashboardFilter = "pending";
+        this.activeDetailTab = 'diff';
+        this.filters = {
+            query: "",
+            risk: "all",
+            status: "all",
+            type: "all",
+            sortBy: "date_desc"
+        };
+        this.searchTimeout = null;
 
         // Registration Flow
         this.registration = new RegistrationFlow(this);
+
+        // Caching
+        this.diffCache = new Map();
+        // Clear cache once to ensure new format is applied
+        this.diffCache.clear();
     }
 
-    init() {
-        console.log('Dashboard App Initialized (Live Mode)');
-        dbService.init();
-        this.bindEvents();
-        this.registration.init(); // Initialize registration flow
-        this.navigate('dashboard');
+    async init() {
+        try {
+            console.log('Dashboard App Initializing...');
+            if (window.dbService) {
+                await window.dbService.init();
+            } else {
+                console.error('dbService is not defined');
+            }
+            this.bindEvents();
+            this.registration.init();
+            this.navigate('dashboard');
+            console.log('Dashboard App Initialized Successfully');
+        } catch (error) {
+            console.error('Initialization Error:', error);
+            alert('ダッシュボードの初期化中にエラーが発生しました。詳細はコンソールを確認してください。');
+        }
     }
 
     bindEvents() {
-        // Mobile Toggle
         const toggle = document.getElementById('sidebar-toggle');
         const sidebar = document.getElementById('app-sidebar');
         const main = document.getElementById('app-main');
@@ -550,26 +829,35 @@ class DashboardApp {
             }
         }
     }
+
     navigate(viewId, params = null) {
+        console.log(`Navigating to ${viewId}`, params);
         this.currentView = viewId;
 
-        // Reset search/page if moving away from contracts list
+        // Toggle Fluid Layout Mode for Detail View
+        if (viewId === 'diff') {
+            this.mainContent.classList.add('is-detail-view');
+        } else {
+            this.mainContent.classList.remove('is-detail-view');
+        }
+
         if (viewId !== 'contracts') {
             this.searchQuery = "";
             this.currentPage = 1;
         }
 
-        // Handle specific params for contracts view
         let renderParams = params;
         if (viewId === 'contracts') {
             renderParams = {
                 page: this.currentPage,
-                query: this.searchQuery,
+                ...this.filters,
                 ...params
             };
         }
+        if (viewId === 'diff') {
+            this.currentViewParams = params;
+        }
 
-        // Update Sidebar Active State
         const navMap = {
             'dashboard': 0, 'contracts': 1, 'history': 2, 'team': 3
         };
@@ -581,39 +869,127 @@ class DashboardApp {
             if (navItems[navIndex]) navItems[navIndex].classList.add('active');
         }
 
-        // Render View
         if (Views[viewId]) {
-            this.mainContent.innerHTML = Views[viewId](renderParams);
+            try {
+                this.mainContent.innerHTML = Views[viewId](renderParams);
 
-            // Update Header Breadcrumb
-            let title = 'ダッシュボード';
-            if (viewId === 'contracts') title = '契約管理';
-            if (viewId === 'diff') title = '差分詳細';
-            if (viewId === 'history') title = '解析履歴';
-            if (viewId === 'team') title = 'チーム設定';
-            this.pageTitle.textContent = title;
-
-            // Scroll to top
-            window.scrollTo(0, 0);
-
-            // Maintain focus for search
-            if (viewId === 'contracts' && this.searchQuery) {
-                const searchInput = document.getElementById('contract-search');
-                if (searchInput) {
-                    searchInput.focus();
-                    searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
+                // Async rendering for heavy views
+                if (viewId === 'diff') {
+                    // Slight delay to allow UI to paint the loading state
+                    setTimeout(() => {
+                        this.renderDiffAsync(renderParams);
+                    }, 50);
                 }
+
+                let title = 'ダッシュボード';
+                if (viewId === 'contracts') title = '契約管理';
+                if (viewId === 'diff') title = '差分詳細';
+                if (viewId === 'history') title = '解析履歴';
+                if (viewId === 'team') title = 'チーム設定';
+                this.pageTitle.textContent = title;
+
+                window.scrollTo(0, 0);
+
+                if (viewId === 'contracts' && this.filters.query) {
+                    const searchInput = document.getElementById('contract-search');
+                    if (searchInput) {
+                        searchInput.focus();
+                        searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
+                    }
+                }
+            } catch (error) {
+                console.error(`View Render Error (${viewId}):`, error);
+                this.mainContent.innerHTML = '<div class="p-md text-danger">画面の表示中にエラーが発生しました。</div>';
             }
+        }
+    }
+
+    async renderDiffAsync(contractId) {
+        const contract = dbService.getContractById(contractId);
+        if (!contract) return;
+
+        const placeholder = document.getElementById('diff-content-placeholder');
+        if (!placeholder) return;
+
+        const noticeArea = document.getElementById('diff-notice-area');
+        if (noticeArea) noticeArea.innerHTML = '';
+
+        // Check cache first (Key: ID + LastUpdated)
+        const cacheKey = `${contractId}_${contract.last_updated_at}`;
+        if (this.diffCache.has(cacheKey)) {
+            const cached = this.diffCache.get(cacheKey);
+            if (typeof cached === 'string') {
+                placeholder.innerHTML = cached;
+            } else {
+                if (noticeArea) noticeArea.innerHTML = cached.notice || '';
+                placeholder.innerHTML = cached.content || '';
+            }
+            return;
+        }
+
+        // Give UI a moment to breathe before heavy calculation
+        await new Promise(r => setTimeout(r, 10));
+
+        try {
+            // Check if Diff handling is needed
+            if (!contract.history || contract.history.length === 0) {
+                const stickyNoteHtml = `
+                    <div class="sticky-note">
+                        <i class="fa-solid fa-note-sticky"></i>
+                        比較対象となる旧バージョンがありません（初回登録のため最新版を表示）
+                    </div>
+                `;
+                const contentHtml = contract.original_content || '';
+
+                if (noticeArea) {
+                    noticeArea.innerHTML = stickyNoteHtml;
+                    placeholder.innerHTML = contentHtml;
+                } else {
+                    placeholder.innerHTML = stickyNoteHtml + contentHtml;
+                }
+
+                this.diffCache.set(cacheKey, { notice: stickyNoteHtml, content: contentHtml });
+                return;
+            }
+
+            const previousVersion = contract.history[contract.history.length - 1].content;
+            const currentVersion = contract.original_content || '';
+
+            if (typeof Diff === 'undefined') {
+                placeholder.innerHTML = '<div class="text-danger">エラー: Diffライブラリが読み込まれていません</div>';
+                return;
+            }
+
+            // Heavy calculation specific to large text
+            const diff = Diff.diffChars(previousVersion, currentVersion);
+
+            const diffHtml = diff.map(part => {
+                const colorClass = part.added ? 'diff-inline-add' :
+                    part.removed ? 'diff-inline-del' : '';
+
+                const escapedValue = part.value
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;");
+
+                return colorClass ? `<span class="${colorClass}">${escapedValue}</span>` : escapedValue;
+            }).join('');
+
+            const resultHtml = `<div style="white-space: pre-wrap;">${diffHtml}</div>`;
+            this.diffCache.set(cacheKey, { notice: '', content: resultHtml });
+            if (noticeArea) noticeArea.innerHTML = '';
+            placeholder.innerHTML = resultHtml;
+
+        } catch (e) {
+            console.error('Diff Calculation Error:', e);
+            placeholder.innerHTML = `<div class="text-danger">差分の計算中にエラーが発生しました: ${e.message}</div>`;
         }
     }
 
     setDashboardFilter(filter) {
         this.dashboardFilter = filter;
-
-        // Get fresh data
         const filteredItems = dbService.getFilteredContracts(filter);
 
-        // 1. Update Section Title
         const titleEl = document.getElementById('dashboard-section-title');
         if (titleEl) {
             let sectionTitle = "要確認アイテム (優先度順)";
@@ -623,7 +999,6 @@ class DashboardApp {
             titleEl.textContent = sectionTitle;
         }
 
-        // 2. Update Table Content
         const tableBody = document.getElementById('dashboard-table-body');
         if (tableBody) {
             const rows = filteredItems.length > 0 ? filteredItems.slice(0, 10).map(c => {
@@ -638,7 +1013,7 @@ class DashboardApp {
                 else if (c.status === '確認済') statusBadge = '<span class="badge badge-neutral"><i class="fa-solid fa-check"></i> 確認済</span>';
 
                 return `
-                    <tr onclick="app.navigate('diff', ${c.id})">
+                    <tr onclick="window.app.navigate('diff', ${c.id})">
                         <td><span class="badge ${riskBadgeClass}">${c.risk_level}</span></td>
                         <td class="col-name" title="${c.name}">${c.name}</td>
                         <td>${c.last_updated_at}</td>
@@ -650,7 +1025,6 @@ class DashboardApp {
             tableBody.innerHTML = rows;
         }
 
-        // 3. Update Stat Card Active States
         document.querySelectorAll('.stat-card').forEach(card => {
             card.classList.remove('active');
             const isActive = (filter === 'pending' && card.textContent.includes('未処理')) ||
@@ -660,34 +1034,371 @@ class DashboardApp {
         });
     }
 
-
     // --- Action Handlers ---
 
+    updateFilter(key, value) {
+        this.filters[key] = value;
+        this.currentPage = 1;
+
+        if (key === 'query') {
+            clearTimeout(this.searchTimeout);
+            this.searchTimeout = setTimeout(() => this.navigate('contracts'), 300);
+        } else {
+            this.navigate('contracts');
+        }
+    }
+
+    setDetailTab(tab) {
+        this.activeDetailTab = tab;
+        this.navigate('diff', this.currentViewParams);
+    }
+
     searchContracts(query) {
-        this.searchQuery = query;
-        this.currentPage = 1; // Reset to page 1 on search
-        this.navigate('contracts', { query, page: 1 });
+        this.updateFilter('query', query);
     }
 
     changePage(newPage) {
         this.currentPage = newPage;
-        this.navigate('contracts', { query: this.searchQuery, page: newPage });
+        this.navigate('contracts', { page: newPage });
     }
 
     confirmContract(id) {
         if (dbService.updateContractStatus(id, '確認済')) {
-            alert('確認済みに更新しました');
-            this.navigate('dashboard'); // Go back to refresh stats
+            // alert('確認済みに更新しました'); // Removed alert as per instruction
+            this.navigate('diff', id); // Changed navigation as per instruction
+        }
+    }
+
+    async analyzeContract(id) {
+        const contract = dbService.getContractById(id);
+        if (!contract) {
+            this.showToast('❌ 契約が見つかりません', 'error');
+            return;
+        }
+
+        if (!contract.original_content) {
+            this.showToast('❌ 元のテキストが見つかりません。再度登録してください。', 'error');
+            return;
+        }
+
+        // 確認ダイアログ
+        if (!confirm(`「${contract.name}」の差分解析を実行しますか？\n\nAI解析により、リスク判定と変更箇所の抽出を行います。`)) {
+            return;
+        }
+
+        let loadingMsg = null;
+        try {
+            // ローディング表示
+            loadingMsg = document.createElement('div');
+            loadingMsg.style.cssText = 'position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:white; padding:30px; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,0.3); z-index:10000; text-align:center;';
+            loadingMsg.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="font-size:32px; color:#4CAF50;"></i><br><br><strong>AI解析中...</strong><br><span style="font-size:12px; color:#666;">数秒お待ちください</span>';
+            document.body.appendChild(loadingMsg);
+
+            // AI解析を実行（previousVersionとして元のテキストを使用）
+            const result = await aiService.analyzeContract(
+                id,
+                'text',  // テキストとして送信
+                contract.original_content,
+                null  // 将来的には旧バージョンとの比較に使用
+            );
+
+            // ローディング削除
+            document.body.removeChild(loadingMsg);
+
+            if (result.success) {
+                // 解析結果をDBに保存
+                dbService.updateContractAnalysis(id, {
+                    extractedText: contract.original_content,  // 既存のテキストを保持
+                    changes: result.data.changes,
+                    riskLevel: result.data.riskLevel,
+                    riskReason: result.data.riskReason,
+                    summary: result.data.summary,
+                    status: '未確認'  // 解析完了、確認待ち
+                });
+
+                // 画面を再読み込み
+                this.navigate('diff', id);
+
+                this.showToast('✅ AI解析が完了しました', 'success', 5000);
+            } else {
+                throw new Error(result.error || '解析に失敗しました');
+            }
+
+        } catch (error) {
+            console.error('AI解析エラー:', error);
+            if (document.body.contains(loadingMsg)) {
+                document.body.removeChild(loadingMsg);
+            }
+            this.showToast(`❌ AI解析に失敗しました: ${error.message}`, 'error', 5000);
+        }
+    }
+
+    uploadNewVersion(id) {
+        const contract = dbService.getContractById(id);
+        if (!contract) {
+            this.showToast('❌ 契約が見つかりません', 'error');
+            return;
+        }
+
+        // URLベースの契約の場合
+        if (contract.source_url || contract.source_type === 'URL' || contract.type === 'Web規約') {
+            const url = contract.source_url || contract.source_type; // source_type might store URL in some legacy data
+            // URLが有効かチェック（簡易）
+            const currentUrl = (url && url.startsWith('http')) ? url : '';
+
+            // カスタムモーダルを表示
+            const modal = document.getElementById('url-input-modal');
+            const input = document.getElementById('url-input-value');
+            const confirmBtn = document.getElementById('url-input-confirm-btn');
+
+            input.value = currentUrl;
+            modal.classList.add('active'); // activeクラスで表示 (CSS要確認)
+
+            // ワンタイムイベントハンドラを設定
+            const handleConfirm = () => {
+                const newUrl = input.value.trim();
+                if (!newUrl) return; // 空なら何もしない（あるいはエラー）
+
+                if (!newUrl.startsWith('http')) {
+                    this.showToast('❌ 有効なURLを入力してください (http/https)', 'error');
+                    return;
+                }
+
+                modal.classList.remove('active');
+                this.performUrlAnalysis(id, newUrl, contract);
+
+                // クリーンアップ
+                confirmBtn.removeEventListener('click', handleConfirm);
+            };
+
+            confirmBtn.onclick = handleConfirm; // シンプルに上書き (同じボタンを使い回すため)
+
+            return;
+        }
+
+        // PDFファイル選択ダイアログを表示
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'application/pdf';
+
+        // input.click() をトリガーする前にイベントハンドラを設定
+        input.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            if (file.type !== 'application/pdf') {
+                this.showToast('❌ PDFファイルを選択してください', 'error');
+                return;
+            }
+
+            this.performPdfAnalysis(id, file, contract);
+        };
+
+        // ファイル選択ダイアログを表示
+        input.click();
+    }
+
+    async performUrlAnalysis(id, url, contract) {
+        try {
+            this.showLoading('URLから最新の規約を取得中...');
+
+            const previousVersion = contract.original_content;
+
+            // AI解析を実行（URLモード）
+            const result = await aiService.analyzeContract(
+                id,
+                'url',
+                url,
+                previousVersion
+            );
+
+            this.hideLoading();
+
+            if (result.success) {
+                this.saveAnalysisResult(id, result, contract.name); // ファイル名は既存または自動
+                this.navigate('diff', id); // 画面を再読み込みして差分を表示
+                this.showToast('✅ 最新版の取得と解析が完了しました', 'success', 5000);
+            } else {
+                throw new Error(result.error || '解析に失敗しました');
+            }
+
+        } catch (error) {
+            console.error('URL解析エラー:', error);
+            this.hideLoading();
+            this.showToast(`❌ 更新中にエラーが発生しました: ${error.message}`, 'error', 5000);
+        }
+    }
+
+    async performPdfAnalysis(id, file, contract, retryCount = 0) {
+        try {
+            this.showLoading(`PDFドキュメントを解析中...${retryCount > 0 ? '(再試行中)' : ''}`, 'テキストデータとレイアウトを抽出しています');
+
+            // PDFをBase64に変換
+            const base64Data = await aiService.convertFileToBase64(file);
+
+            // 旧バージョンのテキストを取得
+            const previousVersion = contract.original_content;
+
+            // AI解析を実行（差分検出）
+            const result = await aiService.analyzeContract(
+                id,
+                'pdf',
+                base64Data,
+                previousVersion
+            );
+
+            this.hideLoading();
+
+            if (result.success) {
+                this.saveAnalysisResult(id, result, file.name);
+                this.navigate('diff', id); // 画面を再読み込みして差分を表示
+
+                // 部分的な失敗（AI解析のみ失敗）のチェック
+                if (result.data.riskReason && result.data.riskReason.includes("AI解析サーバーからの応答がありませんでした")) {
+                    this.showToast('⚠️ 解析は不完全ですが、ドキュメントを保存しました', 'warning', 6000);
+                } else {
+                    this.showToast('✅ 差分解析が完了しました', 'success', 5000);
+                }
+
+            } else {
+                throw new Error(result.error || '解析に失敗しました');
+            }
+
+        } catch (error) {
+            console.error('AI解析エラー:', error);
+            this.hideLoading();
+            this.showToast(`❌ 解析中にエラーが発生しました: ${error.message}`, 'error', 6000);
+        }
+    }
+
+    // 共通化: ローディング表示
+    showLoading(title, subtitle = '') {
+        const loadingMsg = document.createElement('div');
+        loadingMsg.id = 'analysis-loading';
+        loadingMsg.style.cssText = 'position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:white; padding:30px; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,0.3); z-index:10000; text-align:center; min-width:300px;';
+        loadingMsg.innerHTML = `<div class="custom-loader"></div><br><strong>${title}</strong><br><span style="font-size:12px; color:#666;">${subtitle}</span>`;
+        document.body.appendChild(loadingMsg);
+
+        let overlay = document.getElementById('analysis-overlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'analysis-overlay';
+            overlay.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999;';
+            document.body.appendChild(overlay);
+        }
+    }
+
+    // 共通化: ローディング非表示
+    hideLoading() {
+        if (document.getElementById('analysis-loading')) document.getElementById('analysis-loading').remove();
+        if (document.getElementById('analysis-overlay')) document.getElementById('analysis-overlay').remove();
+    }
+
+    // 共通化: 結果保存
+    saveAnalysisResult(id, result, originalFilename = null) {
+        dbService.updateContractAnalysis(id, {
+            extractedText: result.data.extractedText,
+            extractedTextHash: result.data.extractedTextHash,
+            extractedTextLength: result.data.extractedTextLength,
+            sourceType: result.data.sourceType,
+            pdfStoragePath: result.data.pdfStoragePath,
+            pdfUrl: result.data.pdfUrl,
+            changes: result.data.changes,
+            riskLevel: result.data.riskLevel,
+            riskReason: result.data.riskReason,
+            summary: result.data.summary,
+            status: '未確認',
+            originalFilename: originalFilename
+        });
+
+        // 画面を再読み込み
+        this.navigate('diff', id);
+    }
+
+    showSuccessModal(title, message) {
+        // 既存のモダルがあれば削除
+        const existing = document.getElementById('success-modal');
+        if (existing) existing.remove();
+
+        const modal = document.createElement('div');
+        modal.id = 'success-modal';
+        modal.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:11000; animation: fadeIn 0.3s;';
+
+        modal.innerHTML = `
+            <div style="background:white; width:90%; max-width:450px; border-radius:12px; padding:32px; text-align:center; box-shadow:0 10px 40px rgba(0,0,0,0.2); animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);">
+                <div style="width:60px; height:60px; background:#e6ffed; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 20px; color:#28a745; font-size:30px;">
+                    <i class="fa-solid fa-check"></i>
+                </div>
+                <h3 style="margin:0 0 12px; color:#24292E; font-size:20px; font-weight:700;">${title}</h3>
+                <p style="margin:0 0 24px; color:#586069; font-size:14px; line-height:1.6;">${message}</p>
+                <button class="btn-dashboard btn-primary-action" style="padding:10px 32px; font-size:14px;" onclick="document.getElementById('success-modal').remove()">OK</button>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        // アニメーション用スタイル定義（なければ追加）
+        if (!document.getElementById('modal-styles')) {
+            const style = document.createElement('style');
+            style.id = 'modal-styles';
+            style.innerText = `
+                @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+                @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+            `;
+            document.head.appendChild(style);
         }
     }
 
     addMemo(id) {
-        const input = document.getElementById('memo-input');
+        const input = document.getElementById('modal-memo-input');
         if (input && input.value.trim()) {
-            dbService.addActivityLog(`メモ追加: ${input.value.substring(0, 20)}...`, dbService.getContractById(id).name);
-            alert('メモを保存しました');
-            input.value = '';
+            const contract = dbService.getContractById(id);
+            dbService.addActivityLog(`Memo: ${input.value}`, contract.name);
+
+            // モダル内のリストを更新
+            this.showHistoryModal(id);
         }
+    }
+
+    showHistoryModal(id) {
+        const contract = dbService.getContractById(id);
+        const logs = dbService.getActivityLogs().filter(l => l.target_name === contract.name); // 名前でフィルタリング
+
+        // 既存のモダルがあれば削除
+        const existing = document.getElementById('history-modal');
+        if (existing) existing.remove();
+
+        const modal = document.createElement('div');
+        modal.id = 'history-modal';
+        modal.className = 'modal-overlay active';
+
+        const logsHtml = logs.length > 0 ? logs.map(l => `
+            <div style="padding:12px; border-bottom:1px solid #eee;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                    <span style="font-weight:600; font-size:12px; color:#333;">${l.actor}</span>
+                    <span style="font-size:11px; color:#999;">${l.created_at}</span>
+                </div>
+                <div style="font-size:13px; color:#555;">${l.action}</div>
+            </div>
+        `).join('') : '<div style="padding:20px; text-align:center; color:#999;">履歴はありません</div>';
+
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width:600px;">
+                <div class="modal-header">
+                    <h3>監査履歴・社内メモ</h3>
+                    <button class="btn-close" onclick="document.getElementById('history-modal').remove()">&times;</button>
+                </div>
+                <div class="modal-body" style="padding:0;">
+                    <div style="max-height:300px; overflow-y:auto; background:#f9f9f9;">
+                        ${logsHtml}
+                    </div>
+                    <div style="padding:16px; border-top:1px solid #ddd; background:#fff;">
+                        <textarea id="modal-memo-input" style="width:100%; border:1px solid #ddd; padding:10px; border-radius:4px; font-family:inherit; min-height:80px; resize:vertical; margin-bottom:10px;" placeholder="メモを入力..."></textarea>
+                        <button class="btn-dashboard btn-primary-action" style="width:100%;" onclick="window.app.addMemo(${id})">メモを記録</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
     }
 
     updateUserRole(email, newRole) {
@@ -705,6 +1416,90 @@ class DashboardApp {
         }
     }
 
+
+    viewHistory(contractId, version) {
+        const contract = dbService.getContractById(contractId);
+        if (!contract || !contract.history) return;
+
+        const historyItem = contract.history.find(h => h.version === version);
+        if (!historyItem) return;
+
+        // 【修正】モーダルは使用せず、右側のペインに直接表示する（インライン表示）
+        // 既存のモーダルがあれば削除（念のため）
+        document.querySelectorAll('.modal').forEach(m => m.remove());
+
+        // 右側のペインを取得 (Diffビューの構成に依存: .pane の2つ目)
+        const panes = document.querySelectorAll('.pane');
+        if (panes.length < 2) {
+            // もしDiffビューでない場合、一旦移動してからリトライ
+            this.navigate('diff', contractId);
+            setTimeout(() => this.viewHistory(contractId, version), 300);
+            return;
+        }
+
+        const rightPane = panes[1];
+
+        // ヘッダーを一時的に書き換え（ハイライト）
+        const header = rightPane.querySelector('.pane-header');
+        if (header) {
+            header.style.background = '#fff8e1';
+            header.style.borderBottom = '1px solid #ffe0b2';
+            header.innerHTML = `
+                <div style="display:flex; justify-content:center; align-items:center; width:100%; position:relative;">
+                    <span style="position:absolute; left:0; font-weight:bold; color:#d4a017; display:flex; align-items:center; font-size:12px;">
+                        <i class="fa-solid fa-clock-rotate-left" style="margin-right:6px;"></i> Version ${version} 
+                    </span>
+                    <button class="btn-dashboard" onclick="window.app.navigate('diff', ${contractId})" style="background:#fff; border:1px solid #c5a059; font-weight:600; font-size:13px; padding:6px 20px; color:#c5a059; border-radius:20px; transition:all 0.2s;">
+                        <i class="fa-solid fa-rotate-left"></i> 最新版(原本)に戻す
+                    </button>
+                </div>
+            `;
+        }
+
+        // タブとサブ情報を非表示にする
+        const tabsRow = rightPane.querySelector('.tabs-row');
+        if (tabsRow) tabsRow.style.display = 'none';
+
+        // サブ情報（ファイル名など）を非表示にする
+        if (tabsRow && tabsRow.nextElementSibling && !tabsRow.nextElementSibling.classList.contains('pane-scroll-area')) {
+            tabsRow.nextElementSibling.style.display = 'none';
+        }
+
+        // コンテンツエリアの取得と再構築（iframeが表示されている場合を考慮）
+        let scrollArea = rightPane.querySelector('.pane-scroll-area');
+        if (scrollArea) {
+            scrollArea.scrollTop = 0;
+            scrollArea.style.background = '#fafffd';
+            scrollArea.style.padding = '24px'; // Reset padding in case it was 0 for PDF
+            scrollArea.style.overflow = 'auto';
+
+            // もし内部にiframeがある、またはdocument-paperがない場合は再構築
+            if (scrollArea.querySelector('iframe') || !scrollArea.querySelector('.document-paper')) {
+                scrollArea.innerHTML = `
+                    <div class="document-paper">
+                        <div class="document-content" style="white-space: pre-wrap; color: #444;"></div>
+                    </div>
+                `;
+            }
+
+            const contentArea = scrollArea.querySelector('.document-content');
+            if (contentArea) {
+                contentArea.textContent = historyItem.content;
+            }
+        }
+    }
+
+    // 履歴・メモボタン用（最新の履歴をインライン表示）
+    previewLatestHistory(contractId) {
+        const contract = dbService.getContractById(contractId);
+        if (contract && contract.history && contract.history.length > 0) {
+            const latest = contract.history[contract.history.length - 1];
+            this.viewHistory(contractId, latest.version);
+        } else {
+            console.log('No history to show');
+        }
+    }
+
     exportCSV() {
         const contracts = dbService.getContracts();
         let csvContent = "data:text/csv;charset=utf-8,ID,契約名,種別,最終更新,リスク,状態,担当者\n";
@@ -719,8 +1514,38 @@ class DashboardApp {
         link.click();
         document.body.removeChild(link);
     }
+
+    showToast(message, type = 'info') {
+        // 中央モーダル通知を表示
+        const toast = document.createElement('div');
+        toast.className = 'toast-modal';
+        toast.innerHTML = `
+            <div class="toast-modal-content">
+                <i class="fa-solid ${type === 'success' ? 'fa-circle-check' : type === 'error' ? 'fa-circle-xmark' : 'fa-info-circle'}" style="font-size:48px; color:${type === 'success' ? '#4CAF50' : type === 'error' ? '#D73A49' : '#2196F3'}; margin-bottom:16px;"></i>
+                <p style="font-size:16px; font-weight:500; color:#24292E; margin-bottom:24px;">${message}</p>
+                <button class="btn-check-doc" onclick="this.closest('.toast-modal').remove()">取り込んだ資料を確認する</button>
+            </div>
+        `;
+
+        document.body.appendChild(toast);
+
+        // アニメーション表示
+        setTimeout(() => toast.classList.add('show'), 10);
+
+        // 5秒後に自動削除（少し長くする）
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => {
+                if (document.body.contains(toast)) {
+                    document.body.removeChild(toast);
+                }
+            }, 300);
+        }, 5000);
+    }
 }
 
-// Global App Instance
-window.app = new DashboardApp();
-document.addEventListener('DOMContentLoaded', () => window.app.init());
+// Initialize App
+document.addEventListener('DOMContentLoaded', () => {
+    window.app = new DashboardApp();
+    window.app.init();
+});

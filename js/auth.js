@@ -18,7 +18,7 @@ export async function handleSignUp(email, password) {
         console.log("Signed up user:", user);
         // Alert is used for simplicity, in production custom UI is better
         alert("アカウント作成に成功しました！");
-        window.location.href = "dashboard.html";
+        window.location.replace("dashboard.html");
     } catch (error) {
         console.error("Error signing up:", error);
         let msg = "エラーが発生しました。\n詳細: " + error.code;
@@ -43,7 +43,7 @@ export async function handleLogin(email, password) {
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
         console.log("Logged in user:", user);
-        window.location.href = "dashboard.html";
+        window.location.replace("dashboard.html");
     } catch (error) {
         console.error("Error logging in:", error);
         alert("メールアドレスまたはパスワードが間違っています。");
@@ -57,7 +57,7 @@ export async function handleLogout() {
     try {
         await signOut(auth);
         console.log("User signed out");
-        window.location.href = "login.html";
+        window.location.replace("login.html");
     } catch (error) {
         console.error("Error signing out:", error);
     }
@@ -72,7 +72,7 @@ export function requireAuth() {
         if (!user) {
             // No user is signed in, redirect to login
             console.log("No user found, redirecting to login.");
-            window.location.href = "login.html";
+            window.location.replace("login.html");
         } else {
             // User is signed in
             console.log("User is authenticated:", user.email);

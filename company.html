@@ -4,14 +4,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>会社概要 - DiffSense</title>
+    <title>会社概要 - DIFFsense</title>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Noto+Sans+JP:wght@300;400;500;700&family=Noto+Serif+JP:wght@400;500;700&family=Shippori+Mincho:wght@400;500;700&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css?v=20260207-5">
     <style>
         .legal-header {
             padding-top: 120px;
@@ -39,12 +41,13 @@
             padding: 1.5rem;
             border-bottom: 1px solid #eee;
             text-align: left;
+            font-size: 0.95rem;
         }
 
         .company-table th {
-            width: 30%;
+            width: 25%;
             font-weight: 600;
-            color: #1a1512;
+            color: #333;
             background-color: #fafafa;
         }
 
@@ -100,22 +103,27 @@
     <!-- Header -->
     <header class="header">
         <div class="container header-container">
-            <a href="index.html" class="logo">DiffSense</a>
+            <a href="index.html" class="logo">
+                <i class="fa-solid fa-scale-balanced"></i>DIFFsense
+            </a>
             <button class="menu-toggle" aria-label="メニューを開く">
                 <span></span>
                 <span></span>
                 <span></span>
             </button>
-            <div class="nav">
+            <nav class="nav">
                 <a href="index.html#problem">課題</a>
                 <a href="index.html#features">機能</a>
                 <a href="index.html#pricing">料金</a>
-                <a href="index.html#contact" class="btn btn-primary btn-sm">お問い合わせ</a>
-            </div>
+                <div class="auth-buttons">
+                    <a href="login.html" class="btn btn-login">ログイン</a>
+                    <a href="signup.html" class="btn btn-primary btn-sm">無料ではじめる</a>
+                </div>
+            </nav>
         </div>
     </header>
 
-    <div class="container">
+    <div class="container legal-container">
         <div class="legal-header">
             <h1>会社概要</h1>
         </div>
@@ -127,7 +135,7 @@
                 </tr>
                 <tr>
                     <th>設立</th>
-                    <td>2024年4月</td>
+                    <td>2018年10月</td>
                 </tr>
                 <tr>
                     <th>代表取締役</th>
@@ -140,7 +148,7 @@
                 <tr>
                     <th>事業内容</th>
                     <td>
-                        AIを活用した契約書差分検知サービス「DiffSense」の開発・運営<br>
+                        AIを活用した契約書差分検知サービス「DIFFsense」の開発・運営<br>
                         リーガルテック領域のソフトウェア開発
                     </td>
                 </tr>

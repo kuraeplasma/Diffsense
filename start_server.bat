@@ -13,7 +13,7 @@ if %errorlevel%==0 (
     echo [OK] Node.js が見つかりました。サーバーを起動します...
     echo ブラウザで http://localhost:3000 を開いてください。
     echo.
-    call npx -y serve .
+    call npx -y serve . -l 3000
     goto :EOF
 )
 

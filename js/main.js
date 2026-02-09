@@ -61,9 +61,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!dashboard || !container) return;
 
-        const baseWidth = 1100;
-        const baseHeight = 750;
         const windowWidth = window.innerWidth;
+
+        if (windowWidth < 770) {
+            // Mobile: Disable JS scaling to allow CSS-based "Focus Card" layout
+            dashboard.style.transform = '';
+            dashboard.style.transformOrigin = '';
+            dashboard.style.boxShadow = '';
+            dashboard.style.transition = '';
+            container.style.height = '';
+            container.style.display = '';
+            container.style.justifyContent = '';
+            container.style.alignItems = '';
+            // CSS will handle hiding elements and showing the summary card
+            return;
+        }
+
+        const baseWidth = 1100;
+        // Current height doesn't matter for desktop scale logic which uses baseHeight
+        const baseHeight = 750;
 
         // Get container width
         const availableWidth = container.clientWidth;
@@ -72,26 +88,19 @@ document.addEventListener('DOMContentLoaded', () => {
         // Calculate scale
         let scale = availableWidth / baseWidth;
 
-        // Adjusted scaling caps
         if (windowWidth >= 768) {
             // Desktop: Subtly enlarged but balanced
             scale = Math.min(scale * 1.08, 1.15);
-        } else {
-            // Mobile: Fill width
-            scale = Math.min((windowWidth - 40) / baseWidth, 1);
         }
 
-        // Apply scale and RETAIN 3D transform (defined in CSS, but scale overrides if not careful)
-        // We manually add the rotate transform here for desktop to ensure it's applied with the dynamic scale.
-
+        // Apply scale and RETAIN 3D transform
         let transformString = `scale(${scale})`;
         if (windowWidth >= 992) {
             transformString += ' rotateY(-12deg) rotateX(2deg)';
             dashboard.style.boxShadow = '-20px 30px 60px rgba(0, 0, 0, 0.25)';
-            // Ensure transition is smooth
             dashboard.style.transition = 'transform 0.5s ease, box-shadow 0.5s ease';
         } else {
-            dashboard.style.boxShadow = '0 40px 100px -20px rgba(0, 0, 0, 0.4)';
+            dashboard.style.boxShadow = '0 20px 50px -10px rgba(0, 0, 0, 0.3)';
             dashboard.style.transition = 'transform 0.5s ease';
         }
 

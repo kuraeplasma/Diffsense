@@ -4,37 +4,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DiffSense Dashboard</title>
+    <title>DIFFsense Dashboard</title>
     <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;700&family=Noto+Serif+JP:wght@400;700&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="css/dashboard.css">
     <!-- FontAwesome for Icons (CDN) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- jsdiff for text comparison -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.1.0/diff.min.js"></script>
 </head>
 
 <body>
 
     <!-- Sidebar -->
     <nav id="app-sidebar">
-        <div class="sidebar-logo">
+        <div class="sidebar-logo" style="color: #c5a059;">
             <i class="fa-solid fa-scale-balanced" style="margin-right:10px;"></i>
-            DiffSense
+            DIFFsense
         </div>
         <div class="nav-menu">
-            <div class="nav-item active" onclick="app.navigate('dashboard')">
+            <div class="nav-item active" onclick="window.app.navigate('dashboard')">
                 <div class="nav-icon"><i class="fa-solid fa-house"></i></div>
                 <span>ダッシュボード</span>
             </div>
-            <div class="nav-item" onclick="app.navigate('contracts')">
+            <div class="nav-item" onclick="window.app.navigate('contracts')">
                 <div class="nav-icon"><i class="fa-solid fa-file-contract"></i></div>
                 <span>契約・規約管理</span>
             </div>
-            <div class="nav-item" onclick="app.navigate('history')">
+            <div class="nav-item" onclick="window.app.navigate('history')">
                 <div class="nav-icon"><i class="fa-solid fa-clock-rotate-left"></i></div>
                 <span>解析履歴</span>
             </div>
-            <div class="nav-item" onclick="app.navigate('team')">
+            <div class="nav-item" onclick="window.app.navigate('team')">
                 <div class="nav-icon"><i class="fa-solid fa-users"></i></div>
                 <span>チーム設定</span>
             </div>
@@ -83,11 +85,43 @@
         </div>
     </div>
 
+    <!-- URL Input Modal -->
+    <div id="url-input-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3 style="font-size: 18px; font-weight: 700; color: #333;">新しいバージョンの参照URL</h3>
+                <button class="btn-close"
+                    onclick="document.getElementById('url-input-modal').classList.remove('active')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 20px; font-size: 14px; color: #666; line-height: 1.6;">
+                    新しいバージョンとして取り込むWebページのURLを入力してください。<br>
+                    <span style="font-size: 12px; color: #999;">※ 現在登録されているURLが初期値として入力されています。</span>
+                </p>
+                <div style="margin-bottom: 24px;">
+                    <label
+                        style="display:block; font-size:12px; font-weight:600; color:#333; margin-bottom:8px;">対象URL</label>
+                    <input type="text" id="url-input-value" class="form-control" placeholder="https://example.com/terms"
+                        style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; background: #fafafa; transition: border 0.2s;"
+                        onfocus="this.style.borderColor='#c5a059'; this.style.background='#fff';"
+                        onblur="this.style.borderColor='#ddd'; this.style.background='#fafafa';">
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 12px;">
+                    <button class="btn-dashboard"
+                        onclick="document.getElementById('url-input-modal').classList.remove('active')"
+                        style="padding: 10px 20px;">キャンセル</button>
+                    <button class="btn-dashboard btn-primary-action" id="url-input-confirm-btn"
+                        style="padding: 10px 24px; font-weight: 600;">取り込む</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Hidden File Input for PDF Upload -->
     <input type="file" id="reg-file-input" style="display: none;" accept="application/pdf">
 
     <!-- App Logic -->
-    <script type="module" src="js/dashboard.js?v=1.0.1"></script>
+    <script type="module" src="js/dashboard.js?v=1.1.0"></script>
     <script type="module">
         import { requireAuth, handleLogout } from './js/auth.js';
 
