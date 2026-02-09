@@ -89,29 +89,20 @@
     <div id="url-input-modal" class="modal-overlay">
         <div class="modal-content" style="max-width: 500px;">
             <div class="modal-header">
-                <h3 style="font-size: 18px; font-weight: 700; color: #333;">新しいバージョンの参照URL</h3>
+                <h3 id="modal-title">URLを更新</h3>
                 <button class="btn-close"
                     onclick="document.getElementById('url-input-modal').classList.remove('active')">&times;</button>
             </div>
-            <div class="modal-body">
-                <p style="margin-bottom: 20px; font-size: 14px; color: #666; line-height: 1.6;">
-                    新しいバージョンとして取り込むWebページのURLを入力してください。<br>
-                    <span style="font-size: 12px; color: #999;">※ 現在登録されているURLが初期値として入力されています。</span>
-                </p>
-                <div style="margin-bottom: 24px;">
-                    <label
-                        style="display:block; font-size:12px; font-weight:600; color:#333; margin-bottom:8px;">対象URL</label>
-                    <input type="text" id="url-input-value" class="form-control" placeholder="https://example.com/terms"
-                        style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; background: #fafafa; transition: border 0.2s;"
-                        onfocus="this.style.borderColor='#c5a059'; this.style.background='#fff';"
-                        onblur="this.style.borderColor='#ddd'; this.style.background='#fafafa';">
+            <div class="modal-body" style="padding: 24px;">
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600;">最新版の規約URL</label>
+                    <input type="text" id="new-version-url" class="form-control" placeholder="https://example.com/terms"
+                        style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
                 </div>
-                <div style="display: flex; justify-content: flex-end; gap: 12px;">
+                <div style="display: flex; gap: 12px; justify-content: flex-end;">
                     <button class="btn-dashboard"
-                        onclick="document.getElementById('url-input-modal').classList.remove('active')"
-                        style="padding: 10px 20px;">キャンセル</button>
-                    <button class="btn-dashboard btn-primary-action" id="url-input-confirm-btn"
-                        style="padding: 10px 24px; font-weight: 600;">取り込む</button>
+                        onclick="document.getElementById('url-input-modal').classList.remove('active')">キャンセル</button>
+                    <button class="btn-dashboard btn-primary-action" id="submit-url-btn">更新・解析を実行</button>
                 </div>
             </div>
         </div>

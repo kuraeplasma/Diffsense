@@ -1,22 +1,4 @@
-# Large dependency folders
 node_modules/
-backend/node_modules/
-
-# Sensitive data
+_backup_*/
 .env
-backend/.env
-backend/data/*.json
-backend/uploads/*
-
-# Temporary / Agent files
-.agent/
-logs/
-backend/logs/
-*.log
-
-# Backups
-backups/
-
-# OS files
 .DS_Store
-Thumbs.db

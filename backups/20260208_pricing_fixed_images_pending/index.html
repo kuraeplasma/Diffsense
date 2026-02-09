@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI契約差分検知SaaS - 契約変更をスマートに管理</title>
+    <meta name="description" content="利用規約や契約書の「どこが・どう変わったか」だけをAIが要約・通知。法務業務を効率化するAI差分検知ツール。">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚖️</text></svg>">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Noto+Sans+JP:wght@300;400;500;700&family=Noto+Serif+JP:wght@400;500;700&family=Shippori+Mincho:wght@400;500;700&display=swap"
+        rel="stylesheet">
+
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="css/style.css?v=20260207-5">
+</head>
+
+<body>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="container header-container">
+            <a href="#" class="logo" onclick="window.scrollTo({top: 0, behavior: 'smooth'}); return false;">
+                <i class="fa-solid fa-scale-balanced"></i>DIFFsense
+            </a>
+            <button class="menu-toggle" aria-label="メニューを開く">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+            <nav class="nav">
+                <a href="#problem">課題</a>
+                <a href="#features">機能</a>
+                <a href="#pricing">料金</a>
+                <div class="auth-buttons">
+                    <a href="login.html" class="btn btn-login">ログイン</a>
+                    <a href="signup.html" class="btn btn-primary btn-sm">無料ではじめる</a>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-bg"></div>
+        <div class="container hero-container">
+            <div class="hero-content">
+                <!-- badge-new removed -->
+                <h1 class="hero-title">
+                    <span style="display:inline-block; white-space:nowrap;">契約書の</span>
+                    <span style="display:inline-block; white-space:nowrap;" class="text-gradient">「どこが変わったか」だけ</span>
+                    <span style="display:inline-block; white-space:nowrap;">AIが瞬時に要約</span>
+                </h1>
+                <p class="hero-subtitle">
+                    法務確認の「見落とし」を防ぐ支援ツール。<br>
+                    利用規約・業務委託契約の変更差分をAIが検知し、判断材料を整理します。
+                </p>
+                <div class="hero-btns">
+                    <a href="signup.html" class="btn btn-primary">無料で試す</a>
+                    <a href="#features" class="btn btn-secondary">機能を見る</a>
+                </div>
+            </div>
+            <div class="hero-visual">
+                <!-- Mobile-Only: Simplified LP Visual -->
+                <div class="mobile-lp-visual">
+                    <!-- AI Risk Card -->
+                    <div class="lp-ai-card">
+                        <div class="lp-ai-header">
+                            <i class="fa-solid fa-robot"></i>
+                            <span>AIリスク判定：要警戒</span>
+                        </div>
+                        <p class="lp-ai-text">損害賠償額の大幅な減額およびデータ保全義務の免責が含まれており、当社にとって著しく不利な変更</p>
+                    </div>
+
+                    <!-- Unified Comparison Card -->
+                    <div class="lp-unified-comparison">
+                        <div class="lp-comparison-header">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <span>AIが検知した変更箇所</span>
+                        </div>
+
+                        <div class="lp-clause-title">第15条（損害賠償）</div>
+
+                        <div class="lp-comparison-row">
+                            <div class="lp-badge lp-badge-before">変更前</div>
+                            <p class="lp-text lp-text-before">
+                                損害賠償の額は、利用料金の<span class="lp-highlight lp-highlight-red">【3ヶ月分】</span>を上限とする
+                            </p>
+                        </div>
+
+                        <div class="lp-divider">
+                            <i class="fa-solid fa-arrow-down"></i>
+                        </div>
+
+                        <div class="lp-comparison-row">
+                            <div class="lp-badge lp-badge-after">変更後</div>
+                            <p class="lp-text lp-text-after">
+                                損害賠償の額は、利用料金の<span class="lp-highlight lp-highlight-green">【1ヶ月分】</span>を上限とする
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Desktop: Full Dashboard Preview -->
+                <div class="dashboard-frame visual-card">
+                    <!-- Sidebar -->
+                    <div class="mini-sidebar"
+                        style="width: 200px; flex-shrink: 0; background: #1a1a1a; padding: 20px 0;">
+                        <div class="mini-logo"
+                            style="padding: 0 15px 30px; font-size: 1.2rem; color: #c5a059; font-weight: 800; display: flex; align-items: center; gap: 10px;">
+                            <i class="fa-solid fa-scale-balanced" style="color: inherit;"></i> DIFFsense
+                        </div>
+                        <div class="mini-nav" style="display: flex; flex-direction: column; gap: 2px;">
+                            <div class="mini-nav-item"
+                                style="padding: 10px 15px; color: #999; font-size: 0.9rem; display: flex; align-items: center; gap: 10px;">
+                                <i class="fa-solid fa-house" style="width: 16px;"></i> <span>ダッシュボード</span>
+                            </div>
+                            <div class="mini-nav-item active"
+                                style="background: #333; color: #fff; padding: 10px 15px; font-size: 0.9rem; display: flex; align-items: center; gap: 10px; font-weight: 600;">
+                                <i class="fa-solid fa-file-contract" style="width: 16px;"></i> <span>契約・規約管理</span>
+                            </div>
+                            <div class="mini-nav-item"
+                                style="padding: 10px 15px; color: #999; font-size: 0.9rem; display: flex; align-items: center; gap: 10px;">
+                                <i class="fa-solid fa-clock-rotate-left" style="width: 16px;"></i> <span>解析履歴</span>
+                            </div>
+                            <div class="mini-nav-item"
+                                style="padding: 10px 15px; color: #999; font-size: 0.9rem; display: flex; align-items: center; gap: 10px;">
+                                <i class="fa-solid fa-users" style="width: 16px;"></i> <span>チーム設定</span>
+                            </div>
+                        </div>
+                        <div
+                            style="margin-top: auto; padding: 15px; border-top: 1px solid #333; color: #999; font-size: 0.8rem;">
+                            <i class="fa-solid fa-user"></i> <span style="margin-left: 8px;">ユーザー</span>
+                        </div>
+                    </div>
+
+                    <!-- Main Content -->
+                    <div class="mini-main" style="background: #fdfdfd; flex: 1; display: flex; flex-direction: column;">
+                        <!-- Header -->
+                        <div class="mini-header"
+                            style="background: #fff; height: 50px; border-bottom: 1px solid #eee; display: flex; align-items: center; justify-content: space-between; padding: 0 20px;">
+                            <span style="font-weight: 700; color: #333; font-size: 13px;">差分詳細</span>
+                            <div
+                                style="background: #bf9b30; color: #fff; padding: 6px 14px; border-radius: 4px; font-size: 11px; font-weight: 700;">
+                                <i class="fa-solid fa-plus"></i> 新規登録
+                            </div>
+                        </div>
+
+                        <!-- Content Area -->
+                        <div class="mini-content"
+                            style="padding: 20px 25px; overflow-y: hidden; flex: 1; display: flex; flex-direction: column; gap: 15px;">
+                            <div class="preview-back-link" style="font-size: 11px; color: #666;">
+                                <i class="fa-solid fa-arrow-left"></i> ダッシュボードに戻る
+                            </div>
+
+                            <div class="preview-header-area"
+                                style="display: flex; justify-content: space-between; align-items: flex-start;">
+                                <div>
+                                    <h2
+                                        style="font-size: 1.4rem; font-weight: 800; color: #1a1a1a; margin-bottom: 5px;">
+                                        クラウドサービス利用規約 (SaaS) - 2026.01.29版</h2>
+                                    <div style="display: flex; gap: 8px;">
+                                        <span
+                                            style="background: #fff5f5; color: #e53e3e; border: 1px solid #ffd5d5; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700;">Risk
+                                            Level: ★3</span>
+                                        <span
+                                            style="background: #fffaf0; color: #d69e2e; border: 1px solid #fef3c7; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700;">未確認</span>
+                                    </div>
+                                </div>
+                                <div class="preview-actions" style="display: flex; gap: 8px;">
+                                    <div
+                                        style="border: 1px solid #ddd; padding: 8px 15px; border-radius: 6px; font-size: 12px; font-weight: 700; color: #333; background: #fff;">
+                                        <i class="fa-solid fa-share-nodes"></i> 共有
+                                    </div>
+                                    <div
+                                        style="background: #bf9b30; color: #fff; padding: 8px 15px; border-radius: 6px; font-size: 12px; font-weight: 700;">
+                                        <i class="fa-solid fa-check"></i> 確認済みにする
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- AI Summary -->
+                            <div class="preview-ai-summary"
+                                style="background: #fff; border: 1px solid #eee; border-left: 6px solid #bf9b30; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.02);">
+                                <div
+                                    style="color: #bf9b30; font-weight: 800; font-size: 1.1rem; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                                    <i class="fa-solid fa-robot"></i> AIリスク判定：要警戒
+                                </div>
+                                <p
+                                    style="font-size: 1rem; font-weight: 700; color: #333; margin-bottom: 6px; line-height: 1.4;">
+                                    損害賠償額の大幅な減額およびデータ保全義務の免責が含まれており、当社にとって著しく不利な変更であるため。</p>
+                                <p style="font-size: 0.85rem; color: #666; line-height: 1.5;">
+                                    サービス提供事業者が「損害賠償の上限」を「利用料の3ヶ月分」から「1ヶ月分」に縮小する変更を行いました。また、データバックアップの条項が削除されています。</p>
+                            </div>
+
+                            <div class="preview-diff-section-label"
+                                style="font-weight: 800; font-size: 12px; color: #333;">検知された変更箇所</div>
+
+                            <!-- Diff Block 1 -->
+                            <div class="preview-diff-block"
+                                style="border: 1px solid #eee; border-radius: 6px; overflow: hidden; background: #fff;">
+                                <div
+                                    style="background: #f8f9fa; padding: 8px 15px; font-size: 11px; color: #666; border-bottom: 1px solid #eee; font-weight: 700;">
+                                    第15条（損害賠償） <span
+                                        style="font-weight: normal; margin-left:8px; opacity: 0.7;">(変更)</span></div>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; font-size: 12px;">
+                                    <div
+                                        style="padding: 15px; background: #fffafa; border-right: 1px solid #eee; line-height: 1.6;">
+                                        甲が乙に支払う損害賠償の額は、当該損害が発生した月の利用料金の<span
+                                            style="background: #fed7d7; text-decoration: line-through; color: #9b2c2c; padding: 1px 3px;">【3ヶ月分】</span>を上限とする。
+                                    </div>
+                                    <div style="padding: 15px; background: #fafffa; line-height: 1.6;">
+                                        甲が乙に支払う損害賠償の額は、当該損害が発生した月の利用料金の<span
+                                            style="background: #c6f6d5; color: #22543d; padding: 1px 3px; font-weight: 700;">【1ヶ月分】</span>を上限とする。
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Diff Block 2 -->
+                            <div class="preview-diff-block"
+                                style="border: 1px solid #eee; border-radius: 6px; overflow: hidden; background: #fff;">
+                                <div
+                                    style="background: #f8f9fa; padding: 8px 15px; font-size: 11px; color: #666; border-bottom: 1px solid #eee; font-weight: 700;">
+                                    第18条（データの保全） <span
+                                        style="font-weight: normal; margin-left:8px; opacity: 0.7;">(削除)</span></div>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; font-size: 12px;">
+                                    <div
+                                        style="padding: 15px; background: #fffafa; border-right: 1px solid #eee; line-height: 1.6;">
+                                        <span
+                                            style="background: #fed7d7; text-decoration: line-through; color: #9b2c2c; padding: 1px 3px;">当社は、ユーザーのデータを毎日1回バックアップし、障害発生時には直近のバックアップ地点まで復旧するものとします。</span>
+                                    </div>
+                                    <div style="padding: 15px; background: #fafffa; line-height: 1.6;">
+                                        <span style="color: #22543d; opacity: 0.6;">(削除されました)</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Memo Hint -->
+                            <div class="preview-memo-section" style="border-top: 1px solid #eee; padding-top: 15px;">
+                                <div style="font-weight: 800; font-size: 12px; color: #333; margin-bottom: 10px;">社内メモ
+                                </div>
+                                <div
+                                    style="border: 1px solid #ddd; padding: 10px; border-radius: 6px; color: #999; font-size: 12px; background: #fff;">
+                                    確認事項や法務部への相談内容を入力...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Problem & Solution -->
+    <section id="problem" class="section problem-section">
+        <div class="container">
+            <div class="section-header text-center">
+                <h2 class="section-title">こんな<span class="text-accent">見落とし</span>ありませんか？</h2>
+                <p class="section-desc">日本企業における契約トラブルの多くは、微細な変更の見落としから生まれています。</p>
+            </div>
+            <div class="grid-3">
+                <div class="card problem-card">
+                    <div class="icon-box"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                    <h3>サイレント更新</h3>
+                    <p>SaaS規約など、通知なしに不利な条件に変更されていることに気づかない。</p>
+                </div>
+                <div class="card problem-card">
+                    <div class="icon-box"><i class="fa-solid fa-clock"></i></div>
+                    <h3>確認工数の浪費</h3>
+                    <p>数百ページの契約書から、たった数行の変更箇所を探すのに数時間を費やす。</p>
+                </div>
+                <div class="card problem-card">
+                    <div class="icon-box"><i class="fa-solid fa-user-tie"></i></div>
+                    <h3>法務リソース不足</h3>
+                    <p>高額な法務SaaSは導入できず、目視確認によるヒューマンエラーが発生。</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Core Features (Steps) -->
+    <section id="features" class="section features-section">
+        <div class="container">
+            <div class="section-header text-center">
+                <h2 class="section-title">AIが<span class="text-accent">差分だけ</span>を抽出</h2>
+                <p class="section-desc">複雑な契約書も、AIなら一瞬で要点を理解します。</p>
+            </div>
+            <div class="features-grid">
+                <div class="steps-container">
+                    <!-- Step 1 -->
+                    <div class="step-item">
+                        <div class="step-number">01</div>
+                        <div class="step-content">
+                            <h3>PDF / URL 登録</h3>
+                            <p>契約書PDFをアップロード、またはURLを登録するだけ。</p>
+                        </div>
+                    </div>
+                    <!-- Step 2 -->
+                    <div class="step-item">
+                        <div class="step-number">02</div>
+                        <div class="step-content">
+                            <h3>AI差分抽出</h3>
+                            <p>旧版との差異を自動検知。重要な変更のみを高精度に抽出。</p>
+                        </div>
+                    </div>
+                    <!-- Step 3 -->
+                    <div class="step-item">
+                        <div class="step-number">03</div>
+                        <div class="step-content">
+                            <h3>リスク度判定</h3>
+                            <p>AIがリスクレベルを判定。優先確認事項を一目で把握。</p>
+                        </div>
+                    </div>
+                    <!-- Step 4 -->
+                    <div class="step-item">
+                        <div class="step-number">04</div>
+                        <div class="step-content">
+                            <h3>承認・共有</h3>
+                            <p>コメント付きで社内連携。スムーズな承認フローを実現。</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="features-visual" id="ai-diff-visual">
+                    <div class="visual-placeholder">
+                        <i class="fa-solid fa-robot"></i>
+                        <span>AI Extraction Engine</span>
+                        <p style="font-size: 0.8rem; opacity: 0.7; color: #fff; margin-top: 0.5rem; max-width: 200px;">
+                            特許申請中の高度なアルゴリズムが<br>契約の要点を瞬時に解析</p>
+                    </div>
+                    <!-- Generated image will be placed here -->
+                    <img src="images/ai_features_hero.png" alt="AI Features Hero">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Market Advantage -->
+    <section class="section market-section">
+        <div class="container">
+            <div class="comparison-box glass-card">
+                <div class="section-header text-center">
+                    <h2 class="section-title">なぜ<span class="text-accent logo-font">DIFFsense</span>なのか</h2>
+                </div>
+                <div class="market-visual" id="market-advantage-visual">
+                    <div class="visual-placeholder">
+                        <i class="fa-solid fa-award"></i>
+                        <span style="color: var(--color-text);">Next-Generation Legal Tech</span>
+                    </div>
+                    <!-- Generated image will be placed here -->
+                    <img src="images/market_advantage_visual.png" alt="Market Advantage Visual">
+                </div>
+                <div class="comparison-grid">
+                    <div class="comp-col">
+                        <h4>従来の法務SaaS</h4>
+                        <ul>
+                            <li class="bad"><i class="fa-solid fa-xmark"></i> 導入コストが高い</li>
+                            <li class="bad"><i class="fa-solid fa-xmark"></i> 機能過多で使いにくい</li>
+                            <li class="bad"><i class="fa-solid fa-xmark"></i> 契約「管理」がメイン</li>
+                        </ul>
+                    </div>
+                    <div class="comp-col highlight">
+                        <h4 class="logo-font">DIFFsense</h4>
+                        <ul>
+                            <li class="good"><i class="fa-solid fa-check"></i> 特化型で低価格</li>
+                            <li class="good"><i class="fa-solid fa-check"></i> AIが「中身」を要約</li>
+                            <li class="good"><i class="fa-solid fa-check"></i> 日本の法務に完全対応</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing -->
+    <section id="pricing" class="section pricing-section">
+        <div class="container">
+            <div class="section-header text-center">
+                <span class="badge badge-primary"
+                    style="background: rgba(161, 126, 26, 0.08); color: #a17e1a; border: 1px solid #a17e1a; padding: 6px 16px; border-radius: 20px; font-weight: 600; margin-bottom: 1.5rem; display: inline-block; letter-spacing: 0.05em;">
+                    🎉 30日間無料トライアル実施中（Pro / Legalプランの全機能を体験可能）
+                </span>
+                <h2 class="section-title">利用規模に合わせた<span class="text-accent">料金プラン</span></h2>
+                <p class="section-desc">
+                    AI解析コストに基づいた適正価格で提供します。<br>
+                    まずは<strong>Pro / Legalプランの全機能</strong>を無料でお試しください。
+                </p>
+            </div>
+            <div class="pricing-grid">
+                <!-- Starter -->
+                <div class="pricing-card starter">
+                    <div class="pricing-badge">個人・検証用</div>
+                    <div class="pricing-header">
+                        <h3>Starter</h3>
+                        <div class="price">
+                            <span class="currency">¥</span><span class="amount">1,480</span><span class="price-sub">/ 月
+                                (税抜)</span>
+                        </div>
+                    </div>
+                    <div class="pricing-description">
+                        <p style="font-size: 0.85rem; color: #666; margin-bottom: 1rem;">
+                            まずは仕組みを試したい方向けのプランです。<br>
+                            契約内容の確認作業を体験できますが、業務利用は想定していません。
+                        </p>
+                    </div>
+                    <div class="pricing-features">
+                        <ul>
+                            <li>PDF / URL 登録：<strong>5件まで</strong></li>
+                            <li>差分抽出：<strong>月15回まで</strong></li>
+                            <li>リスク判定：★表示のみ</li>
+                            <li>要約：簡易（箇条書き）</li>
+                            <li>共有：リンク共有のみ</li>
+                            <li class="bad">利用ログ：なし</li>
+                            <li class="bad">業務利用：不可</li>
+                        </ul>
+                    </div>
+                    <div class="pricing-cta">
+                        <a href="signup.html" class="btn btn-secondary full-width">無料で始める</a>
+                        <p style="text-align:center; font-size:0.75rem; color:#888; margin-top:8px;">30日間無料体験</p>
+                    </div>
+                </div>
+
+                <!-- Business (Highlighted) -->
+                <div class="pricing-card business highlight-plan">
+                    <div class="pricing-badge recommended">おすすめ</div>
+                    <div class="pricing-header">
+                        <h3>Business</h3>
+                        <div class="price">
+                            <span class="currency">¥</span><span class="amount">4,980</span><span class="price-sub">/ 月
+                                (税抜)</span>
+                        </div>
+                    </div>
+                    <div class="pricing-description">
+                        <p style="font-size: 0.85rem; color: #666; margin-bottom: 1rem;">
+                            法務専任がいない組織でも、契約・規約の変更を“見落とさない”ための実務向けプランです。<br>
+                            社内確認用途に限定してご利用いただけます。
+                        </p>
+                    </div>
+                    <div class="pricing-features">
+                        <ul>
+                            <li>PDF / URL 登録：<strong>30件まで</strong></li>
+                            <li>差分抽出：<strong>月120回まで</strong></li>
+                            <li>リスク判定：★＋理由コメント</li>
+                            <li>重要変更の自動強調</li>
+                            <li>社内共有・確認フロー</li>
+                            <li>利用ログ保存</li>
+                            <li>業務利用：自社内利用のみ可</li>
+                        </ul>
+                    </div>
+                    <div class="pricing-cta">
+                        <a href="signup.html" class="btn btn-primary full-width">無料で始める</a>
+                        <p
+                            style="text-align:center; font-size:0.85rem; font-weight:bold; color:#a17e1a; margin-top:12px; letter-spacing:0.05em;">
+                            30日間無料トライアル中</p>
+                    </div>
+                </div>
+
+                <!-- Pro -->
+                <div class="pricing-card pro">
+                    <div class="pricing-badge">士業・専門職向け</div>
+                    <div class="pricing-header">
+                        <h3>Pro / Legal</h3>
+                        <div class="price">
+                            <span class="currency">¥</span><span class="amount">9,800</span><span class="price-sub">/ 月
+                                (税抜)</span>
+                        </div>
+                    </div>
+                    <div class="pricing-description">
+                        <p style="font-size: 0.85rem; color: #666; margin-bottom: 1rem;">
+                            士業・コンサル・法務代行など、第三者の契約確認を業務として行う方向けのプランです。<br>
+                            確認プロセスの証跡管理まで対応します。
+                        </p>
+                    </div>
+                    <div class="pricing-features">
+                        <ul>
+                            <li>PDF / URL 登録：<strong>80件まで</strong></li>
+                            <li>差分抽出：<strong>月400回まで</strong></li>
+                            <li>定期クロールによる自動監視</li>
+                            <li>リスク判定：詳細コメント</li>
+                            <li>チーム管理・権限設定</li>
+                            <li>CSV / PDFエクスポート</li>
+                            <li>業務利用：<strong>可 (第三者業務含)</strong></li>
+                        </ul>
+                    </div>
+                    <div class="pricing-cta">
+                        <a href="signup.html" class="btn btn-secondary full-width">無料で始める</a>
+                        <p style="text-align:center; font-size:0.75rem; color:#888; margin-top:8px;">30日間無料体験</p>
+                    </div>
+                </div>
+            </div>
+            <p class="note text-center" style="margin-top: 2rem; font-size: 0.8rem; color: #888;">
+                本サービスは契約内容の確認を支援するものであり、法的判断や助言を行うものではありません。<br>
+                最終的な判断は利用者ご自身で行ってください。<br>
+                ※ 差分抽出回数は、AIによる解析処理を1回実行するごとにカウントされます。月間上限を超えた場合、翌月まで解析は実行されません。
+            </p>
+        </div>
+    </section>
+
+    <!-- CTA -->
+    <section id="contact" class="section cta-section">
+        <div class="container text-center">
+            <h2 class="cta-title">法務の「見落とし」を<span style="display: inline-block; white-space: nowrap;">ゼロに。</span></h2>
+            <p class="cta-desc">まずは無料デモで、AIの精度をご体験ください。</p>
+            <form class="cta-form">
+                <input type="email" placeholder="メールアドレスを入力" required>
+                <button type="submit" class="btn btn-primary">事前登録する</button>
+            </form>
+            <p class="note">※ β版ユーザー募集中</p>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container text-center">
+            <div class="footer-links" style="margin-bottom: 1.5rem;">
+                <a href="company.html" style="font-size: 0.9rem; color: #888; margin: 0 1rem;">会社概要</a>
+                <a href="law.html" style="font-size: 0.9rem; color: #888; margin: 0 1rem;">特定商取引法に基づく表記</a>
+                <a href="terms.html" style="font-size: 0.9rem; color: #888; margin: 0 1rem;">利用規約</a>
+                <a href="privacy.html" style="font-size: 0.9rem; color: #888; margin: 0 1rem;">プライバシーポリシー</a>
+            </div>
+            <p>&copy; 2026 SpaceGleam All Rights Reserved.</p>
+        </div>
+    </footer>
+
+    <script src="js/main.js"></script>
+</body>
+
+</html>

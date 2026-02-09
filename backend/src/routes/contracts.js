@@ -5,6 +5,7 @@ const { validateAnalyzeRequest } = require('../utils/validator');
 const geminiService = require('../services/gemini');
 const pdfService = require('../services/pdf');
 const urlService = require('../services/url');
+const dbService = require('../services/db');
 const logger = require('../utils/logger');
 
 /**
@@ -24,8 +25,26 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
         }
 
         const { contractId, method, source, previousVersion } = value;
+        const uid = req.user.uid;
 
-        logger.info(`Starting analysis for contract ${contractId}`, { method });
+        logger.info(`Starting analysis for contract ${contractId} by user ${uid}`, { method });
+
+        // 0. Usage & Plan Limit Check
+        const userProfile = await dbService.getUserProfile(uid);
+        const planLimits = {
+            'starter': 15,
+            'business': 120,
+            'pro': 400
+        };
+        const limit = planLimits[userProfile.plan] || 0;
+
+        if (userProfile.usageCount >= limit) {
+            logger.warn(`Usage limit reached for user ${uid}`, { plan: userProfile.plan, current: userProfile.usageCount });
+            return res.status(403).json({
+                success: false,
+                error: `プランの月間解析上限（${limit}回）に達しました。アップグレードをご検討ください。`
+            });
+        }
 
         // 1. Save PDF file early if method is 'pdf'
         let pdfUrl = null;
@@ -73,6 +92,9 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                     extractedText,
                     previousVersion
                 );
+
+                // 3.1 Increment Usage Count on SUCCESS
+                await dbService.incrementUsage(uid);
             } else {
                 logger.warn('No text extracted, skipping AI analysis');
                 aiResult.summary = 'テキストを抽出できませんでした（画像ベースの可能性があります）';

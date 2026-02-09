@@ -1,0 +1,1404 @@
+import { dbService } from './db-service.js';
+import { aiService } from './ai-service.js';
+
+// --- Static Content ---
+// --- Static Content ---
+// (Deleted: Backend integration completed)
+
+// --- View Renderers ---
+const Views = {
+    // 1. Dashboard Overview
+    dashboard: () => {
+        const stats = dbService.getStats();
+        const currentFilter = window.app ? window.app.dashboardFilter : 'pending';
+        const filteredItems = dbService.getFilteredContracts(currentFilter);
+
+        let sectionTitle = "要確認アイテム (優先度順)";
+        if (currentFilter === 'pending') sectionTitle = "未処理のアイテム (新着・変更検知)";
+        if (currentFilter === 'risk') sectionTitle = "リスク要判定アイテム";
+        if (currentFilter === 'total') sectionTitle = "全監視対象（最新順）";
+
+        const tableRows = filteredItems.length > 0 ? filteredItems.slice(0, 10).map(c => {
+            let riskBadgeClass = 'badge-neutral';
+            if (c.risk_level === 'High') riskBadgeClass = 'badge-danger';
+            else if (c.risk_level === 'Medium') riskBadgeClass = 'badge-warning';
+            else if (c.risk_level === 'Low') riskBadgeClass = 'badge-success';
+
+            let statusBadge = '';
+            if (c.status === '未解析') statusBadge = '<span class="badge badge-info">未解析 (新規)</span>';
+            else if (c.status === '未確認') statusBadge = '<span class="badge badge-warning">要確認 (変更)</span>';
+            else if (c.status === '確認済') statusBadge = '<span class="badge badge-neutral"><i class="fa-solid fa-check"></i> 確認済</span>';
+
+            return `
+                <tr onclick="window.app.navigate('diff', ${c.id})">
+                    <td><span class="badge ${riskBadgeClass}">${c.risk_level}</span></td>
+                    <td class="col-name" title="${c.name}">${c.name}</td>
+                    <td>${c.last_updated_at}</td>
+                    <td>${statusBadge}</td>
+                    <td><button class="btn-dashboard">${c.status === '確認済' ? '履歴を見る' : '確認する'}</button></td>
+                </tr>
+            `;
+        }).join('') : '<tr><td colspan="5" class="text-center text-muted" style="padding:40px;">該当するアイテムはありません</td></tr>';
+
+        return `
+            <div class="stats-grid">
+                <div class="stat-card ${currentFilter === 'pending' ? 'active' : ''}" onclick="window.app.setDashboardFilter('pending')">
+                    <div class="stat-label ${currentFilter === 'pending' ? 'text-warning' : ''}"><i class="fa-regular fa-square-check"></i> 未処理</div>
+                    <div class="stat-value">${stats.pending}件</div>
+                </div>
+                <div class="stat-card ${currentFilter === 'risk' ? 'active' : ''}" onclick="window.app.setDashboardFilter('risk')">
+                    <div class="stat-label ${currentFilter === 'risk' ? 'text-danger' : ''}"><i class="fa-solid fa-triangle-exclamation"></i> リスク要判定</div>
+                    <div class="stat-value">${stats.highRisk}件</div>
+                </div>
+                <div class="stat-card ${currentFilter === 'total' ? 'active' : ''}" onclick="window.app.setDashboardFilter('total')">
+                    <div class="stat-label"><i class="fa-solid fa-satellite-dish"></i> 監視中</div>
+                    <div class="stat-value text-muted">${stats.total}</div>
+                </div>
+            </div>
+
+            <h3 id="dashboard-section-title" style="font-size:16px; margin-bottom:16px; font-weight:600;">${sectionTitle}</h3>
+            <div class="table-container">
+                <table class="data-table dashboard-table">
+                    <thead>
+                        <tr>
+                            <th>リスク</th>
+                            <th>契約・規約名</th>
+                            <th>日付</th>
+                            <th>ステータス</th>
+                            <th>アクション</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dashboard-table-body">
+                        ${tableRows}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    },
+
+    // 2. Contract List
+    contracts: (params) => {
+        const page = params?.page || 1;
+        const pageSize = 10;
+        const appFilters = window.app ? window.app.filters : {};
+
+        const { items, totalPages, totalItems } = dbService.getPaginatedContracts(page, pageSize, params);
+
+        const rows = items.map(c => {
+            let riskBadge = '';
+            if (c.risk_level === 'High') riskBadge = '<span class="badge badge-danger">High</span>';
+            else if (c.risk_level === 'Medium') riskBadge = '<span class="badge badge-warning">Med</span>';
+            else if (c.risk_level === 'Low') riskBadge = '<span class="badge badge-success">Low</span>';
+            else riskBadge = '<span class="badge badge-neutral">No</span>';
+
+            const statusBadge = c.status === '確認済'
+                ? '<span class="badge badge-neutral"><i class="fa-solid fa-check"></i> 確認済</span>'
+                : '<span class="badge badge-warning">未確認</span>';
+
+            return `
+                <tr onclick="window.app.navigate('diff', ${c.id})">
+                    <td class="col-name" title="${c.name}">${c.name}</td>
+                    <td>${c.type}</td>
+                    <td>${c.last_updated_at}</td>
+                    <td>${riskBadge}</td>
+                    <td>${statusBadge}</td>
+                    <td>${c.assignee_name}</td>
+                </tr>
+            `;
+        }).join('');
+
+        return `
+            <div class="flex justify-between items-center mb-md">
+                <h2 class="page-title" style="margin-bottom:0;">契約・規約管理</h2>
+                <div class="flex gap-sm">
+                   <button class="btn-dashboard" onclick="window.app.exportCSV()"><i class="fa-solid fa-download"></i> CSV出力</button>
+                </div>
+            </div>
+
+            <div class="filter-bar mb-md">
+                <div class="flex flex-wrap gap-md items-center">
+                    <div style="position:relative; flex:1; min-width:250px;">
+                        <i class="fa-solid fa-magnifying-glass" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:#999;"></i>
+                        <input type="text" id="contract-search" placeholder="契約名・種別・担当者で検索..." 
+                               value="${appFilters.query || ''}"
+                               style="padding:8px 12px 8px 36px; border:1px solid #ddd; border-radius:4px; width:100%; font-size:13px;"
+                               oninput="window.app.updateFilter('query', this.value)">
+                    </div>
+                    
+                    <div class="flex gap-sm items-center">
+                        <span class="text-muted" style="font-size:12px;">リスク:</span>
+                        <select onchange="window.app.updateFilter('risk', this.value)" style="padding:6px 8px; border:1px solid #ddd; border-radius:4px; font-size:13px;">
+                            <option value="all" ${appFilters.risk === 'all' ? 'selected' : ''}>すべて</option>
+                            <option value="High" ${appFilters.risk === 'High' ? 'selected' : ''}>High</option>
+                            <option value="Medium" ${appFilters.risk === 'Medium' ? 'selected' : ''}>Med</option>
+                            <option value="Low" ${appFilters.risk === 'Low' ? 'selected' : ''}>Low</option>
+                        </select>
+                    </div>
+
+                    <div class="flex gap-sm items-center">
+                        <span class="text-muted" style="font-size:12px;">状態:</span>
+                        <select onchange="window.app.updateFilter('status', this.value)" style="padding:6px 8px; border:1px solid #ddd; border-radius:4px; font-size:13px;">
+                            <option value="all" ${appFilters.status === 'all' ? 'selected' : ''}>すべて</option>
+                            <option value="未確認" ${appFilters.status === '未確認' ? 'selected' : ''}>未確認</option>
+                            <option value="確認済" ${appFilters.status === '確認済' ? 'selected' : ''}>確認済</option>
+                        </select>
+                    </div>
+
+                    <div class="flex gap-sm items-center">
+                        <span class="text-muted" style="font-size:12px;">種別:</span>
+                        <select onchange="window.app.updateFilter('type', this.value)" style="padding:6px 8px; border:1px solid #ddd; border-radius:4px; font-size:13px;">
+                            <option value="all" ${appFilters.type === 'all' ? 'selected' : ''}>すべて</option>
+                            <option value="利用規約" ${appFilters.type === '利用規約' ? 'selected' : ''}>利用規約</option>
+                            <option value="秘密保持契約書" ${appFilters.type === '秘密保持契約書' ? 'selected' : ''}>秘密保持契約書</option>
+                            <option value="業務委託契約書" ${appFilters.type === '業務委託契約書' ? 'selected' : ''}>業務委託契約書</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table class="data-table contracts-table">
+                    <thead>
+                        <tr>
+                            <th>契約・規約名</th>
+                            <th>種別</th>
+                            <th>最終更新</th>
+                            <th>リスク</th>
+                            <th>状態</th>
+                            <th>担当者</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows || '<tr><td colspan="6" class="text-center text-muted" style="padding:40px;">該当する契約が見つかりませんでした</td></tr>'}</tbody>
+                </table>
+            </div>
+
+            <div class="flex justify-between items-center mt-md">
+                <div class="text-muted" style="font-size:13px;">全 ${totalItems} 件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, totalItems)} 件を表示</div>
+                <div class="flex gap-sm">
+                    <button class="btn-dashboard" ${page <= 1 ? 'disabled' : ''} onclick="window.app.changePage(${page - 1})">前へ</button>
+                    <div style="display:flex; align-items:center; padding:0 12px; font-size:13px; font-weight:600;">${page} / ${totalPages || 1}</div>
+                    <button class="btn-dashboard" ${page >= totalPages ? 'disabled' : ''} onclick="window.app.changePage(${page + 1})">次へ</button>
+                </div>
+            </div>
+`;
+    },
+
+    // 3. Diff Details
+    diff: (id) => {
+        const contract = dbService.getContractById(id);
+        const activeTab = window.app ? window.app.activeDetailTab : 'diff';
+
+        // AI解析結果があればそれを使用、なければ静的コンテンツまたはデフォルト
+        const hasAIResults = contract.ai_summary || contract.ai_changes;
+
+        let diffData;
+        if (hasAIResults) {
+            // AI解析結果を使用
+            diffData = {
+                title: `${contract.name} - AI解析結果`,
+                summary: contract.ai_summary || 'AI解析が完了しました',
+                riskLevel: contract.risk_level === 'High' ? 3 : (contract.risk_level === 'Medium' ? 2 : 1),
+                riskReason: contract.ai_risk_reason || 'リスク判定が完了しました',
+                changes: contract.ai_changes || []
+            };
+        } else {
+            // デフォルトデータ
+            diffData = {
+                title: `${contract.name} - 詳細分析`,
+                summary: contract.status === '未解析'
+                    ? 'このドキュメントはまだAI解析されていません。新規登録から解析を実行してください。'
+                    : 'このドキュメントの最新の変更要約をAIが生成しています...',
+                riskLevel: contract.risk_level === 'High' ? 3 : (contract.risk_level === 'Medium' ? 2 : 1),
+                riskReason: contract.status === '未解析'
+                    ? 'AI解析が未実行です'
+                    : '特定の変更箇所において、リスク要因が検知されました。詳細を確認してください。',
+                changes: []
+            };
+        }
+
+        // デバッグ情報の表示（ユーザー要件：検証用）
+        const debugInfoHtml = `
+            <div class="debug-info-panel" style="margin-bottom: 20px; padding: 10px; background: #f8f9fa; border: 1px dashed #ccc; font-size: 11px; color: #555;">
+                <strong>🛠 デバッグ情報 (検証用)</strong><br>
+                Contract ID: ${contract.id}<br>
+                Source Type: ${contract.source_type || 'Unknown'}<br>
+                Storage Path: ${contract.pdf_storage_path || 'N/A'}<br>
+                Extracted Length: ${contract.extracted_text_length || 0} chars<br>
+                SHA-256 Hash: ${contract.extracted_text_hash || 'Not Calculated'}<br>
+                Updated At: ${contract.last_updated_at}
+            </div>
+        `;
+
+        const changesHtml = (diffData.changes.length > 0 ? diffData.changes : []).map(c => `
+            <div style="margin-bottom: 24px; border:1px solid #eee; border-radius:4px; overflow:hidden;">
+                <div style="background:#f0f0f0; padding:8px 12px; font-weight:600; font-size:12px; border-bottom:1px solid #eee;">
+                    ${c.section} <span style="font-weight:normal; color:#666; margin-left:8px;">(${c.type === 'modification' ? '変更' : '削除'})</span>
+                </div>
+                <div class="diff-container" style="height:auto; min-height:100px;">
+                    <div class="diff-pane diff-left"><span class="diff-del">${c.old}</span></div>
+                    <div class="diff-pane diff-right"><span class="diff-add">${c.new}</span></div>
+                </div>
+                ${(c.impact || c.concern) ? `
+                <div style="background:#fff8e1; padding:10px 12px; border-top:1px solid #ffeeba; font-size:12px; color:#5c3a00;">
+                    ${c.impact ? `<div style="margin-bottom:4px;"><strong><i class="fa-solid fa-scale-balanced"></i> 法的影響:</strong> ${c.impact}</div>` : ''}
+                    ${c.concern ? `<div><strong><i class="fa-solid fa-triangle-exclamation"></i> 懸念点:</strong> ${c.concern}</div>` : ''}
+                </div>
+                ` : ''}
+            </div>
+    `).join('');
+
+        return `
+            <div class="detail-split-container">
+                <!-- Breadcrumb & Top Actions -->
+                <div class="detail-split-header flex justify-between items-center">
+                    <div class="flex items-center gap-md">
+                        <a onclick="window.app.navigate('dashboard')" style="color:#666; font-size:12px; cursor:pointer;" title="戻る">
+                            <i class="fa-solid fa-arrow-left"></i>
+                        </a>
+                        <h2 style="font-size:18px; font-weight:700; color:var(--text-main); margin:0;">${diffData.title}</h2>
+                        <div class="flex gap-sm">
+                            <span class="badge ${contract.risk_level === 'High' ? 'badge-danger' : 'badge-warning'}">Risk: ★${diffData.riskLevel}</span>
+                            <span class="badge ${contract.status === '確認済' ? 'badge-neutral' : 'badge-warning'}">${contract.status}</span>
+                        </div>
+                        <div style="font-size:12px; color:#666; margin-top:4px;">
+                            ${contract.source_url ? `<i class="fa-solid fa-link"></i> Source: <a href="${contract.source_url}" target="_blank" style="color:#2196F3; text-decoration:underline;">${contract.source_url}</a>` : ''}
+                            ${contract.original_filename ? `<i class="fa-solid fa-file-pdf"></i> Original File: ${contract.original_filename}` : ''}
+                        </div>
+                    </div>
+                    <div class="flex gap-sm">
+                        <button class="btn-dashboard" onclick="window.app.showHistoryModal(${id})"><i class="fa-solid fa-clock-rotate-left"></i> 履歴・メモ</button>
+                        <button class="btn-dashboard" style="background:#fff;"><i class="fa-solid fa-share-nodes"></i> 共有</button>
+                        ${contract.status === '未処理'
+                ? ''
+                : contract.status === '未確認'
+                    ? `<button class="btn-dashboard btn-primary-action" onclick="window.app.confirmContract(${id})"><i class="fa-solid fa-check"></i> 確認済みにする</button>`
+                    : `<button class="btn-dashboard" disabled><i class="fa-solid fa-check"></i> 確認済み</button>`}
+                    </div>
+                </div>
+
+                <div class="detail-split-body">
+                    <!-- Left Pane: Analysis & Diffs -->
+                    <div class="pane">
+                        <div class="pane-header">
+                            <span><i class="fa-solid fa-clock-rotate-left"></i> バージョン履歴</span>
+                        </div>
+                        <div class="pane-scroll-area" style="max-height: 150px; overflow-y: auto; border-bottom: 1px solid #eee;">
+                            ${contract.history && contract.history.length > 0
+                ? contract.history.slice().reverse().map(h => `
+                                    <div class="history-item" onclick="window.app.viewHistory(${id}, ${h.version})" style="padding:8px 12px; border-bottom:1px solid #eee; cursor:pointer; font-size:12px; display:flex; justify-content:space-between; align-items:center;">
+                                        <span><i class="fa-solid fa-clock-rotate-left" style="color:#ccc; margin-right:6px;"></i> Version ${h.version} <span class="text-muted" style="margin-left:8px;">${h.date}</span></span>
+                                    </div>
+                                `).join('')
+                : '<div class="text-muted p-md text-center">履歴はありません</div>'
+            }
+                        </div>
+                        
+                        <div class="pane-header">
+                            <span><i class="fa-solid fa-magnifying-glass-chart"></i> AI解析・差分判定</span>
+                            <span class="text-muted" style="font-weight:normal; font-size:11px;">最終解析: ${contract.last_analyzed_at || '-'}</span>
+                        </div>
+                        <div class="pane-scroll-area">
+                            <div class="analysis-section-title">
+                                <i class="fa-solid fa-circle-exclamation text-warning"></i> 検知された重要な変更点
+                            </div>
+                            <div style="margin-bottom:32px;">
+                                ${changesHtml}
+                            </div>
+
+                            <div class="analysis-section-title">
+                                <i class="fa-solid fa-robot text-primary"></i> AIリスク要約
+                            </div>
+
+                            <div class="ai-summary" style="margin-bottom:32px;">
+                                <div class="risk-level ${contract.risk_level === 'High' ? 'text-danger' : 'text-warning'}">判定：${contract.risk_level === 'High' ? '要警戒' : '要確認'}</div>
+                                <p style="margin-bottom:12px; font-weight:600;">${diffData.riskReason}</p>
+                                <p class="text-muted">${diffData.summary}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Pane: Original Document -->
+                    <div class="pane">
+                        <div class="pane-header" style="display:flex; justify-content:space-between; align-items:center;">
+                            <span><i class="fa-solid fa-file-contract"></i> 比較対象の原本データ</span>
+                            <button class="btn-upload-version" onclick="window.app.uploadNewVersion(${id})">
+                                <i class="fa-solid fa-cloud-arrow-up"></i> 新しいバージョンをアップロード
+                            </button>
+                        </div>
+                        <div class="tabs-row">
+                            <button class="tab-item ${activeTab === 'diff' ? 'active' : ''}" onclick="window.app.setDetailTab('diff')">差分表示</button>
+                            <button class="tab-item ${activeTab === 'original' ? 'active' : ''}" onclick="window.app.setDetailTab('original')">原本全文</button>
+                        </div>
+                        <div style="background:#f9f9f9; padding:4px 12px; font-size:11px; color:#666; border-bottom:1px solid #eee;">
+                            <i class="fa-solid fa-file"></i> ${contract.original_filename || contract.source_url || ''}
+                        </div>
+                        <div class="pane-scroll-area document-pane-bg" style="${activeTab === 'original' && contract.pdf_url ? 'padding:0; overflow:hidden;' : ''}">
+                                ${activeTab === 'original' && contract.pdf_url
+                ? `<iframe src="${contract.pdf_url}" style="width:100%; height:100%; border:none;"></iframe>`
+                : `<div class="document-paper">
+                                    <div class="document-content">
+                                        ${activeTab === 'diff'
+                    ? (() => {
+                        // 差分表示ロジック
+                        if (!contract.history || contract.history.length === 0) {
+                            return '<div class="text-muted text-center" style="padding:40px;">比較対象となる旧バージョンがありません（初回登録）</div><br>' + (contract.original_content || '');
+                        }
+
+                        // 最新の旧バージョンを取得
+                        const previousVersion = contract.history[contract.history.length - 1].content;
+                        const currentVersion = contract.original_content || '';
+
+                        // jsdiffで差分生成 (文字単位)
+                        if (typeof Diff === 'undefined') {
+                            return '<div class="text-danger">エラー: Diffライブラリが読み込まれていません</div>';
+                        }
+
+                        const diff = Diff.diffChars(previousVersion, currentVersion);
+
+                        // HTML生成
+                        let diffHtml = diff.map(part => {
+                            const colorClass = part.added ? 'diff-inline-add' :
+                                part.removed ? 'diff-inline-del' : '';
+
+                            // エスケープ処理（XSS対策）
+                            const escapedValue = part.value
+                                .replace(/&/g, "&amp;")
+                                .replace(/</g, "&lt;")
+                                .replace(/>/g, "&gt;");
+                            // .replace(/\n/g, "<br>"); // pre-wrapを使うのでbrは不要だが、デザインによっては検討
+
+                            return colorClass ? `<span class="${colorClass}">${escapedValue}</span>` : escapedValue;
+                        }).join('');
+
+                        return `<div style="white-space: pre-wrap;">${diffHtml}</div>`;
+                    })()
+                    : (contract.original_content || (contract.source_type === 'URL' ? '<div class="text-center text-muted" style="padding:40px;">URLから取り込んだコンテンツです。<br><a href="' + (contract.pdf_storage_path || '#') + '" target="_blank">元のページを開く <i class="fa-solid fa-external-link-alt"></i></a></div>' : '原本データがありません'))}
+                                    </div>
+                                </div>`
+            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+`;
+    },
+
+    // 4. History
+    history: () => {
+        const logs = dbService.getActivityLogs();
+        const rows = logs.map(h => `
+            <tr>
+                <td>${h.created_at}</td>
+                <td class="col-name" title="${h.target_name}">${h.target_name}</td>
+                <td><span class="badge badge-success">${h.action}</span></td>
+                <td>${h.actor}</td>
+                <td><button class="btn-dashboard" style="padding:2px 8px; font-size:11px;" onclick="alert('詳細ログ機能は開発中です')">詳細</button></td>
+            </tr>
+    `).join('');
+
+        return `
+            <h2 class="page-title">解析ログ・監査履歴</h2>
+            <div class="table-container">
+                <table class="data-table history-table">
+                    <thead>
+                        <tr>
+                            <th>日時</th>
+                            <th>対象</th>
+                            <th>結果/操作</th>
+                            <th>実行者</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows || '<tr><td colspan="5" class="text-center text-muted">履歴はありません</td></tr>'}</tbody>
+                </table>
+            </div>
+`;
+    },
+
+    // 5. Team
+    team: () => {
+        const users = dbService.getUsers();
+        const rows = users.map(m => `
+            <tr>
+                <td class="col-name" title="${m.name}">${m.name}</td>
+                <td>${m.email}</td>
+                <td>
+                    <select onchange="window.app.updateUserRole('${m.email}', this.value)" style="border:1px solid #ddd; padding:4px; border-radius:4px;">
+                        <option value="管理者" ${m.role === '管理者' ? 'selected' : ''}>管理者</option>
+                        <option value="承認者" ${m.role === '承認者' ? 'selected' : ''}>承認者</option>
+                        <option value="閲覧のみ" ${m.role === '閲覧のみ' ? 'selected' : ''}>閲覧のみ</option>
+                    </select>
+                </td>
+                <td>${m.last_active_at}</td>
+                <td><button class="btn-dashboard" onclick="alert('編集機能は開発中です')">編集</button></td>
+            </tr>
+    `).join('');
+
+        return `
+            <div class="flex justify-between items-center mb-md">
+                <h2 class="page-title" style="margin-bottom:0;">チーム管理</h2>
+                <button class="btn-dashboard btn-primary-action" onclick="window.app.showInviteModal()"><i class="fa-solid fa-user-plus"></i> メンバー招待</button>
+            </div>
+    <div class="table-container">
+        <table class="data-table team-table">
+            <thead>
+                <tr>
+                    <th>名前</th>
+                    <th>メールアドレス</th>
+                    <th>権限</th>
+                    <th>最終アクティブ</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>
+    </div>
+`;
+    }
+};
+
+// --- Registration Flow Logic ---
+class RegistrationFlow {
+    constructor(app) {
+        this.app = app;
+        this.modal = document.getElementById('registration-modal');
+        this.modalBody = document.getElementById('modal-body');
+        this.modalTitle = document.getElementById('modal-title');
+        this.fileInput = document.getElementById('reg-file-input');
+        this.currentStep = 1;
+        this.tempData = {};
+    }
+
+    init() {
+        const openBtn = document.getElementById('open-registration-btn');
+        const closeBtn = document.getElementById('close-registration-modal');
+
+        if (openBtn) openBtn.onclick = () => this.open();
+        if (closeBtn) closeBtn.onclick = () => this.close();
+
+        if (this.modal) {
+            this.modal.onclick = (e) => {
+                if (e.target === this.modal) this.close();
+            };
+        }
+
+        if (this.fileInput) {
+            this.fileInput.onchange = (e) => this.handleFileSelect(e.target.files[0]);
+        }
+    }
+
+    open() {
+        this.currentStep = 1;
+        this.tempData = {};
+
+        // 先にレンダリング
+        this.renderStep();
+
+        // 次のフレームで表示（描画のちらつき防止＆滑らかさ向上）
+        requestAnimationFrame(() => {
+            if (this.modal) this.modal.classList.add('active');
+        });
+    }
+
+    close() {
+        if (this.modal) this.modal.classList.remove('active');
+        if (this.fileInput) this.fileInput.value = '';
+    }
+
+    renderStep() {
+        if (!this.modalBody) return;
+
+        if (this.currentStep === 1) {
+            this.modalTitle.textContent = "新規登録 - 登録方法の選択";
+            this.modalBody.innerHTML = `
+                <p class="reg-step-title">監視対象（契約書・規約）の追加方法を選んでください</p>
+                <div class="reg-method-card" id="reg-card-pdf">
+                    <div class="reg-method-icon"><i class="fa-solid fa-file-pdf"></i></div>
+                    <div class="reg-method-info">
+                        <h4>PDFをアップロード</h4>
+                        <p>ファイルをここにドロップするか、クリックして選択</p>
+                        <p style="font-size:11px; color:#ff9800; margin-top:4px;">※スキャンした画像PDFやパスワード付きPDFは文字を抽出できない場合があります</p>
+                    </div>
+                </div>
+                <div class="reg-method-card" onclick="window.app.registration.nextStep(2, {method: 'url'})">
+                    <div class="reg-method-icon"><i class="fa-solid fa-globe"></i></div>
+                    <div class="reg-method-info">
+                        <h4>URLを登録 (Web規約)</h4>
+                        <p>公開URLを監視対象に設定します</p>
+                    </div>
+                </div>
+            `;
+            this.bindCardEvents();
+        } else if (this.currentStep === 2) {
+            const isPdf = this.tempData.method === 'pdf';
+            const methodLabel = isPdf ? 'アップロードされたファイル' : '監視対象のURL';
+            const sourceVal = isPdf ? (this.tempData.fileName || '選択済み') : "";
+            const defaultName = this.tempData.fileName ? this.tempData.fileName.replace(/\.[^/.]+$/, "") : "";
+
+            this.modalBody.innerHTML = `
+                <div class="form-group">
+                    <label>管理名 (必須)</label>
+                    <input type="text" id="reg-name" class="form-control" placeholder="例: 利用規約 (2026年版)" value="${defaultName}">
+                </div>
+                <div class="form-group">
+                    <label>種別</label>
+                    <select id="reg-type" class="form-control">
+                        <option value="利用規約">利用規約</option>
+                        <option value="NDA">NDA (秘密保持契約)</option>
+                        <option value="業務委託契約">業務委託契約</option>
+                        <option value="プライバシーポリシー">プライバシーポリシー</option>
+                        <option value="その他">その他</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>${methodLabel}</label>
+                    <input type="text" id="reg-source" class="form-control" 
+                        placeholder="${isPdf ? '' : 'https://example.com/terms'}" 
+                        value="${sourceVal}" 
+                        ${isPdf ? 'readonly style="background:#f5f5f5; cursor:not-allowed;"' : ''}>
+                </div>
+                <div class="reg-actions">
+                    <button class="btn-dashboard" onclick="window.app.registration.nextStep(1)">戻る</button>
+                    <button class="btn-dashboard btn-primary-action" onclick="window.app.registration.submit()">登録する</button>
+                </div>
+            `;
+        } else if (this.currentStep === 3) {
+            this.modalTitle.textContent = "登録完了";
+            this.modalBody.innerHTML = `
+                <div class="reg-success-icon"><i class="fa-solid fa-check-circle"></i></div>
+                <div class="reg-success-text">
+                    <h4>登録を受け付けました</h4>
+                    <p>「${this.tempData.name}」を監視対象として登録しました。ダッシュボードから確認できます。</p>
+                </div>
+                <div class="reg-actions">
+                    <button class="btn-dashboard btn-primary-action" onclick="window.app.registration.close()">ダッシュボードへ</button>
+                </div>
+            `;
+        }
+    }
+
+    bindCardEvents() {
+        const cardPdf = document.getElementById('reg-card-pdf');
+        if (!cardPdf) return;
+
+        cardPdf.onclick = () => this.fileInput.click();
+
+        cardPdf.ondragover = (e) => {
+            e.preventDefault();
+            cardPdf.classList.add('drop-active');
+        };
+        cardPdf.ondragleave = () => {
+            cardPdf.classList.remove('drop-active');
+        };
+        cardPdf.ondrop = (e) => {
+            e.preventDefault();
+            cardPdf.classList.remove('drop-active');
+            if (e.dataTransfer.files.length > 0) {
+                this.handleFileSelect(e.dataTransfer.files[0]);
+            }
+        };
+    }
+
+    handleFileSelect(file) {
+        if (!file) return;
+        if (file.type !== 'application/pdf') {
+            alert('PDFファイルを選択してください');
+            return;
+        }
+
+        this.nextStep(2, {
+            method: 'pdf',
+            fileName: file.name,
+            fileSize: file.size,
+            fileData: file  // ファイルオブジェクトを保持
+        });
+    }
+
+    nextStep(step, data = {}) {
+        this.tempData = { ...this.tempData, ...data };
+        this.currentStep = step;
+        this.renderStep();
+    }
+
+    async submit() {
+        const nameInput = document.getElementById('reg-name');
+        const typeInput = document.getElementById('reg-type');
+        const sourceInput = document.getElementById('reg-source');
+
+        const name = nameInput ? nameInput.value : "";
+        const type = typeInput ? typeInput.value : "";
+        const source = sourceInput ? sourceInput.value : "";
+
+        if (!name) {
+            alert('管理名を入力してください');
+            return;
+        }
+
+        this.tempData.name = name;
+        this.tempData.type = type;
+        this.tempData.source = source;
+
+        // ローディング表示（抽出中）
+        const isPdf = this.tempData.method === 'pdf';
+        const loadingText = isPdf ? 'PDFを取り込み中...' : 'URLから規約を解析中...';
+        const loadingSubText = isPdf ? '解析準備をしています' : 'Webサイトから詳細を取得しています';
+
+        const loadingMsg = document.createElement('div');
+        loadingMsg.id = 'reg-loading';
+        loadingMsg.style.cssText = 'position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:white; padding:30px; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,0.3); z-index:10005; text-align:center; min-width:300px;';
+        loadingMsg.innerHTML = `<div class="custom-loader"></div><br><strong>${loadingText}</strong><br><span style="font-size:12px; color:#666;">${loadingSubText}</span>`;
+        document.body.appendChild(loadingMsg);
+
+        // 背景を暗くするオーバーレイ
+        const overlay = document.createElement('div');
+        overlay.id = 'reg-overlay';
+        overlay.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10004;';
+        document.body.appendChild(overlay);
+
+        // UI描画を確実にするための短い遅延
+        await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 50)));
+
+        try {
+            // DBに登録
+            const newContract = dbService.addContract({
+                name: this.tempData.name || (this.tempData.method === 'pdf' ? this.tempData.fileData.name : 'Web規約'),
+                type: this.tempData.type, // デフォルト
+                sourceUrl: this.tempData.method === 'url' ? this.tempData.source : '',
+                originalFilename: this.tempData.method === 'pdf' ? this.tempData.fileData.name : ''
+            });
+            // 2. テキスト抽出を実行（失敗しても登録は維持する）
+            try {
+                await this.extractTextOnly(newContract.id);
+            } catch (extractError) {
+                console.error('Text Extraction Failed (Non-fatal):', extractError);
+                // 失敗時はステータスを更新しておく（ユーザーには後で通知）
+                // NOTE: dbService側で自動的に '未処理' になっているはずだが、エラー情報を残すならここで更新
+            }
+
+            // 3. 完了処理
+            if (document.getElementById('reg-loading')) document.getElementById('reg-loading').remove();
+            if (document.getElementById('reg-overlay')) document.getElementById('reg-overlay').remove();
+
+            this.close();
+
+            // 4. 詳細ページへ遷移（まずは原本を表示して安心させる）
+            this.app.activeDetailTab = 'original';
+            this.app.navigate('diff', newContract.id);
+            this.app.showToast('✅ 読み込み完了<br><small>※AI解析用テキストは「差分表示」で確認できます</small>', 'success', 5000);
+
+        } catch (error) {
+            console.error('Registration Error:', error);
+            if (document.getElementById('reg-loading')) document.getElementById('reg-loading').remove();
+            if (document.getElementById('reg-overlay')) document.getElementById('reg-overlay').remove();
+            alert('登録中にエラーが発生しました: ' + error.message);
+        }
+    }
+
+    async extractTextOnly(contractId) {
+        try {
+            let sourceData = this.tempData.source;
+
+            // PDFの場合はFileReaderでBase64に変換
+            if (this.tempData.method === 'pdf' && this.tempData.fileData) {
+                sourceData = await aiService.convertFileToBase64(this.tempData.fileData);
+            }
+
+            // バックエンドAPIにテキスト抽出リクエスト
+            const result = await aiService.analyzeContract(
+                contractId,
+                this.tempData.method,
+                sourceData,
+                null  // previousVersion なし
+            );
+
+            if (result.success) {
+                // 抽出されたテキストのみを保存（AI解析結果は保存しない）
+                dbService.updateContractText(contractId, {
+                    extractedText: result.data.extractedText,
+                    extractedTextHash: result.data.extractedTextHash,
+                    extractedTextLength: result.data.extractedTextLength,
+                    sourceType: result.data.sourceType,
+                    pdfStoragePath: result.data.pdfStoragePath,
+                    pdfUrl: result.data.pdfUrl,
+                    status: '未処理'  // 差分がまだないので未処理
+                });
+
+                console.log('Text extraction completed');
+                return true;
+            } else {
+                throw new Error(result.error || 'テキスト抽出に失敗しました');
+            }
+
+        } catch (error) {
+            console.error('テキスト抽出エラー:', error);
+
+            // エラーステータスに更新
+            dbService.updateContractStatus(contractId, '登録失敗');
+
+            console.warn(`テキスト抽出に失敗: ${error.message}`);
+        }
+    }
+
+    async startAIAnalysis(contractId) {
+        try {
+            console.log(`Starting AI analysis for contract ${contractId}`);
+
+            let sourceData = this.tempData.source;
+
+            // PDFの場合はFileReaderでBase64に変換
+            if (this.tempData.method === 'pdf' && this.tempData.fileData) {
+                sourceData = await aiService.convertFileToBase64(this.tempData.fileData);
+            }
+
+            // バックエンドAPIに解析リクエスト
+            const result = await aiService.analyzeContract(
+                contractId,
+                this.tempData.method,
+                sourceData,
+                null  // previousVersion は将来の機能
+            );
+
+            if (result.success) {
+                // 解析結果をDBに保存
+                dbService.updateContractAnalysis(contractId, {
+                    extractedText: result.data.extractedText,
+                    changes: result.data.changes,
+                    riskLevel: result.data.riskLevel,
+                    riskReason: result.data.riskReason,
+                    summary: result.data.summary,
+                    status: '未確認'  // 解析完了、確認待ち
+                });
+
+                // UIを更新
+                if (this.app.currentView === 'dashboard' || this.app.currentView === 'contracts') {
+                    this.app.navigate(this.app.currentView);
+                }
+
+                alert('✅ AI解析が完了しました！\n\n契約書の差分とリスク判定が完了しました。');
+            } else {
+                throw new Error(result.error || '解析に失敗しました');
+            }
+
+        } catch (error) {
+            console.error('AI解析エラー:', error);
+
+            // エラーステータスに更新
+            dbService.updateContractStatus(contractId, '解析失敗');
+
+            // ユーザーにエラーを通知
+            alert(`❌ AI解析中にエラーが発生しました\n\n${error.message}\n\nバックエンドサーバーが起動しているか確認してください。`);
+        }
+    }
+}
+
+// --- App Logic ---
+class DashboardApp {
+    constructor() {
+        this.currentView = 'dashboard';
+        this.mainContent = document.getElementById('app-content');
+        this.pageTitle = document.getElementById('page-header-title');
+        this.currentViewParams = null;
+
+        // Navigation State
+        this.searchQuery = "";
+        this.currentPage = 1;
+        this.dashboardFilter = "pending";
+        this.activeDetailTab = 'diff';
+        this.filters = {
+            query: "",
+            risk: "all",
+            status: "all",
+            type: "all",
+            sortBy: "date_desc"
+        };
+        this.searchTimeout = null;
+
+        // Registration Flow
+        this.registration = new RegistrationFlow(this);
+    }
+
+    init() {
+        try {
+            console.log('Dashboard App Initializing...');
+            dbService.init();
+            this.bindEvents();
+            this.registration.init();
+            this.navigate('dashboard');
+            console.log('Dashboard App Initialized Successfully');
+        } catch (error) {
+            console.error('Initialization Error:', error);
+            alert('ダッシュボードの初期化中にエラーが発生しました。詳細はコンソールを確認してください。');
+        }
+    }
+
+    bindEvents() {
+        const toggle = document.getElementById('sidebar-toggle');
+        const sidebar = document.getElementById('app-sidebar');
+        const main = document.getElementById('app-main');
+
+        if (toggle && sidebar) {
+            toggle.addEventListener('click', () => {
+                sidebar.classList.toggle('active');
+            });
+            if (main) {
+                main.addEventListener('click', (e) => {
+                    if (window.innerWidth <= 768 && sidebar.classList.contains('active')) {
+                        if (!toggle.contains(e.target)) {
+                            sidebar.classList.remove('active');
+                        }
+                    }
+                });
+            }
+        }
+    }
+
+    navigate(viewId, params = null) {
+        console.log(`Navigating to ${viewId}`, params);
+        this.currentView = viewId;
+
+        // Toggle Fluid Layout Mode for Detail View
+        if (viewId === 'diff') {
+            this.mainContent.classList.add('is-detail-view');
+        } else {
+            this.mainContent.classList.remove('is-detail-view');
+        }
+
+        if (viewId !== 'contracts') {
+            this.searchQuery = "";
+            this.currentPage = 1;
+        }
+
+        let renderParams = params;
+        if (viewId === 'contracts') {
+            renderParams = {
+                page: this.currentPage,
+                ...this.filters,
+                ...params
+            };
+        }
+        if (viewId === 'diff') {
+            this.currentViewParams = params;
+        }
+
+        const navMap = {
+            'dashboard': 0, 'contracts': 1, 'history': 2, 'team': 3
+        };
+
+        if (navMap.hasOwnProperty(viewId)) {
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            const navItems = document.querySelectorAll('.nav-item');
+            const navIndex = navMap[viewId];
+            if (navItems[navIndex]) navItems[navIndex].classList.add('active');
+        }
+
+        if (Views[viewId]) {
+            try {
+                this.mainContent.innerHTML = Views[viewId](renderParams);
+
+                let title = 'ダッシュボード';
+                if (viewId === 'contracts') title = '契約管理';
+                if (viewId === 'diff') title = '差分詳細';
+                if (viewId === 'history') title = '解析履歴';
+                if (viewId === 'team') title = 'チーム設定';
+                this.pageTitle.textContent = title;
+
+                window.scrollTo(0, 0);
+
+                if (viewId === 'contracts' && this.filters.query) {
+                    const searchInput = document.getElementById('contract-search');
+                    if (searchInput) {
+                        searchInput.focus();
+                        searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
+                    }
+                }
+            } catch (error) {
+                console.error(`View Render Error (${viewId}):`, error);
+                this.mainContent.innerHTML = '<div class="p-md text-danger">画面の表示中にエラーが発生しました。</div>';
+            }
+        }
+    }
+
+    setDashboardFilter(filter) {
+        this.dashboardFilter = filter;
+        const filteredItems = dbService.getFilteredContracts(filter);
+
+        const titleEl = document.getElementById('dashboard-section-title');
+        if (titleEl) {
+            let sectionTitle = "要確認アイテム (優先度順)";
+            if (filter === 'pending') sectionTitle = "未処理のアイテム (新着・変更検知)";
+            if (filter === 'risk') sectionTitle = "リスク要判定アイテム";
+            if (filter === 'total') sectionTitle = "全監視対象（最新順）";
+            titleEl.textContent = sectionTitle;
+        }
+
+        const tableBody = document.getElementById('dashboard-table-body');
+        if (tableBody) {
+            const rows = filteredItems.length > 0 ? filteredItems.slice(0, 10).map(c => {
+                let riskBadgeClass = 'badge-neutral';
+                if (c.risk_level === 'High') riskBadgeClass = 'badge-danger';
+                else if (c.risk_level === 'Medium') riskBadgeClass = 'badge-warning';
+                else if (c.risk_level === 'Low') riskBadgeClass = 'badge-success';
+
+                let statusBadge = '';
+                if (c.status === '未解析') statusBadge = '<span class="badge badge-info">未解析 (新規)</span>';
+                else if (c.status === '未確認') statusBadge = '<span class="badge badge-warning">要確認 (変更)</span>';
+                else if (c.status === '確認済') statusBadge = '<span class="badge badge-neutral"><i class="fa-solid fa-check"></i> 確認済</span>';
+
+                return `
+                    <tr onclick="window.app.navigate('diff', ${c.id})">
+                        <td><span class="badge ${riskBadgeClass}">${c.risk_level}</span></td>
+                        <td class="col-name" title="${c.name}">${c.name}</td>
+                        <td>${c.last_updated_at}</td>
+                        <td>${statusBadge}</td>
+                        <td><button class="btn-dashboard">${c.status === '確認済' ? '履歴を見る' : '確認する'}</button></td>
+                    </tr>
+                `;
+            }).join('') : '<tr><td colspan="5" class="text-center text-muted" style="padding:40px;">該当するアイテムはありません</td></tr>';
+            tableBody.innerHTML = rows;
+        }
+
+        document.querySelectorAll('.stat-card').forEach(card => {
+            card.classList.remove('active');
+            const isActive = (filter === 'pending' && card.textContent.includes('未処理')) ||
+                (filter === 'risk' && card.textContent.includes('リスク要判定')) ||
+                (filter === 'total' && card.textContent.includes('監視中'));
+            if (isActive) card.classList.add('active');
+        });
+    }
+
+    // --- Action Handlers ---
+
+    updateFilter(key, value) {
+        this.filters[key] = value;
+        this.currentPage = 1;
+
+        if (key === 'query') {
+            clearTimeout(this.searchTimeout);
+            this.searchTimeout = setTimeout(() => this.navigate('contracts'), 300);
+        } else {
+            this.navigate('contracts');
+        }
+    }
+
+    setDetailTab(tab) {
+        this.activeDetailTab = tab;
+        this.navigate('diff', this.currentViewParams);
+    }
+
+    searchContracts(query) {
+        this.updateFilter('query', query);
+    }
+
+    changePage(newPage) {
+        this.currentPage = newPage;
+        this.navigate('contracts', { page: newPage });
+    }
+
+    confirmContract(id) {
+        if (dbService.updateContractStatus(id, '確認済')) {
+            // alert('確認済みに更新しました'); // Removed alert as per instruction
+            this.navigate('diff', id); // Changed navigation as per instruction
+        }
+    }
+
+    async analyzeContract(id) {
+        const contract = dbService.getContractById(id);
+        if (!contract) {
+            alert('契約が見つかりません');
+            return;
+        }
+
+        if (!contract.original_content) {
+            alert('元のテキストが見つかりません。再度登録してください。');
+            return;
+        }
+
+        // 確認ダイアログ
+        if (!confirm(`「${contract.name}」の差分解析を実行しますか？\n\nAI解析により、リスク判定と変更箇所の抽出を行います。`)) {
+            return;
+        }
+
+        try {
+            // ローディング表示
+            const loadingMsg = document.createElement('div');
+            loadingMsg.style.cssText = 'position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:white; padding:30px; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,0.3); z-index:10000; text-align:center;';
+            loadingMsg.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="font-size:32px; color:#4CAF50;"></i><br><br><strong>AI解析中...</strong><br><span style="font-size:12px; color:#666;">数秒お待ちください</span>';
+            document.body.appendChild(loadingMsg);
+
+            // AI解析を実行（previousVersionとして元のテキストを使用）
+            const result = await aiService.analyzeContract(
+                id,
+                'text',  // テキストとして送信
+                contract.original_content,
+                null  // 将来的には旧バージョンとの比較に使用
+            );
+
+            // ローディング削除
+            document.body.removeChild(loadingMsg);
+
+            if (result.success) {
+                // 解析結果をDBに保存
+                dbService.updateContractAnalysis(id, {
+                    extractedText: contract.original_content,  // 既存のテキストを保持
+                    changes: result.data.changes,
+                    riskLevel: result.data.riskLevel,
+                    riskReason: result.data.riskReason,
+                    summary: result.data.summary,
+                    status: '未確認'  // 解析完了、確認待ち
+                });
+
+                // 画面を再読み込み
+                this.navigate('diff', id);
+
+                alert('✅ AI解析が完了しました！\n\nリスク判定と差分抽出が完了しました。');
+            } else {
+                throw new Error(result.error || '解析に失敗しました');
+            }
+
+        } catch (error) {
+            console.error('AI解析エラー:', error);
+            alert(`❌ AI解析中にエラーが発生しました\n\n${error.message}`);
+        }
+    }
+
+    uploadNewVersion(id) {
+        const contract = dbService.getContractById(id);
+        if (!contract) {
+            alert('契約が見つかりません');
+            return;
+        }
+
+        // ファイル選択ダイアログを表示
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'application/pdf';
+
+        // input.click() をトリガーする前にイベントハンドラを設定
+        input.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            if (file.type !== 'application/pdf') {
+                alert('PDFファイルを選択してください');
+                return;
+            }
+
+            const performAnalysis = async (retryCount = 0) => {
+                try {
+                    // ローディング表示
+                    const loadingMsg = document.createElement('div');
+                    loadingMsg.id = 'analysis-loading';
+                    loadingMsg.style.cssText = 'position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:white; padding:30px; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,0.3); z-index:10000; text-align:center; min-width:300px;';
+                    loadingMsg.innerHTML = `<div class="custom-loader"></div><br><strong>PDFドキュメントを解析中...${retryCount > 0 ? '(再試行中)' : ''}</strong><br><span style="font-size:12px; color:#666;">テキストデータとレイアウトを抽出しています<br>※スキャンデータなどは時間がかかる場合があります</span>`;
+                    document.body.appendChild(loadingMsg);
+
+                    // 背景オーバーレイ
+                    let overlay = document.getElementById('analysis-overlay');
+                    if (!overlay) {
+                        overlay = document.createElement('div');
+                        overlay.id = 'analysis-overlay';
+                        overlay.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999;';
+                        document.body.appendChild(overlay);
+                    }
+
+                    // UI描画待ち
+                    await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 50)));
+
+                    // PDFをBase64に変換
+                    const base64Data = await aiService.convertFileToBase64(file);
+
+                    // 旧バージョンのテキストを取得
+                    const previousVersion = contract.original_content;
+
+                    // AI解析を実行（差分検出）
+                    const result = await aiService.analyzeContract(
+                        id,
+                        'pdf',
+                        base64Data,
+                        previousVersion
+                    );
+
+                    // ローディング削除
+                    if (document.getElementById('analysis-loading')) document.getElementById('analysis-loading').remove();
+                    if (document.getElementById('analysis-overlay')) document.getElementById('analysis-overlay').remove();
+
+                    if (result.success) {
+                        // 解析結果をDBに保存
+                        dbService.updateContractAnalysis(id, {
+                            extractedText: result.data.extractedText,
+                            extractedTextHash: result.data.extractedTextHash,
+                            extractedTextLength: result.data.extractedTextLength,
+                            sourceType: result.data.sourceType,
+                            pdfStoragePath: result.data.pdfStoragePath,
+                            pdfUrl: result.data.pdfUrl,
+                            changes: result.data.changes,
+                            riskLevel: result.data.riskLevel,
+                            riskReason: result.data.riskReason,
+                            summary: result.data.summary,
+                            status: '未確認',
+                            originalFilename: file.name
+                        });
+
+                        // 画面を再読み込み
+                        this.navigate('diff', id);
+
+                        // 部分的な失敗（AI解析のみ失敗）のチェック
+                        if (result.data.riskReason && result.data.riskReason.includes("AI解析サーバーからの応答がありませんでした")) {
+                            if (confirm("⚠️ AI解析に失敗しました。\n\nテキストデータの取り込みは完了しましたが、AIによるリスク判定ができませんでした。\n\nもう一度解析を試みますか？\n（[OK]を押すと再試行します）")) {
+                                await performAnalysis(retryCount + 1);
+                                return;
+                            } else {
+                                this.showToast('⚠️ 解析は不完全ですが保存しました', 'warning', 5000);
+                            }
+                        } else {
+                            this.showToast('✅ 差分解析が完了しました', 'success', 5000);
+                        }
+
+                    } else {
+                        throw new Error(result.error || '解析に失敗しました');
+                    }
+
+                } catch (error) {
+                    console.error('AI解析エラー:', error);
+                    if (document.getElementById('analysis-loading')) document.getElementById('analysis-loading').remove();
+                    if (document.getElementById('analysis-overlay')) document.getElementById('analysis-overlay').remove();
+
+                    if (confirm(`❌ エラーが発生しました\n\n${error.message}\n\nもう一度試しますか？`)) {
+                        await performAnalysis(retryCount + 1);
+                    }
+                }
+            };
+
+            await performAnalysis();
+        };
+
+        // ファイル選択ダイアログを表示
+        input.click();
+    }
+
+    showSuccessModal(title, message) {
+        // 既存のモダルがあれば削除
+        const existing = document.getElementById('success-modal');
+        if (existing) existing.remove();
+
+        const modal = document.createElement('div');
+        modal.id = 'success-modal';
+        modal.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:11000; animation: fadeIn 0.3s;';
+
+        modal.innerHTML = `
+            <div style="background:white; width:90%; max-width:450px; border-radius:12px; padding:32px; text-align:center; box-shadow:0 10px 40px rgba(0,0,0,0.2); animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);">
+                <div style="width:60px; height:60px; background:#e6ffed; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 20px; color:#28a745; font-size:30px;">
+                    <i class="fa-solid fa-check"></i>
+                </div>
+                <h3 style="margin:0 0 12px; color:#24292E; font-size:20px; font-weight:700;">${title}</h3>
+                <p style="margin:0 0 24px; color:#586069; font-size:14px; line-height:1.6;">${message}</p>
+                <button class="btn-dashboard btn-primary-action" style="padding:10px 32px; font-size:14px;" onclick="document.getElementById('success-modal').remove()">OK</button>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        // アニメーション用スタイル定義（なければ追加）
+        if (!document.getElementById('modal-styles')) {
+            const style = document.createElement('style');
+            style.id = 'modal-styles';
+            style.innerText = `
+                @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+                @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+            `;
+            document.head.appendChild(style);
+        }
+    }
+
+    addMemo(id) {
+        const input = document.getElementById('modal-memo-input');
+        if (input && input.value.trim()) {
+            const contract = dbService.getContractById(id);
+            dbService.addActivityLog(`Memo: ${input.value}`, contract.name);
+
+            // モダル内のリストを更新
+            this.showHistoryModal(id);
+        }
+    }
+
+    showHistoryModal(id) {
+        const contract = dbService.getContractById(id);
+        const logs = dbService.getActivityLogs().filter(l => l.target_name === contract.name); // 名前でフィルタリング
+
+        // 既存のモダルがあれば削除
+        const existing = document.getElementById('history-modal');
+        if (existing) existing.remove();
+
+        const modal = document.createElement('div');
+        modal.id = 'history-modal';
+        modal.className = 'modal-overlay active';
+
+        const logsHtml = logs.length > 0 ? logs.map(l => `
+            <div style="padding:12px; border-bottom:1px solid #eee;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                    <span style="font-weight:600; font-size:12px; color:#333;">${l.actor}</span>
+                    <span style="font-size:11px; color:#999;">${l.created_at}</span>
+                </div>
+                <div style="font-size:13px; color:#555;">${l.action}</div>
+            </div>
+        `).join('') : '<div style="padding:20px; text-align:center; color:#999;">履歴はありません</div>';
+
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width:600px;">
+                <div class="modal-header">
+                    <h3>監査履歴・社内メモ</h3>
+                    <button class="btn-close" onclick="document.getElementById('history-modal').remove()">&times;</button>
+                </div>
+                <div class="modal-body" style="padding:0;">
+                    <div style="max-height:300px; overflow-y:auto; background:#f9f9f9;">
+                        ${logsHtml}
+                    </div>
+                    <div style="padding:16px; border-top:1px solid #ddd; background:#fff;">
+                        <textarea id="modal-memo-input" style="width:100%; border:1px solid #ddd; padding:10px; border-radius:4px; font-family:inherit; min-height:80px; resize:vertical; margin-bottom:10px;" placeholder="メモを入力..."></textarea>
+                        <button class="btn-dashboard btn-primary-action" style="width:100%;" onclick="window.app.addMemo(${id})">メモを記録</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    updateUserRole(email, newRole) {
+        if (dbService.updateUserRole(email, newRole)) {
+            console.log(`Role updated for ${email} to ${newRole} `);
+        }
+    }
+
+    showInviteModal() {
+        const name = prompt('名前を入力してください');
+        const email = prompt('メールアドレスを入力してください');
+        if (name && email) {
+            dbService.addUser(name, email, '閲覧のみ');
+            this.navigate('team');
+        }
+    }
+
+
+    viewHistory(contractId, version) {
+        const contract = dbService.getContractById(contractId);
+        if (!contract || !contract.history) return;
+
+        const historyItem = contract.history.find(h => h.version === version);
+        if (!historyItem) return;
+
+        // 【修正】モーダルは使用せず、右側のペインに直接表示する（インライン表示）
+        // 既存のモーダルがあれば削除（念のため）
+        document.querySelectorAll('.modal').forEach(m => m.remove());
+
+        // 右側のペインを取得 (Diffビューの構成に依存: .pane の2つ目)
+        const panes = document.querySelectorAll('.pane');
+        if (panes.length < 2) {
+            // もしDiffビューでない場合、一旦移動してからリトライ
+            this.navigate('diff', contractId);
+            setTimeout(() => this.viewHistory(contractId, version), 300);
+            return;
+        }
+
+        const rightPane = panes[1];
+
+        // ヘッダーを一時的に書き換え（ハイライト）
+        rightPane.querySelector('.pane-header').style.background = '#fff8e1';
+        rightPane.querySelector('.pane-header').style.borderBottom = '1px solid #ffe0b2';
+
+        // ヘッダー内容を書き換え
+        rightPane.querySelector('.pane-header').innerHTML = `
+            <div style="display:flex; justify-content:center; align-items:center; width:100%; position:relative;">
+                <span style="position:absolute; left:0; font-weight:bold; color:#d4a017; display:flex; align-items:center; font-size:12px;">
+                    <i class="fa-solid fa-clock-rotate-left" style="margin-right:6px;"></i> Version ${version} 
+                </span>
+                <button class="btn-dashboard" onclick="window.app.navigate('diff', ${contractId})" style="background:#fff; border:1px solid #c5a059; font-weight:600; font-size:13px; padding:6px 20px; color:#c5a059; border-radius:20px; transition:all 0.2s;">
+                    <i class="fa-solid fa-rotate-left"></i> 最新版(原本)に戻す
+                </button>
+            </div>
+        `;
+
+        // タブとサブ情報を非表示にする
+        const tabsRow = rightPane.querySelector('.tabs-row');
+        if (tabsRow) tabsRow.style.display = 'none';
+
+        // サブ情報（ファイル名など）を非表示にする
+        // tabs-rowの次の要素を想定
+        if (tabsRow && tabsRow.nextElementSibling) {
+            tabsRow.nextElementSibling.style.display = 'none';
+        }
+
+        // コンテンツエリアを書き換え
+        const contentArea = rightPane.querySelector('.document-content');
+        if (contentArea) {
+            // スクロールをトップへ
+            const scrollArea = rightPane.querySelector('.pane-scroll-area');
+            if (scrollArea) {
+                scrollArea.scrollTop = 0;
+                scrollArea.style.background = '#fafffd'; // 少し背景色を変える
+            }
+
+            // テキストを挿入
+            contentArea.textContent = historyItem.content;
+            contentArea.style.color = '#444';
+        }
+
+        // this.showToast(`Version ${version} をプレビュー中`, 'info'); // ポップアップ非表示
+    }
+
+    // 履歴・メモボタン用（最新の履歴をインライン表示）
+    showHistoryModal(contractId) {
+        const contract = dbService.getContractById(contractId);
+        if (contract && contract.history && contract.history.length > 0) {
+            const latest = contract.history[contract.history.length - 1];
+            this.viewHistory(contractId, latest.version);
+        } else {
+            console.log('No history to show');
+        }
+    }
+
+    exportCSV() {
+        const contracts = dbService.getContracts();
+        let csvContent = "data:text/csv;charset=utf-8,ID,契約名,種別,最終更新,リスク,状態,担当者\n";
+        contracts.forEach(c => {
+            csvContent += `${c.id},${c.name},${c.type},${c.last_updated_at},${c.risk_level},${c.status},${c.assignee_name} \n`;
+        });
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `diffsense_contracts_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    showToast(message, type = 'info') {
+        // 中央モーダル通知を表示
+        const toast = document.createElement('div');
+        toast.className = 'toast-modal';
+        toast.innerHTML = `
+            <div class="toast-modal-content">
+                <i class="fa-solid ${type === 'success' ? 'fa-circle-check' : type === 'error' ? 'fa-circle-xmark' : 'fa-info-circle'}" style="font-size:48px; color:${type === 'success' ? '#4CAF50' : type === 'error' ? '#D73A49' : '#2196F3'}; margin-bottom:16px;"></i>
+                <p style="font-size:16px; font-weight:500; color:#24292E; margin-bottom:24px;">${message}</p>
+                <button class="btn-check-doc" onclick="this.closest('.toast-modal').remove()">取り込んだ資料を確認する</button>
+            </div>
+        `;
+
+        document.body.appendChild(toast);
+
+        // アニメーション表示
+        setTimeout(() => toast.classList.add('show'), 10);
+
+        // 5秒後に自動削除（少し長くする）
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => {
+                if (document.body.contains(toast)) {
+                    document.body.removeChild(toast);
+                }
+            }, 300);
+        }, 5000);
+    }
+}
+
+// Global App Instance
+window.app = new DashboardApp();
+document.addEventListener('DOMContentLoaded', () => window.app.init());

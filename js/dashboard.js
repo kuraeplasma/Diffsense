@@ -218,14 +218,14 @@ const Views = {
 
         // デバッグ情報の表示（ユーザー要件：検証用）
         const debugInfoHtml = `
-            <div class="debug-info-panel" style="margin-bottom: 20px; padding: 10px; background: #f8f9fa; border: 1px dashed #ccc; font-size: 11px; color: #555;">
-                <strong>🛠 デバッグ情報 (検証用)</strong><br>
-                Contract ID: ${contract.id}<br>
-                Source Type: ${contract.source_type || 'Unknown'}<br>
-                Storage Path: ${contract.pdf_storage_path || 'N/A'}<br>
-                Extracted Length: ${contract.extracted_text_length || 0} chars<br>
-                SHA-256 Hash: ${contract.extracted_text_hash || 'Not Calculated'}<br>
-                Updated At: ${contract.last_updated_at}
+            <div class="debug-info-panel" style="margin-bottom: 20px; padding: 10px; background: #fff0f0; border: 2px solid red; font-size: 11px; color: #333;">
+                <strong>🛠 強制デバッグモード (PDF検証)</strong><br>
+                Contract ID: <b>${contract.id}</b><br>
+                Source Type: <b>${contract.source_type}</b><br>
+                PDF URL (DB): <b>${contract.pdf_url ? contract.pdf_url : '<span style="color:red">NULL</span>'}</b><br>
+                Storage Path: <b>${contract.pdf_storage_path ? contract.pdf_storage_path : '<span style="color:red">NULL</span>'}</b><br>
+                Original Filename: ${contract.original_filename}<br>
+                <button onclick="alert('PDF URL: ' + '${contract.pdf_url}')">URL確認</button>
             </div>
         `;
 
@@ -257,23 +257,16 @@ const Views = {
                         </a>
                         <h2 style="font-size:18px; font-weight:700; color:var(--text-main); margin:0;">${diffData.title}</h2>
                         <div class="flex gap-sm">
-                            ${(() => {
-                if (contract.status === '未解析') return `<span class="badge badge-neutral" style="color:#aaa;">-</span>`;
-
-                if (contract.risk_level === 'High') return `<span class="badge badge-danger">High</span>`;
-                if (contract.risk_level === 'Medium') return `<span class="badge badge-warning">Med</span>`;
-                if (contract.risk_level === 'Low') return `<span class="badge badge-success">Low</span>`;
-
-                return `<span class="badge badge-success">No</span>`;
-            })()}                   <span class="badge ${contract.status === '確認済' ? 'badge-neutral' : 'badge-warning'}">${contract.status}</span>
+                            <span class="badge ${contract.risk_level === 'High' ? 'badge-danger' : 'badge-warning'}">Risk: ★${diffData.riskLevel}</span>
+                            <span class="badge ${contract.status === '確認済' ? 'badge-neutral' : 'badge-warning'}">${contract.status}</span>
                         </div>
                         <div style="font-size:12px; color:#666; margin-top:4px;">
-                            ${contract.source_url ? `<i class="fa-solid fa-link"></i> <a href="${contract.source_url}" target="_blank" style="color:#2196F3; text-decoration:underline;">${contract.source_url}</a>` : ''}
-                            ${contract.original_filename && !contract.original_filename.startsWith('http') ? `<i class="fa-solid fa-file-pdf"></i> Original File: ${contract.original_filename}` : ''}
+                            ${contract.source_url ? `<i class="fa-solid fa-link"></i> Source: <a href="${contract.source_url}" target="_blank" style="color:#2196F3; text-decoration:underline;">${contract.source_url}</a>` : ''}
+                            ${contract.original_filename ? `<i class="fa-solid fa-file-pdf"></i> Original File: ${contract.original_filename}` : ''}
                         </div>
                     </div>
                     <div class="flex gap-sm">
-                        <button class="btn-dashboard" onclick="window.app.showHistoryModal(${id})"><i class="fa-solid fa-clock-rotate-left"></i> 履歴・メモ</button>
+                        <button class="btn-dashboard" onclick="window.app.showHistoryModal(${id})"><i class="fa-solid fa-note-sticky"></i> メモ</button>
                         <button class="btn-dashboard" style="background:#fff;"><i class="fa-solid fa-share-nodes"></i> 共有</button>
                         ${contract.status === '未処理'
                 ? ''
@@ -286,6 +279,8 @@ const Views = {
                 <div class="detail-split-body">
                     <!-- Left Pane: Analysis & Diffs -->
                     <div class="pane">
+                        <div class="pane-header">
+                            <span><i class="fa-solid fa-clock-rotate-left"></i> バージョン履歴</span>
                         </div>
                         <div class="pane-scroll-area" style="max-height: 150px; overflow-y: auto; border-bottom: 1px solid #eee;">
                             ${contract.history && contract.history.length > 0
@@ -315,7 +310,7 @@ const Views = {
                             </div>
 
                             <div class="ai-summary" style="margin-bottom:32px;">
-                                <div class="risk-level ${contract.risk_level === 'High' ? 'text-danger' : 'text-warning'}">判定：${contract.risk_level}</div>
+                                <div class="risk-level ${contract.risk_level === 'High' ? 'text-danger' : 'text-warning'}">判定：${contract.risk_level === 'High' ? '要警戒' : '要確認'}</div>
                                 <p style="margin-bottom:12px; font-weight:600;">${diffData.riskReason}</p>
                                 <p class="text-muted">${diffData.summary}</p>
                             </div>
@@ -334,18 +329,54 @@ const Views = {
                             <button class="tab-item ${activeTab === 'diff' ? 'active' : ''}" onclick="window.app.setDetailTab('diff')">差分表示</button>
                             <button class="tab-item ${activeTab === 'original' ? 'active' : ''}" onclick="window.app.setDetailTab('original')">原本全文</button>
                         </div>
-
-                        <div class="pane-scroll-area document-pane-bg" style="${activeTab === 'original' && contract.pdf_url ? 'padding:0; overflow:hidden;' : ''}">
-                            <div id="diff-notice-area"></div>
-                                ${activeTab === 'original' && contract.pdf_url
-                ? `<iframe src="${contract.pdf_url}${contract.pdf_url.includes('?') ? '&' : '?'}t=${Date.now()}" style="width:100%; height:100%; border:none;"></iframe>`
-                : `<div class="document-paper">
-                                    <div class="document-content">
+                        <div class="pane-scroll-area ${activeTab === 'original' && (contract.pdf_url || contract.pdf_storage_path) ? '' : 'document-pane-bg is-frameless'}" style="padding:0; flex:1; display:flex; flex-direction:column; overflow:hidden;">
+                                ${activeTab === 'original' && (contract.pdf_url || contract.pdf_storage_path)
+                ? `<div style="width:100%; height:100%; display:flex; flex-direction:column;">
+                        <iframe src="${contract.pdf_url || contract.pdf_storage_path}" style="width:100%; flex:1; border:none; background:#525659; min-height:600px;"></iframe>
+                        <div style="padding:10px; text-align:center; background:#f9f9f9; border-top:1px solid #ddd; font-size:12px;">
+                            <a href="${contract.pdf_url || contract.pdf_storage_path}" target="_blank" class="text-primary"><i class="fa-solid fa-external-link-alt"></i> PDFを別ウィンドウで開く</a>
+                             <span style="margin-left:10px; color:#999;">(Shift+Clickでダウンロード)</span>
+                        </div>
+                   </div>`
+                : `<div class="document-paper-container is-frameless">
+                     <div class="document-content-full">
                                         ${activeTab === 'diff'
-                    ? '<div id="diff-content-placeholder" class="text-center p-md"><div class="custom-loader"></div><br>差分を表示中...<br><span style="font-size:11px;color:#999;">(端末内で処理しています。AI解析のカウントはされません)</span></div>'
+                    ? (() => {
+                        // 差分表示ロジック
+                        if (!contract.history || contract.history.length === 0) {
+                            return '<div class="text-muted text-center" style="padding:40px;">比較対象となる旧バージョンがありません（初回登録）</div><br>' + (contract.original_content || '');
+                        }
+
+                        // 最新の旧バージョンを取得
+                        const previousVersion = contract.history[contract.history.length - 1].content;
+                        const currentVersion = contract.original_content || '';
+
+                        // jsdiffで差分生成 (文字単位)
+                        if (typeof Diff === 'undefined') {
+                            return '<div class="text-danger">エラー: Diffライブラリが読み込まれていません</div>';
+                        }
+
+                        const diff = Diff.diffChars(previousVersion, currentVersion);
+
+                        // HTML生成
+                        let diffHtml = diff.map(part => {
+                            const colorClass = part.added ? 'diff-inline-add' :
+                                part.removed ? 'diff-inline-del' : '';
+
+                            // エスケープ処理（XSS対策）
+                            const escapedValue = part.value
+                                .replace(/&/g, "&amp;")
+                                .replace(/</g, "&lt;")
+                                .replace(/>/g, "&gt;");
+
+                            return colorClass ? `<span class="${colorClass}">${escapedValue}</span>` : escapedValue;
+                        }).join('');
+
+                        return `<div style="white-space: pre-wrap;">${diffHtml}</div>`;
+                    })()
                     : (contract.original_content || (contract.source_type === 'URL' ? '<div class="text-center text-muted" style="padding:40px;">URLから取り込んだコンテンツです。<br><a href="' + (contract.pdf_storage_path || '#') + '" target="_blank">元のページを開く <i class="fa-solid fa-external-link-alt"></i></a></div>' : '原本データがありません'))}
-                                    </div>
-                                </div>`
+                    </div>
+                </div>`
             }
                         </div>
                     </div>
@@ -363,7 +394,7 @@ const Views = {
                 <td class="col-name" title="${h.target_name}">${h.target_name}</td>
                 <td><span class="badge badge-success">${h.action}</span></td>
                 <td>${h.actor}</td>
-                <td><button class="btn-dashboard" style="padding:2px 8px; font-size:11px;" onclick="window.app.showToast('ℹ️ 詳細ログ機能は開発中です', 'info')">詳細</button></td>
+                <td><button class="btn-dashboard" style="padding:2px 8px; font-size:11px;" onclick="alert('詳細ログ機能は開発中です')">詳細</button></td>
             </tr>
     `).join('');
 
@@ -401,7 +432,7 @@ const Views = {
                     </select>
                 </td>
                 <td>${m.last_active_at}</td>
-                <td><button class="btn-dashboard" onclick="window.app.showToast('ℹ️ 編集機能は開発中です', 'info')">編集</button></td>
+                <td><button class="btn-dashboard" onclick="alert('編集機能は開発中です')">編集</button></td>
             </tr>
     `).join('');
 
@@ -652,8 +683,8 @@ class RegistrationFlow {
 
             this.close();
 
-            // 4. 詳細ページへ遷移（差分結果をすぐに見せる）
-            this.app.activeDetailTab = 'diff';
+            // 4. 詳細ページへ遷移（まずは原本を表示して安心させる）
+            this.app.activeDetailTab = 'original';
             this.app.navigate('diff', newContract.id);
             this.app.showToast('✅ 読み込み完了<br><small>※AI解析用テキストは「差分表示」で確認できます</small>', 'success', 5000);
 
@@ -661,7 +692,7 @@ class RegistrationFlow {
             console.error('Registration Error:', error);
             if (document.getElementById('reg-loading')) document.getElementById('reg-loading').remove();
             if (document.getElementById('reg-overlay')) document.getElementById('reg-overlay').remove();
-            this.app.showToast(`❌ 登録中にエラーが発生しました: ${error.message}`, 'error', 6000);
+            alert('登録中にエラーが発生しました: ' + error.message);
         }
     }
 
@@ -703,9 +734,10 @@ class RegistrationFlow {
         } catch (error) {
             console.error('テキスト抽出エラー:', error);
 
-            // 登録失敗にするのではなく、未解析ステータス（デフォルト）のままにする、
-            // または解析失敗のフラグを立てる（現在は警告表示で対応）
-            console.warn(`テキスト抽出に失敗（非致命的）: ${error.message}`);
+            // エラーステータスに更新
+            dbService.updateContractStatus(contractId, '登録失敗');
+
+            console.warn(`テキスト抽出に失敗: ${error.message}`);
         }
     }
 
@@ -744,8 +776,9 @@ class RegistrationFlow {
                     this.app.navigate(this.app.currentView);
                 }
 
+                alert('✅ AI解析が完了しました！\n\n契約書の差分とリスク判定が完了しました。');
             } else {
-                this.app.showToast(`✅ ${result.data.riskReason || '読み込み完了'}<br><small>※AIによる詳細解析が一部制限されている可能性があります</small>`, 'warning', 6000);
+                throw new Error(result.error || '解析に失敗しました');
             }
 
         } catch (error) {
@@ -755,7 +788,7 @@ class RegistrationFlow {
             dbService.updateContractStatus(contractId, '解析失敗');
 
             // ユーザーにエラーを通知
-            this.app.showToast(`❌ AI解析中にエラーが発生しました: ${error.message}`, 'error', 6000);
+            alert(`❌ AI解析中にエラーが発生しました\n\n${error.message}\n\nバックエンドサーバーが起動しているか確認してください。`);
         }
     }
 }
@@ -784,21 +817,12 @@ class DashboardApp {
 
         // Registration Flow
         this.registration = new RegistrationFlow(this);
-
-        // Caching
-        this.diffCache = new Map();
-        // Clear cache once to ensure new format is applied
-        this.diffCache.clear();
     }
 
-    async init() {
+    init() {
         try {
             console.log('Dashboard App Initializing...');
-            if (window.dbService) {
-                await window.dbService.init();
-            } else {
-                console.error('dbService is not defined');
-            }
+            dbService.init();
             this.bindEvents();
             this.registration.init();
             this.navigate('dashboard');
@@ -827,6 +851,21 @@ class DashboardApp {
                     }
                 });
             }
+        }
+
+        // URL Modal Submit Binding
+        const submitUrlBtn = document.getElementById('submit-url-btn');
+        if (submitUrlBtn) {
+            submitUrlBtn.onclick = () => {
+                const urlInput = document.getElementById('new-version-url');
+                const url = urlInput ? urlInput.value.trim() : "";
+                if (!url) {
+                    alert("URLを入力してください");
+                    return;
+                }
+                const contractId = submitUrlBtn.getAttribute('data-contract-id');
+                this.handleUrlVersionSubmit(contractId, url);
+            };
         }
     }
 
@@ -873,14 +912,6 @@ class DashboardApp {
             try {
                 this.mainContent.innerHTML = Views[viewId](renderParams);
 
-                // Async rendering for heavy views
-                if (viewId === 'diff') {
-                    // Slight delay to allow UI to paint the loading state
-                    setTimeout(() => {
-                        this.renderDiffAsync(renderParams);
-                    }, 50);
-                }
-
                 let title = 'ダッシュボード';
                 if (viewId === 'contracts') title = '契約管理';
                 if (viewId === 'diff') title = '差分詳細';
@@ -901,88 +932,6 @@ class DashboardApp {
                 console.error(`View Render Error (${viewId}):`, error);
                 this.mainContent.innerHTML = '<div class="p-md text-danger">画面の表示中にエラーが発生しました。</div>';
             }
-        }
-    }
-
-    async renderDiffAsync(contractId) {
-        const contract = dbService.getContractById(contractId);
-        if (!contract) return;
-
-        const placeholder = document.getElementById('diff-content-placeholder');
-        if (!placeholder) return;
-
-        const noticeArea = document.getElementById('diff-notice-area');
-        if (noticeArea) noticeArea.innerHTML = '';
-
-        // Check cache first (Key: ID + LastUpdated)
-        const cacheKey = `${contractId}_${contract.last_updated_at}`;
-        if (this.diffCache.has(cacheKey)) {
-            const cached = this.diffCache.get(cacheKey);
-            if (typeof cached === 'string') {
-                placeholder.innerHTML = cached;
-            } else {
-                if (noticeArea) noticeArea.innerHTML = cached.notice || '';
-                placeholder.innerHTML = cached.content || '';
-            }
-            return;
-        }
-
-        // Give UI a moment to breathe before heavy calculation
-        await new Promise(r => setTimeout(r, 10));
-
-        try {
-            // Check if Diff handling is needed
-            if (!contract.history || contract.history.length === 0) {
-                const stickyNoteHtml = `
-                    <div class="sticky-note">
-                        <i class="fa-solid fa-note-sticky"></i>
-                        比較対象となる旧バージョンがありません（初回登録のため最新版を表示）
-                    </div>
-                `;
-                const contentHtml = contract.original_content || '';
-
-                if (noticeArea) {
-                    noticeArea.innerHTML = stickyNoteHtml;
-                    placeholder.innerHTML = contentHtml;
-                } else {
-                    placeholder.innerHTML = stickyNoteHtml + contentHtml;
-                }
-
-                this.diffCache.set(cacheKey, { notice: stickyNoteHtml, content: contentHtml });
-                return;
-            }
-
-            const previousVersion = contract.history[contract.history.length - 1].content;
-            const currentVersion = contract.original_content || '';
-
-            if (typeof Diff === 'undefined') {
-                placeholder.innerHTML = '<div class="text-danger">エラー: Diffライブラリが読み込まれていません</div>';
-                return;
-            }
-
-            // Heavy calculation specific to large text
-            const diff = Diff.diffChars(previousVersion, currentVersion);
-
-            const diffHtml = diff.map(part => {
-                const colorClass = part.added ? 'diff-inline-add' :
-                    part.removed ? 'diff-inline-del' : '';
-
-                const escapedValue = part.value
-                    .replace(/&/g, "&amp;")
-                    .replace(/</g, "&lt;")
-                    .replace(/>/g, "&gt;");
-
-                return colorClass ? `<span class="${colorClass}">${escapedValue}</span>` : escapedValue;
-            }).join('');
-
-            const resultHtml = `<div style="white-space: pre-wrap;">${diffHtml}</div>`;
-            this.diffCache.set(cacheKey, { notice: '', content: resultHtml });
-            if (noticeArea) noticeArea.innerHTML = '';
-            placeholder.innerHTML = resultHtml;
-
-        } catch (e) {
-            console.error('Diff Calculation Error:', e);
-            placeholder.innerHTML = `<div class="text-danger">差分の計算中にエラーが発生しました: ${e.message}</div>`;
         }
     }
 
@@ -1072,12 +1021,12 @@ class DashboardApp {
     async analyzeContract(id) {
         const contract = dbService.getContractById(id);
         if (!contract) {
-            this.showToast('❌ 契約が見つかりません', 'error');
+            alert('契約が見つかりません');
             return;
         }
 
         if (!contract.original_content) {
-            this.showToast('❌ 元のテキストが見つかりません。再度登録してください。', 'error');
+            alert('元のテキストが見つかりません。再度登録してください。');
             return;
         }
 
@@ -1086,10 +1035,9 @@ class DashboardApp {
             return;
         }
 
-        let loadingMsg = null;
         try {
             // ローディング表示
-            loadingMsg = document.createElement('div');
+            const loadingMsg = document.createElement('div');
             loadingMsg.style.cssText = 'position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:white; padding:30px; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,0.3); z-index:10000; text-align:center;';
             loadingMsg.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="font-size:32px; color:#4CAF50;"></i><br><br><strong>AI解析中...</strong><br><span style="font-size:12px; color:#666;">数秒お待ちください</span>';
             document.body.appendChild(loadingMsg);
@@ -1119,64 +1067,39 @@ class DashboardApp {
                 // 画面を再読み込み
                 this.navigate('diff', id);
 
-                this.showToast('✅ AI解析が完了しました', 'success', 5000);
+                alert('✅ AI解析が完了しました！\n\nリスク判定と差分抽出が完了しました。');
             } else {
                 throw new Error(result.error || '解析に失敗しました');
             }
 
         } catch (error) {
             console.error('AI解析エラー:', error);
-            if (document.body.contains(loadingMsg)) {
-                document.body.removeChild(loadingMsg);
-            }
-            this.showToast(`❌ AI解析に失敗しました: ${error.message}`, 'error', 5000);
+            alert(`❌ AI解析中にエラーが発生しました\n\n${error.message}`);
         }
     }
 
     uploadNewVersion(id) {
         const contract = dbService.getContractById(id);
         if (!contract) {
-            this.showToast('❌ 契約が見つかりません', 'error');
+            alert('契約が見つかりません');
             return;
         }
 
-        // URLベースの契約の場合
-        if (contract.source_url || contract.source_type === 'URL' || contract.type === 'Web規約') {
-            const url = contract.source_url || contract.source_type; // source_type might store URL in some legacy data
-            // URLが有効かチェック（簡易）
-            const currentUrl = (url && url.startsWith('http')) ? url : '';
+        // URL形式の場合はURL入力モーダルを表示
+        if (contract.source_url || contract.source_type === 'URL') {
+            const urlModal = document.getElementById('url-input-modal');
+            const urlInput = document.getElementById('new-version-url');
+            const submitUrlBtn = document.getElementById('submit-url-btn');
 
-            // カスタムモーダルを表示
-            const modal = document.getElementById('url-input-modal');
-            const input = document.getElementById('url-input-value');
-            const confirmBtn = document.getElementById('url-input-confirm-btn');
-
-            input.value = currentUrl;
-            modal.classList.add('active'); // activeクラスで表示 (CSS要確認)
-
-            // ワンタイムイベントハンドラを設定
-            const handleConfirm = () => {
-                const newUrl = input.value.trim();
-                if (!newUrl) return; // 空なら何もしない（あるいはエラー）
-
-                if (!newUrl.startsWith('http')) {
-                    this.showToast('❌ 有効なURLを入力してください (http/https)', 'error');
-                    return;
-                }
-
-                modal.classList.remove('active');
-                this.performUrlAnalysis(id, newUrl, contract);
-
-                // クリーンアップ
-                confirmBtn.removeEventListener('click', handleConfirm);
-            };
-
-            confirmBtn.onclick = handleConfirm; // シンプルに上書き (同じボタンを使い回すため)
-
+            if (urlModal) {
+                if (urlInput) urlInput.value = contract.source_url || "";
+                if (submitUrlBtn) submitUrlBtn.setAttribute('data-contract-id', id);
+                urlModal.classList.add('active');
+            }
             return;
         }
 
-        // PDFファイル選択ダイアログを表示
+        // それ以外（PDF）はファイル選択ダイアログを表示
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = 'application/pdf';
@@ -1187,132 +1110,188 @@ class DashboardApp {
             if (!file) return;
 
             if (file.type !== 'application/pdf') {
-                this.showToast('❌ PDFファイルを選択してください', 'error');
+                alert('PDFファイルを選択してください');
                 return;
             }
 
-            this.performPdfAnalysis(id, file, contract);
+            const performAnalysis = async (retryCount = 0) => {
+                try {
+                    // ローディング表示
+                    const loadingMsg = document.createElement('div');
+                    loadingMsg.id = 'analysis-loading';
+                    loadingMsg.style.cssText = 'position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:white; padding:30px; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,0.3); z-index:10000; text-align:center; min-width:300px;';
+                    loadingMsg.innerHTML = `<div class="custom-loader"></div><br><strong>PDFドキュメントを解析中...${retryCount > 0 ? '(再試行中)' : ''}</strong><br><span style="font-size:12px; color:#666;">テキストデータとレイアウトを抽出しています<br>※スキャンデータなどは時間がかかる場合があります</span>`;
+                    document.body.appendChild(loadingMsg);
+
+                    // 背景オーバーレイ
+                    let overlay = document.getElementById('analysis-overlay');
+                    if (!overlay) {
+                        overlay = document.createElement('div');
+                        overlay.id = 'analysis-overlay';
+                        overlay.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999;';
+                        document.body.appendChild(overlay);
+                    }
+
+                    // UI描画待ち
+                    await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 50)));
+
+                    // 事前にトークンをリフレッシュ（念のため）
+                    try {
+                        const { getIdToken } = await import('./auth.js');
+                        await getIdToken();
+                        console.log("Token refreshed before upload");
+                    } catch (e) {
+                        console.warn("Token pre-refresh failed:", e);
+                    }
+
+                    // PDFをBase64に変換
+                    const base64Data = await aiService.convertFileToBase64(file);
+
+                    // 旧バージョンのテキストを取得
+                    const previousVersion = contract.original_content;
+
+                    // AI解析を実行（差分検出）
+                    const result = await aiService.analyzeContract(
+                        id,
+                        'pdf',
+                        base64Data,
+                        previousVersion
+                    );
+
+                    // ローディング削除
+                    if (document.getElementById('analysis-loading')) document.getElementById('analysis-loading').remove();
+                    if (document.getElementById('analysis-overlay')) document.getElementById('analysis-overlay').remove();
+
+                    if (result.success) {
+                        // 解析結果をDBに保存
+                        dbService.updateContractAnalysis(id, {
+                            extractedText: result.data.extractedText,
+                            extractedTextHash: result.data.extractedTextHash,
+                            extractedTextLength: result.data.extractedTextLength,
+                            sourceType: result.data.sourceType,
+                            pdfStoragePath: result.data.pdfStoragePath,
+                            pdfUrl: result.data.pdfUrl,
+                            changes: result.data.changes,
+                            riskLevel: result.data.riskLevel,
+                            riskReason: result.data.riskReason,
+                            summary: result.data.summary,
+                            status: '未確認',
+                            originalFilename: file.name
+                        });
+
+                        // 画面を再読み込み (差分表示を優先)
+                        this.activeDetailTab = 'diff';
+                        this.navigate('diff', id);
+
+                        // 部分的な失敗（AI解析のみ失敗）のチェック
+                        if (result.data.riskReason && result.data.riskReason.includes("AI解析サーバーからの応答がありませんでした")) {
+                            if (confirm("⚠️ AI解析に失敗しました。\n\nテキストデータの取り込みは完了しましたが、AIによるリスク判定ができませんでした。\n\nもう一度解析を試みますか？\n（[OK]を押すと再試行します）")) {
+                                await performAnalysis(retryCount + 1);
+                                return;
+                            } else {
+                                this.showToast('⚠️ 解析は不完全ですが保存しました', 'warning', 5000);
+                            }
+                        } else {
+                            this.showToast('✅ 差分解析が完了しました', 'success', 5000);
+                        }
+
+                    } else {
+                        throw new Error(result.error || '解析に失敗しました');
+                    }
+
+                } catch (error) {
+                    console.error('AI解析エラー:', error);
+                    if (document.getElementById('analysis-loading')) document.getElementById('analysis-loading').remove();
+                    if (document.getElementById('analysis-overlay')) document.getElementById('analysis-overlay').remove();
+
+                    if (confirm(`❌ エラーが発生しました\n\n${error.message}\n\nもう一度試しますか？`)) {
+                        await performAnalysis(retryCount + 1);
+                    }
+                }
+            };
+
+            await performAnalysis();
         };
 
         // ファイル選択ダイアログを表示
         input.click();
     }
 
-    async performUrlAnalysis(id, url, contract) {
-        try {
-            this.showLoading('URLから最新の規約を取得中...');
+    /**
+     * URL版の新しいバージョンを解析して保存
+     */
+    async handleUrlVersionSubmit(id, url) {
+        const urlModal = document.getElementById('url-input-modal');
+        const contract = dbService.getContractById(id);
 
-            const previousVersion = contract.original_content;
+        const performUrlAnalysis = async (retryCount = 0) => {
+            try {
+                // ローディング表示
+                const loadingMsg = document.createElement('div');
+                loadingMsg.id = 'analysis-loading';
+                loadingMsg.style.cssText = 'position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:white; padding:30px; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,0.3); z-index:10000; text-align:center; min-width:300px;';
+                loadingMsg.innerHTML = `<div class="custom-loader"></div><br><strong>指定されたURLを解析中...${retryCount > 0 ? '(再試行中)' : ''}</strong><br><span style="font-size:12px; color:#666;">最新のコンテンツを取得して差分を抽出しています</span>`;
+                document.body.appendChild(loadingMsg);
 
-            // AI解析を実行（URLモード）
-            const result = await aiService.analyzeContract(
-                id,
-                'url',
-                url,
-                previousVersion
-            );
-
-            this.hideLoading();
-
-            if (result.success) {
-                this.saveAnalysisResult(id, result, contract.name); // ファイル名は既存または自動
-                this.navigate('diff', id); // 画面を再読み込みして差分を表示
-                this.showToast('✅ 最新版の取得と解析が完了しました', 'success', 5000);
-            } else {
-                throw new Error(result.error || '解析に失敗しました');
-            }
-
-        } catch (error) {
-            console.error('URL解析エラー:', error);
-            this.hideLoading();
-            this.showToast(`❌ 更新中にエラーが発生しました: ${error.message}`, 'error', 5000);
-        }
-    }
-
-    async performPdfAnalysis(id, file, contract, retryCount = 0) {
-        try {
-            this.showLoading(`PDFドキュメントを解析中...${retryCount > 0 ? '(再試行中)' : ''}`, 'テキストデータとレイアウトを抽出しています');
-
-            // PDFをBase64に変換
-            const base64Data = await aiService.convertFileToBase64(file);
-
-            // 旧バージョンのテキストを取得
-            const previousVersion = contract.original_content;
-
-            // AI解析を実行（差分検出）
-            const result = await aiService.analyzeContract(
-                id,
-                'pdf',
-                base64Data,
-                previousVersion
-            );
-
-            this.hideLoading();
-
-            if (result.success) {
-                this.saveAnalysisResult(id, result, file.name);
-                this.navigate('diff', id); // 画面を再読み込みして差分を表示
-
-                // 部分的な失敗（AI解析のみ失敗）のチェック
-                if (result.data.riskReason && result.data.riskReason.includes("AI解析サーバーからの応答がありませんでした")) {
-                    this.showToast('⚠️ 解析は不完全ですが、ドキュメントを保存しました', 'warning', 6000);
-                } else {
-                    this.showToast('✅ 差分解析が完了しました', 'success', 5000);
+                // 背景オーバーレイ
+                let overlay = document.getElementById('analysis-overlay');
+                if (!overlay) {
+                    overlay = document.createElement('div');
+                    overlay.id = 'analysis-overlay';
+                    overlay.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999;';
+                    document.body.appendChild(overlay);
                 }
 
-            } else {
-                throw new Error(result.error || '解析に失敗しました');
+                if (urlModal) urlModal.classList.remove('active');
+
+                // UI描画待ち
+                await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 50)));
+
+                // AI解析を実行（URLメソッド）
+                const result = await aiService.analyzeContract(
+                    id,
+                    'url',
+                    url,
+                    contract.original_content // 旧バージョンのテキスト
+                );
+
+                // ローディング削除
+                if (document.getElementById('analysis-loading')) document.getElementById('analysis-loading').remove();
+                if (document.getElementById('analysis-overlay')) document.getElementById('analysis-overlay').remove();
+
+                if (result.success) {
+                    // 解析結果をDBに保存
+                    dbService.updateContractAnalysis(id, {
+                        extractedText: result.data.extractedText,
+                        sourceUrl: url,
+                        sourceType: 'URL',
+                        changes: result.data.changes,
+                        riskLevel: result.data.riskLevel,
+                        riskReason: result.data.riskReason,
+                        summary: result.data.summary,
+                        status: '未確認'
+                    });
+
+                    // 画面を再読み込み (差分表示を優先)
+                    this.activeDetailTab = 'diff';
+                    this.navigate('diff', id);
+                    alert('✅ 最新バージョンの取り込みとAI解析が完了しました！');
+                } else {
+                    throw new Error(result.error || '解析に失敗しました');
+                }
+
+            } catch (error) {
+                console.error('URL AI Service Error:', error);
+                if (document.getElementById('analysis-loading')) document.getElementById('analysis-loading').remove();
+                if (document.getElementById('analysis-overlay')) document.getElementById('analysis-overlay').remove();
+
+                if (confirm(`❌ エラーが発生しました: ${error.message}\n\nもう一度試しますか？`)) {
+                    await performUrlAnalysis(retryCount + 1);
+                }
             }
+        };
 
-        } catch (error) {
-            console.error('AI解析エラー:', error);
-            this.hideLoading();
-            this.showToast(`❌ 解析中にエラーが発生しました: ${error.message}`, 'error', 6000);
-        }
-    }
-
-    // 共通化: ローディング表示
-    showLoading(title, subtitle = '') {
-        const loadingMsg = document.createElement('div');
-        loadingMsg.id = 'analysis-loading';
-        loadingMsg.style.cssText = 'position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:white; padding:30px; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,0.3); z-index:10000; text-align:center; min-width:300px;';
-        loadingMsg.innerHTML = `<div class="custom-loader"></div><br><strong>${title}</strong><br><span style="font-size:12px; color:#666;">${subtitle}</span>`;
-        document.body.appendChild(loadingMsg);
-
-        let overlay = document.getElementById('analysis-overlay');
-        if (!overlay) {
-            overlay = document.createElement('div');
-            overlay.id = 'analysis-overlay';
-            overlay.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999;';
-            document.body.appendChild(overlay);
-        }
-    }
-
-    // 共通化: ローディング非表示
-    hideLoading() {
-        if (document.getElementById('analysis-loading')) document.getElementById('analysis-loading').remove();
-        if (document.getElementById('analysis-overlay')) document.getElementById('analysis-overlay').remove();
-    }
-
-    // 共通化: 結果保存
-    saveAnalysisResult(id, result, originalFilename = null) {
-        dbService.updateContractAnalysis(id, {
-            extractedText: result.data.extractedText,
-            extractedTextHash: result.data.extractedTextHash,
-            extractedTextLength: result.data.extractedTextLength,
-            sourceType: result.data.sourceType,
-            pdfStoragePath: result.data.pdfStoragePath,
-            pdfUrl: result.data.pdfUrl,
-            changes: result.data.changes,
-            riskLevel: result.data.riskLevel,
-            riskReason: result.data.riskReason,
-            summary: result.data.summary,
-            status: '未確認',
-            originalFilename: originalFilename
-        });
-
-        // 画面を再読み込み
-        this.navigate('diff', id);
+        await performUrlAnalysis();
     }
 
     showSuccessModal(title, message) {
@@ -1361,7 +1340,8 @@ class DashboardApp {
 
     showHistoryModal(id) {
         const contract = dbService.getContractById(id);
-        const logs = dbService.getActivityLogs().filter(l => l.target_name === contract.name); // 名前でフィルタリング
+        // systemのログ（自動生成ログ）を除外し、ユーザーのメモやアクションのみを表示
+        const logs = dbService.getActivityLogs().filter(l => l.target_name === contract.name && l.actor !== 'system');
 
         // 既存のモダルがあれば削除
         const existing = document.getElementById('history-modal');
@@ -1384,7 +1364,7 @@ class DashboardApp {
         modal.innerHTML = `
             <div class="modal-content" style="max-width:600px;">
                 <div class="modal-header">
-                    <h3>監査履歴・社内メモ</h3>
+                    <h3>メモ</h3>
                     <button class="btn-close" onclick="document.getElementById('history-modal').remove()">&times;</button>
                 </div>
                 <div class="modal-body" style="padding:0;">
@@ -1440,65 +1420,49 @@ class DashboardApp {
         const rightPane = panes[1];
 
         // ヘッダーを一時的に書き換え（ハイライト）
-        const header = rightPane.querySelector('.pane-header');
-        if (header) {
-            header.style.background = '#fff8e1';
-            header.style.borderBottom = '1px solid #ffe0b2';
-            header.innerHTML = `
-                <div style="display:flex; justify-content:center; align-items:center; width:100%; position:relative;">
-                    <span style="position:absolute; left:0; font-weight:bold; color:#d4a017; display:flex; align-items:center; font-size:12px;">
-                        <i class="fa-solid fa-clock-rotate-left" style="margin-right:6px;"></i> Version ${version} 
-                    </span>
-                    <button class="btn-dashboard" onclick="window.app.navigate('diff', ${contractId})" style="background:#fff; border:1px solid #c5a059; font-weight:600; font-size:13px; padding:6px 20px; color:#c5a059; border-radius:20px; transition:all 0.2s;">
-                        <i class="fa-solid fa-rotate-left"></i> 最新版(原本)に戻す
-                    </button>
-                </div>
-            `;
-        }
+        rightPane.querySelector('.pane-header').style.background = '#fff8e1';
+        rightPane.querySelector('.pane-header').style.borderBottom = '1px solid #ffe0b2';
+
+        // ヘッダー内容を書き換え
+        rightPane.querySelector('.pane-header').innerHTML = `
+            <div style="display:flex; justify-content:center; align-items:center; width:100%; position:relative;">
+                <span style="position:absolute; left:0; font-weight:bold; color:#d4a017; display:flex; align-items:center; font-size:12px;">
+                    <i class="fa-solid fa-clock-rotate-left" style="margin-right:6px;"></i> Version ${version} 
+                </span>
+                <button class="btn-dashboard" onclick="window.app.navigate('diff', ${contractId})" style="background:#fff; border:1px solid #c5a059; font-weight:600; font-size:13px; padding:6px 20px; color:#c5a059; border-radius:20px; transition:all 0.2s;">
+                    <i class="fa-solid fa-rotate-left"></i> 最新版(原本)に戻す
+                </button>
+            </div>
+        `;
 
         // タブとサブ情報を非表示にする
         const tabsRow = rightPane.querySelector('.tabs-row');
         if (tabsRow) tabsRow.style.display = 'none';
 
         // サブ情報（ファイル名など）を非表示にする
-        if (tabsRow && tabsRow.nextElementSibling && !tabsRow.nextElementSibling.classList.contains('pane-scroll-area')) {
+        // tabs-rowの次の要素を想定
+        if (tabsRow && tabsRow.nextElementSibling) {
             tabsRow.nextElementSibling.style.display = 'none';
         }
 
-        // コンテンツエリアの取得と再構築（iframeが表示されている場合を考慮）
-        let scrollArea = rightPane.querySelector('.pane-scroll-area');
-        if (scrollArea) {
-            scrollArea.scrollTop = 0;
-            scrollArea.style.background = '#fafffd';
-            scrollArea.style.padding = '24px'; // Reset padding in case it was 0 for PDF
-            scrollArea.style.overflow = 'auto';
-
-            // もし内部にiframeがある、またはdocument-paperがない場合は再構築
-            if (scrollArea.querySelector('iframe') || !scrollArea.querySelector('.document-paper')) {
-                scrollArea.innerHTML = `
-                    <div class="document-paper">
-                        <div class="document-content" style="white-space: pre-wrap; color: #444;"></div>
-                    </div>
-                `;
+        // コンテンツエリアを書き換え
+        const contentArea = rightPane.querySelector('.document-content');
+        if (contentArea) {
+            // スクロールをトップへ
+            const scrollArea = rightPane.querySelector('.pane-scroll-area');
+            if (scrollArea) {
+                scrollArea.scrollTop = 0;
+                scrollArea.style.background = '#fafffd'; // 少し背景色を変える
             }
 
-            const contentArea = scrollArea.querySelector('.document-content');
-            if (contentArea) {
-                contentArea.textContent = historyItem.content;
-            }
+            // テキストを挿入
+            contentArea.textContent = historyItem.content;
+            contentArea.style.color = '#444';
         }
+
+        // this.showToast(`Version ${version} をプレビュー中`, 'info'); // ポップアップ非表示
     }
 
-    // 履歴・メモボタン用（最新の履歴をインライン表示）
-    previewLatestHistory(contractId) {
-        const contract = dbService.getContractById(contractId);
-        if (contract && contract.history && contract.history.length > 0) {
-            const latest = contract.history[contract.history.length - 1];
-            this.viewHistory(contractId, latest.version);
-        } else {
-            console.log('No history to show');
-        }
-    }
 
     exportCSV() {
         const contracts = dbService.getContracts();
@@ -1544,8 +1508,6 @@ class DashboardApp {
     }
 }
 
-// Initialize App
-document.addEventListener('DOMContentLoaded', () => {
-    window.app = new DashboardApp();
-    window.app.init();
-});
+// Global App Instance
+window.app = new DashboardApp();
+document.addEventListener('DOMContentLoaded', () => window.app.init());

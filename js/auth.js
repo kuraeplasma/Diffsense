@@ -84,3 +84,23 @@ export function requireAuth() {
         }
     });
 }
+/**
+ * Get current user's ID Token
+ */
+export function getIdToken() {
+    return new Promise((resolve, reject) => {
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+            unsubscribe();
+            if (user) {
+                try {
+                    const token = await user.getIdToken(true); // Force refresh
+                    resolve(token);
+                } catch (e) {
+                    reject(e);
+                }
+            } else {
+                resolve(null);
+            }
+        });
+    });
+}

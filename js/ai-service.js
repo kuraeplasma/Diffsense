@@ -1,3 +1,5 @@
+import { getIdToken } from './auth.js';
+
 /**
  * AI Service - Backend API Communication
  * バックエンドAPIとの通信を担当
@@ -15,10 +17,13 @@ export const aiService = {
      */
     async analyzeContract(contractId, method, source, previousVersion = null) {
         try {
+            const token = await getIdToken();
+            console.log("AI Service: Token retrieval status:", token ? "Success" : "Failed");
             const response = await fetch(`${this.API_BASE}/contracts/analyze`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': token ? `Bearer ${token}` : ''
                 },
                 body: JSON.stringify({
                     contractId,

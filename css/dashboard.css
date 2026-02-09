@@ -504,19 +504,6 @@ ul {
     font-family: var(--font-mono);
     font-size: 13px;
     line-height: 1.6;
-    overflow-wrap: anywhere;
-    /* Force wrap even for long URLs */
-    word-break: break-all;
-    /* Fallback for older browsers */
-}
-
-.document-content {
-    word-break: break-word;
-    /* Ensure content wraps */
-    white-space: pre-wrap;
-    /* Preserve formatting but wrap */
-    overflow-wrap: anywhere;
-    /* Force wrap even for long URLs */
 }
 
 .diff-left {
@@ -958,8 +945,8 @@ ul {
     font-family: "Noto Serif JP", serif;
     line-height: 2.0;
     color: #333;
-    max-width: 800px;
-    margin: 0 auto;
+    width: 100%;
+    margin: 0;
     font-size: 16px;
 }
 
@@ -1029,31 +1016,48 @@ ul {
 .pane-scroll-area {
     flex: 1;
     overflow-y: auto;
-    padding: 24px;
+    padding: 20px;
 }
 
-/* Document Specific Pane Styling - Simplified */
+/* Document Specific Pane Styling */
 .document-pane-bg {
-    background: #fff;
-    /* Removed gray background */
-    padding: 0;
-    /* Removed padding */
-    display: block;
-    /* Removed flex centering */
+    background: #eeeeee;
+    padding: 40px 20px;
+    display: flex;
+    justify-content: center;
+}
+
+.document-pane-bg.is-frameless {
+    background: transparent;
+    padding: 20px;
 }
 
 .document-paper {
-    background: #fff;
+    background: #ffffff;
     width: 100%;
-    max-width: none;
-    /* Removed fixed width */
-    min-height: auto;
-    padding: var(--space-md);
-    /* Standard padding */
+    max-width: 1000px;
+    /* Slightly wider than before to satisfy "fuller" feel if needed */
+    min-height: 100%;
+    padding: 60px 40px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border: 1px solid #dddddd;
+}
+
+.document-paper-container.is-frameless {
+    width: 100%;
+    background: transparent;
     box-shadow: none;
-    /* Removed shadow */
     border: none;
-    /* Removed border */
+}
+
+.document-content-full {
+    font-family: "Noto Serif JP", serif;
+    line-height: 2.0;
+    color: #333;
+    width: 100%;
+    margin: 0;
+    font-size: 16px;
+    padding: 0 10px;
 }
 
 /* Analysis Pane components */
@@ -1252,32 +1256,4 @@ ul {
     font-weight: bold;
     background-color: #e3f2fd;
     padding: 0 2px;
-}
-
-/* Sticky Note for Notices (Updated for better visibility) */
-.sticky-note {
-    background-color: #ffebee;
-    /* Light Red */
-    color: #c62828;
-    /* Red Text */
-    padding: 12px 20px;
-    border-radius: 6px;
-    border: 1px solid #ef5350;
-    /* Full border instead of just bottom */
-    margin: 0 0 20px 0;
-    /* Removed negative margins */
-    width: 100%;
-    font-size: 13px;
-    font-weight: 600;
-    line-height: 1.4;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    box-sizing: border-box;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-
-.sticky-note .note-icon {
-    font-size: 16px;
-    color: #ef5350;
 }

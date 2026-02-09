@@ -75,6 +75,47 @@ class DBService {
         }
         return false;
     }
+
+    // --- User Profile & Usage Tracking ---
+
+    /**
+     * Get or create a basic user profile for usage tracking
+     * @param {string} uid - Firebase UID
+     */
+    async getUserProfile(uid) {
+        const users = await this.readData('users');
+        let user = users.find(u => u.uid === uid);
+
+        if (!user) {
+            user = {
+                uid: uid,
+                plan: 'starter', // Default plan
+                usageCount: 0,
+                lastResetDate: new Date().toISOString()
+            };
+            users.push(user);
+            await this.writeData('users', users);
+        }
+
+        return user;
+    }
+
+    /**
+     * Increment AI usage count for a user
+     * @param {string} uid - Firebase UID
+     */
+    async incrementUsage(uid) {
+        const users = await this.readData('users');
+        const index = users.findIndex(u => u.uid === uid);
+
+        if (index > -1) {
+            users[index].usageCount = (users[index].usageCount || 0) + 1;
+            users[index].lastUsedAt = new Date().toISOString();
+            await this.writeData('users', users);
+            return users[index];
+        }
+        return null;
+    }
 }
 
 module.exports = new DBService();

@@ -5,77 +5,289 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ログイン - DIFFsense</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Noto+Sans+JP:wght@300;400;500;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@300;400;500;700&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=20260207-5">
-    <!-- FontAwesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
     <style>
-        .auth-container {
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: var(--color-bg-light);
-            padding: 2rem;
+        /* Document/Binder Style Override */
+        body {
+            background-color: #f7f3f0;
+            background-image: none;
+            /* Removed pattern as requested */
+            font-family: var(--font-body);
         }
 
+        /* The "Binder" Card */
         .auth-card {
             background: #fff;
-            padding: 3rem;
-            border-radius: var(--radius-md);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+            padding: 4rem 3rem 4rem 5rem;
+            border-radius: 4px 12px 12px 4px;
+            box-shadow:
+                -1px 0 0 #e2ddd9,
+                -2px 0 0 #fcfaf7,
+                -3px 0 5px rgba(0, 0, 0, 0.05),
+                10px 20px 40px rgba(0, 0, 0, 0.08);
             width: 100%;
-            max-width: 400px;
-            border: 1px solid #eee;
+            max-width: 480px;
+            height: 650px;
+            /* Fixed height to perfectly prevent any jumping */
+            border-right: 2px solid rgba(197, 160, 89, 0.2);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: visible;
         }
+
+        /* Binder Spine (Black/Dark Grey for Professional Look) */
+        .auth-card::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 45px;
+            background: linear-gradient(to right, #2a2a2a, #1a1a1a);
+            border-radius: 4px 0 0 4px;
+            box-shadow: inset -1px 0 2px rgba(255, 255, 255, 0.1), inset -2px 0 5px rgba(0, 0, 0, 0.5);
+            border-left: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Binder Holes */
+        .binder-holes {
+            position: absolute;
+            left: 12px;
+            top: 0;
+            bottom: 0;
+            display: flex;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-evenly;
+            height: 100%;
+            z-index: 2;
+        }
+
+        /* Realistic 3D Rings */
+        .hole {
+            width: 50px;
+            /* Span across spine and paper */
+            height: 10px;
+            /* Thickness of the ring wire */
+            background: linear-gradient(to bottom, #9fa4a7 0%, #f5f5f5 40%, #f5f5f5 60%, #7f8c8d 100%);
+            /* Metallic Gradient */
+            border-radius: 2px;
+            box-shadow: 0 3px 5px rgba(0, 0, 0, 0.4);
+            position: relative;
+            margin-left: 0;
+            z-index: 5;
+        }
+
+        /* Hole in the Spine (Dark) */
+        .hole::before {
+            content: "";
+            position: absolute;
+            left: -4px;
+            top: -3px;
+            width: 16px;
+            height: 16px;
+            background: #111;
+            /* Dark hole */
+            border-radius: 50%;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.8), 0 1px 0 rgba(255, 255, 255, 0.1);
+            z-index: -1;
+        }
+
+        /* Hole in the Paper (White) */
+        .hole::after {
+            content: "";
+            position: absolute;
+            right: -4px;
+            top: -3px;
+            width: 16px;
+            height: 16px;
+            background: #fdfcfb;
+            /* Match paper bg */
+            border-radius: 50%;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.15), 0 1px 0 #fff;
+            z-index: -1;
+        }
+
+        /* Center the Auth Card */
+        .auth-container {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+            min-height: 100vh;
+        }
+
+        /* Horizontal Auth Tabs (SaaS Style) */
+        .auth-tabs {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-bottom: 2rem;
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 0;
+        }
+
+        .auth-tab {
+            text-decoration: none;
+            font-family: var(--font-heading);
+            font-size: 1.1rem;
+            font-weight: 500;
+            color: #999;
+            padding-bottom: 0.8rem;
+            margin-bottom: -2px;
+            /* Overlap border */
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .auth-tab.active {
+            color: #c5a059;
+            font-weight: 700;
+            border-bottom: 2px solid #c5a059;
+        }
+
+        .auth-tab:hover:not(.active) {
+            color: #c5a059;
+        }
+
 
         .auth-logo {
             text-align: center;
-            margin-bottom: 2rem;
-            font-family: var(--font-heading);
-            font-weight: 700;
+            margin-bottom: 2.5rem;
+            font-family: "Helvetica", "Arial", sans-serif;
+            font-weight: 800;
             font-size: 1.8rem;
             color: #c5a059;
         }
 
+        .auth-logo a {
+            color: inherit;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+
+
+        .auth-subtitle {
+            color: #888;
+            margin-bottom: 2.5rem;
+            font-size: 0.9rem;
+            text-align: center;
+            letter-spacing: 0.05em;
+        }
+
         .form-group {
-            margin-bottom: 1.5rem;
+            margin-bottom: 1.8rem;
+            position: relative;
         }
 
         .form-label {
             display: block;
-            font-size: 0.9rem;
-            margin-bottom: 0.5rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 0.8rem;
             color: var(--color-text-muted);
+            letter-spacing: 0.05em;
+        }
+
+        .input-wrapper {
+            position: relative;
         }
 
         .form-input {
             width: 100%;
-            padding: 0.8rem;
-            border: 1px solid #ddd;
-            border-radius: var(--radius-sm);
+            padding: 1rem;
+            border: none;
+            border-bottom: 1px solid #e2ddd9;
+            border-radius: 0;
             font-family: var(--font-body);
             font-size: 1rem;
+            transition: all 0.3s ease;
+            background: transparent;
         }
 
         .form-input:focus {
-            border-color: var(--color-primary);
+            border-bottom-color: #c5a059;
             outline: none;
+            background: rgba(197, 160, 89, 0.03);
+        }
+
+        .toggle-password {
+            position: absolute;
+            right: 0.5rem;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: #bbb;
+            transition: color 0.3s;
+        }
+
+        .toggle-password:hover {
+            color: #c5a059;
         }
 
         .auth-links {
-            margin-top: 1.5rem;
+            margin-top: 3rem;
             text-align: center;
             font-size: 0.9rem;
+            color: var(--color-text-muted);
+        }
+
+        .auth-links p {
+            margin-bottom: 1rem;
         }
 
         .auth-links a {
-            color: var(--color-primary);
-            font-weight: 500;
+            color: #c5a059;
+            font-weight: 600;
+            text-decoration: underline;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-top: 1.5rem;
+            color: #999 !important;
+            font-size: 0.85rem;
+            font-weight: 400 !important;
+            text-decoration: none !important;
+        }
+
+        /* Loading Spinner */
+        .btn-loading {
+            position: relative;
+            color: transparent !important;
+            pointer-events: none;
+        }
+
+        .btn-loading::after {
+            content: "";
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            top: 50%;
+            left: 50%;
+            margin-top: -10px;
+            margin-left: -10px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
         }
     </style>
 </head>
@@ -83,39 +295,150 @@
 <body>
     <div class="auth-container">
         <div class="auth-card">
-            <h1 class="auth-logo"><a href="index.html"><i class="fa-solid fa-scale-balanced"
-                        style="margin-right:10px;"></i>DIFFsense</a></h1>
-            <h2 class="text-center" style="margin-bottom: 1.5rem; font-size: 1.2rem;">ログイン</h2>
-            <form id="login-form">
-                <div class="form-group">
-                    <label class="form-label" for="email">メールアドレス</label>
-                    <input type="email" id="email" class="form-input" required placeholder="example@email.com">
-                </div>
-                <div class="form-group">
-                    <label class="form-label" for="password">パスワード</label>
-                    <input type="password" id="password" class="form-input" required placeholder="••••••••">
-                </div>
-                <button type="submit" class="btn btn-primary full-width">ログイン</button>
-            </form>
+            <!-- Decorative Holes: Removed as per user request (Spine Only) -->
+
+            <h1 class="auth-logo">
+                <a href="index.html">
+                    <i class="fa-solid fa-scale-balanced"></i>
+                    <span>DIFFsense</span>
+                </a>
+            </h1>
+
+            <div class="auth-tabs">
+                <div class="auth-tab active" id="tab-login" onclick="switchTab('login')">ログイン</div>
+                <div class="auth-tab" id="tab-signup" onclick="switchTab('signup')">新規登録</div>
+            </div>
+
+            <!-- LOGIN VIEW -->
+            <div id="view-login">
+                <form id="login-form">
+                    <div class="form-group">
+                        <label class="form-label" for="login-email">メールアドレス</label>
+                        <div class="input-wrapper">
+                            <input type="email" id="login-email" class="form-input" required
+                                placeholder="example@email.com">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="login-password">パスワード</label>
+                        <div class="input-wrapper">
+                            <input type="password" id="login-password" class="form-input" required
+                                placeholder="••••••••">
+                            <i class="fa-solid fa-eye-slash toggle-password" data-target="login-password"></i>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn full-width" id="login-btn"
+                        style="border-radius: 4px; padding: 1.2rem; background: #c5a059; color: #fff; border: none; font-weight: 700;">ログイン</button>
+                </form>
+            </div>
+
+            <!-- SIGNUP VIEW -->
+            <div id="view-signup" style="display: none;">
+                <form id="signup-form">
+                    <div class="form-group">
+                        <label class="form-label" for="signup-email">メールアドレス</label>
+                        <div class="input-wrapper">
+                            <input type="email" id="signup-email" class="form-input" required
+                                placeholder="example@email.com">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="signup-password">パスワード</label>
+                        <div class="input-wrapper">
+                            <input type="password" id="signup-password" class="form-input" required placeholder="6文字以上"
+                                minlength="6">
+                            <i class="fa-solid fa-eye-slash toggle-password" data-target="signup-password"></i>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn full-width" id="signup-btn"
+                        style="border-radius: 4px; padding: 1.2rem; background: #c5a059; color: #fff; border: none; font-weight: 700;">新規登録</button>
+                </form>
+            </div>
+
             <div class="auth-links">
-                <p>アカウントをお持ちでないですか？ <a href="signup.html">新規登録</a></p>
-                <div style="margin-top: 0.5rem;">
-                    <a href="index.html" style="color: #999; font-size: 0.85rem;">← トップページに戻る</a>
-                </div>
+                <a href="index.html" class="back-link">← 書類を閉じてトップページへ</a>
             </div>
         </div>
     </div>
 
     <!-- Auth Logic -->
     <script type="module">
-        import { handleLogin } from './js/auth.js';
+        import { handleLogin, handleSignUp } from './js/auth.js';
 
-        document.getElementById('login-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-            handleLogin(email, password);
+        // --- Tab Switching Logic ---
+        window.switchTab = (tab) => {
+            const loginView = document.getElementById('view-login');
+            const signupView = document.getElementById('view-signup');
+            const loginTab = document.getElementById('tab-login');
+            const signupTab = document.getElementById('tab-signup');
+
+            if (tab === 'login') {
+                loginView.style.display = 'block';
+                signupView.style.display = 'none';
+                loginTab.classList.add('active');
+                signupTab.classList.remove('active');
+                // Update URL without reload if needed, but keeping internal state is cleaner for SPA
+                const url = new URL(window.location);
+                url.searchParams.delete('tab');
+                history.replaceState(null, '', url);
+            } else {
+                loginView.style.display = 'none';
+                signupView.style.display = 'block';
+                loginTab.classList.remove('active');
+                signupTab.classList.add('active');
+                const url = new URL(window.location);
+                url.searchParams.set('tab', 'signup');
+                history.replaceState(null, '', url);
+            }
+        };
+
+        // --- Password Toggle Logic ---
+        document.querySelectorAll('.toggle-password').forEach(icon => {
+            icon.addEventListener('click', function () {
+                const targetId = this.getAttribute('data-target');
+                const passwordInput = document.getElementById(targetId);
+                const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                passwordInput.setAttribute('type', type);
+                this.classList.toggle('fa-eye');
+                this.classList.toggle('fa-eye-slash');
+            });
         });
+
+        // --- Login Form Submit ---
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('login-btn');
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+
+            btn.classList.add('btn-loading');
+            try {
+                await handleLogin(email, password);
+            } finally {
+                btn.classList.remove('btn-loading');
+            }
+        });
+
+        // --- Signup Form Submit ---
+        document.getElementById('signup-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('signup-btn');
+            const email = document.getElementById('signup-email').value;
+            const password = document.getElementById('signup-password').value;
+
+            btn.classList.add('btn-loading');
+            try {
+                await handleSignUp(email, password);
+            } finally {
+                btn.classList.remove('btn-loading');
+            }
+        });
+
+        // --- Initial State Check ---
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('tab') === 'signup') {
+            switchTab('signup');
+        }
     </script>
 </body>
 

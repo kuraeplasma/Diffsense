@@ -4,121 +4,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>新規登録 - DIFFsense</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Noto+Sans+JP:wght@300;400;500;700&display=swap"
-        rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=20260207-5">
-    <!-- FontAwesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        .auth-container {
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: var(--color-bg-light);
-            padding: 2rem;
-        }
-
-        .auth-card {
-            background: #fff;
-            padding: 3rem;
-            border-radius: var(--radius-md);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
-            width: 100%;
-            max-width: 400px;
-            border: 1px solid #eee;
-        }
-
-        .auth-logo {
-            text-align: center;
-            margin-bottom: 2rem;
-            font-family: var(--font-heading);
-            font-weight: 700;
-            font-size: 1.8rem;
-            color: #c5a059;
-        }
-
-        .form-group {
-            margin-bottom: 1.5rem;
-        }
-
-        .form-label {
-            display: block;
-            font-size: 0.9rem;
-            margin-bottom: 0.5rem;
-            color: var(--color-text-muted);
-        }
-
-        .form-input {
-            width: 100%;
-            padding: 0.8rem;
-            border: 1px solid #ddd;
-            border-radius: var(--radius-sm);
-            font-family: var(--font-body);
-            font-size: 1rem;
-        }
-
-        .form-input:focus {
-            border-color: var(--color-primary);
-            outline: none;
-        }
-
-        .auth-links {
-            margin-top: 1.5rem;
-            text-align: center;
-            font-size: 0.9rem;
-        }
-
-        .auth-links a {
-            color: var(--color-primary);
-            font-weight: 500;
-        }
-    </style>
+    <title>Redirecting...</title>
+    <script>
+        window.location.replace("login.html?tab=signup");
+    </script>
 </head>
 
 <body>
-    <div class="auth-container">
-        <div class="auth-card">
-            <h1 class="auth-logo"><a href="index.html"><i class="fa-solid fa-scale-balanced"
-                        style="margin-right:10px;"></i>DIFFsense</a></h1>
-            <h2 class="text-center" style="margin-bottom: 0.5rem; font-size: 1.2rem;">アカウント作成</h2>
-            <p class="text-center" style="color:#888; margin-bottom: 1.5rem; font-size: 0.9rem;">契約変更の管理を最適化しましょう</p>
-
-            <form id="signup-form">
-                <div class="form-group">
-                    <label class="form-label" for="email">メールアドレス</label>
-                    <input type="email" id="email" class="form-input" required placeholder="example@email.com">
-                </div>
-                <div class="form-group">
-                    <label class="form-label" for="password">パスワード</label>
-                    <input type="password" id="password" class="form-input" required placeholder="6文字以上" minlength="6">
-                </div>
-                <button type="submit" class="btn btn-primary full-width">新規登録</button>
-            </form>
-            <div class="auth-links">
-                <p>既にアカウントをお持ちですか？ <a href="login.html">ログイン</a></p>
-                <div style="margin-top: 0.5rem;">
-                    <a href="index.html" style="color: #999; font-size: 0.85rem;">← トップページに戻る</a>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Auth Logic -->
-    <script type="module">
-        import { handleSignUp } from './js/auth.js';
-
-        document.getElementById('signup-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-            handleSignUp(email, password);
-        });
-    </script>
 </body>
 
 </html>

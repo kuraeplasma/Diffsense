@@ -5,9 +5,26 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const fs = require('fs');
 const path = require('path');
+const admin = require('firebase-admin');
 const contractRoutes = require('./routes/contracts');
+const dbRoutes = require('./routes/db');
+const authMiddleware = require('./middleware/authMiddleware');
 const errorHandler = require('./middleware/errorHandler');
 const logger = require('./utils/logger');
+
+// Initialize Firebase Admin
+if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
+    admin.initializeApp({
+        credential: admin.credential.cert({
+            projectId: process.env.FIREBASE_PROJECT_ID,
+            clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+            privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+        })
+    });
+    logger.info('Firebase Admin initialized successfully');
+} else {
+    logger.warn('Firebase Admin credentials not fully set. Auth middleware will fail.');
+}
 
 const app = express();
 
@@ -65,10 +82,9 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-// API routes
-app.use('/api/contracts', contractRoutes);
-const dbRoutes = require('./routes/db');
-app.use('/api/db', dbRoutes);
+// API routes (Protected by Auth Middleware)
+app.use('/api/contracts', authMiddleware, contractRoutes);
+app.use('/api/db', authMiddleware, dbRoutes);
 
 // Static files (PDF Uploads)
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
