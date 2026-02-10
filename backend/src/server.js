@@ -23,6 +23,10 @@ if (!fs.existsSync(logsDir)) {
 }
 
 // Security headers with custom CSP to allow framing from frontend
+// Enable trust proxy for correct protocol detection behind Load Balancers (Cloud Run)
+app.set('trust proxy', 1);
+
+// Security headers with custom CSP to allow framing from frontend
 app.use(helmet({
     contentSecurityPolicy: {
         directives: {
@@ -30,7 +34,8 @@ app.use(helmet({
             "frame-ancestors": ["'self'", "http://localhost:3000", "http://localhost:8000", "https://diffsense.netlify.app"],
         },
     },
-    crossOriginResourcePolicy: { policy: "cross-origin" }
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    xFrameOptions: false // Disable X-Frame-Options in favor of CSP frame-ancestors
 }));
 
 // CORS configuration

@@ -8,6 +8,7 @@ https.get(url, (res) => {
     let data = '';
 
     console.log(`Status Code: ${res.statusCode}`);
+    console.log('Headers:', res.headers);
 
     res.on('data', (chunk) => {
         data += chunk;

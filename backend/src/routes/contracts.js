@@ -117,9 +117,10 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
 
                 // Construct URL
                 // In dev, we use the backend port
-                const baseUrl = (process.env.NODE_ENV === 'production')
-                    ? 'https://api-qf37m5ba2q-uc.a.run.app'
-                    : (req.protocol + '://' + req.get('host'));
+                // Construct URL
+                // In dev, we use the backend port. In prod (even if NODE_ENV is dev), we need HTTPS.
+                const protocol = (req.get('host').includes('run.app') || process.env.NODE_ENV === 'production') ? 'https' : req.protocol;
+                const baseUrl = `${protocol}://${req.get('host')}`;
 
                 pdfUrl = `${baseUrl}/uploads/${filename}`;
 
