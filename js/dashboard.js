@@ -463,19 +463,6 @@ const Views = {
             <tbody>${rows}</tbody>
         </table>
     </div>
-
-    ${window.app.can('manage_team') ? `
-        <div style="margin-top: 60px; padding-top: 30px; border-top: 1px solid #eee;">
-            <h3 style="color: #ff4d4f; font-size: 16px; margin-bottom: 12px;"><i class="fa-solid fa-triangle-exclamation"></i> 危険エリア</h3>
-            <p style="color: #666; font-size: 13px; margin-bottom: 20px;">
-                本番運用を開始する前に、すべてのデモデータやテストデータをクリアできます。<br>
-                この操作を行うと、現在の契約データ、解析履歴、およびチームメンバー設定がすべて初期化されます。
-            </p>
-            <button class="btn-dashboard btn-danger-action" style="background-color: transparent; border: 1px solid #ff4d4f; color: #ff4d4f; display: block;" onclick="window.app.confirmSystemReset()">
-                全データの初期化 (データ消去)
-            </button>
-        </div>
-    ` : ''}
 `;
     }
 };
@@ -1613,49 +1600,7 @@ class DashboardApp {
         }
     }
 
-    confirmSystemReset() {
-        if (!this.can('manage_team')) return;
 
-        const existing = document.getElementById('system-reset-modal');
-        if (existing) existing.remove();
-
-        const modal = document.createElement('div');
-        modal.id = 'system-reset-modal';
-        modal.className = 'modal-overlay active';
-        modal.innerHTML = `
-            <div class="modal-content" style="max-width: 450px; text-align: center; padding: 40px;">
-                <div style="font-size: 48px; color: #ff4d4f; margin-bottom: 20px;">
-                    <i class="fa-solid fa-triangle-exclamation"></i>
-                </div>
-                <h3 style="margin-bottom: 16px;">全データを初期化しますか？</h3>
-                <p style="color: #666; font-size: 14px; margin-bottom: 30px; line-height: 1.6;">
-                    登録済みの契約書、解析結果、およびチームメンバー情報（あなた以外）がすべて削除されます。<br>
-                    <strong>この操作は元に戻せません。</strong>
-                </p>
-                <div class="form-group" style="text-align: left; margin-bottom: 30px;">
-                    <label style="font-size: 12px; color: #999;">実行するには「RESET」と入力してください</label>
-                    <input type="text" id="reset-confirm-input" class="form-control" placeholder="RESET">
-                </div>
-                <div class="form-actions" style="justify-content: center; gap: 12px;">
-                    <button class="btn-dashboard" onclick="document.getElementById('system-reset-modal').remove()">キャンセル</button>
-                    <button class="btn-dashboard btn-danger-action" onclick="window.app.executeSystemReset()">初期化を実行する</button>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(modal);
-    }
-
-    executeSystemReset() {
-        const input = document.getElementById('reset-confirm-input').value;
-        if (input !== 'RESET') {
-            alert('確認用のキーワードが正しくありません。');
-            return;
-        }
-
-        dbService.clearAllData();
-        // Reload will trigger checkAndRegisterAdmin to re-add the current user
-        location.reload();
-    }
 
 
     viewHistory(contractId, version) {
