@@ -280,20 +280,6 @@ const Views = {
                     <!-- Left Pane: Analysis & Diffs -->
                     <div class="pane">
                         <div class="pane-header">
-                            <span><i class="fa-solid fa-clock-rotate-left"></i> バージョン履歴</span>
-                        </div>
-                        <div class="pane-scroll-area" style="max-height: 150px; overflow-y: auto; border-bottom: 1px solid #eee;">
-                            ${contract.history && contract.history.length > 0
-                ? contract.history.slice().reverse().map(h => `
-                                    <div class="history-item" onclick="window.app.viewHistory(${id}, ${h.version})" style="padding:8px 12px; border-bottom:1px solid #eee; cursor:pointer; font-size:12px; display:flex; justify-content:space-between; align-items:center;">
-                                        <span><i class="fa-solid fa-clock-rotate-left" style="color:#ccc; margin-right:6px;"></i> Version ${h.version} <span class="text-muted" style="margin-left:8px;">${h.date}</span></span>
-                                    </div>
-                                `).join('')
-                : '<div class="text-muted p-md text-center">履歴はありません</div>'
-            }
-                        </div>
-                        
-                        <div class="pane-header">
                             <span><i class="fa-solid fa-magnifying-glass-chart"></i> AI解析・差分判定</span>
                             <span class="text-muted" style="font-weight:normal; font-size:11px;">最終解析: ${contract.last_analyzed_at || '-'}</span>
                         </div>
@@ -320,7 +306,27 @@ const Views = {
                     <!-- Right Pane: Original Document -->
                     <div class="pane">
                         <div class="pane-header" style="display:flex; justify-content:space-between; align-items:center;">
-                            <span><i class="fa-solid fa-file-contract"></i> 比較対象の原本データ</span>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <span><i class="fa-solid fa-file-contract"></i> ドキュメント表示</span>
+                                <!-- History Dropdown -->
+                                <div class="header-dropdown-container">
+                                    <button class="btn-dashboard" style="display:flex; align-items:center; gap:6px; padding:4px 10px; font-size:12px;" onclick="event.stopPropagation(); document.getElementById('history-menu-${id}').classList.toggle('show');" title="バージョン履歴">
+                                        <i class="fa-solid fa-clock-rotate-left"></i> バージョン履歴
+                                    </button>
+                                    <div id="history-menu-${id}" class="header-dropdown-menu" style="left:0; right:auto; min-width:180px;" onclick="event.stopPropagation();">
+                                        ${contract.history && contract.history.length > 0
+                ? contract.history.slice().reverse().map(h => `
+                                                <div class="header-dropdown-item" onclick="window.app.viewHistory(${id}, ${h.version}); document.getElementById('history-menu-${id}').classList.remove('show');" style="padding:10px 16px; border-bottom:1px solid #f5f5f5; display:flex; justify-content:space-between; align-items:center;">
+                                                    <span style="display:flex; align-items:center;"><i class="fa-solid fa-clock-rotate-left" style="color:#ccc; margin-right:8px;"></i> Version ${h.version}</span>
+                                                    <span style="font-size:11px; color:#999;">${h.date}</span>
+                                                </div>
+                                            `).join('')
+                : '<div style="padding:10px 16px; font-size:12px; color:#999;">履歴はありません</div>'
+            }
+                                    </div>
+                                </div>
+                            </div>
+                            
                             <button class="btn-upload-version" onclick="window.app.uploadNewVersion(${id})">
                                 <i class="fa-solid fa-cloud-arrow-up"></i> 新しいバージョンをアップロード
                             </button>
@@ -382,6 +388,7 @@ const Views = {
                     </div>
                 </div>
             </div>
+
 `;
     },
 
@@ -736,6 +743,9 @@ class RegistrationFlow {
 
             // エラーステータスに更新
             dbService.updateContractStatus(contractId, '登録失敗');
+
+            // ユーザーにエラーを通知
+            alert(`申し訳ありません。PDFからのテキスト抽出に失敗しました。\n\n原因: ${error.message}\n\n※画像PDFやパスワード付きPDFは対応していない場合があります。`);
 
             console.warn(`テキスト抽出に失敗: ${error.message}`);
         }

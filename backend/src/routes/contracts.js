@@ -51,27 +51,81 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
         let pdfStoragePath = null;
         if (method === 'pdf') {
             const { bucket } = require('../firebase');
-            const base64Data = source.replace(/^data:application\/pdf;base64,/, '');
-            const buffer = Buffer.from(base64Data, 'base64');
+            const admin = require('firebase-admin'); // Assuming firebase-admin is initialized elsewhere
 
-            // Storage path: contracts/{contractId}/{timestamp}.pdf
-            pdfStoragePath = `contracts/${contractId}/${Date.now()}.pdf`;
-            const file = bucket.file(pdfStoragePath);
+            // Check if Firebase Storage is available (Production or correctly configured Dev)
+            // We use a simple check: if we are in production OR if we have credentials
+            const isProduction = process.env.NODE_ENV === 'production';
+            const hasFirebaseCredentials = process.env.FIREBASE_PRIVATE_KEY || (admin.apps.length > 0 && admin.app().options.credential);
+            const useFirebase = isProduction || hasFirebaseCredentials;
 
-            // Upload to Firebase Storage
-            await file.save(buffer, {
-                metadata: { contentType: 'application/pdf' }
-            });
+            // Remove data URL prefix
+            const base64Clean = source.replace(/^data:application\/pdf;base64,/, '');
+            const buffer = Buffer.from(base64Clean, 'base64');
 
-            // Generate Signed URL (valid for 1 year)
-            // Note: In production, client should fetch fresh URL dynamically via SDK
-            const [signedUrl] = await file.getSignedUrl({
-                action: 'read',
-                expires: Date.now() + 31536000000 // 1 year
-            });
+            if (useFirebase) {
+                // Production / Firebase Mode
+                try {
+                    // Storage path: contracts/{contractId}/{timestamp}.pdf
+                    pdfStoragePath = `contracts/${contractId}/${Date.now()}.pdf`;
+                    const file = bucket.file(pdfStoragePath);
 
-            pdfUrl = signedUrl;
-            logger.info(`PDF uploaded to Firebase Storage: ${pdfStoragePath}`);
+                    // Upload to Firebase Storage
+                    await file.save(buffer, {
+                        metadata: { contentType: 'application/pdf' }
+                    });
+
+                    // Generate Signed URL (valid for 1 year)
+                    const [signedUrl] = await file.getSignedUrl({
+                        action: 'read',
+                        expires: Date.now() + 31536000000 // 1 year
+                    });
+
+                    pdfUrl = signedUrl;
+                    logger.info(`PDF uploaded to Firebase Storage: ${pdfStoragePath}`);
+                } catch (firebaseError) {
+                    // If Firebase fails in dev, fall back to local (renaming variable to avoid conflict)
+                    if (!isProduction) {
+                        logger.warn('Firebase upload failed in dev, falling back to local storage:', firebaseError.message);
+                        await saveLocally();
+                    } else {
+                        throw firebaseError;
+                    }
+                }
+            } else {
+                // Development / Local Mode (No credentials)
+                await saveLocally();
+            }
+
+            // Helper function for local save
+            async function saveLocally() {
+                const fs = require('fs');
+                const path = require('path');
+
+                // Local storage path: backend/uploads/contract-{id}-{timestamp}.pdf
+                const filename = `contract-${contractId}-${Date.now()}.pdf`;
+                const uploadsDir = path.join(__dirname, '../../uploads');
+
+                if (!fs.existsSync(uploadsDir)) {
+                    fs.mkdirSync(uploadsDir, { recursive: true });
+                }
+
+                pdfStoragePath = path.join(uploadsDir, filename);
+
+                // Write to local file
+                await fs.promises.writeFile(pdfStoragePath, buffer);
+
+                // Construct URL
+                // In dev, we use the backend port
+                const baseUrl = (process.env.NODE_ENV === 'production')
+                    ? 'https://api-qf37m5ba2q-uc.a.run.app'
+                    : (req.protocol + '://' + req.get('host'));
+
+                pdfUrl = `${baseUrl}/uploads/${filename}`;
+
+                logger.info(`PDF saved locally (Dev/Fallback): ${pdfStoragePath}`);
+                logger.info(`PDF URL: ${pdfUrl}`);
+            }
 
         } else if (method === 'url') {
             pdfUrl = source;

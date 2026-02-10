@@ -2,3 +2,6 @@ node_modules/
 _backup_*/
 .env
 .DS_Store
+
+backend/uploads/
+backend/test_pdf_extraction.js

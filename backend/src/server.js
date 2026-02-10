@@ -39,7 +39,24 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
     : ['http://localhost:3000', 'http://localhost:8000'];
 
 app.use(cors({
-    origin: true,
+    origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+
+        // Allow any localhost origin in development
+        if (process.env.NODE_ENV === 'development' && origin.startsWith('http://localhost')) {
+            return callback(null, true);
+        }
+
+        if (allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            // For now, log the blocked origin but allow it if it's localhost (double check)
+            // or just block it
+            logger.warn(`Blocked by CORS: ${origin}`);
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     credentials: true
 }));
 
