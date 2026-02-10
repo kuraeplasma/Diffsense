@@ -20,7 +20,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <!-- Styles -->
-    <link rel="stylesheet" href="css/style.css?v=20260207-5">
+    <link rel="stylesheet" href="css/style.css?v=20260211-11">
 </head>
 
 <body>
@@ -113,75 +113,85 @@
                 <div class="dashboard-frame visual-card">
                     <!-- Sidebar -->
                     <div class="mini-sidebar"
-                        style="width: 200px; flex-shrink: 0; background: #1a1a1a; padding: 20px 0;">
+                        style="width: 200px; flex-shrink: 0; background: #1E1E1E; padding: 20px 0;">
                         <div class="mini-logo"
-                            style="padding: 0 15px 30px; font-size: 1.2rem; color: #c5a059; font-weight: 800; display: flex; align-items: center; gap: 10px;">
+                            style="padding: 0 20px 30px; font-size: 1.25rem; color: #c5a059; font-weight: 800; display: flex; align-items: center; gap: 10px;">
                             <i class="fa-solid fa-scale-balanced" style="color: inherit;"></i> DIFFsense
                         </div>
                         <div class="mini-nav" style="display: flex; flex-direction: column; gap: 2px;">
                             <div class="mini-nav-item"
-                                style="padding: 10px 15px; color: #999; font-size: 0.9rem; display: flex; align-items: center; gap: 10px;">
+                                style="padding: 12px 20px; color: #888; font-size: 0.9rem; display: flex; align-items: center; gap: 12px;">
                                 <i class="fa-solid fa-house" style="width: 16px;"></i> <span>ダッシュボード</span>
                             </div>
                             <div class="mini-nav-item active"
-                                style="background: #333; color: #fff; padding: 10px 15px; font-size: 0.9rem; display: flex; align-items: center; gap: 10px; font-weight: 600;">
-                                <i class="fa-solid fa-file-contract" style="width: 16px;"></i> <span>契約・規約管理</span>
+                                style="background: rgba(197, 160, 89, 0.15); color: #fff; padding: 12px 20px; font-size: 0.9rem; display: flex; align-items: center; gap: 12px; font-weight: 600; border-left: 3px solid #c5a059;">
+                                <i class="fa-solid fa-file-contract" style="width: 16px; color: #c5a059;"></i>
+                                <span>契約・規約管理</span>
                             </div>
                             <div class="mini-nav-item"
-                                style="padding: 10px 15px; color: #999; font-size: 0.9rem; display: flex; align-items: center; gap: 10px;">
+                                style="padding: 12px 20px; color: #888; font-size: 0.9rem; display: flex; align-items: center; gap: 12px;">
                                 <i class="fa-solid fa-clock-rotate-left" style="width: 16px;"></i> <span>解析履歴</span>
                             </div>
                             <div class="mini-nav-item"
-                                style="padding: 10px 15px; color: #999; font-size: 0.9rem; display: flex; align-items: center; gap: 10px;">
+                                style="padding: 12px 20px; color: #888; font-size: 0.9rem; display: flex; align-items: center; gap: 12px;">
                                 <i class="fa-solid fa-users" style="width: 16px;"></i> <span>チーム設定</span>
                             </div>
                         </div>
                         <div
-                            style="margin-top: auto; padding: 15px; border-top: 1px solid #333; color: #999; font-size: 0.8rem;">
-                            <i class="fa-solid fa-user"></i> <span style="margin-left: 8px;">ユーザー</span>
+                            style="margin-top: auto; padding: 20px; border-top: 1px solid #333; color: #999; font-size: 0.85rem; display: flex; align-items: center; gap: 10px;">
+                            <div
+                                style="width: 28px; height: 28px; background: #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #fff; font-weight: 600;">
+                                JD</div>
+                            <div>
+                                <div style="color: #eee; font-weight: 600; font-size: 11px;">田中 太郎</div>
+                                <div style="font-size: 9px; opacity: 0.6;">Admin Account</div>
+                            </div>
                         </div>
                     </div>
 
                     <!-- Main Content -->
-                    <div class="mini-main" style="background: #fdfdfd; flex: 1; display: flex; flex-direction: column;">
+                    <div class="mini-main" style="background: #f8f9fa; flex: 1; display: flex; flex-direction: column;">
                         <!-- Header -->
                         <div class="mini-header"
-                            style="background: #fff; height: 50px; border-bottom: 1px solid #eee; display: flex; align-items: center; justify-content: space-between; padding: 0 20px;">
-                            <span style="font-weight: 700; color: #333; font-size: 13px;">差分詳細</span>
+                            style="background: #fff; height: 60px; border-bottom: 1px solid #e1e4e8; display: flex; align-items: center; justify-content: space-between; padding: 0 25px;">
+                            <span style="font-weight: 700; color: #24292e; font-size: 14px;">差分詳細</span>
                             <div
-                                style="background: #bf9b30; color: #fff; padding: 6px 14px; border-radius: 4px; font-size: 11px; font-weight: 700;">
+                                style="background: #c5a059; color: #fff; padding: 8px 16px; border-radius: 6px; font-size: 12px; font-weight: 700; box-shadow: 0 2px 8px rgba(197, 160, 89, 0.3);">
                                 <i class="fa-solid fa-plus"></i> 新規登録
                             </div>
                         </div>
 
                         <!-- Content Area -->
                         <div class="mini-content"
-                            style="padding: 20px 25px; overflow-y: hidden; flex: 1; display: flex; flex-direction: column; gap: 15px;">
-                            <div class="preview-back-link" style="font-size: 11px; color: #666;">
+                            style="padding: 25px 30px; overflow-y: hidden; flex: 1; display: flex; flex-direction: column; gap: 20px;">
+                            <div class="preview-back-link"
+                                style="font-size: 12px; color: #586069; display: flex; align-items: center; gap: 8px;">
                                 <i class="fa-solid fa-arrow-left"></i> ダッシュボードに戻る
                             </div>
 
                             <div class="preview-header-area"
                                 style="display: flex; justify-content: space-between; align-items: flex-start;">
-                                <div>
+                                <div style="flex: 1;">
                                     <h2
-                                        style="font-size: 1.4rem; font-weight: 800; color: #1a1a1a; margin-bottom: 5px;">
+                                        style="font-size: 1.5rem; font-weight: 800; color: #1a1a1a; margin-bottom: 8px; letter-spacing: -0.01em;">
                                         クラウドサービス利用規約 (SaaS) - 2026.01.29版</h2>
-                                    <div style="display: flex; gap: 8px;">
+                                    <div style="display: flex; gap: 10px; align-items: center;">
                                         <span
-                                            style="background: #fff5f5; color: #e53e3e; border: 1px solid #ffd5d5; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700;">Risk
+                                            style="background: #FFEef0; color: #D73A49; border: 1px solid #ffcfd4; padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 700;">Risk
                                             Level: ★3</span>
                                         <span
-                                            style="background: #fffaf0; color: #d69e2e; border: 1px solid #fef3c7; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700;">未確認</span>
+                                            style="background: #fff5b1; color: #856404; border: 1px solid #ffeeba; padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 700;">未確認</span>
+                                        <span style="font-size: 11px; color: #959DA5;"><i
+                                                class="fa-regular fa-clock"></i> 最終解析: 2026.02.11 02:15</span>
                                     </div>
                                 </div>
-                                <div class="preview-actions" style="display: flex; gap: 8px;">
+                                <div class="preview-actions" style="display: flex; gap: 10px;">
                                     <div
-                                        style="border: 1px solid #ddd; padding: 8px 15px; border-radius: 6px; font-size: 12px; font-weight: 700; color: #333; background: #fff;">
+                                        style="border: 1px solid #d1d5da; padding: 8px 18px; border-radius: 6px; font-size: 13px; font-weight: 700; color: #24292e; background: #fff;">
                                         <i class="fa-solid fa-share-nodes"></i> 共有
                                     </div>
                                     <div
-                                        style="background: #bf9b30; color: #fff; padding: 8px 15px; border-radius: 6px; font-size: 12px; font-weight: 700;">
+                                        style="background: #24292e; color: #fff; padding: 8px 18px; border-radius: 6px; font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
                                         <i class="fa-solid fa-check"></i> 確認済みにする
                                     </div>
                                 </div>
@@ -189,67 +199,62 @@
 
                             <!-- AI Summary -->
                             <div class="preview-ai-summary"
-                                style="background: #fff; border: 1px solid #eee; border-left: 6px solid #bf9b30; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.02);">
+                                style="background: #fff; border: 1px solid #e1e4e8; border-left: 6px solid #c5a059; padding: 22px; border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.04);">
                                 <div
-                                    style="color: #bf9b30; font-weight: 800; font-size: 1.1rem; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                                    style="color: #c5a059; font-weight: 800; font-size: 1.15rem; margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
                                     <i class="fa-solid fa-robot"></i> AIリスク判定：要警戒
                                 </div>
                                 <p
-                                    style="font-size: 1rem; font-weight: 700; color: #333; margin-bottom: 6px; line-height: 1.4;">
+                                    style="font-size: 1.05rem; font-weight: 700; color: #24292e; margin-bottom: 8px; line-height: 1.5;">
                                     損害賠償額の大幅な減額およびデータ保全義務の免責が含まれており、当社にとって著しく不利な変更であるため。</p>
-                                <p style="font-size: 0.85rem; color: #666; line-height: 1.5;">
+                                <p style="font-size: 0.9rem; color: #586069; line-height: 1.6;">
                                     サービス提供事業者が「損害賠償の上限」を「利用料の3ヶ月分」から「1ヶ月分」に縮小する変更を行いました。また、データバックアップの条項が削除されています。</p>
                             </div>
 
                             <div class="preview-diff-section-label"
-                                style="font-weight: 800; font-size: 12px; color: #333;">検知された変更箇所</div>
+                                style="font-weight: 800; font-size: 13px; color: #24292e; display: flex; align-items: center; gap: 8px;">
+                                <i class="fa-solid fa-circle-exclamation" style="color: #c5a059;"></i> 検知された重要な変更点
+                            </div>
 
                             <!-- Diff Block 1 -->
                             <div class="preview-diff-block"
-                                style="border: 1px solid #eee; border-radius: 6px; overflow: hidden; background: #fff;">
+                                style="border: 1px solid #e1e4e8; border-radius: 8px; overflow: hidden; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,0.02);">
                                 <div
-                                    style="background: #f8f9fa; padding: 8px 15px; font-size: 11px; color: #666; border-bottom: 1px solid #eee; font-weight: 700;">
+                                    style="background: #f6f8fa; padding: 10px 18px; font-size: 12px; color: #24292e; border-bottom: 1px solid #e1e4e8; font-weight: 700;">
                                     第15条（損害賠償） <span
-                                        style="font-weight: normal; margin-left:8px; opacity: 0.7;">(変更)</span></div>
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; font-size: 12px;">
+                                        style="font-weight: normal; margin-left:10px; color: #586069; opacity: 0.8;">(変更)</span>
+                                </div>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; font-size: 13px;">
                                     <div
-                                        style="padding: 15px; background: #fffafa; border-right: 1px solid #eee; line-height: 1.6;">
-                                        甲が乙に支払う損害賠償の額は、当該損害が発生した月の利用料金の<span
-                                            style="background: #fed7d7; text-decoration: line-through; color: #9b2c2c; padding: 1px 3px;">【3ヶ月分】</span>を上限とする。
+                                        style="padding: 18px; background: #fff5f5; border-right: 1px solid #e1e4e8; line-height: 1.7;">
+                                        甲が乙に支払う損害賠償の額は、利用料金の<span
+                                            style="background: #ffdce0; text-decoration: line-through; color: #b91c1c; padding: 1px 4px;">【3ヶ月分】</span>を上限とする。
                                     </div>
-                                    <div style="padding: 15px; background: #fafffa; line-height: 1.6;">
-                                        甲が乙に支払う損害賠償の額は、当該損害が発生した月の利用料金の<span
-                                            style="background: #c6f6d5; color: #22543d; padding: 1px 3px; font-weight: 700;">【1ヶ月分】</span>を上限とする。
+                                    <div style="padding: 18px; background: #f0fff4; line-height: 1.7;">
+                                        甲が乙に支払う損害賠償の額は、利用料金の<span
+                                            style="background: #dcffe4; color: #166534; padding: 1px 4px; font-weight: 700;">【1ヶ月分】</span>を上限とする。
                                     </div>
                                 </div>
-                            </div>
-
-                            <!-- Diff Block 2 -->
-                            <div class="preview-diff-block"
-                                style="border: 1px solid #eee; border-radius: 6px; overflow: hidden; background: #fff;">
+                                <!-- Legal Impact Box (NEW in Latest UI) -->
                                 <div
-                                    style="background: #f8f9fa; padding: 8px 15px; font-size: 11px; color: #666; border-bottom: 1px solid #eee; font-weight: 700;">
-                                    第18条（データの保全） <span
-                                        style="font-weight: normal; margin-left:8px; opacity: 0.7;">(削除)</span></div>
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; font-size: 12px;">
-                                    <div
-                                        style="padding: 15px; background: #fffafa; border-right: 1px solid #eee; line-height: 1.6;">
-                                        <span
-                                            style="background: #fed7d7; text-decoration: line-through; color: #9b2c2c; padding: 1px 3px;">当社は、ユーザーのデータを毎日1回バックアップし、障害発生時には直近のバックアップ地点まで復旧するものとします。</span>
-                                    </div>
-                                    <div style="padding: 15px; background: #fafffa; line-height: 1.6;">
-                                        <span style="color: #22543d; opacity: 0.6;">(削除されました)</span>
-                                    </div>
+                                    style="background: #fff8e1; padding: 12px 18px; border-top: 1px solid #ffeeba; font-size: 12px; color: #5c3a00; display: flex; flex-direction: column; gap: 4px;">
+                                    <div><strong><i class="fa-solid fa-scale-balanced" style="margin-right: 6px;"></i>
+                                            法的影響:</strong> 賠償責任の範囲が3分の1に縮小され、万が一の際の補填額が大幅に減少します。</div>
+                                    <div><strong><i class="fa-solid fa-triangle-exclamation"
+                                                style="margin-right: 6px;"></i> 懸念点:</strong>
+                                        BtoBサービスにおいてこの上限額は一般的ではなく、リスク過多となる可能性があります。</div>
                                 </div>
                             </div>
 
                             <!-- Memo Hint -->
-                            <div class="preview-memo-section" style="border-top: 1px solid #eee; padding-top: 15px;">
-                                <div style="font-weight: 800; font-size: 12px; color: #333; margin-bottom: 10px;">社内メモ
+                            <div class="preview-memo-section" style="border-top: 1px solid #e1e4e8; padding-top: 20px;">
+                                <div style="font-weight: 800; font-size: 13px; color: #24292e; margin-bottom: 12px;">
+                                    社内メモ
                                 </div>
                                 <div
-                                    style="border: 1px solid #ddd; padding: 10px; border-radius: 6px; color: #999; font-size: 12px; background: #fff;">
-                                    確認事項や法務部への相談内容を入力...</div>
+                                    style="border: 1px solid #d1d5da; border-radius: 6px; padding: 12px 15px; color: #959DA5; font-size: 12px; background: #fcfcfc;">
+                                    確認事項や法務部への相談内容を入力...
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -298,6 +303,8 @@
                     <div class="step-item">
                         <div class="step-number">01</div>
                         <div class="step-content">
+                            <div style="color: #bf9b30; margin-bottom: 1.5rem;"><i
+                                    class="fa-solid fa-file-import fa-3x"></i></div>
                             <h3>PDF / URL 登録</h3>
                             <p>契約書PDFをアップロード、またはURLを登録するだけ。</p>
                         </div>
@@ -306,6 +313,8 @@
                     <div class="step-item">
                         <div class="step-number">02</div>
                         <div class="step-content">
+                            <div style="color: #bf9b30; margin-bottom: 1.5rem;"><i
+                                    class="fa-solid fa-wand-magic-sparkles fa-3x"></i></div>
                             <h3>AI差分抽出</h3>
                             <p>旧版との差異を自動検知。重要な変更のみを高精度に抽出。</p>
                         </div>
@@ -314,6 +323,8 @@
                     <div class="step-item">
                         <div class="step-number">03</div>
                         <div class="step-content">
+                            <div style="color: #bf9b30; margin-bottom: 1.5rem;"><i
+                                    class="fa-solid fa-shield-halved fa-3x"></i></div>
                             <h3>リスク度判定</h3>
                             <p>AIがリスクレベルを判定。優先確認事項を一目で把握。</p>
                         </div>
@@ -322,22 +333,14 @@
                     <div class="step-item">
                         <div class="step-number">04</div>
                         <div class="step-content">
+                            <div style="color: #bf9b30; margin-bottom: 1.5rem;"><i
+                                    class="fa-solid fa-paper-plane fa-3x"></i></div>
                             <h3>承認・共有</h3>
                             <p>コメント付きで社内連携。スムーズな承認フローを実現。</p>
                         </div>
                     </div>
                 </div>
 
-                <div class="features-visual" id="ai-diff-visual">
-                    <div class="visual-placeholder">
-                        <i class="fa-solid fa-robot"></i>
-                        <span>AI Extraction Engine</span>
-                        <p style="font-size: 0.8rem; opacity: 0.7; color: #fff; margin-top: 0.5rem; max-width: 200px;">
-                            特許申請中の高度なアルゴリズムが<br>契約の要点を瞬時に解析</p>
-                    </div>
-                    <!-- Generated image will be placed here -->
-                    <img src="images/ai_features_hero.png" alt="AI Features Hero">
-                </div>
             </div>
         </div>
     </section>
@@ -349,29 +352,26 @@
                 <div class="section-header text-center">
                     <h2 class="section-title">なぜ<span class="text-accent logo-font">DIFFsense</span>なのか</h2>
                 </div>
-                <div class="market-visual" id="market-advantage-visual">
-                    <div class="visual-placeholder">
-                        <i class="fa-solid fa-award"></i>
-                        <span style="color: var(--color-text);">Next-Generation Legal Tech</span>
-                    </div>
-                    <!-- Generated image will be placed here -->
-                    <img src="images/market_advantage_visual.png" alt="Market Advantage Visual">
-                </div>
                 <div class="comparison-grid">
                     <div class="comp-col">
-                        <h4>従来の法務SaaS</h4>
+                        <h4>従来の法務・管理SaaS</h4>
+                        <div class="comp-subtitle">「管理」のための重厚なシステム</div>
                         <ul>
-                            <li class="bad"><i class="fa-solid fa-xmark"></i> 導入コストが高い</li>
-                            <li class="bad"><i class="fa-solid fa-xmark"></i> 機能過多で使いにくい</li>
-                            <li class="bad"><i class="fa-solid fa-xmark"></i> 契約「管理」がメイン</li>
+                            <li class="bad"><i class="fa-solid fa-xmark"></i> 初期費用100万円〜・数ヶ月の準備</li>
+                            <li class="bad"><i class="fa-solid fa-xmark"></i> 多機能すぎてマニュアルなしでは困難</li>
+                            <li class="bad"><i class="fa-solid fa-xmark"></i> 過去の契約書を整理・保管するのが主目的</li>
+                            <li class="bad"><i class="fa-solid fa-xmark"></i> URLの変化や規約更新の自動検知は不得手</li>
                         </ul>
                     </div>
                     <div class="comp-col highlight">
+                        <div class="recommend-badge">推奨：差分チェックを効率化したい方</div>
                         <h4 class="logo-font">DIFFsense</h4>
+                        <div class="comp-subtitle">「変化」を即座に捉える現場の知能</div>
                         <ul>
-                            <li class="good"><i class="fa-solid fa-check"></i> 特化型で低価格</li>
-                            <li class="good"><i class="fa-solid fa-check"></i> AIが「中身」を要約</li>
-                            <li class="good"><i class="fa-solid fa-check"></i> 日本の法務に完全対応</li>
+                            <li class="good"><i class="fa-solid fa-check"></i> 月額1,480円〜・5分で登録完了</li>
+                            <li class="good"><i class="fa-solid fa-check"></i> AIが「どこが・どう変わったか」を日本語要約</li>
+                            <li class="good"><i class="fa-solid fa-check"></i> 変化があれば自動通知。見落としリスクをゼロに</li>
+                            <li class="good"><i class="fa-solid fa-check"></i> 特許申請中のアルゴリズムによる圧倒的タイパ</li>
                         </ul>
                     </div>
                 </div>
@@ -493,24 +493,51 @@
                     </div>
                 </div>
             </div>
-            <p class="note text-center" style="margin-top: 2rem; font-size: 0.8rem; color: #888;">
-                本サービスは契約内容の確認を支援するものであり、法的判断や助言を行うものではありません。<br>
-                最終的な判断は利用者ご自身で行ってください。<br>
-                ※ AI差分チェック回数は、AIによる解析処理を1回実行するごとにカウントされます。月間上限を超えた場合、翌月まで解析は実行されません。
-            </p>
         </div>
     </section>
 
-    <!-- CTA -->
-    <section id="contact" class="section cta-section">
-        <div class="container text-center">
-            <h2 class="cta-title">法務の「見落とし」を<span style="display: inline-block; white-space: nowrap;">ゼロに。</span></h2>
-            <p class="cta-desc">まずは無料デモで、AIの精度をご体験ください。</p>
-            <form class="cta-form">
-                <input type="email" placeholder="メールアドレスを入力" required>
-                <button type="submit" class="btn btn-primary">事前登録する</button>
-            </form>
-            <p class="note">※ β版ユーザー募集中</p>
+    <!-- FAQ Section -->
+    <section id="faq" class="section faq-section">
+        <div class="container">
+            <h2 class="section-title text-center">よくある質問</h2>
+            <div class="faq-container">
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <span>AIの精度はどの程度ですか？</span>
+                    </div>
+                    <div class="faq-answer">
+                        <p>DIFFsenseは契約内容の解析に特化したチューニングを行っています。AIが契約書の構造を深く理解し、重要な変更点や潜在的なリスクを高い精度で特定します。また、人間による確認の補助として、要約や補足コメントを提示します。
+                        </p>
+                    </div>
+                </div>
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <span>セキュリティ体制はどうなっていますか？</span>
+                    </div>
+                    <div class="faq-answer">
+                        <p>全ての通信は最新の暗号化技術により保護され、Google
+                            Cloudの堅牢なインフラストラクチャ上で厳重に管理されます。また、入力されたデータがAIの学習に利用されることは一切なく、お客様のプライバシーと機密性を最優先に設計されています。
+                        </p>
+                    </div>
+                </div>
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <span>導入までどのくらいの期間がかかりますか？</span>
+                    </div>
+                    <div class="faq-answer">
+                        <p>アカウント作成後、すぐにご利用いただけます。複雑な環境構築やインストールは不要で、ブラウザからお手持ちのPDFファイルをアップロード、あるいはURLを指定するだけで解析を開始できます。
+                        </p>
+                    </div>
+                </div>
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <span>どのようなファイル形式に対応していますか？</span>
+                    </div>
+                    <div class="faq-answer">
+                        <p>現在はPDFファイルのアップロードと、WEBサイトのURL指定による自動チェックに対応しています。今後、Word（.docx）形式などへの対応も順次進めてまいります。</p>
+                    </div>
+                </div>
+            </div>
         </div>
     </section>
 
