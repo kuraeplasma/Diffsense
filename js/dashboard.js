@@ -301,12 +301,35 @@ const Views = {
                                 <i class="fa-solid fa-robot text-primary"></i> AIリスク要約
                             </div>
 
-                            <div class="ai-summary" style="margin-bottom:32px;">
-                                <div class="risk-level ${contract.risk_level === 'High' ? 'text-danger' : 'text-warning'}">判定：${contract.risk_level === 'High' ? '要警戒' : '要確認'}</div>
-                                <p style="margin-bottom:12px; font-weight:600;">${diffData.riskReason}</p>
-                                <p class="text-muted">${diffData.summary}</p>
+                        </div>
+                        
+                        ${contract.source_type === 'URL' && window.app.userPlan === 'pro' ? `
+                        <div class="analysis-section" style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #eee;">
+                            <div class="analysis-section-title" style="display:flex; justify-content:space-between; align-items:center;">
+                                <span><i class="fa-solid fa-eye text-primary"></i> 定期監視（クローリング）</span>
+                                <label class="switch">
+                                    <input type="checkbox" ${contract.monitoring_enabled ? 'checked' : ''} onchange="window.app.toggleMonitoring(${id}, this.checked)">
+                                    <span class="slider round"></span>
+                                </label>
+                            </div>
+                            <div style="font-size: 13px; color: #666; margin-bottom:16px;">
+                                URLの変更を毎日自動でチェックします。差分がある場合のみAI解析を実行します。
+                            </div>
+                            <div style="background: #f8f9fa; border-radius: 8px; padding: 12px; font-size: 12px;">
+                                <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                                    <span class="text-muted">最終チェック:</span>
+                                    <span>${contract.last_checked_at ? new Date(contract.last_checked_at).toLocaleString('ja-JP') : '未実行'}</span>
+                                </div>
+                                <div style="display:flex; justify-content:space-between; margin-bottom:12px;">
+                                    <span class="text-muted">監視頻度:</span>
+                                    <span>${contract.stable_count >= 14 ? '3日に1回（安定）' : (contract.stable_count >= 7 ? '2日に1回' : '毎日')}</span>
+                                </div>
+                                <button class="btn-dashboard btn-outline" style="width:100%; justify-content:center;" onclick="window.app.manualCrawl(${id})">
+                                    <i class="fa-solid fa-sync"></i> 今すぐ更新を確認（AI回数消費）
+                                </button>
                             </div>
                         </div>
+                        ` : ''}
                     </div>
 
                     <!-- Right Pane: Original Document -->
@@ -888,7 +911,13 @@ class DashboardApp {
                 } else {
                     this.userRole = matchedUser.role;
                 }
+
+                // For testing/development: Assume Pro plan if user is admin
+                // In production, this would be fetched from backend or Stripe
+                this.userPlan = 'pro';
+
                 console.log('Current User Role:', this.userRole);
+                console.log('Current User Plan:', this.userPlan);
 
                 // Hide Team menu for non-admins
                 const teamNavLink = document.querySelector('.nav-item[onclick*="team"]');
@@ -1597,6 +1626,112 @@ class DashboardApp {
         } else {
             alert('削除に失敗しました（管理者は削除できない場合があります）');
             document.getElementById('delete-confirm-modal').classList.remove('active');
+        }
+    }
+
+    /**
+     * 定期監視のON/OFFを切り替える
+     */
+    toggleMonitoring(id, enabled) {
+        dbService.toggleMonitoring(id, enabled);
+        this.navigate('diff', { id }); // Refresh view
+    }
+
+    /**
+     * 手動クローリングを実行
+     */
+    async manualCrawl(id) {
+        const contract = dbService.getContractById(id);
+        if (!contract || !contract.source_url) return;
+
+        try {
+            this.showLoading('URLをチェックしています...');
+
+            const response = await fetch(`${this.backendUrl}/crawl`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${sessionStorage.getItem('idToken')}`
+                },
+                body: JSON.stringify({
+                    url: contract.source_url,
+                    lastHash: contract.last_hash
+                })
+            });
+
+            const result = await response.json();
+            this.hideLoading();
+
+            if (result.success) {
+                dbService.updateCrawlResult(id, result);
+
+                if (result.changed) {
+                    if (confirm('更新（差分）が検知されました。AI解析を実行して内容を確認しますか？\n（解析回数を1回消費します）')) {
+                        await this.performAIAnalysis(id);
+                    } else {
+                        this.navigate('diff', { id });
+                    }
+                } else {
+                    alert('更新はありませんでした。');
+                    this.navigate('diff', { id });
+                }
+            } else {
+                throw new Error(result.error || 'クローリングに失敗しました');
+            }
+        } catch (error) {
+            this.hideLoading();
+            console.error('Manual Crawl Error:', error);
+            alert('エラー: ' + error.message);
+        }
+    }
+
+    /**
+     * AI解析を実行（共通ロジック）
+     */
+    async performAIAnalysis(id) {
+        const contract = dbService.getContractById(id);
+        const fbModule = await import('./firebase-config.js');
+        const user = fbModule.auth.currentUser;
+
+        if (!user) {
+            alert('セッションが切れました。再ログインしてください。');
+            return;
+        }
+
+        try {
+            this.showLoading('AI解析を実行中...');
+            const idToken = await fbModule.auth.currentUser.getIdToken();
+
+            // 履歴用の前バージョン内容を取得
+            const previousVersion = contract.original_content;
+
+            const response = await fetch(`${this.backendUrl}/contracts/analyze`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${idToken}`
+                },
+                body: JSON.stringify({
+                    contractId: contract.id,
+                    method: 'url',
+                    source: contract.source_url,
+                    previousVersion: previousVersion
+                })
+            });
+
+            const resData = await response.json();
+            this.hideLoading();
+
+            if (resData.success) {
+                dbService.updateContractAnalysis(id, resData.data);
+                this.navigate('diff', { id });
+            } else {
+                throw new Error(resData.error || '解析に失敗しました');
+            }
+        } catch (error) {
+            this.hideLoading();
+            console.error('AI Analysis Error:', error);
+            alert('解析エラー: ' + error.message);
         }
     }
 

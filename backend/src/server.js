@@ -11,6 +11,8 @@ const inviteRoutes = require('./routes/invite'); // Added
 const authMiddleware = require('./middleware/authMiddleware');
 const errorHandler = require('./middleware/errorHandler');
 const logger = require('./utils/logger');
+const crawlRoutes = require('./routes/crawl');
+const cronService = require('./services/cronService');
 
 
 // Initialize Firebase Admin (Using shared module)
@@ -88,6 +90,7 @@ app.get('/health', (req, res) => {
 app.use('/contracts', authMiddleware, contractRoutes);
 app.use('/db', authMiddleware, dbRoutes);
 app.use('/invite', authMiddleware, inviteRoutes); // Added
+app.use('/crawl', authMiddleware, crawlRoutes); // New crawling route
 
 
 // Static files (PDF Uploads)
@@ -113,6 +116,9 @@ if (require.main === module) {
         logger.info(`DIFFsense Backend API started on port ${PORT}`);
         logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
         logger.info(`Allowed origins: ${allowedOrigins.join(', ')}`);
+
+        // Initialize Periodic Tasks
+        cronService.init();
     });
 
     process.on('SIGTERM', () => {

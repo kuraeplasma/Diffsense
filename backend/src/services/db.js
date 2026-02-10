@@ -116,6 +116,40 @@ class DBService {
         }
         return null;
     }
+
+    // --- Crawling Support ---
+
+    /**
+     * Get all contracts for Pro-plan users that have monitoring enabled
+     */
+    async getMonitoringContracts() {
+        const users = await this.readData('users');
+        const proUsers = users.filter(u => u.plan === 'pro');
+        const proUids = proUsers.map(u => u.uid);
+
+        const contracts = await this.readData('contracts');
+        // If owner_uid is not present, we assume for now (in dev) that it might be needed
+        // but since we don't have owner_uid, we'll filter by source_type === 'URL' and monitoring_enabled
+        return contracts.filter(c =>
+            c.source_type === 'URL' &&
+            c.monitoring_enabled === true
+        );
+    }
+
+    /**
+     * Update a contract by ID
+     */
+    async updateContract(id, updates) {
+        const contracts = await this.readData('contracts');
+        const index = contracts.findIndex(c => c.id === id);
+
+        if (index > -1) {
+            contracts[index] = { ...contracts[index], ...updates };
+            await this.writeData('contracts', contracts);
+            return contracts[index];
+        }
+        return null;
+    }
 }
 
 module.exports = new DBService();

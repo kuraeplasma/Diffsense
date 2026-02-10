@@ -134,7 +134,12 @@ export const dbService = {
             assignee_name: "-",
             original_content: "",
             source_url: data.sourceUrl || "",
-            original_filename: data.originalFilename || ""
+            original_filename: data.originalFilename || "",
+            // Crawling / Monitoring fields
+            monitoring_enabled: data.monitoring_enabled || false,
+            last_checked_at: null,
+            last_hash: null,
+            stable_count: 0
         };
         contracts.unshift(newContract); // Add to top
         localStorage.setItem(this.KEYS.CONTRACTS, JSON.stringify(contracts));
@@ -359,5 +364,44 @@ export const dbService = {
         if (numericLevel === 2) return 'Medium';
         if (numericLevel === 1) return 'Low';
         return 'None';
+    },
+
+    /**
+     * 定期監視のON/OFFを切り替える
+     */
+    toggleMonitoring(id, enabled) {
+        const contracts = this.getContracts();
+        const contract = contracts.find(c => c.id === parseInt(id));
+        if (contract) {
+            contract.monitoring_enabled = enabled;
+            localStorage.setItem(this.KEYS.CONTRACTS, JSON.stringify(contracts));
+            this.addActivityLog(`定期監視 ${enabled ? '開始' : '停止'}`, contract.name, "ユーザー");
+            return true;
+        }
+        return false;
+    },
+
+    /**
+     * クローリング結果を保存
+     */
+    updateCrawlResult(id, data) {
+        const contracts = this.getContracts();
+        const contract = contracts.find(c => c.id === parseInt(id));
+        if (contract) {
+            contract.last_checked_at = data.checkedAt;
+            contract.last_hash = data.newHash;
+
+            if (data.changed) {
+                contract.status = 'リスク要確認';
+                contract.original_content = data.text;
+                contract.stable_count = 0;
+            } else {
+                contract.stable_count = (contract.stable_count || 0) + 1;
+            }
+
+            localStorage.setItem(this.KEYS.CONTRACTS, JSON.stringify(contracts));
+            return true;
+        }
+        return false;
     }
 };
