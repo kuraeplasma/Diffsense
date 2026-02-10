@@ -7,9 +7,11 @@ const fs = require('fs');
 const path = require('path');
 const contractRoutes = require('./routes/contracts');
 const dbRoutes = require('./routes/db');
+const inviteRoutes = require('./routes/invite'); // Added
 const authMiddleware = require('./middleware/authMiddleware');
 const errorHandler = require('./middleware/errorHandler');
 const logger = require('./utils/logger');
+
 
 // Initialize Firebase Admin (Using shared module)
 const { admin, db, bucket } = require('./firebase');
@@ -85,6 +87,8 @@ app.get('/health', (req, res) => {
 // API routes (Protected by Auth Middleware)
 app.use('/contracts', authMiddleware, contractRoutes);
 app.use('/db', authMiddleware, dbRoutes);
+app.use('/invite', authMiddleware, inviteRoutes); // Added
+
 
 // Static files (PDF Uploads)
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));

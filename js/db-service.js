@@ -81,7 +81,7 @@ export const dbService = {
 
         const initialUsers = [
             { id: 101, name: "山田 太郎", email: "taro@example.com", role: "管理者", last_active_at: "2026-01-30 18:45" },
-            { id: 102, name: "鈴木 一郎", email: "ichiro@example.com", role: "承認者", last_active_at: "2026-01-29 11:20" },
+            { id: 102, name: "鈴木 一郎", email: "ichiro@example.com", role: "作業者", last_active_at: "2026-01-29 11:20" },
             { id: 103, name: "佐藤 花子", email: "hanako@example.com", role: "閲覧のみ", last_active_at: "2026-01-30 09:00" },
         ];
 
@@ -161,6 +161,7 @@ export const dbService = {
         const contract = contracts.find(c => c.id === parseInt(id));
         if (contract) {
             contract.status = status;
+            contract.last_updated_at = new Date().toISOString().split('T')[0];
             localStorage.setItem(this.KEYS.CONTRACTS, JSON.stringify(contracts));
 
             // Log this action
@@ -215,14 +216,17 @@ export const dbService = {
     },
 
     getFilteredContracts(type) {
-        const contracts = this.getContracts();
+        let contracts = [...this.getContracts()];
+        // Sort by last_updated_at desc to show recent items first
+        contracts.sort((a, b) => new Date(b.last_updated_at) - new Date(a.last_updated_at));
+
         switch (type) {
             case 'pending':
                 return contracts.filter(c => c.status === '未確認' || c.status === '未解析');
             case 'risk':
                 return contracts.filter(c => c.risk_level === 'High' && c.status !== '確認済');
             case 'total':
-                return contracts; // Sorted by recent in db
+                return contracts; // Now sorted
             default:
                 return contracts;
         }
@@ -265,6 +269,9 @@ export const dbService = {
 
     addUser(name, email, role) {
         const users = this.getUsers();
+        if (users.find(u => u.email === email)) {
+            return false; // Email already exists
+        }
         const newUser = {
             id: Date.now(),
             name,
@@ -276,6 +283,34 @@ export const dbService = {
         localStorage.setItem(this.KEYS.USERS, JSON.stringify(users));
         this.addActivityLog("メンバー追加", name, "管理者");
         return true;
+    },
+
+    updateUser(email, data) {
+        const users = this.getUsers();
+        const user = users.find(u => u.email === email);
+        if (user) {
+            if (data.name) user.name = data.name;
+            if (data.role) user.role = data.role;
+            localStorage.setItem(this.KEYS.USERS, JSON.stringify(users));
+            this.addActivityLog("メンバー情報更新", user.name, "管理者");
+            return true;
+        }
+        return false;
+    },
+
+    deleteUser(email) {
+        let users = this.getUsers();
+        const user = users.find(u => u.email === email);
+        if (user) {
+            // Prevent deleting the last admin or self (simplified logic)
+            // if (user.role === '管理者') return false; 
+
+            users = users.filter(u => u.email !== email);
+            localStorage.setItem(this.KEYS.USERS, JSON.stringify(users));
+            this.addActivityLog("メンバー削除", user.name, "管理者");
+            return true;
+        }
+        return false;
     },
 
     // --- AI Analysis Methods ---

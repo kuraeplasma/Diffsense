@@ -57,6 +57,42 @@ export const aiService = {
     },
 
     /**
+     * 招待メールを送信
+     * @param {string} email - 招待先メールアドレス
+     * @param {string} name - 招待先名前
+     * @param {string} role - 権限
+     * @returns {Promise<Object>} 送信結果
+     */
+    async sendInvite(email, name, role) {
+        try {
+            const token = await getIdToken();
+            const response = await fetch(`${this.API_BASE}/invite`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': token ? `Bearer ${token}` : ''
+                },
+                body: JSON.stringify({
+                    email,
+                    name,
+                    role
+                })
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || `HTTP error! status: ${response.status}`);
+            }
+
+            return result;
+        } catch (error) {
+            console.error('Invite Error:', error);
+            throw error;
+        }
+    },
+
+    /**
      * ヘルスチェック
      * @returns {Promise<Object>} サーバーステータス
      */

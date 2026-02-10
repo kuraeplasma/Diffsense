@@ -7,6 +7,8 @@ console.log(`Checking CSP on: ${url}`);
 https.get(url, (res) => {
     console.log('CSP Header:');
     console.log(res.headers['content-security-policy']);
+    console.log('X-Frame-Options:');
+    console.log(res.headers['x-frame-options']);
 }).on('error', (err) => {
     console.error('Error:', err.message);
 });

@@ -29,13 +29,17 @@ const Views = {
             else if (c.status === '未確認') statusBadge = '<span class="badge badge-warning">要確認 (変更)</span>';
             else if (c.status === '確認済') statusBadge = '<span class="badge badge-neutral"><i class="fa-solid fa-check"></i> 確認済</span>';
 
+            const actionBtn = window.app.can('operate_contract')
+                ? `<button class="btn-dashboard">${c.status === '確認済' ? '履歴を見る' : '確認する'}</button>`
+                : `<button class="btn-dashboard">詳細を見る</button>`;
+
             return `
                 <tr onclick="window.app.navigate('diff', ${c.id})">
-                    <td><span class="badge ${riskBadgeClass}">${c.risk_level}</span></td>
+                    <td><span class="badge ${riskBadgeClass}">${c.risk_level === 'High' ? 'High' : (c.risk_level === 'Medium' ? 'Medium' : (c.risk_level === 'Low' ? 'Low' : c.risk_level))}</span></td>
                     <td class="col-name" title="${c.name}">${c.name}</td>
                     <td>${c.last_updated_at}</td>
                     <td>${statusBadge}</td>
-                    <td><button class="btn-dashboard">${c.status === '確認済' ? '履歴を見る' : '確認する'}</button></td>
+                    <td>${actionBtn}</td>
                 </tr>
             `;
         }).join('') : '<tr><td colspan="5" class="text-center text-muted" style="padding:40px;">該当するアイテムはありません</td></tr>';
@@ -87,9 +91,9 @@ const Views = {
         const rows = items.map(c => {
             let riskBadge = '';
             if (c.risk_level === 'High') riskBadge = '<span class="badge badge-danger">High</span>';
-            else if (c.risk_level === 'Medium') riskBadge = '<span class="badge badge-warning">Med</span>';
+            else if (c.risk_level === 'Medium') riskBadge = '<span class="badge badge-warning">Medium</span>';
             else if (c.risk_level === 'Low') riskBadge = '<span class="badge badge-success">Low</span>';
-            else riskBadge = '<span class="badge badge-neutral">No</span>';
+            else riskBadge = '<span class="badge badge-neutral">-</span>';
 
             const statusBadge = c.status === '確認済'
                 ? '<span class="badge badge-neutral"><i class="fa-solid fa-check"></i> 確認済</span>'
@@ -111,7 +115,7 @@ const Views = {
             <div class="flex justify-between items-center mb-md">
                 <h2 class="page-title" style="margin-bottom:0;">契約・規約管理</h2>
                 <div class="flex gap-sm">
-                   <button class="btn-dashboard" onclick="window.app.exportCSV()"><i class="fa-solid fa-download"></i> CSV出力</button>
+                   ${window.app.can('operate_contract') ? `<button class="btn-dashboard" onclick="window.app.exportCSV()"><i class="fa-solid fa-download"></i> CSV出力</button>` : ''}
                 </div>
             </div>
 
@@ -130,7 +134,7 @@ const Views = {
                         <select onchange="window.app.updateFilter('risk', this.value)" style="padding:6px 8px; border:1px solid #ddd; border-radius:4px; font-size:13px;">
                             <option value="all" ${appFilters.risk === 'all' ? 'selected' : ''}>すべて</option>
                             <option value="High" ${appFilters.risk === 'High' ? 'selected' : ''}>High</option>
-                            <option value="Medium" ${appFilters.risk === 'Medium' ? 'selected' : ''}>Med</option>
+                            <option value="Medium" ${appFilters.risk === 'Medium' ? 'selected' : ''}>Medium</option>
                             <option value="Low" ${appFilters.risk === 'Low' ? 'selected' : ''}>Low</option>
                         </select>
                     </div>
@@ -257,7 +261,7 @@ const Views = {
                         </a>
                         <h2 style="font-size:18px; font-weight:700; color:var(--text-main); margin:0;">${diffData.title}</h2>
                         <div class="flex gap-sm">
-                            <span class="badge ${contract.risk_level === 'High' ? 'badge-danger' : 'badge-warning'}">Risk: ★${diffData.riskLevel}</span>
+                            <span class="badge ${contract.risk_level === 'High' ? 'badge-danger' : 'badge-warning'}">${contract.risk_level === 'High' ? 'High' : (contract.risk_level === 'Medium' ? 'Medium' : 'Low')}</span>
                             <span class="badge ${contract.status === '確認済' ? 'badge-neutral' : 'badge-warning'}">${contract.status}</span>
                         </div>
                         <div style="font-size:12px; color:#666; margin-top:4px;">
@@ -266,13 +270,15 @@ const Views = {
                         </div>
                     </div>
                     <div class="flex gap-sm">
-                        <button class="btn-dashboard" onclick="window.app.showHistoryModal(${id})"><i class="fa-solid fa-note-sticky"></i> メモ</button>
+                        ${window.app.can('operate_contract') ? `<button class="btn-dashboard" onclick="window.app.showHistoryModal(${id})"><i class="fa-solid fa-note-sticky"></i> メモ</button>` : ''}
                         <button class="btn-dashboard" style="background:#fff;"><i class="fa-solid fa-share-nodes"></i> 共有</button>
-                        ${contract.status === '未処理'
-                ? ''
-                : contract.status === '未確認'
-                    ? `<button class="btn-dashboard btn-primary-action" onclick="window.app.confirmContract(${id})"><i class="fa-solid fa-check"></i> 確認済みにする</button>`
-                    : `<button class="btn-dashboard" disabled><i class="fa-solid fa-check"></i> 確認済み</button>`}
+                        ${window.app.can('operate_contract')
+                ? (contract.status === '未処理'
+                    ? ''
+                    : contract.status === '未確認'
+                        ? `<button class="btn-dashboard btn-primary-action" onclick="window.app.confirmContract(${id})"><i class="fa-solid fa-check"></i> 確認済みにする</button>`
+                        : `<button class="btn-dashboard" disabled><i class="fa-solid fa-check"></i> 確認済み</button>`)
+                : ''}
                     </div>
                 </div>
 
@@ -327,9 +333,10 @@ const Views = {
                                 </div>
                             </div>
                             
+                            ${window.app.can('operate_contract') ? `
                             <button class="btn-upload-version" onclick="window.app.uploadNewVersion(${id})">
                                 <i class="fa-solid fa-cloud-arrow-up"></i> 新しいバージョンをアップロード
-                            </button>
+                            </button>` : ''}
                         </div>
                         <div class="tabs-row">
                             <button class="tab-item ${activeTab === 'diff' ? 'active' : ''}" onclick="window.app.setDetailTab('diff')">差分表示</button>
@@ -429,24 +436,18 @@ const Views = {
         const users = dbService.getUsers();
         const rows = users.map(m => `
             <tr>
-                <td class="col-name" title="${m.name}">${m.name}</td>
-                <td>${m.email}</td>
-                <td>
-                    <select onchange="window.app.updateUserRole('${m.email}', this.value)" style="border:1px solid #ddd; padding:4px; border-radius:4px;">
-                        <option value="管理者" ${m.role === '管理者' ? 'selected' : ''}>管理者</option>
-                        <option value="承認者" ${m.role === '承認者' ? 'selected' : ''}>承認者</option>
-                        <option value="閲覧のみ" ${m.role === '閲覧のみ' ? 'selected' : ''}>閲覧のみ</option>
-                    </select>
-                </td>
-                <td>${m.last_active_at}</td>
-                <td><button class="btn-dashboard" onclick="alert('編集機能は開発中です')">編集</button></td>
-            </tr>
-    `).join('');
+                <td class="col-name" title="${m.name}">${m.name} ${m.role === '管理者' ? '<i class="fa-solid fa-crown text-warning" style="font-size:12px; margin-left:4px;"></i>' : ''}</td>
+            <td>${m.email}</td>
+            <td><span class="badge ${m.role === '管理者' ? 'badge-warning' : (m.role === '作業者' ? 'badge-success' : 'badge-neutral')}">${m.role}</span></td>
+            <td>${m.last_active_at}</td>
+            <td>${window.app.can('manage_team') ? `<button class="btn-dashboard" onclick="window.app.showEditMemberModal('${m.email}')">編集</button>` : '-'}</td>
+        </tr>
+`).join('');
 
         return `
             <div class="flex justify-between items-center mb-md">
                 <h2 class="page-title" style="margin-bottom:0;">チーム管理</h2>
-                <button class="btn-dashboard btn-primary-action" onclick="window.app.showInviteModal()"><i class="fa-solid fa-user-plus"></i> メンバー招待</button>
+                ${window.app.can('manage_team') ? `<button class="btn-dashboard btn-primary-action" onclick="window.app.showInviteModal()"><i class="fa-solid fa-user-plus"></i> メンバー招待</button>` : ''}
             </div>
     <div class="table-container">
         <table class="data-table team-table">
@@ -810,6 +811,8 @@ class DashboardApp {
         this.mainContent = document.getElementById('app-content');
         this.pageTitle = document.getElementById('page-header-title');
         this.currentViewParams = null;
+        this.userRole = '閲覧のみ'; // Default to safest
+
 
         // Navigation State
         this.searchQuery = "";
@@ -829,12 +832,31 @@ class DashboardApp {
         this.registration = new RegistrationFlow(this);
     }
 
+    can(action) {
+        if (!this.userRole) return false;
+
+        switch (action) {
+            case 'manage_team':
+                return this.userRole === '管理者';
+            case 'operate_contract':
+                return this.userRole === '管理者' || this.userRole === '作業者';
+            case 'view_only':
+                return true;
+            default:
+                return false;
+        }
+    }
+
     init() {
         try {
             console.log('Dashboard App Initializing...');
             dbService.init();
             this.bindEvents();
             this.registration.init();
+
+            // Auto-register current user as Admin if needed
+            this.checkAndRegisterAdmin();
+
             this.navigate('dashboard');
             console.log('Dashboard App Initialized Successfully');
         } catch (error) {
@@ -842,6 +864,44 @@ class DashboardApp {
             alert('ダッシュボードの初期化中にエラーが発生しました。詳細はコンソールを確認してください。');
         }
     }
+
+    async checkAndRegisterAdmin() {
+        try {
+            const authModule = await import('./auth.js');
+            await authModule.getIdToken(); // Ensure auth is ready
+
+            const fbConfig = await import('./firebase-config.js');
+            const auth = fbConfig.auth;
+            const user = auth.currentUser;
+
+            if (user) {
+                this.currentUser = user; // Store for later use
+
+                const users = dbService.getUsers();
+                const matchedUser = users.find(u => u.email === user.email);
+
+                if (!matchedUser) {
+                    console.log('Auto-registering admin user:', user.email);
+                    const displayName = user.displayName || user.email.split('@')[0];
+                    dbService.addUser(displayName, user.email, '管理者');
+                    this.userRole = '管理者';
+                } else {
+                    this.userRole = matchedUser.role;
+                }
+                console.log('Current User Role:', this.userRole);
+
+                // Hide Team menu for non-admins
+                const teamNavLink = document.querySelector('.nav-item[onclick*="team"]');
+                if (teamNavLink && !this.can('manage_team')) {
+                    teamNavLink.style.display = 'none';
+                }
+            }
+        } catch (e) {
+            console.error('Admin Check Error:', e);
+        }
+    }
+
+
 
     bindEvents() {
         const toggle = document.getElementById('sidebar-toggle');
@@ -881,6 +941,14 @@ class DashboardApp {
 
     navigate(viewId, params = null) {
         console.log(`Navigating to ${viewId}`, params);
+
+        // RBAC: Protect team view
+        if (viewId === 'team' && !this.can('manage_team')) {
+            console.warn('Access denied for team view. Redirecting to dashboard.');
+            this.navigate('dashboard');
+            return;
+        }
+
         this.currentView = viewId;
 
         // Toggle Fluid Layout Mode for Detail View
@@ -971,13 +1039,17 @@ class DashboardApp {
                 else if (c.status === '未確認') statusBadge = '<span class="badge badge-warning">要確認 (変更)</span>';
                 else if (c.status === '確認済') statusBadge = '<span class="badge badge-neutral"><i class="fa-solid fa-check"></i> 確認済</span>';
 
+                const actionBtn = window.app.can('operate_contract')
+                    ? `<button class="btn-dashboard">${c.status === '確認済' ? '履歴を見る' : '確認する'}</button>`
+                    : `<button class="btn-dashboard">詳細を見る</button>`;
+
                 return `
                     <tr onclick="window.app.navigate('diff', ${c.id})">
                         <td><span class="badge ${riskBadgeClass}">${c.risk_level}</span></td>
                         <td class="col-name" title="${c.name}">${c.name}</td>
                         <td>${c.last_updated_at}</td>
                         <td>${statusBadge}</td>
-                        <td><button class="btn-dashboard">${c.status === '確認済' ? '履歴を見る' : '確認する'}</button></td>
+                        <td>${actionBtn}</td>
                     </tr>
                 `;
             }).join('') : '<tr><td colspan="5" class="text-center text-muted" style="padding:40px;">該当するアイテムはありません</td></tr>';
@@ -1023,8 +1095,9 @@ class DashboardApp {
 
     confirmContract(id) {
         if (dbService.updateContractStatus(id, '確認済')) {
-            // alert('確認済みに更新しました'); // Removed alert as per instruction
-            this.navigate('diff', id); // Changed navigation as per instruction
+            // Switch to 'Monitoring' (Total) view and go back to dashboard
+            this.dashboardFilter = 'total';
+            this.navigate('dashboard');
         }
     }
 
@@ -1397,12 +1470,133 @@ class DashboardApp {
         }
     }
 
+    // --- Team Management ---
     showInviteModal() {
-        const name = prompt('名前を入力してください');
-        const email = prompt('メールアドレスを入力してください');
-        if (name && email) {
-            dbService.addUser(name, email, '閲覧のみ');
+        document.getElementById('invite-name').value = '';
+        document.getElementById('invite-email').value = '';
+        document.getElementById('invite-role').value = '閲覧のみ';
+        document.getElementById('invite-member-modal').classList.add('active');
+    }
+
+    showAlertModal(title, message, type = 'error') {
+        const existing = document.getElementById('alert-modal');
+        if (existing) existing.remove();
+
+        const modal = document.createElement('div');
+        modal.id = 'alert-modal';
+        modal.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:11000; animation: fadeIn 0.3s;';
+
+        const iconColor = type === 'error' ? '#dc3545' : '#ffc107';
+        const iconClass = type === 'error' ? 'fa-circle-xmark' : 'fa-triangle-exclamation';
+        const bgColor = type === 'error' ? '#fde8e8' : '#fff3cd';
+
+        modal.innerHTML = `
+            <div style="background:white; width:90%; max-width:450px; border-radius:12px; padding:32px; text-align:center; box-shadow:0 10px 40px rgba(0,0,0,0.2); animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);">
+                <div style="width:60px; height:60px; background:${bgColor}; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 20px; color:${iconColor}; font-size:30px;">
+                    <i class="fa-solid ${iconClass}"></i>
+                </div>
+                <h3 style="margin:0 0 12px; color:#24292E; font-size:20px; font-weight:700;">${title}</h3>
+                <p style="margin:0 0 24px; color:#586069; font-size:14px; line-height:1.6;">${message}</p>
+                <button class="btn-dashboard btn-primary-action" style="padding:10px 32px; font-size:14px;" onclick="document.getElementById('alert-modal').remove()">OK</button>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    async submitInvite() {
+        const name = document.getElementById('invite-name').value;
+        const email = document.getElementById('invite-email').value;
+        const role = document.getElementById('invite-role').value;
+
+        if (!name || !email) {
+            alert('名前とメールアドレスを入力してください');
+            return;
+        }
+
+        if (dbService.addUser(name, email, role)) {
+            document.getElementById('invite-member-modal').classList.remove('active');
             this.navigate('team');
+
+            // Send Email via Backend
+            try {
+                await aiService.sendInvite(email, name, role);
+                this.showSuccessModal('招待送信完了', 'メンバーを追加し、招待メールを送信しました。');
+            } catch (error) {
+                console.error('Email send failed:', error);
+                this.showAlertModal('送信エラー', 'メンバーは追加されましたが、招待メールの送信に失敗しました。<br>サーバーログを確認してください。', 'warning');
+            }
+        } else {
+            // Check if user exists to give specific error
+            const users = dbService.getUsers();
+            const exists = users.find(u => u.email === email);
+            if (exists) {
+                this.showAlertModal('登録エラー', 'このメールアドレスは既に登録されています。<br>別のメールアドレスを使用するか、既存のメンバーを編集してください。');
+            } else {
+                this.showAlertModal('登録エラー', 'メンバーの追加に失敗しました。');
+            }
+        }
+    }
+
+    showEditMemberModal(email) {
+        const users = dbService.getUsers();
+        const user = users.find(u => u.email === email);
+        if (user) {
+            document.getElementById('edit-original-email').value = user.email;
+            // If name is same as email (default), show placeholder or empty
+            document.getElementById('edit-name').value = (user.name === user.email) ? '' : user.name;
+            document.getElementById('edit-email').value = user.email;
+            document.getElementById('edit-role').value = user.role;
+
+            // Protect current user from deletion
+            const deleteBtn = document.querySelector('#edit-member-modal .btn-danger-action');
+            if (this.currentUser && user.email === this.currentUser.email) {
+                deleteBtn.style.display = 'none';
+                // Optional: Disable role change for self to prevent lockout
+                document.getElementById('edit-role').disabled = true;
+            } else {
+                deleteBtn.style.display = 'block';
+                document.getElementById('edit-role').disabled = false;
+            }
+
+            document.getElementById('edit-member-modal').classList.add('active');
+        }
+    }
+
+    updateMember() {
+        const originalEmail = document.getElementById('edit-original-email').value;
+        const name = document.getElementById('edit-name').value;
+        const role = document.getElementById('edit-role').value;
+
+        if (dbService.updateUser(originalEmail, { name, role })) {
+            document.getElementById('edit-member-modal').classList.remove('active');
+            this.navigate('team');
+        } else {
+            alert('更新に失敗しました');
+        }
+    }
+
+    deleteMember() {
+        const email = document.getElementById('edit-original-email').value;
+
+        // Final safeguard against self-deletion
+        if (this.currentUser && email === this.currentUser.email) {
+            alert('自分自身のアカウントは削除できません。');
+            return;
+        }
+
+        // Just show the confirmation modal
+        document.getElementById('delete-confirm-modal').classList.add('active');
+    }
+
+    executeDeleteMember() {
+        const email = document.getElementById('edit-original-email').value;
+        if (dbService.deleteUser(email)) {
+            document.getElementById('delete-confirm-modal').classList.remove('active'); // Close confirm modal
+            document.getElementById('edit-member-modal').classList.remove('active');   // Close edit modal
+            this.navigate('team');
+        } else {
+            alert('削除に失敗しました（管理者は削除できない場合があります）');
+            document.getElementById('delete-confirm-modal').classList.remove('active');
         }
     }
 
