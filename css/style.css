@@ -29,8 +29,8 @@
     --font-body: 'Noto Sans JP', 'Inter', sans-serif;
 
     /* Spacing */
-    --container-width: 1500px;
-    /* Increased from 1400px to accommodate longer text */
+    --container-width: 1600px;
+    /* Increased to 1600px for generous spacing */
     --spacing-xs: 0.5rem;
     --spacing-sm: 1rem;
     --spacing-md: 2rem;
@@ -711,14 +711,16 @@ ul {
 /* Pricing Grid */
 .pricing-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 2rem;
     align-items: stretch;
+    max-width: var(--container-width);
+    margin: 0 auto;
 }
 
 .pricing-card {
     background: #fff;
-    padding: 2.5rem;
+    padding: 3rem 2rem;
     text-align: center;
     border: 1px solid #eee;
     border-radius: var(--radius-md);
@@ -726,14 +728,13 @@ ul {
     position: relative;
     display: flex;
     flex-direction: column;
-    max-width: none;
+    width: 100%;
     margin: 0;
 }
 
 .pricing-card.highlight-plan {
     border: 2px solid var(--color-primary);
     box-shadow: 0 15px 40px rgba(161, 126, 26, 0.1);
-    transform: scale(1.05);
     z-index: 10;
 }
 
@@ -770,9 +771,10 @@ ul {
 }
 
 .price {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
+    display: flex;
+    justify-content: center;
     align-items: baseline;
+    gap: 10px;
     width: 100%;
     margin-bottom: 1.5rem;
 }
@@ -801,26 +803,35 @@ ul {
     font-family: var(--font-body);
     font-weight: 400;
     text-align: left;
-    margin-left: 8px;
+    white-space: nowrap;
+}
+
+.pricing-description {
+    min-height: 80px;
+    /* Standardize height to align feature lists */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 2rem;
 }
 
 .pricing-description p {
     font-size: 1rem;
-    color: #a17e1a;
-    font-weight: 800;
-    margin-bottom: 2rem;
-    background: rgba(197, 160, 89, 0.08);
-    padding: 12px 15px;
+    color: #444;
+    /* Back to original grey */
+    font-weight: 600;
+    background: #f9f9f9;
+    /* Near-white background */
+    padding: 12px 20px;
+    border: 1px solid #eee;
+    /* Light border for "frame" feel */
     border-radius: 6px;
-    line-height: 1.6;
+    line-height: 1.4;
     text-align: center;
+    width: 100%;
 }
 
-@media (min-width: 1400px) {
-    .pricing-description p {
-        white-space: nowrap;
-    }
-}
+
 
 .pricing-features {
     text-align: left;
