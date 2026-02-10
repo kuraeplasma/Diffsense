@@ -27,7 +27,7 @@ app.use(helmet({
     contentSecurityPolicy: {
         directives: {
             ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-            "frame-ancestors": ["'self'", "http://localhost:3000", "http://localhost:8000"],
+            "frame-ancestors": ["'self'", "http://localhost:3000", "http://localhost:8000", "https://diffsense.netlify.app"],
         },
     },
     crossOriginResourcePolicy: { policy: "cross-origin" }
