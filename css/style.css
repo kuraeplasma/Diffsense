@@ -29,8 +29,8 @@
     --font-body: 'Noto Sans JP', 'Inter', sans-serif;
 
     /* Spacing */
-    --container-width: 1400px;
-    /* Increased from 1200px */
+    --container-width: 1500px;
+    /* Increased from 1400px to accommodate longer text */
     --spacing-xs: 0.5rem;
     --spacing-sm: 1rem;
     --spacing-md: 2rem;
@@ -802,6 +802,24 @@ ul {
     font-weight: 400;
     text-align: left;
     margin-left: 8px;
+}
+
+.pricing-description p {
+    font-size: 1rem;
+    color: #a17e1a;
+    font-weight: 800;
+    margin-bottom: 2rem;
+    background: rgba(197, 160, 89, 0.08);
+    padding: 12px 15px;
+    border-radius: 6px;
+    line-height: 1.6;
+    text-align: center;
+}
+
+@media (min-width: 1400px) {
+    .pricing-description p {
+        white-space: nowrap;
+    }
 }
 
 .pricing-features {
