@@ -436,7 +436,7 @@ const Views = {
         const users = dbService.getUsers();
         const rows = users.map(m => `
             <tr>
-                <td class="col-name" title="${m.name}">${m.name} ${m.role === '管理者' ? '<i class="fa-solid fa-crown text-warning" style="font-size:12px; margin-left:4px;"></i>' : ''}</td>
+                <td class="col-name" title="${m.name}">${m.name}</td>
             <td>${m.email}</td>
             <td><span class="badge ${m.role === '管理者' ? 'badge-warning' : (m.role === '作業者' ? 'badge-success' : 'badge-neutral')}">${m.role}</span></td>
             <td>${m.last_active_at}</td>
