@@ -462,15 +462,22 @@ const Views = {
     // 4. History
     history: () => {
         const logs = dbService.getActivityLogs();
-        const rows = logs.map(h => `
+        const rows = logs.map(h => {
+            let statusBadge = 'badge-neutral';
+            if (h.status === '成功') statusBadge = 'badge-success';
+            else if (h.status === '失敗') statusBadge = 'badge-danger';
+            else if (h.status === 'スキップ') statusBadge = 'badge-info';
+
+            return `
             <tr>
                 <td>${h.created_at}</td>
                 <td class="col-name" title="${h.target_name}">${h.target_name}</td>
-                <td><span class="badge badge-success">${h.action}</span></td>
+                <td><span class="badge ${statusBadge}">${h.status || '成功'}</span></td>
+                <td>${h.action}</td>
                 <td>${h.actor}</td>
-                <td><button class="btn-dashboard" style="padding:2px 8px; font-size:11px;" onclick="alert('詳細ログ機能は開発中です')">詳細</button></td>
+                <td><button class="btn-dashboard" style="padding:2px 8px; font-size:11px;" onclick="window.app.showLogDetails(${h.id})">詳細</button></td>
             </tr>
-    `).join('');
+        `}).join('');
 
         return `
             <h2 class="page-title">解析ログ・監査履歴</h2>
@@ -480,12 +487,13 @@ const Views = {
                         <tr>
                             <th>日時</th>
                             <th>対象</th>
-                            <th>結果/操作</th>
+                            <th>ステータス</th>
+                            <th>操作/種別</th>
                             <th>実行者</th>
-                            <th>操作</th>
+                            <th>詳細</th>
                         </tr>
                     </thead>
-                    <tbody>${rows || '<tr><td colspan="5" class="text-center text-muted">履歴はありません</td></tr>'}</tbody>
+                    <tbody>${rows || '<tr><td colspan="6" class="text-center text-muted">履歴はありません</td></tr>'}</tbody>
                 </table>
             </div>
 `;
@@ -1108,6 +1116,10 @@ class DashboardApp {
             return;
         }
 
+        if (viewId === 'history') {
+            dbService.cleanupLogs(this.userPlan || 'starter');
+        }
+
         this.currentView = viewId;
 
         // Toggle Fluid Layout Mode for Detail View
@@ -1634,6 +1646,75 @@ class DashboardApp {
         if (dbService.updateUserRole(email, newRole)) {
             console.log(`Role updated for ${email} to ${newRole} `);
         }
+    }
+
+    showLogDetails(logId) {
+        const logs = dbService.getActivityLogs();
+        const log = logs.find(l => l.id === logId);
+        if (!log) return;
+
+        const modalId = 'log-detail-modal';
+        const existing = document.getElementById(modalId);
+        if (existing) existing.remove();
+
+        const modal = document.createElement('div');
+        modal.id = modalId;
+        modal.classList.add('modal-overlay', 'active');
+        modal.style.zIndex = '12000';
+
+        let statusColor = '#586069';
+        if (log.status === '成功') statusColor = '#28a745';
+        else if (log.status === '失敗') statusColor = '#d73a49';
+        else if (log.status === 'スキップ') statusColor = '#005cc5';
+
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 500px; padding: 0; overflow: hidden; border-radius: 12px; border: none; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+                <div style="background: #fafbfc; padding: 20px 24px; border-bottom: 1px solid #e1e4e8; display: flex; justify-content: space-between; align-items: center;">
+                    <h3 style="margin: 0; font-size: 16px; color: #24292e; font-weight: 700;">ログ詳細（閲覧専用）</h3>
+                    <button class="btn-close" onclick="document.getElementById('${modalId}').remove()">&times;</button>
+                </div>
+                <div style="padding: 24px;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                        <tr style="border-bottom: 1px solid #f6f8fa;">
+                            <td style="padding: 12px 0; color: #586069; width: 120px;">日時</td>
+                            <td style="padding: 12px 0; font-weight: 600;">${log.created_at}</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid #f6f8fa;">
+                            <td style="padding: 12px 0; color: #586069;">実行種別</td>
+                            <td style="padding: 12px 0; font-weight: 600;">${log.action}</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid #f6f8fa;">
+                            <td style="padding: 12px 0; color: #586069;">対象</td>
+                            <td style="padding: 12px 0; font-weight: 600;">${log.target_name}</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid #f6f8fa;">
+                            <td style="padding: 12px 0; color: #586069;">実行者</td>
+                            <td style="padding: 12px 0; font-weight: 600;">${log.actor}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px 0; color: #586069;">結果ステータス</td>
+                            <td style="padding: 12px 0; font-weight: 600; color: ${statusColor};">
+                                <i class="fa-solid ${log.status === '成功' ? 'fa-circle-check' : (log.status === '失敗' ? 'fa-circle-xmark' : 'fa-circle-info')}" style="margin-right: 6px;"></i>
+                                ${log.status || '成功'}
+                            </td>
+                        </tr>
+                    </table>
+                    <div style="margin-top: 24px; padding: 12px; background: #f8f9fa; border-radius: 6px; font-size: 12px; color: #586069; line-height: 1.5;">
+                        <i class="fa-solid fa-circle-info"></i> ※この画面は証跡確認のみ可能です。AIの再実行、差分の再表示等の高コスト操作はこの画面からは行えません。必要な場合は各契約情報の詳細画面から操作してください。
+                    </div>
+                </div>
+                <div style="padding: 16px 24px; background: #fafbfc; border-top: 1px solid #e1e4e8; text-align: right;">
+                    <button class="btn-dashboard" onclick="document.getElementById('${modalId}').remove()" style="padding: 8px 24px;">閉じる</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // Handle click outside to close
+        modal.onclick = (e) => {
+            if (e.target === modal) modal.remove();
+        };
     }
 
     // --- Team Management ---

@@ -118,7 +118,7 @@ export const dbService = {
             localStorage.setItem(this.KEYS.CONTRACTS, JSON.stringify(contracts));
 
             // Log this action
-            this.addActivityLog(`ステータス更新 (${status})`, contract.name, "ユーザー");
+            this.addActivityLog(`ステータス更新 (${status})`, contract.name, "ユーザー", "成功");
             return true;
         }
         return false;
@@ -149,7 +149,7 @@ export const dbService = {
         };
         contracts.unshift(newContract); // Add to top
         localStorage.setItem(this.KEYS.CONTRACTS, JSON.stringify(contracts));
-        this.addActivityLog("新規登録", data.name, "ユーザー");
+        this.addActivityLog("新規登録", data.name, "ユーザー", "成功");
         return newContract;
     },
 
@@ -195,17 +195,49 @@ export const dbService = {
         return JSON.parse(localStorage.getItem(this.KEYS.ACTIVITY_LOGS) || '[]');
     },
 
-    addActivityLog(action, target_name, actor = "ユーザー") {
+    addActivityLog(action, target_name, actor = "ユーザー", status = "成功") {
         const logs = this.getActivityLogs();
+        const now = new Date();
         const newLog = {
             id: Date.now(),
             action,
             target_name,
             actor,
-            created_at: new Date().toLocaleString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(/\//g, '-')
+            status, // 成功 / 失敗 / スキップ
+            created_at: now.toLocaleString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(/\//g, '-'),
+            timestamp: now.getTime()
         };
         logs.unshift(newLog); // Newest first
-        localStorage.setItem(this.KEYS.ACTIVITY_LOGS, JSON.stringify(logs.slice(0, 100))); // Keep last 100
+        localStorage.setItem(this.KEYS.ACTIVITY_LOGS, JSON.stringify(logs));
+    },
+
+    /**
+     * プランに応じた保持期間でログをクリーンアップ
+     */
+    cleanupLogs(plan = 'starter') {
+        const logs = this.getActivityLogs();
+        const now = Date.now();
+
+        const retentionDays = {
+            'starter': 30,
+            'business': 90,
+            'pro': 365
+        };
+
+        const days = retentionDays[plan] || 30;
+        const cutoff = now - (days * 24 * 60 * 60 * 1000);
+
+        const filteredLogs = logs.filter(log => {
+            // timestampがない古いログは、created_atから推測するか、安全のため残す/消す
+            if (!log.timestamp) return true;
+            return log.timestamp > cutoff;
+        });
+
+        if (filteredLogs.length !== logs.length) {
+            console.log(`Cleaned up ${logs.length - filteredLogs.length} old logs for plan: ${plan}`);
+            localStorage.setItem(this.KEYS.ACTIVITY_LOGS, JSON.stringify(filteredLogs));
+        }
+        return filteredLogs;
     },
 
     // --- User Methods ---
@@ -219,7 +251,7 @@ export const dbService = {
         if (user) {
             user.role = newRole;
             localStorage.setItem(this.KEYS.USERS, JSON.stringify(users));
-            this.addActivityLog(`権限変更 (${newRole})`, user.name, "管理者");
+            this.addActivityLog(`権限変更 (${newRole})`, user.name, "管理者", "成功");
             return true;
         }
         return false;
@@ -245,7 +277,7 @@ export const dbService = {
         };
         users.push(newUser);
         localStorage.setItem(this.KEYS.USERS, JSON.stringify(users));
-        this.addActivityLog("メンバー追加", name, "管理者");
+        this.addActivityLog("メンバー追加", name, "管理者", "成功");
         return { success: true };
     },
 
@@ -256,7 +288,7 @@ export const dbService = {
             if (data.name) user.name = data.name;
             if (data.role) user.role = data.role;
             localStorage.setItem(this.KEYS.USERS, JSON.stringify(users));
-            this.addActivityLog("メンバー情報更新", user.name, "管理者");
+            this.addActivityLog("メンバー情報更新", user.name, "管理者", "成功");
             return true;
         }
         return false;
@@ -271,7 +303,7 @@ export const dbService = {
 
             users = users.filter(u => u.email !== email);
             localStorage.setItem(this.KEYS.USERS, JSON.stringify(users));
-            this.addActivityLog("メンバー削除", user.name, "管理者");
+            this.addActivityLog("メンバー削除", user.name, "管理者", "成功");
             return true;
         }
         return false;
@@ -302,7 +334,7 @@ export const dbService = {
             contract.last_updated_at = new Date().toISOString().split('T')[0];
 
             localStorage.setItem(this.KEYS.CONTRACTS, JSON.stringify(contracts));
-            this.addActivityLog('テキスト抽出完了', contract.name, 'system');
+            this.addActivityLog('テキスト抽出完了', contract.name, 'system', '成功');
             return true;
         }
         return false;
@@ -362,7 +394,7 @@ export const dbService = {
             contract.last_analyzed_at = new Date().toISOString().split('T')[0];
 
             localStorage.setItem(this.KEYS.CONTRACTS, JSON.stringify(contracts));
-            this.addActivityLog('AI解析完了', contract.name, 'system');
+            this.addActivityLog('AI解析完了', contract.name, 'system', '成功');
             return true;
         }
         return false;
@@ -387,7 +419,7 @@ export const dbService = {
         if (contract) {
             contract.monitoring_enabled = enabled;
             localStorage.setItem(this.KEYS.CONTRACTS, JSON.stringify(contracts));
-            this.addActivityLog(`定期監視 ${enabled ? '開始' : '停止'}`, contract.name, "ユーザー");
+            this.addActivityLog(`定期監視 ${enabled ? '開始' : '停止'}`, contract.name, "ユーザー", "成功");
             return true;
         }
         return false;
