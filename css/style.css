@@ -429,11 +429,26 @@ ul {
 @media (min-width: 992px) {
     .dashboard-frame {
         /* Rotate slightly to the left (y-axis) and tilt up (x-axis) for depth */
-        transform: rotateY(-12deg) rotateX(2deg);
+        transform: rotateY(-12deg) rotateX(2deg) translateZ(0);
         box-shadow: -20px 30px 60px rgba(0, 0, 0, 0.25);
         /* Enhanced shadow for depth */
         transition: transform 0.5s ease;
         /* Mask removed as overlap is gone */
+
+        /* High Quality Rendering Fixes */
+        image-rendering: -webkit-optimize-contrast;
+        image-rendering: crisp-edges;
+        backface-visibility: hidden;
+        -webkit-font-smoothing: antialiased;
+    }
+
+    .dashboard-frame img {
+        display: block;
+        width: 100%;
+        height: auto;
+        border-radius: 8px;
+        /* Prevent blurring on some browsers */
+        image-rendering: auto;
     }
 
     .dashboard-frame:hover {
