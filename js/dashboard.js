@@ -10,6 +10,7 @@ const Views = {
     // 5. Plan Management (New)
     plan: () => {
         const sub = window.app ? window.app.subscription : null;
+        const payment = window.app ? window.app.paymentStatus : null;
         if (!sub) return '<div class="text-center p-5">利用状況を読み込んでいます...</div>';
 
         const plans = [
@@ -18,14 +19,16 @@ const Views = {
             { id: 'pro', name: 'Pro / Legal', price: '¥9,800', features: ['AI解析 400回/月', '定期URL監視', 'CSV/PDFエクスポート', 'チーム5人'] }
         ];
 
+        const hasPayment = payment && payment.hasPaymentMethod;
+
         const cards = plans.map(p => {
             const isCurrent = sub.plan === p.id;
             return `
-                <div class="pricing-card ${isCurrent ? 'business highlight-plan' : ''}" style="border: 1px solid #eee; padding: 20px; border-radius: 8px; flex: 1; background: #fff;">
+                <div class="pricing-card ${isCurrent ? 'business highlight-plan' : ''}" style="border: 1px solid #eee; padding: 20px; border-radius: 8px; flex: 1; background: #fff; display:flex; flex-direction:column;">
                     ${isCurrent ? '<div class="pricing-badge" style="background:#c19b4a; color:#fff; font-size:10px; padding:2px 8px; border-radius:10px; display:inline-block; margin-bottom:10px;">現在のプラン</div>' : ''}
                     <h3 style="margin-bottom:10px;">${p.name}</h3>
                     <div style="font-size: 24px; font-weight: bold; margin-bottom: 20px;">${p.price}<small style="font-size:12px; color:#666;"> / 月</small></div>
-                    <ul style="list-style: none; padding: 0; margin-bottom: 20px; font-size: 0.85rem; color: #555;">
+                    <ul style="list-style: none; padding: 0; margin-bottom: 20px; font-size: 0.85rem; color: #555; flex:1;">
                         ${p.features.map(f => `<li style="margin-bottom:8px;"><i class="fa-solid fa-check" style="color:#c19b4a; margin-right:8px;"></i>${f}</li>`).join('')}
                     </ul>
                     ${!isCurrent ? '<button class="btn-dashboard full-width" style="background:#c19b4a; color:#fff; border:none;">アップグレード</button>' : ''}
@@ -33,11 +36,57 @@ const Views = {
             `;
         }).join('');
 
+        // Payment section
+        let paymentSection = '';
+        if (hasPayment) {
+            paymentSection = `
+                <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:8px; padding:20px; margin-bottom:20px;">
+                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+                        <i class="fa-solid fa-circle-check" style="color:#22c55e; font-size:1.2rem;"></i>
+                        <strong style="color:#166534;">お支払い方法が登録されています</strong>
+                    </div>
+                    <p style="font-size:0.85rem; color:#555; margin:0;">PayPalサブスクリプション: アクティブ</p>
+                </div>
+            `;
+        } else {
+            paymentSection = `
+                <div style="background:#fffbeb; border:1px solid #fbbf24; border-radius:8px; padding:20px; margin-bottom:20px;">
+                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+                        <i class="fa-solid fa-triangle-exclamation" style="color:#d97706; font-size:1.2rem;"></i>
+                        <strong style="color:#92400e;">お支払い方法が未登録です</strong>
+                    </div>
+                    <p style="font-size:0.85rem; color:#555; margin-bottom:16px;">
+                        ${sub.isInTrial
+                            ? 'トライアル終了前にお支払い方法を登録すると、自動的に有料プランに移行します。'
+                            : 'トライアルが終了しました。継続利用にはお支払い方法の登録が必要です。'}
+                    </p>
+                    <button onclick="window.app.startPayPalSubscription()" class="btn-dashboard" style="background:#0070ba; color:#fff; border:none; padding:10px 24px; border-radius:6px; font-weight:600; cursor:pointer;">
+                        <i class="fa-brands fa-paypal" style="margin-right:8px;"></i>PayPalでお支払い方法を登録
+                    </button>
+                </div>
+            `;
+        }
+
+        // Cancel section
+        let cancelSection = '';
+        if (hasPayment) {
+            cancelSection = `
+                <div style="border-top:1px solid #eee; padding-top:20px; margin-top:20px;">
+                    <p style="font-size:0.85rem; color:#888; margin-bottom:12px;">プランの解約をご希望の場合：</p>
+                    <button onclick="window.app.showCancelModal()" class="btn-dashboard" style="background:#fff; color:#d73a49; border:1px solid #d73a49; padding:8px 20px; border-radius:6px; font-size:0.85rem; cursor:pointer;">
+                        <i class="fa-solid fa-xmark" style="margin-right:6px;"></i>プランをキャンセル
+                    </button>
+                </div>
+            `;
+        }
+
         return `
             <div class="page-title">プラン管理</div>
+            ${paymentSection}
             <div style="display: flex; gap: 20px; margin-bottom: 30px;">
                 ${cards}
             </div>
+            ${cancelSection}
             <div class="upgrade-promo-box">
                 <p><i class="fa-solid fa-gift"></i> ご不明な点はサポートチームまでお気軽にお問い合わせください。</p>
             </div>
@@ -966,6 +1015,17 @@ class DashboardApp {
 
                 // Fetch real subscription status from backend
                 await this.fetchSubscriptionStatus(token);
+                await this.fetchPaymentStatus(token);
+
+                // Handle PayPal return callback
+                const urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.get('payment') === 'success' && urlParams.get('subscription_id')) {
+                    await this.confirmPayPalSubscription(urlParams.get('subscription_id'));
+                    // Clean URL
+                    history.replaceState(null, '', window.location.pathname);
+                } else if (urlParams.get('payment') === 'cancelled') {
+                    history.replaceState(null, '', window.location.pathname);
+                }
 
                 console.log('Current User Role:', this.userRole);
 
@@ -1027,6 +1087,150 @@ class DashboardApp {
         }
     }
 
+    async fetchPaymentStatus(token) {
+        try {
+            const protocol = location.hostname === 'localhost' ? 'http' : 'https';
+            const port = location.hostname === 'localhost' ? ':3001' : '';
+            const apiUrl = `${protocol}://${location.hostname}${port}/payment/status`;
+
+            const response = await fetch(apiUrl, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const result = await response.json();
+
+            if (result.success) {
+                this.paymentStatus = result.data;
+            }
+        } catch (error) {
+            console.error('Failed to fetch payment status:', error);
+            this.paymentStatus = { hasPaymentMethod: false };
+        }
+    }
+
+    async startPayPalSubscription() {
+        try {
+            const authModule = await import('./auth.js');
+            const token = await authModule.getIdToken();
+            const protocol = location.hostname === 'localhost' ? 'http' : 'https';
+            const port = location.hostname === 'localhost' ? ':3001' : '';
+            const apiUrl = `${protocol}://${location.hostname}${port}/payment/create-subscription`;
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            const result = await response.json();
+
+            if (result.success && result.data.approvalUrl) {
+                // Redirect to PayPal for approval
+                window.location.href = result.data.approvalUrl;
+            } else {
+                alert('PayPalサブスクリプションの作成に失敗しました。\n' + (result.error || ''));
+            }
+        } catch (error) {
+            console.error('PayPal subscription error:', error);
+            alert('お支払い処理でエラーが発生しました。');
+        }
+    }
+
+    async confirmPayPalSubscription(subscriptionId) {
+        try {
+            const authModule = await import('./auth.js');
+            const token = await authModule.getIdToken();
+            const protocol = location.hostname === 'localhost' ? 'http' : 'https';
+            const port = location.hostname === 'localhost' ? ':3001' : '';
+            const apiUrl = `${protocol}://${location.hostname}${port}/payment/confirm-subscription`;
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ subscriptionId })
+            });
+            const result = await response.json();
+
+            if (result.success) {
+                this.paymentStatus = { hasPaymentMethod: true };
+                this.updateSubscriptionUI();
+                alert('お支払い方法が正常に登録されました！');
+                this.navigate('plan');
+            }
+        } catch (error) {
+            console.error('Confirm subscription error:', error);
+        }
+    }
+
+    showCancelModal() {
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay';
+        overlay.id = 'cancel-modal-overlay';
+        overlay.innerHTML = `
+            <div class="modal-content" style="max-width:480px;">
+                <div class="modal-header" style="background:#fef2f2; border-bottom:1px solid #fecaca;">
+                    <h3 style="color:#991b1b; margin:0; font-size:1.1rem;">
+                        <i class="fa-solid fa-triangle-exclamation" style="margin-right:8px;"></i>プランのキャンセル
+                    </h3>
+                    <button class="modal-close" onclick="document.getElementById('cancel-modal-overlay').remove()">×</button>
+                </div>
+                <div class="modal-body" style="padding:24px;">
+                    <p style="margin-bottom:16px; color:#333;">本当にプランをキャンセルしますか？</p>
+                    <ul style="font-size:0.85rem; color:#666; margin-bottom:20px; padding-left:20px;">
+                        <li style="margin-bottom:6px;">PayPalサブスクリプションが停止されます</li>
+                        <li style="margin-bottom:6px;">Starterプラン（無料）に戻ります</li>
+                        <li style="margin-bottom:6px;">AI解析回数が月15回に制限されます</li>
+                    </ul>
+                    <div style="display:flex; gap:12px; justify-content:flex-end;">
+                        <button onclick="document.getElementById('cancel-modal-overlay').remove()" class="btn-dashboard" style="padding:8px 20px;">キャンセルしない</button>
+                        <button onclick="window.app.executeCancelSubscription()" class="btn-dashboard" style="background:#d73a49; color:#fff; border:none; padding:8px 20px;">解約する</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+    }
+
+    async executeCancelSubscription() {
+        try {
+            const authModule = await import('./auth.js');
+            const token = await authModule.getIdToken();
+            const protocol = location.hostname === 'localhost' ? 'http' : 'https';
+            const port = location.hostname === 'localhost' ? ':3001' : '';
+            const apiUrl = `${protocol}://${location.hostname}${port}/payment/cancel-subscription`;
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            const result = await response.json();
+
+            // Close modal
+            const modal = document.getElementById('cancel-modal-overlay');
+            if (modal) modal.remove();
+
+            if (result.success) {
+                this.paymentStatus = { hasPaymentMethod: false };
+                this.subscription.plan = 'starter';
+                this.userPlan = 'starter';
+                this.updateSubscriptionUI();
+                alert('プランがキャンセルされました。Starterプランに移行しました。');
+                this.navigate('plan');
+            } else {
+                alert('キャンセル処理でエラーが発生しました。');
+            }
+        } catch (error) {
+            console.error('Cancel subscription error:', error);
+            alert('キャンセル処理でエラーが発生しました。');
+        }
+    }
+
     updateSubscriptionUI() {
         const container = document.getElementById('plan-status-container');
         if (!container) return;
@@ -1066,6 +1270,11 @@ class DashboardApp {
                 ${sub.isInTrial ? `
                 <div style="margin-top: 12px; font-size: 0.75rem; color: #a17e1a; border-top: 1px solid rgba(255, 255, 255, 0.05); padding-top: 8px;">
                     <i class="fa-solid fa-circle-info"></i> トライアル終了後は ${planName} プランへ自動移行します。
+                </div>
+                ` : ''}
+                ${(sub.isInTrial && this.paymentStatus && !this.paymentStatus.hasPaymentMethod) ? `
+                <div onclick="window.app.navigate('plan')" style="margin-top:10px; padding:8px 10px; background:rgba(251,191,36,0.15); border:1px solid rgba(251,191,36,0.3); border-radius:6px; cursor:pointer; font-size:0.72rem; color:#fbbf24; text-align:center;">
+                    <i class="fa-solid fa-credit-card" style="margin-right:4px;"></i>お支払い方法を登録
                 </div>
                 ` : ''}
             </div>

@@ -164,6 +164,23 @@ class DBService {
     }
 
     /**
+     * Update payment info for a user
+     * @param {string} uid - Firebase UID
+     * @param {object} paymentData - Payment fields to update
+     */
+    async updatePaymentInfo(uid, paymentData) {
+        const users = await this.readData('users');
+        const index = users.findIndex(u => u.uid === uid);
+
+        if (index > -1) {
+            Object.assign(users[index], paymentData);
+            await this.writeData('users', users);
+            return users[index];
+        }
+        return null;
+    }
+
+    /**
      * Set user's selected plan
      * @param {string} uid - Firebase UID
      * @param {string} plan - Plan ID (starter, business, pro)

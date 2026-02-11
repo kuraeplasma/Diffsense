@@ -9,6 +9,7 @@ const contractRoutes = require('./routes/contracts');
 const dbRoutes = require('./routes/db');
 const inviteRoutes = require('./routes/invite'); // Added
 const userRoutes = require('./routes/user'); // Added
+const paymentRoutes = require('./routes/payment'); // Added
 const authMiddleware = require('./middleware/authMiddleware');
 const errorHandler = require('./middleware/errorHandler');
 const logger = require('./utils/logger');
@@ -92,6 +93,7 @@ app.use('/contracts', authMiddleware, contractRoutes);
 app.use('/db', authMiddleware, dbRoutes);
 app.use('/invite', authMiddleware, inviteRoutes); // Added
 app.use('/user', authMiddleware, userRoutes); // Added
+app.use('/payment', authMiddleware, paymentRoutes); // Added
 app.use('/crawl', authMiddleware, crawlRoutes); // New crawling route
 
 

@@ -6,6 +6,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Redirecting...</title>
     <script>
+        // プランパラメータがあればlocalStorageに保存してから遷移
+        const params = new URLSearchParams(window.location.search);
+        const plan = params.get('plan');
+        if (plan) {
+            localStorage.setItem('diffsense_selected_plan', plan);
+        }
         window.location.replace("login.html?tab=signup");
     </script>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">

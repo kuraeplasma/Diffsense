@@ -18,7 +18,13 @@ export async function handleSignUp(email, password) {
         console.log("Signed up user:", user);
         // Alert is used for simplicity, in production custom UI is better
         alert("アカウント作成に成功しました！");
-        window.location.replace("select-plan.html");
+        // プランがLP経由で既に選択済みならダッシュボードへ直行、未選択ならプラン選択画面へ
+        const selectedPlan = localStorage.getItem('diffsense_selected_plan');
+        if (selectedPlan) {
+            window.location.replace("dashboard.html");
+        } else {
+            window.location.replace("select-plan.html");
+        }
     } catch (error) {
         console.error("Error signing up:", error);
         let msg = "エラーが発生しました。\n詳細: " + error.code;
