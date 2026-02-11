@@ -1098,6 +1098,23 @@ ul {
         max-width: 100%;
     }
 
+    /* Global Styles */
+    :root {
+        --color-primary: #c5a059;
+        --color-bg: #ffffff;
+        --color-text: #1a1512;
+        --font-main: 'Inter', 'Noto Sans JP', sans-serif;
+        --spacing-lg: 4rem;
+        --spacing-xl: 6rem;
+        --container-width: 1200px;
+        --radius-md: 12px;
+    }
+
+    .no-scroll {
+        overflow: hidden !important;
+        height: 100vh;
+    }
+
     /* Dashboard Preview Styles (Hero Visual) */
     .dashboard-preview-card {
         background: #fff;
