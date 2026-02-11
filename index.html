@@ -20,7 +20,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <!-- Styles -->
-    <link rel="stylesheet" href="css/style.css?v=20260211-11">
+    <link rel="stylesheet" href="css/style.css?v=20260211-12">
+    <link rel="stylesheet" href="css/dashboard-mockup.css?v=1">
 </head>
 
 <body>
@@ -109,10 +110,259 @@
                     </div>
                 </div>
 
-                <!-- Desktop: Full Dashboard Preview -->
+                <!-- Desktop: Full Dashboard Mockup (Exact AI Analysis Result View) -->
                 <div class="dashboard-frame visual-card">
-                    <img src="images/dashboard-latest.png" alt="DIFFsense Dashboard"
-                        style="width: 100%; height: auto; display: block; border-radius: 8px;">
+                    <div class="mock-app-container">
+                        <!-- Sidebar -->
+                        <div class="mock-sidebar">
+                            <div class="mock-logo"><i class="fa-solid fa-scale-balanced"></i> DIFFsense</div>
+                            <div class="mock-nav">
+                                <div class="mock-nav-item"><i class="fa-solid fa-house"></i><span>ダッシュボード</span></div>
+                                <div class="mock-nav-item active"><i
+                                        class="fa-solid fa-file-contract"></i><span>契約・規約管理</span></div>
+                                <div class="mock-nav-item"><i
+                                        class="fa-solid fa-clock-rotate-left"></i><span>解析履歴</span></div>
+                                <div class="mock-nav-item"><i class="fa-solid fa-users"></i><span>チーム設定</span></div>
+                                <div class="mock-nav-item"><i class="fa-solid fa-credit-card"></i><span>プラン管理</span>
+                                </div>
+                            </div>
+                            <div class="mock-sidebar-bottom">
+                                <div class="mock-plan-card">
+                                    <div class="mock-plan-tiny">Pro / Legal</div>
+                                    <div class="mock-plan-usage">AI解析: 7 / 400回</div>
+                                </div>
+                                <div class="mock-user-info">
+                                    <div class="mock-user-name">ユーザー</div>
+                                    <div class="mock-user-mail">user@example.com</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Main Layout -->
+                        <div class="mock-main">
+                            <!-- App Header -->
+                            <div class="mock-app-header">
+                                <div class="mock-header-title">解析詳細</div>
+                                <div class="mock-header-right">
+                                    <div class="mock-btn-main-reg">+ 新規登録</div>
+                                </div>
+                            </div>
+
+                            <!-- Detail Content -->
+                            <div class="mock-detail-container">
+                                <!-- Detail Header -->
+                                <div class="mock-detail-header">
+                                    <div class="mock-header-left">
+                                        <i class="fa-solid fa-arrow-left mock-back-icon"></i>
+                                        <div class="mock-detail-title-row">
+                                            <span class="mock-doc-name">terms1 - AI解析結果</span>
+                                            <span class="mock-detail-badge red">High</span>
+                                            <span class="mock-detail-badge yellow">未確認</span>
+                                            <span class="mock-file-info"><i class="fa-solid fa-file-pdf"></i>
+                                                terms2.pdf</span>
+                                        </div>
+                                    </div>
+                                    <div class="mock-header-right-btns">
+                                        <div class="mock-btn-outline"><i class="fa-solid fa-file-pdf"></i> PDF出力</div>
+                                        <div class="mock-btn-outline"><i class="fa-solid fa-note-sticky"></i> メモ</div>
+                                        <div class="mock-btn-outline"><i class="fa-solid fa-share-nodes"></i> 共有</div>
+                                        <div class="mock-btn-primary"><i class="fa-solid fa-check"></i> 確認済みにする</div>
+                                    </div>
+                                </div>
+
+                                <!-- Detail Body (Split Pane) -->
+                                <div class="mock-detail-body">
+                                    <!-- Left Pane -->
+                                    <div class="mock-pane">
+                                        <div class="mock-pane-header">
+                                            <span><i class="fa-solid fa-magnifying-glass-chart"></i> AI解析・差分判定</span>
+                                            <span class="mock-last-analyzed">最終解析: 2026-02-11</span>
+                                        </div>
+                                        <div class="mock-pane-content">
+                                            <div class="mock-section-title"><i
+                                                    class="fa-solid fa-circle-exclamation yellow-icon"></i> 検知された重要な変更点
+                                            </div>
+
+                                            <!-- Change Card 1 -->
+                                            <div class="mock-change-card">
+                                                <div class="mock-change-header">第1条（変更）<span
+                                                        class="mock-change-type">(変更)</span></div>
+                                                <div class="mock-diff-split">
+                                                    <div class="mock-diff-left"><span
+                                                            class="mock-del">本サービス（以下「本サービス」という）</span></div>
+                                                    <div class="mock-diff-right"><span
+                                                            class="mock-add">本サービス（以下「サービス」という）</span></div>
+                                                </div>
+                                                <div class="mock-legal-impact">
+                                                    <div><strong><i class="fa-solid fa-scale-balanced"></i>
+                                                            法的影響:</strong> 用語の略称が変更</div>
+                                                    <div><strong><i class="fa-solid fa-triangle-exclamation"></i>
+                                                            懸念点:</strong> 特になし</div>
+                                                </div>
+                                            </div>
+
+                                            <!-- Change Card 2 -->
+                                            <div class="mock-change-card">
+                                                <div class="mock-change-header">第2条（変更）<span
+                                                        class="mock-change-type">(変更)</span></div>
+                                                <div class="mock-diff-split">
+                                                    <div class="mock-diff-left"><span
+                                                            class="mock-del">ユーザー：本サービスを利用する個人、または法人</span></div>
+                                                    <div class="mock-diff-right"><span
+                                                            class="mock-add">ユーザー：本サービスを利用する個人、法人、団体</span></div>
+                                                </div>
+                                                <div class="mock-legal-impact">
+                                                    <div><strong><i class="fa-solid fa-scale-balanced"></i>
+                                                            法的影響:</strong> ユーザーの定義に団体を追加</div>
+                                                    <div><strong><i class="fa-solid fa-triangle-exclamation"></i>
+                                                            懸念点:</strong> 特になし</div>
+                                                </div>
+                                            </div>
+
+                                            <!-- Change Card 3 -->
+                                            <div class="mock-change-card">
+                                                <div class="mock-change-header">第3条（守秘義務）<span
+                                                        class="mock-change-type">(変更)</span></div>
+                                                <div class="mock-diff-split">
+                                                    <div class="mock-diff-left"><span
+                                                            class="mock-del">機密情報を第三者に開示できない</span></div>
+                                                    <div class="mock-diff-right"><span
+                                                            class="mock-add">機密情報を、書面による事前の同意なく第三者に開示できない</span></div>
+                                                </div>
+                                                <div class="mock-legal-impact">
+                                                    <div><strong><i class="fa-solid fa-scale-balanced"></i>
+                                                            法的影響:</strong> 第三者開示の要件が明確化</div>
+                                                    <div><strong><i class="fa-solid fa-triangle-exclamation"></i>
+                                                            懸念点:</strong> プロジェクト終了後の情報返還規定が欠落</div>
+                                                </div>
+                                            </div>
+
+                                            <!-- Change Card 4 -->
+                                            <div class="mock-change-card">
+                                                <div class="mock-change-header">第4条（損害賠償）<span
+                                                        class="mock-change-type">(変更)</span></div>
+                                                <div class="mock-diff-split">
+                                                    <div class="mock-diff-left"><span
+                                                            class="mock-del">損害賠償の限度額を100万円とする</span></div>
+                                                    <div class="mock-diff-right"><span
+                                                            class="mock-add">損害賠償の限度額を、直近12ヶ月間に支払われた委託料の総額とする</span>
+                                                    </div>
+                                                </div>
+                                                <div class="mock-legal-impact">
+                                                    <div><strong><i class="fa-solid fa-scale-balanced"></i>
+                                                            法的影響:</strong> 賠償限度額の計算式が変動制に</div>
+                                                    <div><strong><i class="fa-solid fa-triangle-exclamation"></i>
+                                                            懸念点:</strong> 故意・重過失時の免責除外が未記載</div>
+                                                </div>
+                                            </div>
+
+                                            <!-- Change Card 5 -->
+                                            <div class="mock-change-card">
+                                                <div class="mock-change-header">第6条（反社排除）<span
+                                                        class="mock-change-type">(新規)</span></div>
+                                                <div class="mock-diff-split">
+                                                    <div class="mock-diff-left"><span class="mock-del">- (規定なし)</span>
+                                                    </div>
+                                                    <div class="mock-diff-right"><span
+                                                            class="mock-add">反社会的勢力との関係遮断および表明保証規定</span></div>
+                                                </div>
+                                                <div class="mock-legal-impact">
+                                                    <div><strong><i class="fa-solid fa-scale-balanced"></i>
+                                                            法的影響:</strong> 最新のコンプライアンス要件に適合</div>
+                                                    <div><strong><i class="fa-solid fa-triangle-exclamation"></i>
+                                                            懸念点:</strong> 解除時の損害賠償請求権が不十分</div>
+                                                </div>
+                                            </div>
+
+                                            <!-- Change Card 6 -->
+                                            <div class="mock-change-card">
+                                                <div class="mock-change-header">第9条（合意管轄）<span
+                                                        class="mock-change-type">(変更)</span></div>
+                                                <div class="mock-diff-split">
+                                                    <div class="mock-diff-left"><span
+                                                            class="mock-del">管轄裁判所を指定しない</span></div>
+                                                    <div class="mock-diff-right"><span
+                                                            class="mock-add">東京地方裁判所を第一審の専属的合意管轄とする</span></div>
+                                                </div>
+                                                <div class="mock-legal-impact">
+                                                    <div><strong><i class="fa-solid fa-scale-balanced"></i>
+                                                            法的影響:</strong> 紛争発生時のコスト・利便性が確定</div>
+                                                    <div><strong><i class="fa-solid fa-triangle-exclamation"></i>
+                                                            懸念点:</strong> 相手方の所在地によっては交渉余地あり</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Right Pane -->
+                                    <div class="mock-pane">
+                                        <div class="mock-pane-header-tabs">
+                                            <div class="mock-tab-left">
+                                                <span><i class="fa-solid fa-file-contract"></i> ドキュメント表示</span>
+                                            </div>
+                                            <div class="mock-header-actions">
+                                                <div class="mock-btn-history"><i
+                                                        class="fa-solid fa-clock-rotate-left"></i> バージョン履歴</div>
+                                                <div class="mock-btn-upload"><i class="fa-solid fa-cloud-arrow-up"></i>
+                                                    新しいバージョンをアップロード</div>
+                                            </div>
+                                        </div>
+                                        <div class="mock-tabs-row">
+                                            <div class="mock-tab active">差分表示</div>
+                                            <div class="mock-tab">原本全文</div>
+                                        </div>
+                                        <div class="mock-document-paper">
+                                            <p>3. ユーザーは登録時に設定したパスワードを<span class="mock-inline-del">安全</span><span
+                                                    class="mock-inline-add">厳重</span>に管理する責任を負うものとします。不正利用の疑いがある場合は直ちに当社に通知するものとします。
+                                            </p>
+                                            <p>第4条 <b>利用料金<span class="mock-inline-add">と支払い</span></b></p>
+                                            <p>1. 本サービスの利用料金は、別途定める料金表に従うものとします。なお、銀行振込手数料は<span
+                                                    class="mock-inline-add">ユーザーの負担</span>とします。</p>
+                                            <p>2. ユーザーは毎月末<span class="mock-inline-del">10</span><span
+                                                    class="mock-inline-add">15</span>日までに当月の利用料金をお支払いいただくものとします。</p>
+                                            <p>第5条 <b>機密保持</b></p>
+                                            <p>1. 乙は、本業務に関連して甲より開示された機密情報を、<span
+                                                    class="mock-inline-add">事前の書面による同意なく</span>第三者に提供、開示、漏洩してはならないものとします。本義務は契約終了後も3年間存続するものとします。
+                                            </p>
+                                            <p>第6条 <b>反社会的勢力の排除</b></p>
+                                            <p>1.
+                                                甲および乙は、自らまたは自らの役員が、現在および将来において反社会的勢力に該当しないことを表明し、保証します。本項の反があった場合、無条件で契約解除できるものとします。
+                                            </p>
+                                            <p>第7条 <b>知的財産権</b></p>
+                                            <p>1. 本業務の遂行により生じた著作権その他の知的財産権は、<span
+                                                    class="mock-inline-del">乙に帰属するものとする</span><span
+                                                    class="mock-inline-add">甲に帰属するものとする。ただし、乙が従前から保有していたものは除く</span>。
+                                            </p>
+                                            <p>第8条 <b>有効期間</b></p>
+                                            <p>1. 本契約の有効期間は、契約締結日から<span class="mock-inline-del">1</span><span
+                                                    class="mock-inline-add">2</span>年間とする。ただし、期間満了の3ヶ月前までに書面による申し出がない限り...
+                                            </p>
+                                            <p>第9条 <b>合意管轄</b></p>
+                                            <p>1. 本契約に関して紛争が生じた場合、<span
+                                                    class="mock-inline-add">東京地方裁判所</span>を第一審の専属的合意管轄裁判所とするものとします。</p>
+                                            <p>第10条 <b>譲渡禁止</b></p>
+                                            <p>1. 甲および乙は、相手方の事前の書面による同意なく、本契約上の地位を第三者に譲渡してはならないものとします。</p>
+                                            <p>第11条 <b>通知義務</b></p>
+                                            <p>1. 当事者は、その名称、住所、代表者等に変更が生じた場合、遅滞なく相手方に通知しなければならないものとします。</p>
+                                            <p>第12条 <b>不可抗力</b></p>
+                                            <p>1. 天災地変その他当事者の責に帰すべからざる事由により、債務の履行が遅延または不能となった場合、一切の責任を負わないものとします。</p>
+                                            <p>第13条 <b>完全合意</b></p>
+                                            <p>1. 本契約は、本件に関する甲乙間の完全なる合意であり、従前の書面による合意に優先します。</p>
+                                            <p>第14条 <b>分離可能性</b></p>
+                                            <p>1. 本契約の一部が無効とされた場合でも、他の条項の有効性には影響を与えないものとします。</p>
+                                            <p>第15条 <b>協議解決</b></p>
+                                            <p>1. 本契約に定めのない事項については、甲乙誠実に協議して解決するものとする。</p>
+                                            <p>第16条 <b>準拠法</b></p>
+                                            <p>1. 本契約の成立、効力、履行および解釈については、日本法に準拠するものとします。</p>
+                                            <p>第17条 <b>存続条項</b></p>
+                                            <p>1. 第5条（機密保持）、第7条（知的財産権）の規定は、本契約終了後も有効に存続する。</p>
+                                            <p style="text-align: right; margin-top: 60px;">（以下余白）</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -141,6 +391,97 @@
                     <h3>法務リソース不足</h3>
                     <p>高額な法務SaaSは導入できず、目視確認によるヒューマンエラーが発生。</p>
                 </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Security & Trust -->
+    <section class="section security-section">
+        <div class="container">
+            <div class="section-header text-center">
+                <h2 class="section-title">契約書を、<span class="text-accent">汎用AIに直接入力しない</span>という選択</h2>
+                <div class="section-desc">
+                    <p>契約書や規約を、そのまま汎用AIツールに入力することに不安を感じたことはありませんか？</p>
+                    <p>DiffSenseは、契約・規約の管理と差分確認に特化した専用SaaSです。外部AIに全文を投げるのではなく、変更があった部分だけを、必要なときに限定してAIで分析します。</p>
+                </div>
+            </div>
+
+            <div class="security-grid">
+                <div class="security-points">
+                    <div class="security-item">
+                        <i class="fa-solid fa-shield-halved"></i>
+                        <div>
+                            <h4>契約書全文を汎用AIに入力しない設計</h4>
+                            <p>独自の解析エンジンにより、必要な情報のみを抽出し、プライバシーに配慮した処理を行います。</p>
+                        </div>
+                    </div>
+                    <div class="security-item">
+                        <i class="fa-solid fa-microchip"></i>
+                        <div>
+                            <h4>差分検知・定期クローリングは AI不使用</h4>
+                            <p>論理比較アルゴリズムにより、AIを使わずに確実な差分検知を行い、不要な情報送信を抑え込みます。</p>
+                        </div>
+                    </div>
+                    <div class="security-item">
+                        <i class="fa-solid fa-server"></i>
+                        <div>
+                            <h4>AI（Gemini）は バックエンド専用・用途限定</h4>
+                            <p>AIの役割を「要約とリスク分析」に限定。管理されたサーバーサイド環境でのみ利用します。</p>
+                        </div>
+                    </div>
+                    <div class="security-item">
+                        <i class="fa-solid fa-key"></i>
+                        <div>
+                            <h4>AIキーはフロントに置かず、管理下で運用</h4>
+                            <p>APIキーの漏洩リスクを排除。エンタープライズ品質の管理体制で運用されています。</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="security-diagram-container">
+                    <h4 class="diagram-title text-center">汎用AIとDiffSenseの違い</h4>
+                    <div class="security-diagram">
+                        <!-- General AI Side -->
+                        <div class="diagram-side side-danger">
+                            <div class="diagram-node node-input">契約書全文</div>
+                            <div class="diagram-arrow"><i class="fa-solid fa-arrow-down"></i></div>
+                            <div class="diagram-box box-danger">
+                                <div class="box-icon"><i class="fa-solid fa-circle-xmark"></i></div>
+                                <h5>汎用AIに直接入力</h5>
+                                <ul>
+                                    <li>全文送信のリスク</li>
+                                    <li>組織的な管理不可</li>
+                                    <li>解析履歴が残らない</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- VS spacer -->
+                        <div class="diagram-vs">VS</div>
+
+                        <!-- DiffSense Side -->
+                        <div class="diagram-side side-safe">
+                            <div class="diagram-node node-input">契約書</div>
+                            <div class="diagram-arrow"><i class="fa-solid fa-arrow-down"></i></div>
+                            <div class="diagram-box box-safe">
+                                <div class="box-icon"><i class="fa-solid fa-shield-check"></i><i
+                                        class="fa-solid fa-scale-balanced" style="color:#a17e1a; margin-left:5px;"></i>
+                                </div>
+                                <h5>DiffSense</h5>
+                                <div class="safe-flow">
+                                    <div class="flow-step">① 変更検知（AI不使用）</div>
+                                    <div class="flow-step">② 差分抽出</div>
+                                    <div class="flow-step">③ 必要な場合のみAI要約</div>
+                                </div>
+                                <p class="flow-note">※Geminiへの限定送信</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="security-footer text-center">
+                <p>DiffSenseは、AIを「相談相手」ではなく、管理された内部エンジンとして使う設計を採用しています。</p>
             </div>
         </div>
     </section>
@@ -234,6 +575,7 @@
         </div>
     </section>
 
+
     <!-- Pricing -->
     <section id="pricing" class="section pricing-section">
         <div class="container">
@@ -271,7 +613,7 @@
                             <li>PDF / URL 登録：<strong>無制限</strong></li>
                             <li>AI差分チェック：<strong>月15回まで</strong></li>
                             <li>差分ハイライト表示、バージョン履歴管理</li>
-                            <li style="white-space: nowrap;">リスク判定：High / Medium / Low（AI理由なし）</li>
+                            <li>リスク判定：High / Medium / Low<br>（AI理由なし）</li>
                             <li>原文全文閲覧</li>
                             <li>解析ログ・監査履歴の閲覧</li>
                             <li>チーム管理・1人</li>

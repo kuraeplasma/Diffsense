@@ -29,8 +29,8 @@
     --font-body: 'Noto Sans JP', 'Inter', sans-serif;
 
     /* Spacing */
-    --container-width: 1600px;
-    /* Increased to 1600px for generous spacing */
+    --container-width: 1200px;
+    /* Adjusted from 1600px for better balance */
     --spacing-xs: 0.5rem;
     --spacing-sm: 1rem;
     --spacing-md: 2rem;
@@ -119,7 +119,8 @@ ul {
 .container {
     max-width: var(--container-width);
     margin: 0 auto;
-    padding: 0 var(--spacing-md);
+    padding: 0 2rem;
+    width: 100%;
 }
 
 .text-accent {
@@ -211,6 +212,8 @@ ul {
     justify-content: space-between;
     align-items: center;
     width: 100%;
+    max-width: var(--container-width);
+    margin: 0 auto;
 }
 
 .logo {
@@ -252,9 +255,10 @@ ul {
 }
 
 .nav a {
-    margin-left: 3rem;
+    margin-left: 2.5rem;
     font-size: 0.95rem;
-    color: #ccc;
+    color: #fff;
+    /* Improved from #ccc for visibility */
     position: relative;
     display: inline-flex;
     align-items: center;
@@ -365,27 +369,22 @@ ul {
 }
 
 .hero-container {
-    display: grid;
-    grid-template-columns: 1.2fr 1fr;
-    /* Balanced ratio */
-    gap: -280px;
-    /* Extra aggressive negative gap to force overlap behind text */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 5rem;
     position: relative;
     z-index: 1;
-    align-items: center;
-    text-align: left;
     max-width: var(--container-width);
     margin: 0 auto;
-    /* Center container base */
-    transform: translateX(-140px);
-    /* Significant Left Shift for text anchoring */
+    width: 100%;
 }
 
 .hero-content {
-    display: block;
+    flex: 0 0 500px;
+    /* Fixed width for text block to stay consistent */
     position: relative;
     z-index: 2;
-    /* Ensure text is above image */
 }
 
 .badge-new {
@@ -409,20 +408,14 @@ ul {
 }
 
 .hero-visual {
-    /* Right column */
+    flex: 0 0 650px;
     display: flex;
     justify-content: center;
     align-items: center;
-    width: 100%;
-    min-height: 620px;
-    /* Fallback before JS scales it */
     position: relative;
-    overflow: visible;
-    perspective: 1200px;
-    /* Add depth */
-    transform-style: preserve-3d;
     z-index: 1;
-    /* Image below text */
+    perspective: 1200px;
+    transform-style: preserve-3d;
 }
 
 /* 3D Effect for Desktop */
@@ -760,7 +753,6 @@ ul {
     font-family: var(--font-body);
     font-weight: 400;
     text-align: left;
-    white-space: nowrap;
 }
 
 .pricing-description {
@@ -1746,4 +1738,404 @@ ul {
     font-size: 1.2rem;
 }
 
+/* Security Section */
+.security-section {
+    background-color: #fcfcfc;
+    border-top: 1px solid #eee;
+    border-bottom: 1px solid #eee;
+}
+
+.security-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr;
+    gap: 4rem;
+    align-items: center;
+    margin-top: 3rem;
+}
+
+.security-item {
+    display: flex;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.security-item i {
+    font-size: 1.5rem;
+    color: var(--color-primary);
+    background: rgba(161, 126, 26, 0.05);
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    flex-shrink: 0;
+}
+
+.security-item h4 {
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+    color: #333;
+}
+
+.security-item p {
+    font-size: 0.9rem;
+    color: #666;
+    line-height: 1.6;
+}
+
+.security-diagram-container {
+    background: #fff;
+    padding: 2.5rem;
+    border-radius: var(--radius-md);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+    border: 1px solid #eee;
+}
+
+.diagram-title {
+    margin-bottom: 2rem;
+    font-size: 1.2rem;
+    color: #333;
+    font-weight: 700;
+}
+
+.security-diagram {
+    display: flex;
+    align-items: stretch;
+    gap: 1.5rem;
+}
+
+.diagram-side {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.diagram-node {
+    padding: 0.8rem 1.2rem;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.diagram-arrow {
+    padding: 0.5rem 0;
+    color: #adb5bd;
+}
+
+.diagram-box {
+    width: 100%;
+    flex: 1;
+    padding: 1.5rem;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.box-danger {
+    background: #fff5f5;
+    border: 1px solid #ffd8d8;
+}
+
+.box-safe {
+    background: #f0f7ff;
+    border: 1px solid #d0e7ff;
+}
+
+.diagram-vs {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    color: #dee2e6;
+    padding-top: 80px;
+}
+
+.diagram-box h5 {
+    font-size: 1rem;
+    margin-bottom: 1rem;
+}
+
+.box-danger h5 {
+    color: #e03131;
+}
+
+.box-safe h5 {
+    color: #1971c2;
+}
+
+.diagram-box .box-icon {
+    font-size: 1.5rem;
+    margin-bottom: 0.8rem;
+}
+
+.box-danger .box-icon {
+    color: #fa5252;
+}
+
+.box-safe .box-icon {
+    color: #228be6;
+}
+
+.diagram-box ul {
+    list-style: none;
+    text-align: left;
+    padding: 0;
+}
+
+.diagram-box ul li {
+    font-size: 0.8rem;
+    margin-bottom: 0.5rem;
+    color: #495057;
+    padding-left: 1.2rem;
+    position: relative;
+}
+
+.box-danger ul li::before {
+    content: '×';
+    position: absolute;
+    left: 0;
+    color: #fa5252;
+    font-weight: bold;
+}
+
+.safe-flow {
+    text-align: left;
+}
+
+.flow-step {
+    font-size: 0.8rem;
+    background: #fff;
+    padding: 6px 10px;
+    border-radius: 4px;
+    margin-bottom: 6px;
+    border: 1px solid #e7f5ff;
+    color: #1864ab;
+    font-weight: 600;
+}
+
+.flow-note {
+    font-size: 0.7rem;
+    color: #1971c2;
+    margin-top: 10px;
+    opacity: 0.8;
+}
+
+.security-footer {
+    margin-top: 3rem;
+    padding: 1.5rem;
+    background: rgba(161, 126, 26, 0.03);
+    border-radius: 12px;
+    color: var(--color-primary);
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+@media (max-width: 991px) {
+    .security-grid {
+        display: grid;
+        grid-template-columns: 1fr 1.2fr;
+        gap: 4rem;
+        align-items: center;
+        margin-top: 3rem;
+    }
+
+    .security-item {
+        display: flex;
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .security-item i {
+        font-size: 1.5rem;
+        color: var(--color-primary);
+        background: rgba(161, 126, 26, 0.05);
+        width: 50px;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 12px;
+        flex-shrink: 0;
+    }
+
+    .security-item h4 {
+        font-size: 1.1rem;
+        margin-bottom: 0.5rem;
+        color: #333;
+    }
+
+    .security-item p {
+        font-size: 0.9rem;
+        color: #666;
+        line-height: 1.6;
+    }
+
+    .security-diagram-container {
+        background: #fff;
+        padding: 2.5rem;
+        border-radius: var(--radius-md);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+        border: 1px solid #eee;
+    }
+
+    .diagram-title {
+        margin-bottom: 2rem;
+        font-size: 1.2rem;
+        color: #333;
+        font-weight: 700;
+    }
+
+    .security-diagram {
+        display: flex;
+        align-items: stretch;
+        gap: 1.5rem;
+    }
+
+    .diagram-side {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .diagram-node {
+        padding: 0.8rem 1.2rem;
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        font-size: 0.9rem;
+        font-weight: 600;
+    }
+
+    .diagram-arrow {
+        padding: 0.5rem 0;
+        color: #adb5bd;
+    }
+
+    .diagram-box {
+        width: 100%;
+        flex: 1;
+        padding: 1.5rem;
+        border-radius: 8px;
+        text-align: center;
+    }
+
+    .box-danger {
+        background: #fff5f5;
+        border: 1px solid #ffd8d8;
+    }
+
+    .box-safe {
+        background: #f0f7ff;
+        border: 1px solid #d0e7ff;
+    }
+
+    .diagram-vs {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        color: #dee2e6;
+        padding-top: 80px;
+    }
+
+    .diagram-box h5 {
+        font-size: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .box-danger h5 {
+        color: #e03131;
+    }
+
+    .box-safe h5 {
+        color: #1971c2;
+    }
+
+    .diagram-box .box-icon {
+        font-size: 1.5rem;
+        margin-bottom: 0.8rem;
+    }
+
+    .box-danger .box-icon {
+        color: #fa5252;
+    }
+
+    .box-safe .box-icon {
+        color: #228be6;
+    }
+
+    .diagram-box ul {
+        list-style: none;
+        text-align: left;
+        padding: 0;
+    }
+
+    .diagram-box ul li {
+        font-size: 0.8rem;
+        margin-bottom: 0.5rem;
+        color: #495057;
+        padding-left: 1.2rem;
+        position: relative;
+    }
+
+    .box-danger ul li::before {
+        content: '×';
+        position: absolute;
+        left: 0;
+        color: #fa5252;
+        font-weight: bold;
+    }
+
+    .safe-flow {
+        text-align: left;
+    }
+
+    .flow-step {
+        font-size: 0.8rem;
+        background: #fff;
+        padding: 6px 10px;
+        border-radius: 4px;
+        margin-bottom: 6px;
+        border: 1px solid #e7f5ff;
+        color: #1864ab;
+        font-weight: 600;
+    }
+
+    .flow-note {
+        font-size: 0.7rem;
+        color: #1971c2;
+        margin-top: 10px;
+        opacity: 0.8;
+    }
+
+    .security-footer {
+        margin-top: 3rem;
+        padding: 1.5rem;
+        background: rgba(161, 126, 26, 0.03);
+        border-radius: 12px;
+        color: var(--color-primary);
+        font-weight: 600;
+        font-size: 0.95rem;
+    }
+
+    @media (max-width: 991px) {
+        .security-grid {
+            grid-template-columns: 1fr;
+            gap: 3rem;
+        }
+    }
+
+    @media (max-width: 576px) {
+        .security-diagram {
+            flex-direction: column;
+        }
+
+        .diagram-vs {
+            padding: 1rem 0;
+        }
+    }
 }
