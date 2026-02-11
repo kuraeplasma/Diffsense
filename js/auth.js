@@ -18,7 +18,7 @@ export async function handleSignUp(email, password) {
         console.log("Signed up user:", user);
         // Alert is used for simplicity, in production custom UI is better
         alert("アカウント作成に成功しました！");
-        window.location.replace("dashboard.html");
+        window.location.replace("select-plan.html");
     } catch (error) {
         console.error("Error signing up:", error);
         let msg = "エラーが発生しました。\n詳細: " + error.code;

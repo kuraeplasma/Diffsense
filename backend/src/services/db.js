@@ -164,6 +164,35 @@ class DBService {
     }
 
     /**
+     * Set user's selected plan
+     * @param {string} uid - Firebase UID
+     * @param {string} plan - Plan ID (starter, business, pro)
+     */
+    async setUserPlan(uid, plan) {
+        const users = await this.readData('users');
+        const index = users.findIndex(u => u.uid === uid);
+
+        if (index > -1) {
+            users[index].plan = plan;
+            await this.writeData('users', users);
+            return users[index];
+        } else {
+            // New user with selected plan
+            const user = {
+                uid: uid,
+                plan: plan,
+                trialStartedAt: new Date().toISOString(),
+                hasPaymentMethod: false,
+                usageCount: 0,
+                lastResetDate: new Date().toISOString()
+            };
+            users.push(user);
+            await this.writeData('users', users);
+            return user;
+        }
+    }
+
+    /**
      * Increment AI usage count for a user
      * @param {string} uid - Firebase UID
      */

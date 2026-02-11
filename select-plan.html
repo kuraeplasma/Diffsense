@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>プラン選択 - DIFFsense</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@300;400;500;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        body {
+            background-color: #f7f3f0;
+            font-family: var(--font-body);
+            margin: 0;
+        }
+
+        .plan-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .plan-logo {
+            text-align: center;
+            margin-bottom: 1rem;
+            font-family: "Helvetica", "Arial", sans-serif;
+            font-weight: 800;
+            font-size: 1.8rem;
+            color: #c5a059;
+        }
+
+        .plan-logo a {
+            color: inherit;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            text-decoration: none;
+        }
+
+        .plan-heading {
+            text-align: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .plan-heading h2 {
+            font-family: var(--font-heading);
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: #2b2623;
+            margin: 0;
+        }
+
+        .plan-subtitle {
+            text-align: center;
+            color: #888;
+            font-size: 0.9rem;
+            margin-bottom: 2.5rem;
+        }
+
+        .plan-trial-badge {
+            display: inline-block;
+            background: rgba(197, 160, 89, 0.1);
+            color: #a17e1a;
+            border: 1px solid #c5a059;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            margin-bottom: 1.5rem;
+            letter-spacing: 0.03em;
+        }
+
+        .plan-grid {
+            display: flex;
+            gap: 24px;
+            max-width: 960px;
+            width: 100%;
+            margin-bottom: 2rem;
+        }
+
+        .plan-card {
+            flex: 1;
+            background: #fff;
+            border: 2px solid #eee;
+            border-radius: 12px;
+            padding: 28px 24px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .plan-card:hover {
+            border-color: #c5a059;
+            transform: translateY(-3px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+        }
+
+        .plan-card.selected {
+            border-color: #c5a059;
+            background: #fffdf8;
+            box-shadow: 0 4px 20px rgba(197, 160, 89, 0.2);
+        }
+
+        .plan-card.recommended {
+            border-color: #c5a059;
+        }
+
+        .plan-badge {
+            font-size: 0.7rem;
+            padding: 3px 10px;
+            border-radius: 10px;
+            background: #f0f0f0;
+            color: #666;
+            display: inline-block;
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+
+        .plan-badge.recommended {
+            background: #c5a059;
+            color: #fff;
+        }
+
+        .plan-card h3 {
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin: 0 0 8px;
+            color: #2b2623;
+        }
+
+        .plan-price {
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: #2b2623;
+            margin-bottom: 4px;
+        }
+
+        .plan-price small {
+            font-size: 0.75rem;
+            font-weight: 400;
+            color: #888;
+        }
+
+        .plan-desc {
+            font-size: 0.8rem;
+            color: #888;
+            margin-bottom: 16px;
+        }
+
+        .plan-features {
+            list-style: none;
+            padding: 0;
+            margin: 0 0 16px;
+            font-size: 0.82rem;
+            color: #555;
+            flex: 1;
+        }
+
+        .plan-features li {
+            margin-bottom: 8px;
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+        }
+
+        .plan-features li i {
+            color: #c5a059;
+            margin-top: 2px;
+            flex-shrink: 0;
+        }
+
+        .plan-features li.bad i {
+            color: #ccc;
+        }
+
+        .plan-select-indicator {
+            text-align: center;
+            padding: 10px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+            background: #f5f5f5;
+            color: #999;
+            margin-top: auto;
+        }
+
+        .plan-card.selected .plan-select-indicator {
+            background: #c5a059;
+            color: #fff;
+        }
+
+        .plan-confirm-btn {
+            display: block;
+            width: 100%;
+            max-width: 400px;
+            margin: 0 auto;
+            padding: 1rem;
+            border: none;
+            border-radius: 8px;
+            background: #c5a059;
+            color: #fff;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            font-family: var(--font-body);
+        }
+
+        .plan-confirm-btn:hover {
+            background: #9e8047;
+            transform: translateY(-1px);
+        }
+
+        .plan-confirm-btn:disabled {
+            background: #ddd;
+            color: #999;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .plan-note {
+            text-align: center;
+            font-size: 0.78rem;
+            color: #a17e1a;
+            margin-top: 12px;
+        }
+
+        .plan-back-link {
+            display: inline-block;
+            margin-top: 1.5rem;
+            color: #999;
+            font-size: 0.85rem;
+            text-decoration: none;
+            text-align: center;
+            width: 100%;
+        }
+
+        .plan-back-link:hover {
+            color: #c5a059;
+        }
+
+        /* Loading */
+        .btn-loading {
+            position: relative;
+            color: transparent !important;
+            pointer-events: none;
+        }
+
+        .btn-loading::after {
+            content: "";
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            top: 50%;
+            left: 50%;
+            margin-top: -10px;
+            margin-left: -10px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .plan-grid {
+                flex-direction: column;
+            }
+
+            .plan-container {
+                padding: 1.5rem;
+            }
+
+            .plan-heading h2 {
+                font-size: 1.3rem;
+            }
+        }
+    </style>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+</head>
+
+<body>
+    <div class="plan-container">
+        <h1 class="plan-logo">
+            <a href="index.html">
+                <i class="fa-solid fa-scale-balanced"></i>
+                <span>DIFFsense</span>
+            </a>
+        </h1>
+
+        <div class="plan-heading">
+            <h2>ご利用プランを選択してください</h2>
+        </div>
+        <p class="plan-subtitle">トライアル期間中はすべての機能をお試しいただけます</p>
+        <span class="plan-trial-badge">🎉 7日間無料トライアル（AI差分チェック5回まで）</span>
+
+        <div class="plan-grid">
+            <!-- Starter -->
+            <div class="plan-card" data-plan="starter" onclick="selectPlan('starter')">
+                <div class="plan-badge">個人・検証用</div>
+                <h3>Starter</h3>
+                <div class="plan-price">¥1,480<small> / 月（税抜）</small></div>
+                <p class="plan-desc">個人向け・契約変更チェックの最小プラン</p>
+                <ul class="plan-features">
+                    <li><i class="fa-solid fa-check"></i>PDF / URL 登録：無制限</li>
+                    <li><i class="fa-solid fa-check"></i>AI差分チェック：月15回</li>
+                    <li><i class="fa-solid fa-check"></i>差分ハイライト・バージョン履歴</li>
+                    <li><i class="fa-solid fa-check"></i>リスク判定（AI理由なし）</li>
+                    <li><i class="fa-solid fa-check"></i>チーム：1人</li>
+                    <li class="bad"><i class="fa-solid fa-xmark"></i>業務利用：不可</li>
+                </ul>
+                <div class="plan-select-indicator">選択する</div>
+            </div>
+
+            <!-- Business -->
+            <div class="plan-card recommended" data-plan="business" onclick="selectPlan('business')">
+                <div class="plan-badge recommended">おすすめ</div>
+                <h3>Business</h3>
+                <div class="plan-price">¥4,980<small> / 月（税抜）</small></div>
+                <p class="plan-desc">社内実務での利用に最適</p>
+                <ul class="plan-features">
+                    <li><i class="fa-solid fa-check"></i>PDF / URL 登録：無制限</li>
+                    <li><i class="fa-solid fa-check"></i>AI差分チェック：月120回</li>
+                    <li><i class="fa-solid fa-check"></i>差分ハイライト・バージョン履歴</li>
+                    <li><i class="fa-solid fa-check"></i>リスク判定：AI詳細コメント</li>
+                    <li><i class="fa-solid fa-check"></i>チーム：3人</li>
+                    <li><i class="fa-solid fa-check"></i>業務利用：自社内のみ可</li>
+                </ul>
+                <div class="plan-select-indicator">選択する</div>
+            </div>
+
+            <!-- Pro -->
+            <div class="plan-card" data-plan="pro" onclick="selectPlan('pro')">
+                <div class="plan-badge">士業・専門職向け</div>
+                <h3>Pro / Legal</h3>
+                <div class="plan-price">¥9,800<small> / 月（税抜）</small></div>
+                <p class="plan-desc">外部確認・監査・継続監視まで</p>
+                <ul class="plan-features">
+                    <li><i class="fa-solid fa-check"></i>PDF / URL 登録：無制限</li>
+                    <li><i class="fa-solid fa-check"></i>AI差分チェック：月400回</li>
+                    <li><i class="fa-solid fa-check"></i>差分ハイライト・バージョン履歴</li>
+                    <li><i class="fa-solid fa-check"></i>リスク判定：AI詳細コメント</li>
+                    <li><i class="fa-solid fa-check"></i>定期URL自動監視</li>
+                    <li><i class="fa-solid fa-check"></i>CSV / PDF エクスポート</li>
+                    <li><i class="fa-solid fa-check"></i>チーム：5人</li>
+                    <li><i class="fa-solid fa-check"></i>業務利用：可（第三者含む）</li>
+                </ul>
+                <div class="plan-select-indicator">選択する</div>
+            </div>
+        </div>
+
+        <button class="plan-confirm-btn" id="confirm-btn" disabled onclick="confirmPlan()">
+            プランを選択してください
+        </button>
+        <p class="plan-note">
+            ※7日間の無料トライアル終了後、選択したプランに自動移行します。<br>
+            ※期間内に解約した場合、料金は発生しません。
+        </p>
+        <a href="index.html" class="plan-back-link">← トップページへ戻る</a>
+    </div>
+
+    <script type="module">
+        import { auth } from './js/firebase-config.js';
+        import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+        let selectedPlan = null;
+
+        // Require auth - redirect to login if not authenticated
+        onAuthStateChanged(auth, (user) => {
+            if (!user) {
+                window.location.replace("login.html");
+            }
+        });
+
+        window.selectPlan = (planId) => {
+            selectedPlan = planId;
+
+            // Update UI
+            document.querySelectorAll('.plan-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            document.querySelector(`[data-plan="${planId}"]`).classList.add('selected');
+
+            // Update button
+            const btn = document.getElementById('confirm-btn');
+            const planNames = { starter: 'Starter', business: 'Business', pro: 'Pro / Legal' };
+            btn.textContent = `${planNames[planId]} で始める（7日間無料）`;
+            btn.disabled = false;
+        };
+
+        window.confirmPlan = () => {
+            if (!selectedPlan) return;
+
+            const btn = document.getElementById('confirm-btn');
+            btn.classList.add('btn-loading');
+
+            // Save selected plan to localStorage
+            localStorage.setItem('diffsense_selected_plan', selectedPlan);
+
+            // Redirect to dashboard
+            window.location.replace("dashboard.html");
+        };
+    </script>
+</body>
+
+</html>

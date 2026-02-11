@@ -42,4 +42,28 @@ router.get('/subscription', async (req, res) => {
     }
 });
 
+/**
+ * POST /api/user/select-plan
+ * Set user's selected plan (called after signup)
+ */
+router.post('/select-plan', async (req, res) => {
+    try {
+        const uid = req.user.uid;
+        const { plan } = req.body;
+
+        const validPlans = ['starter', 'business', 'pro'];
+        if (!plan || !validPlans.includes(plan)) {
+            return res.status(400).json({ success: false, error: 'Invalid plan' });
+        }
+
+        await dbService.setUserPlan(uid, plan);
+        logger.info(`User ${uid} selected plan: ${plan}`);
+
+        res.json({ success: true, data: { plan } });
+    } catch (error) {
+        logger.error('Error setting user plan:', error);
+        res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+});
+
 module.exports = router;

@@ -957,6 +957,13 @@ class DashboardApp {
                     this.userRole = matchedUser.role;
                 }
 
+                // Check if user just selected a plan from signup flow
+                const selectedPlan = localStorage.getItem('diffsense_selected_plan');
+                if (selectedPlan) {
+                    await this.registerSelectedPlan(token, selectedPlan);
+                    localStorage.removeItem('diffsense_selected_plan');
+                }
+
                 // Fetch real subscription status from backend
                 await this.fetchSubscriptionStatus(token);
 
@@ -970,6 +977,26 @@ class DashboardApp {
             }
         } catch (e) {
             console.error('Admin Check Error:', e);
+        }
+    }
+
+    async registerSelectedPlan(token, plan) {
+        try {
+            const protocol = location.hostname === 'localhost' ? 'http' : 'https';
+            const port = location.hostname === 'localhost' ? ':3001' : '';
+            const apiUrl = `${protocol}://${location.hostname}${port}/user/select-plan`;
+
+            await fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ plan })
+            });
+            console.log('Selected plan registered:', plan);
+        } catch (error) {
+            console.error('Failed to register selected plan:', error);
         }
     }
 
