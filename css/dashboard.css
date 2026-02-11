@@ -497,10 +497,10 @@ ul {
 
 /* Assignee */
 
-/* 3. History/Logs Table */
+/* 3. History/Logs Table (6 Columns) */
 .history-table th:nth-child(1),
 .history-table td:nth-child(1) {
-    width: 160px;
+    width: 150px;
 }
 
 /* Date */
@@ -512,20 +512,28 @@ ul {
 /* Target (Flex) */
 .history-table th:nth-child(3),
 .history-table td:nth-child(3) {
+    width: 100px;
+}
+
+/* Status Badge */
+.history-table th:nth-child(4),
+.history-table td:nth-child(4) {
     width: 140px;
 }
 
 /* Action Badge */
-.history-table th:nth-child(4),
-.history-table td:nth-child(4) {
-    width: 120px;
+.history-table th:nth-child(5),
+.history-table td:nth-child(5) {
+    width: 100px;
 }
 
 /* Actor */
-.history-table th:nth-child(5),
-.history-table td:nth-child(5) {
+.history-table th:nth-child(6),
+.history-table td:nth-child(6) {
     width: 80px;
 }
+
+/* Detail Button */
 
 /* Detail */
 
