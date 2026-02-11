@@ -258,7 +258,6 @@ ul {
 .feature-locked {
     position: relative;
     opacity: 0.6 !important;
-    pointer-events: none !important;
     filter: grayscale(1);
     cursor: not-allowed !important;
 }

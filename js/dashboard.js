@@ -1091,8 +1091,7 @@ class DashboardApp {
 
         // RBAC: Protect team view - Allow if Business+ OR Trial
         if (viewId === 'team' && this.subscription?.plan === 'starter' && !this.subscription?.isInTrial) {
-            console.warn('Access denied for team view. Redirecting to dashboard.');
-            this.navigate('dashboard');
+            alert('「チーム管理」はBusinessプラン以上の機能です。\nアップグレードするとチームメンバーの招待や管理が可能になります。');
             return;
         }
 
