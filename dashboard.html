@@ -150,6 +150,32 @@
         </div>
     </div>
 
+    <!-- Upgrade Guidance Modal -->
+    <div id="upgrade-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 450px; text-align: center;">
+            <div class="modal-body" style="padding: 40px 32px;">
+                <div style="font-size: 3rem; color: #c19b4a; margin-bottom: 20px;">
+                    <i class="fa-solid fa-crown"></i>
+                </div>
+                <h3 style="margin-bottom: 16px; font-size: 1.4rem;">Businessプラン限定機能</h3>
+                <p style="color: #666; line-height: 1.6; margin-bottom: 32px;">
+                    「チーム管理」はBusinessプラン以上の機能です。<br>
+                    アップグレードするとチームメンバーの招待や管理が可能になります。
+                </p>
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <button class="btn-dashboard btn-primary-action" style="width: 100%; padding: 12px;"
+                        onclick="window.app.navigate('plan'); document.getElementById('upgrade-modal').classList.remove('active');">
+                        プランをアップグレードする
+                    </button>
+                    <button class="btn-dashboard" style="width: 100%; border: none; background: none; color: #888;"
+                        onclick="document.getElementById('upgrade-modal').classList.remove('active')">
+                        あとで
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Edit Member Modal -->
     <div id="edit-member-modal" class="modal-overlay">
         <div class="modal-content" style="max-width: 500px;">
