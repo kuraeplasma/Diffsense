@@ -270,13 +270,15 @@ ul {
     font-weight: 900;
     position: absolute;
     top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    font-size: 1.5rem;
+    right: 15px;
+    /* Moved to the right */
+    transform: translateY(-50%);
+    font-size: 1rem;
+    /* Slightly smaller */
     color: #c19b4a;
     /* primary-ish gold */
     z-index: 100;
-    text-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+    text-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
 }
 
 .upgrade-badge {
