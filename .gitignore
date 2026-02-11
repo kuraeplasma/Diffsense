@@ -1,5 +1,7 @@
 node_modules/
+backups/
 _backup_*/
+logs/
 .env
 .DS_Store
 
