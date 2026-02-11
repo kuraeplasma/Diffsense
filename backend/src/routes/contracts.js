@@ -31,18 +31,33 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
 
         // 0. Usage & Plan Limit Check
         const userProfile = await dbService.getUserProfile(uid);
-        const planLimits = {
-            'starter': 15,
-            'business': 120,
-            'pro': 400
-        };
-        const limit = planLimits[userProfile.plan] || 0;
+        const limit = dbService.getUsageLimit(userProfile);
+        const isInTrial = dbService.isTrialActive(userProfile);
+
+        // Trial Expiration Check - Only if trial was ever started
+        if (userProfile.trialStartedAt && isInTrial === false) {
+            const trialStart = new Date(userProfile.trialStartedAt);
+            const now = new Date();
+            if (now - trialStart > 7 * 24 * 60 * 60 * 1000) {
+                // For this prototype, if trial is over and no "subscription" (simulated), block access.
+                // In production, we'd check userProfile.plan and if they've paid.
+                logger.warn(`Trial expired for user ${uid}`);
+                return res.status(403).json({
+                    success: false,
+                    error: "無料トライアル期間（7日間）が終了しました。継続して利用するにはプランの契約が必要です。"
+                });
+            }
+        }
 
         if (userProfile.usageCount >= limit) {
+            const limitMsg = isInTrial
+                ? `無料トライアルの解析上限（${limit}回）に達しました。継続して利用するにはプランの契約が必要です。`
+                : `プランの月間解析上限（${limit}回）に達しました。アップグレードをご検討ください。`;
+
             logger.warn(`Usage limit reached for user ${uid}`, { plan: userProfile.plan, current: userProfile.usageCount });
             return res.status(403).json({
                 success: false,
-                error: `プランの月間解析上限（${limit}回）に達しました。アップグレードをご検討ください。`
+                error: limitMsg
             });
         }
 
@@ -178,6 +193,16 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
 
         logger.info(`Response ready for contract ${contractId}`);
 
+        // 4. Feature Gating (Business+ only for detailed analysis)
+        let gatedChanges = aiResult.changes || [];
+        if (userProfile.plan === 'starter' && !isInTrial) {
+            gatedChanges = gatedChanges.map(c => ({
+                ...c,
+                impact: "Businessプラン以上で閲覧可能です。",
+                concern: "Businessプラン以上で閲覧可能です。"
+            }));
+        }
+
         res.json({
             success: true,
             data: {
@@ -187,7 +212,7 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                 sourceType: method.toUpperCase(),
                 pdfStoragePath,
                 pdfUrl,
-                changes: aiResult.changes || [],
+                changes: gatedChanges,
                 riskLevel: aiResult.riskLevel,
                 riskReason: aiResult.riskReason,
                 summary: aiResult.summary

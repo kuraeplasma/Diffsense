@@ -206,6 +206,115 @@ ul {
     color: #999;
 }
 
+/* Subscription Plan Badge & Info */
+.plan-status-card {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    margin-bottom: 16px;
+}
+
+.plan-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+}
+
+.plan-badge-trial {
+    background: var(--color-primary);
+    color: #fff;
+}
+
+.plan-badge-pro {
+    background: #7c4dff;
+    color: #fff;
+}
+
+.plan-info-text {
+    font-size: 11px;
+    color: #ccc;
+    line-height: 1.4;
+}
+
+.plan-usage-bar {
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    margin-top: 8px;
+    overflow: hidden;
+}
+
+.plan-usage-progress {
+    background: var(--color-primary);
+    transition: width 0.3s ease;
+}
+
+/* Locked Features & Badges */
+.feature-locked {
+    position: relative;
+    opacity: 0.6 !important;
+    pointer-events: none !important;
+    filter: grayscale(1);
+    cursor: not-allowed !important;
+}
+
+.feature-locked::after {
+    content: '\f023';
+    /* lock icon */
+    font-family: 'Font Awesome 6 Free';
+    font-weight: 900;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 1.5rem;
+    color: #c19b4a;
+    /* primary-ish gold */
+    z-index: 100;
+    text-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+}
+
+.upgrade-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    background: #c19b4a;
+    color: #fff;
+    font-size: 0.65rem;
+    border-radius: 4px;
+    margin-left: 8px;
+    font-weight: 700;
+    vertical-align: middle;
+    text-transform: uppercase;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.mask-content {
+    filter: blur(5px);
+    user-select: none;
+    pointer-events: none;
+}
+
+.upgrade-promo-box {
+    background: rgba(193, 155, 74, 0.05);
+    border: 1px dashed #c19b4a;
+    padding: 16px;
+    border-radius: 8px;
+    text-align: center;
+    margin-top: 16px;
+}
+
+.upgrade-promo-box p {
+    font-size: 0.85rem;
+    color: #c19b4a;
+    margin-bottom: 12px;
+    font-weight: 600;
+}
+
 /* Dashboard Cards (Quiet Style) */
 .page-title {
     font-size: 24px;

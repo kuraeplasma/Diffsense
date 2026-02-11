@@ -40,8 +40,13 @@
                 <div class="nav-icon"><i class="fa-solid fa-users"></i></div>
                 <span>チーム設定</span>
             </div>
+            <div class="nav-item" onclick="window.app.navigate('plan')">
+                <div class="nav-icon"><i class="fa-solid fa-credit-card"></i></div>
+                <span>プラン管理</span>
+            </div>
         </div>
         <div class="user-profile">
+            <div id="plan-status-container"></div>
             <div style="font-weight:600; color:#fff;" id="user-name-display">ユーザー</div>
             <div id="user-email-display" style="font-size:11px; margin-bottom:10px;">...</div>
             <div style="cursor:pointer; color:#ccc;" id="logout-btn">

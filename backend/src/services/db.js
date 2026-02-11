@@ -2,12 +2,43 @@ const fs = require('fs');
 const path = require('path');
 const logger = require('../utils/logger');
 
+const PLAN_LIMITS = {
+    'trial': 1,      // Legacy, but kept for compatibility during migration if needed
+    'starter': 1,
+    'business': 3,
+    'pro': 5
+};
+
+const AI_USAGE_LIMITS = {
+    'trial': 5,      // Legacy/Fallback
+    'starter': 15,
+    'business': 120,
+    'pro': 400
+};
+
+const TRIAL_AI_LIMIT = 5;
+const TRIAL_DURATION_DAYS = 7;
+
 class DBService {
+    // ...
+    getOriginalPlanLimit(plan) {
+        return AI_USAGE_LIMITS[plan] || 0;
+    }
     constructor() {
         this.dataDir = path.join(__dirname, '../../data');
         if (!fs.existsSync(this.dataDir)) {
             fs.mkdirSync(this.dataDir, { recursive: true });
         }
+    }
+
+    async canAddMember(uid) {
+        const user = await this.getUserProfile(uid);
+        const plan = user.plan || 'starter';
+        const limit = PLAN_LIMITS[plan] || 1;
+
+        const allUsers = await this.readData('users');
+        // Simple logic for this prototype: limit applies to total users in the system
+        return allUsers.length < limit;
     }
 
     getFilePath(collection) {
@@ -79,6 +110,35 @@ class DBService {
     // --- User Profile & Usage Tracking ---
 
     /**
+     * Helper to check if a user is currently in the trial period
+     * @param {object} userProfile 
+     */
+    isTrialActive(userProfile) {
+        if (!userProfile.trialStartedAt) return false;
+
+        const trialStart = new Date(userProfile.trialStartedAt);
+        const now = new Date();
+        const diffTime = now - trialStart;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        return diffDays <= TRIAL_DURATION_DAYS && diffDays >= 0;
+    }
+
+    /**
+     * Get usage limit considering trial status
+     * @param {object} userProfile 
+     */
+    getUsageLimit(userProfile) {
+        // If in trial, limit is always 5 checks (Trial limitation)
+        if (this.isTrialActive(userProfile)) {
+            return TRIAL_AI_LIMIT;
+        }
+        // Otherwise, use plan-based limit
+        const plan = userProfile.plan || 'starter';
+        return AI_USAGE_LIMITS[plan] || 0;
+    }
+
+    /**
      * Get or create a basic user profile for usage tracking
      * @param {string} uid - Firebase UID
      */
@@ -87,9 +147,11 @@ class DBService {
         let user = users.find(u => u.uid === uid);
 
         if (!user) {
+            // New user: default to 'starter' plan but with 7-day trial active
             user = {
                 uid: uid,
-                plan: 'starter', // Default plan
+                plan: 'starter',
+                trialStartedAt: new Date().toISOString(),
                 usageCount: 0,
                 lastResetDate: new Date().toISOString()
             };
@@ -128,8 +190,6 @@ class DBService {
         const proUids = proUsers.map(u => u.uid);
 
         const contracts = await this.readData('contracts');
-        // If owner_uid is not present, we assume for now (in dev) that it might be needed
-        // but since we don't have owner_uid, we'll filter by source_type === 'URL' and monitoring_enabled
         return contracts.filter(c =>
             c.source_type === 'URL' &&
             c.monitoring_enabled === true

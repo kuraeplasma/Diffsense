@@ -10,6 +10,12 @@ export const dbService = {
         INITIALIZED: 'diffsense_initialized'
     },
 
+    PLAN_LIMITS: {
+        'starter': 1,
+        'business': 3,
+        'pro': 5
+    },
+
     /**
      * Initialize DB if not already done
      */
@@ -219,11 +225,17 @@ export const dbService = {
         return false;
     },
 
-    addUser(name, email, role) {
+    addUser(name, email, role, currentPlan = 'starter') {
         const users = this.getUsers();
         if (users.find(u => u.email === email)) {
-            return false; // Email already exists
+            return { success: false, error: 'already_exists' };
         }
+
+        const limit = this.PLAN_LIMITS[currentPlan] || 1;
+        if (users.length >= limit) {
+            return { success: false, error: 'limit_reached', limit };
+        }
+
         const newUser = {
             id: Date.now(),
             name,
@@ -234,7 +246,7 @@ export const dbService = {
         users.push(newUser);
         localStorage.setItem(this.KEYS.USERS, JSON.stringify(users));
         this.addActivityLog("メンバー追加", name, "管理者");
-        return true;
+        return { success: true };
     },
 
     updateUser(email, data) {

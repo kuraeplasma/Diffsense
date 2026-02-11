@@ -7,6 +7,42 @@ import { aiService } from './ai-service.js';
 
 // --- View Renderers ---
 const Views = {
+    // 5. Plan Management (New)
+    plan: () => {
+        const sub = window.app ? window.app.subscription : null;
+        if (!sub) return '<div class="text-center p-5">利用状況を読み込んでいます...</div>';
+
+        const plans = [
+            { id: 'starter', name: 'Starter', price: '¥1,480', features: ['AI解析 15回/月', '履歴管理', '判定: High/Med/Low'] },
+            { id: 'business', name: 'Business', price: '¥4,980', features: ['AI解析 120回/月', 'AI詳細解説', 'ステータス管理', 'チーム3人'] },
+            { id: 'pro', name: 'Pro / Legal', price: '¥9,800', features: ['AI解析 400回/月', '定期URL監視', 'CSV/PDFエクスポート', 'チーム5人'] }
+        ];
+
+        const cards = plans.map(p => {
+            const isCurrent = sub.plan === p.id;
+            return `
+                <div class="pricing-card ${isCurrent ? 'business highlight-plan' : ''}" style="border: 1px solid #eee; padding: 20px; border-radius: 8px; flex: 1; background: #fff;">
+                    ${isCurrent ? '<div class="pricing-badge" style="background:#c19b4a; color:#fff; font-size:10px; padding:2px 8px; border-radius:10px; display:inline-block; margin-bottom:10px;">現在のプラン</div>' : ''}
+                    <h3 style="margin-bottom:10px;">${p.name}</h3>
+                    <div style="font-size: 24px; font-weight: bold; margin-bottom: 20px;">${p.price}<small style="font-size:12px; color:#666;"> / 月</small></div>
+                    <ul style="list-style: none; padding: 0; margin-bottom: 20px; font-size: 0.85rem; color: #555;">
+                        ${p.features.map(f => `<li style="margin-bottom:8px;"><i class="fa-solid fa-check" style="color:#c19b4a; margin-right:8px;"></i>${f}</li>`).join('')}
+                    </ul>
+                    ${!isCurrent ? '<button class="btn-dashboard full-width" style="background:#c19b4a; color:#fff; border:none;">アップグレード</button>' : ''}
+                </div>
+            `;
+        }).join('');
+
+        return `
+            <div class="page-title">プラン管理</div>
+            <div style="display: flex; gap: 20px; margin-bottom: 30px;">
+                ${cards}
+            </div>
+            <div class="upgrade-promo-box">
+                <p><i class="fa-solid fa-gift"></i> ご不明な点はサポートチームまでお気軽にお問い合わせください。</p>
+            </div>
+        `;
+    },
     // 1. Dashboard Overview
     dashboard: () => {
         const stats = dbService.getStats();
@@ -303,7 +339,7 @@ const Views = {
 
                         </div>
                         
-                        ${contract.source_type === 'URL' && window.app.userPlan === 'pro' ? `
+                        ${contract.source_type === 'URL' && (window.app.subscription?.plan === 'pro' || window.app.subscription?.isInTrial) ? `
                         <div class="analysis-section" style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #eee;">
                             <div class="analysis-section-title" style="display:flex; justify-content:space-between; align-items:center;">
                                 <span><i class="fa-solid fa-eye text-primary"></i> 定期監視（クローリング）</span>
@@ -891,7 +927,7 @@ class DashboardApp {
     async checkAndRegisterAdmin() {
         try {
             const authModule = await import('./auth.js');
-            await authModule.getIdToken(); // Ensure auth is ready
+            const token = await authModule.getIdToken(); // Ensure auth is ready
 
             const fbConfig = await import('./firebase-config.js');
             const auth = fbConfig.auth;
@@ -912,12 +948,10 @@ class DashboardApp {
                     this.userRole = matchedUser.role;
                 }
 
-                // For testing/development: Assume Pro plan if user is admin
-                // In production, this would be fetched from backend or Stripe
-                this.userPlan = 'pro';
+                // Fetch real subscription status from backend
+                await this.fetchSubscriptionStatus(token);
 
                 console.log('Current User Role:', this.userRole);
-                console.log('Current User Plan:', this.userPlan);
 
                 // Hide Team menu for non-admins
                 const teamNavLink = document.querySelector('.nav-item[onclick*="team"]');
@@ -927,6 +961,85 @@ class DashboardApp {
             }
         } catch (e) {
             console.error('Admin Check Error:', e);
+        }
+    }
+
+    async fetchSubscriptionStatus(token) {
+        try {
+            const protocol = location.hostname === 'localhost' ? 'http' : 'https';
+            const port = location.hostname === 'localhost' ? ':3001' : '';
+            const apiUrl = `${protocol}://${location.hostname}${port}/user/subscription`;
+
+            const response = await fetch(apiUrl, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            const result = await response.json();
+
+            if (result.success) {
+                this.subscription = result.data;
+                this.userPlan = result.data.plan;
+                this.updateSubscriptionUI();
+            }
+        } catch (error) {
+            console.error('Failed to fetch subscription status:', error);
+            // Fallback for dev - starter with trial active
+            this.subscription = { plan: 'starter', usageCount: 0, usageLimit: 5, daysRemaining: 7, isInTrial: true, planLimit: 15 };
+            this.userPlan = 'starter';
+            this.updateSubscriptionUI();
+        }
+    }
+
+    updateSubscriptionUI() {
+        const container = document.getElementById('plan-status-container');
+        if (!container) return;
+
+        const sub = this.subscription;
+        if (!sub) return;
+
+        const planNames = {
+            'starter': 'Starter',
+            'business': 'Business',
+            'pro': 'Pro / Legal'
+        };
+
+        const usagePercent = Math.min(100, (sub.usageCount / sub.usageLimit) * 100);
+        const planName = planNames[sub.plan] || sub.plan;
+
+        let statusHtml = `
+            <div class="plan-status-card">
+                <div class="plan-badge plan-badge-${sub.plan}">${planName}${sub.isInTrial ? '（トライアル）' : ''}</div>
+                <div class="plan-info-text">
+                    ${sub.isInTrial ? `残り期間: <strong>${sub.daysRemaining}日間</strong><br>` : ''}
+                    AI解析: <strong>${sub.usageCount}</strong> / ${sub.usageLimit}回
+                    ${sub.isInTrial ? `<br><small style="font-size: 0.75rem; opacity: 0.7;">通常枠: ${sub.planLimit}回</small>` : ''}
+                </div>
+                <div class="plan-usage-bar">
+                    <div class="plan-usage-progress" style="width: ${usagePercent}%"></div>
+                </div>
+            </div>
+        `;
+
+        container.innerHTML = statusHtml;
+        this.updateUIByPlan();
+    }
+
+    updateUIByPlan() {
+        if (!this.subscription) return;
+        const plan = this.subscription.plan;
+        const isInTrial = this.subscription.isInTrial;
+
+        // --- Navigation Logic ---
+        // Team Management: Business+, trial allowed
+        const navTeam = document.querySelector('.nav-item[onclick*="navigate(\'team\')"]');
+        if (plan === 'starter' && !isInTrial) {
+            if (navTeam) navTeam.classList.add('feature-locked');
+        } else {
+            if (navTeam) {
+                navTeam.classList.remove('feature-locked');
+                navTeam.style.display = 'flex';
+            }
         }
     }
 
@@ -971,8 +1084,8 @@ class DashboardApp {
     navigate(viewId, params = null) {
         console.log(`Navigating to ${viewId}`, params);
 
-        // RBAC: Protect team view
-        if (viewId === 'team' && !this.can('manage_team')) {
+        // RBAC: Protect team view - Allow if Business+ OR Trial
+        if (viewId === 'team' && this.subscription?.plan === 'starter' && !this.subscription?.isInTrial) {
             console.warn('Access denied for team view. Redirecting to dashboard.');
             this.navigate('dashboard');
             return;
@@ -1005,26 +1118,33 @@ class DashboardApp {
         }
 
         const navMap = {
-            'dashboard': 0, 'contracts': 1, 'history': 2, 'team': 3
+            'dashboard': 0, 'contracts': 1, 'history': 2, 'team': 3, 'plan': 4
         };
 
-        if (navMap.hasOwnProperty(viewId)) {
-            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-            const navItems = document.querySelectorAll('.nav-item');
-            const navIndex = navMap[viewId];
-            if (navItems[navIndex]) navItems[navIndex].classList.add('active');
-        }
+        // Update active menu state
+        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+        const navItems = document.querySelectorAll('.nav-item');
+        // Find by content or click handler match
+        navItems.forEach(item => {
+            const onclick = item.getAttribute('onclick');
+            if (onclick && onclick.includes(`navigate('${viewId}')`)) {
+                item.classList.add('active');
+            }
+        });
 
         if (Views[viewId]) {
             try {
                 this.mainContent.innerHTML = Views[viewId](renderParams);
 
-                let title = 'ダッシュボード';
-                if (viewId === 'contracts') title = '契約管理';
-                if (viewId === 'diff') title = '差分詳細';
-                if (viewId === 'history') title = '解析履歴';
-                if (viewId === 'team') title = 'チーム設定';
-                this.pageTitle.textContent = title;
+                const titles = {
+                    'dashboard': 'ダッシュボード',
+                    'plan': 'プラン管理',
+                    'contracts': '契約・規約管理',
+                    'diff': '解析詳細',
+                    'history': '履歴・ログ',
+                    'team': 'チーム設定'
+                };
+                this.pageTitle.textContent = titles[viewId] || 'DIFFsense';
 
                 window.scrollTo(0, 0);
 
@@ -1501,6 +1621,18 @@ class DashboardApp {
 
     // --- Team Management ---
     showInviteModal() {
+        const users = dbService.getUsers();
+        const limit = dbService.PLAN_LIMITS[this.userPlan] || 1;
+
+        if (users.length >= limit) {
+            this.showAlertModal(
+                '人数制限',
+                `現在のプラン（${this.userPlan}）では、最大${limit}名までしか登録できません。<br>さらにメンバーを追加するにはプランをアップグレードしてください。`,
+                'warning'
+            );
+            return;
+        }
+
         document.getElementById('invite-name').value = '';
         document.getElementById('invite-email').value = '';
         document.getElementById('invite-role').value = '閲覧のみ';
@@ -1542,7 +1674,9 @@ class DashboardApp {
             return;
         }
 
-        if (dbService.addUser(name, email, role)) {
+        const result = dbService.addUser(name, email, role, this.userPlan);
+
+        if (result.success) {
             document.getElementById('invite-member-modal').classList.remove('active');
             this.navigate('team');
 
@@ -1555,11 +1689,14 @@ class DashboardApp {
                 this.showAlertModal('送信エラー', 'メンバーは追加されましたが、招待メールの送信に失敗しました。<br>サーバーログを確認してください。', 'warning');
             }
         } else {
-            // Check if user exists to give specific error
-            const users = dbService.getUsers();
-            const exists = users.find(u => u.email === email);
-            if (exists) {
+            if (result.error === 'already_exists') {
                 this.showAlertModal('登録エラー', 'このメールアドレスは既に登録されています。<br>別のメールアドレスを使用するか、既存のメンバーを編集してください。');
+            } else if (result.error === 'limit_reached') {
+                this.showAlertModal(
+                    '登録エラー',
+                    `人数制限に達しました。現在のプラン（${this.userPlan}）の制限は${result.limit}名です。`,
+                    'error'
+                );
             } else {
                 this.showAlertModal('登録エラー', 'メンバーの追加に失敗しました。');
             }
