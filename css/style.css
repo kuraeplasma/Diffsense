@@ -1599,56 +1599,6 @@ ul {
         margin: 0 auto;
     }
 
-    .dashboard-frame {
-        display: none !important;
-    }
-
-    .comparison-box {
-        padding: 1.5rem;
-        /* Significantly reduced for mobile */
-    }
-
-    .comp-col {
-        padding: 1.5rem !important;
-    }
-
-    .recommend-badge {
-        position: static !important;
-        transform: none !important;
-        margin-bottom: 1rem;
-        display: inline-block;
-    }
-
-    .comp-col h4 {
-        font-size: 1.2rem !important;
-    }
-
-    /* AIが差分だけを抽出 セクションのレスポンシブ化 */
-    .steps-container {
-        grid-template-columns: 1fr !important;
-        gap: 2rem !important;
-        margin-top: 3rem !important;
-    }
-
-    .step-item {
-        padding: 2.5rem 1.5rem !important;
-        /* Small padding for mobile */
-    }
-
-    .step-number {
-        font-size: 5rem !important;
-        /* Smaller background number */
-        top: -15px !important;
-    }
-
-    .step-content i {
-        font-size: 2.5rem !important;
-        margin-bottom: 1rem !important;
-    }
-
-    .step-content h3 {
-        font-size: 1.4rem !important;
-    }
 }
 
 /* AI Risk Card */
