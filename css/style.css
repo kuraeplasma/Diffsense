@@ -1049,7 +1049,8 @@ ul {
         flex-direction: column;
         width: 100%;
         max-width: 320px;
-        margin: 0 auto;
+        margin: 2.5rem auto 0;
+        /* Added margin-top to separate from visual */
         gap: 1rem;
         order: 4;
         align-items: center;
@@ -1602,21 +1603,51 @@ ul {
         display: none !important;
     }
 
-    .steps-container {
-        grid-template-columns: 1fr 1fr;
-    }
-
-    .comparison-grid {
-        grid-template-columns: 1fr;
-        gap: 3rem;
-    }
-
-    .comp-col.highlight {
-        transform: none;
-    }
-
     .comparison-box {
-        padding: 2rem 1.5rem;
+        padding: 1.5rem;
+        /* Significantly reduced for mobile */
+    }
+
+    .comp-col {
+        padding: 1.5rem !important;
+    }
+
+    .recommend-badge {
+        position: static !important;
+        transform: none !important;
+        margin-bottom: 1rem;
+        display: inline-block;
+    }
+
+    .comp-col h4 {
+        font-size: 1.2rem !important;
+    }
+
+    /* AIが差分だけを抽出 セクションのレスポンシブ化 */
+    .steps-container {
+        grid-template-columns: 1fr !important;
+        gap: 2rem !important;
+        margin-top: 3rem !important;
+    }
+
+    .step-item {
+        padding: 2.5rem 1.5rem !important;
+        /* Small padding for mobile */
+    }
+
+    .step-number {
+        font-size: 5rem !important;
+        /* Smaller background number */
+        top: -15px !important;
+    }
+
+    .step-content i {
+        font-size: 2.5rem !important;
+        margin-bottom: 1rem !important;
+    }
+
+    .step-content h3 {
+        font-size: 1.4rem !important;
     }
 }
 
