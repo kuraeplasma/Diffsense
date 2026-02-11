@@ -1,4 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- FontAwesome 6 fa-scale-balanced based geometry -->
-  <path fill="#c5a059" d="M448 32c-17.7 0-32 14.3-32 32l0 10.7c-47.3 11.2-85.5 46.2-100.3 91.5l-63.7 195C246.3 378.1 228.4 384 212 384c-35.3 0-64-28.7-64-64c0-4 .4-8 .1-12c-2.3-33-29.6-59.5-63.1-60c-35.3-.5-64 27.9-64 63.3c0 30.6 21.3 56.4 50 62.7l0 10.1c0 53 43 96 96 96c14 0 27.4-3.1 39.4-8.5l67.2 201.7c5.4 16.1 22.8 24.7 38.9 19.3s24.7-22.8 19.3-38.9l-67.2-201.7c1.7-.8 3.5-1.5 5.2-2.3V448c0 17.7 14.3 32 32 32s32-14.3 32-32V256l17.2-52.5c14.8-45.3 53-80.3 100.3-91.5V112c0 8.8 7.2 16 16 16s16-7.2 16-16V64c0-17.7-14.3-32-32-32z"/>
+  <!-- Minimalist Scale Icon matching the DIFFsense logo exactly -->
+  <g fill="none" stroke="#c5a059" stroke-width="24" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Base -->
+    <line x1="150" y1="400" x2="362" y2="400" />
+    <!-- Pillar -->
+    <line x1="256" y1="400" x2="256" y2="120" />
+    <!-- Beam (Crossbar) -->
+    <line x1="120" y1="120" x2="392" y2="120" />
+    
+    <!-- Left Pan (Strings + Pan) -->
+    <path d="M120 120 L80 250 L160 250 Z" /> <!-- String structure -->
+    <path fill="#c5a059" stroke="none" d="M70 250 L170 250 L155 285 L85 285 Z" /> <!-- Pan body -->
+    
+    <!-- Right Pan (Strings + Pan) -->
+    <path d="M392 120 L352 250 L432 250 Z" /> <!-- String structure -->
+    <path fill="#c5a059" stroke="none" d="M342 250 L442 250 L427 285 L357 285 Z" /> <!-- Pan body -->
+  </g>
 </svg>
