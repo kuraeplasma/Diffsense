@@ -8,7 +8,6 @@ document.addEventListener('DOMContentLoaded', () => {
         menuToggle.addEventListener('click', () => {
             menuToggle.classList.toggle('active');
             nav.classList.toggle('active');
-            document.body.classList.toggle('no-scroll');
         });
 
         // Close menu when a link is clicked
@@ -17,7 +16,6 @@ document.addEventListener('DOMContentLoaded', () => {
             link.addEventListener('click', () => {
                 menuToggle.classList.remove('active');
                 nav.classList.remove('active');
-                document.body.classList.remove('no-scroll');
             });
         });
     }
