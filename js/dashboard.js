@@ -151,7 +151,7 @@ const Views = {
             <div class="flex justify-between items-center mb-md">
                 <h2 class="page-title" style="margin-bottom:0;">契約・規約管理</h2>
                 <div class="flex gap-sm">
-                   ${window.app.can('operate_contract') ? `<button class="btn-dashboard" onclick="window.app.exportCSV()"><i class="fa-solid fa-download"></i> CSV出力</button>` : ''}
+                   ${(window.app.subscription?.plan === 'pro') ? `<button class="btn-dashboard" onclick="window.app.exportCSV()"><i class="fa-solid fa-download"></i> CSV出力</button>` : ''}
                 </div>
             </div>
 
@@ -298,6 +298,7 @@ const Views = {
                         <h2 style="font-size:18px; font-weight:700; color:var(--text-main); margin:0;">${diffData.title}</h2>
                         <div class="flex gap-sm">
                             <span class="badge ${contract.risk_level === 'High' ? 'badge-danger' : 'badge-warning'}">${contract.risk_level === 'High' ? 'High' : (contract.risk_level === 'Medium' ? 'Medium' : 'Low')}</span>
+                            ${(window.app.subscription?.plan === 'pro') ? `<button class="btn-dashboard btn-sm" onclick="window.app.exportPDF(${contract.id})"><i class="fa-solid fa-file-pdf"></i> PDFで出力</button>` : ''}
                             <span class="badge ${contract.status === '確認済' ? 'badge-neutral' : 'badge-warning'}">${contract.status}</span>
                         </div>
                         <div style="font-size:12px; color:#666; margin-top:4px;">
@@ -1959,24 +1960,139 @@ class DashboardApp {
 
 
     exportCSV() {
-        const contracts = dbService.getContracts();
-        let csvContent = "data:text/csv;charset=utf-8,ID,契約名,種別,最終更新,リスク,状態,担当者\n";
-        contracts.forEach(c => {
-            csvContent += `${c.id},${c.name},${c.type},${c.last_updated_at},${c.risk_level},${c.status},${c.assignee_name} \n`;
+        if (this.subscription?.plan !== 'pro') return;
+
+        // Get filters from current state
+        const filters = this.filters || {};
+        const contracts = dbService.getContracts().filter(c => {
+            if (filters.query) {
+                const q = filters.query.toLowerCase();
+                const match = c.name.toLowerCase().includes(q) ||
+                    c.type.toLowerCase().includes(q) ||
+                    c.assignee_name.toLowerCase().includes(q);
+                if (!match) return false;
+            }
+            if (filters.risk && filters.risk !== 'all') {
+                if (c.risk_level !== filters.risk) return false;
+            }
+            if (filters.status && filters.status !== 'all') {
+                if (c.status !== filters.status) return false;
+            }
+            if (filters.type && filters.type !== 'all') {
+                if (c.type !== filters.type) return false;
+            }
+            return true;
         });
-        const encodedUri = encodeURI(csvContent);
+
+        // CSV Generation with Escaping
+        const headers = ["契約名", "ステータス", "リスクレベル", "最終更新日"];
+        const rows = contracts.map(c => [
+            c.name,
+            c.status,
+            c.risk_level || '-',
+            c.last_updated_at
+        ]);
+
+        const escapeCSV = (str) => {
+            if (str === null || str === undefined) return '';
+            const s = String(str);
+            if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+                return `"${s.replace(/"/g, '""')}"`;
+            }
+            return s;
+        };
+
+        let csvContent = "\uFEFF"; // UTF-8 BOM for Excel
+        csvContent += headers.map(escapeCSV).join(",") + "\n";
+        csvContent += rows.map(row => row.map(escapeCSV).join(",")).join("\n");
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", `diffsense_contracts_${new Date().toISOString().split('T')[0]}.csv`);
+        link.setAttribute("href", url);
+        link.setAttribute("download", `契約一覧_${new Date().toISOString().split('T')[0]}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    }
+
+    async exportPDF(contractId) {
+        if (this.subscription?.plan !== 'pro') return;
+
+        const contract = dbService.getContractById(contractId);
+        if (!contract) return;
+
+        this.showToast('PDFを生成しています...', 'info');
+
+        try {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            // Standard Fonts and Styles
+            const primaryColor = [193, 155, 74]; // Gold
+            const textColor = [51, 51, 51];
+
+            // Title
+            doc.setFontSize(20);
+            doc.setTextColor(...primaryColor);
+            doc.text('DIFFsense - AI解析レポート', 20, 20);
+
+            // Meta Info
+            doc.setFontSize(10);
+            doc.setTextColor(100, 100, 100);
+            doc.text(`出力日時: ${new Date().toLocaleString('ja-JP')}`, 20, 30);
+            doc.text(`対象ファイル/URL: ${contract.original_filename || contract.name}`, 20, 35);
+
+            let y = 50;
+
+            const addSection = (title, content) => {
+                if (y > 250) {
+                    doc.addPage();
+                    y = 20;
+                }
+                doc.setFontSize(14);
+                doc.setTextColor(...primaryColor);
+                doc.text(title, 20, y);
+                y += 8;
+                doc.setFontSize(10);
+                doc.setTextColor(...textColor);
+
+                // Content with wrapping
+                const lines = doc.splitTextToSize(content || 'データなし', 170);
+                doc.text(lines, 20, y);
+                y += (lines.length * 5) + 15;
+            };
+
+            // Summary
+            addSection('【解析要約】', contract.ai_summary);
+
+            // Risk Analysis
+            const riskLabel = `リスクレベル: ${contract.risk_level || '不明'}`;
+            addSection('【AIリスク判定】', `${riskLabel}\n\n判定理由:\n${contract.ai_risk_reason}`);
+
+            // Changes/Diff (Simplified for PDF)
+            if (contract.ai_changes && contract.ai_changes.length > 0) {
+                let changesText = contract.ai_changes.map(c =>
+                    `■ ${c.section} (${c.type === 'modification' ? '変更' : '削除'})\n原文: ${c.old}\n修正後: ${c.new}\n法的影響: ${c.impact || '-'}\n懸念点: ${c.concern || '-'}`
+                ).join('\n\n');
+                addSection('【主要な変更箇所】', changesText);
+            }
+
+            // Save PDF
+            doc.save(`DIFFsense_Report_${contract.name}_${new Date().toISOString().split('T')[0]}.pdf`);
+            this.showToast('PDFの書き出しが完了しました', 'success');
+
+        } catch (error) {
+            console.error('PDF Export Error:', error);
+            this.showToast('PDFの生成中にエラーが発生しました', 'error');
+        }
     }
 
     showToast(message, type = 'info') {
-        // 中央モーダル通知を表示
         const toast = document.createElement('div');
         toast.className = 'toast-modal';
+        // 中央モーダル通知を表示
         toast.innerHTML = `
             <div class="toast-modal-content">
                 <i class="fa-solid ${type === 'success' ? 'fa-circle-check' : type === 'error' ? 'fa-circle-xmark' : 'fa-info-circle'}" style="font-size:48px; color:${type === 'success' ? '#4CAF50' : type === 'error' ? '#D73A49' : '#2196F3'}; margin-bottom:16px;"></i>
