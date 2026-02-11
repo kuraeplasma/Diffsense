@@ -36,16 +36,15 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
 
         // Trial Expiration Check - Only if trial was ever started
         if (userProfile.trialStartedAt && isInTrial === false) {
-            const trialStart = new Date(userProfile.trialStartedAt);
-            const now = new Date();
-            if (now - trialStart > 7 * 24 * 60 * 60 * 1000) {
-                // For this prototype, if trial is over and no "subscription" (simulated), block access.
-                // In production, we'd check userProfile.plan and if they've paid.
-                logger.warn(`Trial expired for user ${uid}`);
+            // Check if user has registered a payment method for auto-transition
+            if (!userProfile.hasPaymentMethod) {
+                logger.warn(`Trial expired and no payment method for user ${uid}`);
                 return res.status(403).json({
                     success: false,
-                    error: "無料トライアル期間（7日間）が終了しました。継続して利用するにはプランの契約が必要です。"
+                    error: "無料トライアル期間（7日間）が終了しました。継続して利用するには、プランの契約とクレジットカードの登録が必要です。"
                 });
+            } else {
+                logger.info(`Trial expired but user ${uid} has payment method. Auto-continuing to paid plan.`);
             }
         }
 

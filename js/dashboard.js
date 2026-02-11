@@ -1018,6 +1018,11 @@ class DashboardApp {
                 <div class="plan-usage-bar">
                     <div class="plan-usage-progress" style="width: ${usagePercent}%"></div>
                 </div>
+                ${sub.isInTrial ? `
+                <div style="margin-top: 12px; font-size: 0.75rem; color: #a17e1a; border-top: 1px solid rgba(255, 255, 255, 0.05); padding-top: 8px;">
+                    <i class="fa-solid fa-circle-info"></i> トライアル終了後は ${planName} プランへ自動移行します。
+                </div>
+                ` : ''}
             </div>
         `;
 

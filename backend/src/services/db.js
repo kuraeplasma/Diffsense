@@ -152,6 +152,7 @@ class DBService {
                 uid: uid,
                 plan: 'starter',
                 trialStartedAt: new Date().toISOString(),
+                hasPaymentMethod: false, // Default to false
                 usageCount: 0,
                 lastResetDate: new Date().toISOString()
             };
