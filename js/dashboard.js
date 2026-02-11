@@ -298,7 +298,6 @@ const Views = {
                         <h2 style="font-size:18px; font-weight:700; color:var(--text-main); margin:0;">${diffData.title}</h2>
                         <div class="flex gap-sm">
                             <span class="badge ${contract.risk_level === 'High' ? 'badge-danger' : 'badge-warning'}">${contract.risk_level === 'High' ? 'High' : (contract.risk_level === 'Medium' ? 'Medium' : 'Low')}</span>
-                            ${(window.app.subscription?.plan === 'pro') ? `<button class="btn-dashboard btn-sm" onclick="window.app.exportPDF(${contract.id})"><i class="fa-solid fa-file-pdf"></i> PDFで出力</button>` : ''}
                             <span class="badge ${contract.status === '確認済' ? 'badge-neutral' : 'badge-warning'}">${contract.status}</span>
                         </div>
                         <div style="font-size:12px; color:#666; margin-top:4px;">
@@ -307,6 +306,7 @@ const Views = {
                         </div>
                     </div>
                     <div class="flex gap-sm">
+                        ${(window.app.subscription?.plan === 'pro') ? `<button class="btn-dashboard" onclick="window.app.exportPDF(${contract.id})"><i class="fa-solid fa-file-pdf"></i> PDF出力</button>` : ''}
                         ${window.app.can('operate_contract') ? `<button class="btn-dashboard" onclick="window.app.showHistoryModal(${id})"><i class="fa-solid fa-note-sticky"></i> メモ</button>` : ''}
                         <button class="btn-dashboard" style="background:#fff;"><i class="fa-solid fa-share-nodes"></i> 共有</button>
                         ${window.app.can('operate_contract')
@@ -2023,65 +2023,109 @@ class DashboardApp {
         const contract = dbService.getContractById(contractId);
         if (!contract) return;
 
-        this.showToast('PDFを生成しています...', 'info');
+        this.showToast('PDFレポートを生成中...', 'info');
 
         try {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-
-            // Standard Fonts and Styles
-            const primaryColor = [193, 155, 74]; // Gold
-            const textColor = [51, 51, 51];
-
-            // Title
-            doc.setFontSize(20);
-            doc.setTextColor(...primaryColor);
-            doc.text('DIFFsense - AI解析レポート', 20, 20);
-
-            // Meta Info
-            doc.setFontSize(10);
-            doc.setTextColor(100, 100, 100);
-            doc.text(`出力日時: ${new Date().toLocaleString('ja-JP')}`, 20, 30);
-            doc.text(`対象ファイル/URL: ${contract.original_filename || contract.name}`, 20, 35);
-
-            let y = 50;
-
-            const addSection = (title, content) => {
-                if (y > 250) {
-                    doc.addPage();
-                    y = 20;
-                }
-                doc.setFontSize(14);
-                doc.setTextColor(...primaryColor);
-                doc.text(title, 20, y);
-                y += 8;
-                doc.setFontSize(10);
-                doc.setTextColor(...textColor);
-
-                // Content with wrapping
-                const lines = doc.splitTextToSize(content || 'データなし', 170);
-                doc.text(lines, 20, y);
-                y += (lines.length * 5) + 15;
-            };
-
-            // Summary
-            addSection('【解析要約】', contract.ai_summary);
-
-            // Risk Analysis
-            const riskLabel = `リスクレベル: ${contract.risk_level || '不明'}`;
-            addSection('【AIリスク判定】', `${riskLabel}\n\n判定理由:\n${contract.ai_risk_reason}`);
-
-            // Changes/Diff (Simplified for PDF)
-            if (contract.ai_changes && contract.ai_changes.length > 0) {
-                let changesText = contract.ai_changes.map(c =>
-                    `■ ${c.section} (${c.type === 'modification' ? '変更' : '削除'})\n原文: ${c.old}\n修正後: ${c.new}\n法的影響: ${c.impact || '-'}\n懸念点: ${c.concern || '-'}`
-                ).join('\n\n');
-                addSection('【主要な変更箇所】', changesText);
+            // 1. Create a structured report in a hidden container
+            const reportId = 'pdf-export-container';
+            let container = document.getElementById(reportId);
+            if (!container) {
+                container = document.createElement('div');
+                container.id = reportId;
+                // Off-screen but visible to the renderer
+                container.style.position = 'absolute';
+                container.style.left = '-9999px';
+                container.style.width = '800px';
+                container.style.background = 'white';
+                container.style.color = '#333';
+                container.style.fontFamily = "'Noto Sans JP', sans-serif";
+                document.body.appendChild(container);
             }
 
-            // Save PDF
-            doc.save(`DIFFsense_Report_${contract.name}_${new Date().toISOString().split('T')[0]}.pdf`);
-            this.showToast('PDFの書き出しが完了しました', 'success');
+            // 2. Build Report Content (Japanese text included)
+            const riskColor = contract.risk_level === 'High' ? '#D73A49' : (contract.risk_level === 'Medium' ? '#f1c40f' : '#2ecc71');
+            const analysisDate = new Date().toLocaleString('ja-JP');
+
+            container.innerHTML = `
+                <div style="padding: 40px; line-height: 1.6;">
+                    <div style="border-bottom: 2px solid #c19b4a; padding-bottom: 10px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: flex-end;">
+                        <h1 style="margin: 0; color: #c19b4a; font-size: 24px;">DIFFsense AI解析レポート</h1>
+                        <span style="font-size: 12px; color: #888;">出力日: ${analysisDate}</span>
+                    </div>
+
+                    <div style="margin-bottom: 25px; padding: 15px; background: #f9f9f9; border-radius: 4px;">
+                        <div style="margin-bottom: 8px;"><strong>対象ドキュメント:</strong> ${contract.original_filename || contract.name}</div>
+                        ${contract.source_url ? `<div style="margin-bottom: 8px;"><strong>対象URL:</strong> ${contract.source_url}</div>` : ''}
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <strong>AIリスク判定:</strong> 
+                            <span style="padding: 2px 10px; border-radius: 4px; background: ${riskColor}; color: white; font-weight: bold;">${contract.risk_level || 'Low'}</span>
+                        </div>
+                    </div>
+
+                    <h2 style="font-size: 18px; border-left: 4px solid #c19b4a; padding-left: 10px; margin: 30px 0 15px;">【解析要約】</h2>
+                    <div style="white-space: pre-wrap; margin-bottom: 30px;">${contract.ai_summary || '解析データなし'}</div>
+
+                    <h2 style="font-size: 18px; border-left: 4px solid #c19b4a; padding-left: 10px; margin: 30px 0 15px;">【AIリスク判定結果・理由】</h2>
+                    <div style="white-space: pre-wrap; margin-bottom: 30px;">${contract.ai_risk_reason || '判定データなし'}</div>
+
+                    <h2 style="font-size: 18px; border-left: 4px solid #c19b4a; padding-left: 10px; margin: 30px 0 15px;">【主要な差分箇所】</h2>
+                    <div style="margin-bottom: 30px;">
+                        ${(contract.ai_changes || []).map(c => `
+                            <div style="margin-bottom: 20px; border: 1px solid #eee; border-radius: 4px;">
+                                <div style="background: #f5f5f5; padding: 8px 12px; font-weight: bold; border-bottom: 1px solid #eee;">${c.section}</div>
+                                <div style="padding: 12px;">
+                                    <div style="background: #fff5f5; padding: 5px; margin-bottom: 5px;"><span style="color: #D73A49;">原文:</span> ${c.old}</div>
+                                    <div style="background: #f0fff4; padding: 5px;"><span style="color: #2ecc71;">修正後:</span> ${c.new}</div>
+                                    <div style="margin-top: 10px; font-size: 12px; color: #666;">
+                                        <strong>法的影響:</strong> ${c.impact || '-'}<br>
+                                        <strong>懸念点:</strong> ${c.concern || '-'}
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('') || '<p style="color:#999;">差分データはありません</p>'}
+                    </div>
+
+                    <h2 style="font-size: 18px; border-left: 4px solid #c19b4a; padding-left: 10px; margin: 30px 0 15px;">【原本（全文）】</h2>
+                    <div style="white-space: pre-wrap; background: #fafafa; padding: 20px; font-size: 12px; border: 1px solid #eee;">${contract.original_content || '原本データはありません'}</div>
+                    
+                    <div style="margin-top: 50px; text-align: center; border-top: 1px solid #eee; padding-top: 10px; font-size: 10px; color: #aaa;">
+                        Generated by DIFFsense - Professional Contract Analysis Service
+                    </div>
+                </div>
+            `;
+
+            // 3. Render to Canvas then PDF
+            const canvas = await html2canvas(container, {
+                scale: 2, // High clarity
+                useCORS: true,
+                logging: false,
+                backgroundColor: '#ffffff'
+            });
+
+            const imgData = canvas.toDataURL('image/png');
+            const { jsPDF } = window.jspdf;
+
+            // Standard A4 dimensions
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const imgWidth = 210; // A4 width
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+            // If the content is longer than one A4 page
+            let heightLeft = imgHeight;
+            let position = 0;
+
+            pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+            heightLeft -= 297;
+
+            while (heightLeft >= 0) {
+                position = heightLeft - imgHeight;
+                pdf.addPage();
+                pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                heightLeft -= 297;
+            }
+
+            pdf.save(`DIFFsense_Reprot_${contract.name}_${new Date().toISOString().split('T')[0]}.pdf`);
+            this.showToast('PDFを出力しました', 'success');
 
         } catch (error) {
             console.error('PDF Export Error:', error);
