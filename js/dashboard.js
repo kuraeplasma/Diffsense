@@ -1091,7 +1091,10 @@ class DashboardApp {
 
         // RBAC: Protect team view - Allow if Business+ OR Trial
         if (viewId === 'team' && this.subscription?.plan === 'starter' && !this.subscription?.isInTrial) {
-            alert('「チーム管理」はBusinessプラン以上の機能です。\nアップグレードするとチームメンバーの招待や管理が可能になります。');
+            const upgradeModal = document.getElementById('upgrade-modal');
+            if (upgradeModal) {
+                upgradeModal.classList.add('active');
+            }
             return;
         }
 
