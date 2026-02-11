@@ -2210,21 +2210,29 @@ ul {
     }
 
     .nav {
-        display: none;
+        display: flex;
         position: fixed;
         top: 0;
         left: 0;
         right: 0;
-        bottom: 0;
+        height: 100vh;
         background: #1a1512;
         padding: 5rem 2rem 2rem;
         flex-direction: column;
         z-index: 999;
         overflow-y: auto;
+
+        /* Slide from top animation */
+        transform: translateY(-100%);
+        transition: transform 0.5s cubic-bezier(0.165, 0.84, 0.44, 1), opacity 0.4s ease;
+        opacity: 0;
+        visibility: hidden;
     }
 
     .nav.active {
-        display: flex;
+        transform: translateY(0);
+        opacity: 1;
+        visibility: visible;
     }
 
     .nav a {
