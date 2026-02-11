@@ -1014,16 +1014,17 @@ ul {
     }
 
     .hero-subtitle {
-        margin: 0 auto 1.5rem;
-        /* Reduced top margin */
+        margin: 0 auto 2.5rem;
+        /* Increased bottom margin to prevent overlap with visual */
         font-size: 0.95rem;
         order: 2;
         /* Move before visual */
         position: relative;
         z-index: 5;
         width: 100%;
-        padding: 0 1rem;
+        padding: 0 1.5rem;
         text-align: center;
+        line-height: 1.6;
     }
 
     .hero-visual {
