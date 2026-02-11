@@ -1037,9 +1037,10 @@ ul {
         perspective: none;
         display: flex !important;
         justify-content: center;
-        padding: 0;
-        overflow: hidden;
-        /* Clip the 1100px box edges */
+        padding: 0 1rem;
+        overflow: visible;
+        /* Allow cards and shadows to breathe */
+        margin-bottom: 2rem;
     }
 
     .hero-btns {
@@ -1620,13 +1621,14 @@ ul {
 
 /* AI Risk Card */
 .lp-ai-card {
-    background: linear-gradient(135deg, #fffbf0 0%, #fff 100%);
-    border: 2px solid rgba(191, 155, 48, 0.3);
-    border-left: 6px solid #bf9b30;
+    background: linear-gradient(135deg, #fffcf5 0%, #fff 100%);
+    border: 1px solid #e3cfa0;
+    /* Balanced full border */
     border-radius: 16px;
-    padding: 20px;
+    padding: 22px;
     margin-bottom: 24px;
-    box-shadow: 0 8px 30px rgba(191, 155, 48, 0.2);
+    box-shadow: 0 12px 35px rgba(197, 160, 89, 0.15);
+    position: relative;
 }
 
 .lp-ai-header {
@@ -1656,9 +1658,9 @@ ul {
 .lp-unified-comparison {
     background: white;
     border-radius: 16px;
-    padding: 20px;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
-    border: 2px solid #e0e0e0;
+    padding: 22px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
+    border: 1px solid #eee;
 }
 
 /* Pulse animation for AI icon */
