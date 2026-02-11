@@ -1642,9 +1642,13 @@ class DashboardApp {
         const limit = dbService.PLAN_LIMITS[this.userPlan] || 1;
 
         if (users.length >= limit) {
+            const upgradeMessage = (this.userPlan === 'pro')
+                ? 'さらにメンバーを追加するには、法人向け個別エンタープライズプランのご相談を承ります。サポートまでお問い合わせください。'
+                : 'さらにメンバーを追加するにはプランをアップグレードしてください。';
+
             this.showAlertModal(
                 '人数制限',
-                `現在のプラン（${this.userPlan}）では、最大${limit}名までしか登録できません。<br>さらにメンバーを追加するにはプランをアップグレードしてください。`,
+                `現在のプラン（${this.userPlan}）では、最大${limit}名までしか登録できません。<br>${upgradeMessage}`,
                 'warning'
             );
             return;
@@ -1709,9 +1713,13 @@ class DashboardApp {
             if (result.error === 'already_exists') {
                 this.showAlertModal('登録エラー', 'このメールアドレスは既に登録されています。<br>別のメールアドレスを使用するか、既存のメンバーを編集してください。');
             } else if (result.error === 'limit_reached') {
+                const upgradeMsg = (this.userPlan === 'pro')
+                    ? 'さらにメンバーを追加するには、法人向け個別エンタープライズプランのご相談をお受けします。'
+                    : 'さらにメンバーを増やすには、上位プランへのアップグレードをご検討ください。';
+
                 this.showAlertModal(
                     '登録エラー',
-                    `人数制限に達しました。現在のプラン（${this.userPlan}）の制限は${result.limit}名です。`,
+                    `人数制限（${result.limit}名）に達しました。${upgradeMsg}`,
                     'error'
                 );
             } else {
