@@ -1071,21 +1071,23 @@ class DashboardApp {
     bindEvents() {
         const toggle = document.getElementById('sidebar-toggle');
         const sidebar = document.getElementById('app-sidebar');
-        const main = document.getElementById('app-main');
+        const overlay = document.getElementById('sidebar-overlay');
+
+        const closeSidebar = () => {
+            sidebar?.classList.remove('active');
+            overlay?.classList.remove('active');
+        };
 
         if (toggle && sidebar) {
-            toggle.addEventListener('click', () => {
+            toggle.addEventListener('click', (e) => {
+                e.stopPropagation();
                 sidebar.classList.toggle('active');
+                overlay?.classList.toggle('active');
             });
-            if (main) {
-                main.addEventListener('click', (e) => {
-                    if (window.innerWidth <= 768 && sidebar.classList.contains('active')) {
-                        if (!toggle.contains(e.target)) {
-                            sidebar.classList.remove('active');
-                        }
-                    }
-                });
-            }
+        }
+
+        if (overlay) {
+            overlay.addEventListener('click', closeSidebar);
         }
 
         // URL Modal Submit Binding
@@ -1106,6 +1108,10 @@ class DashboardApp {
 
     navigate(viewId, params = null) {
         console.log(`Navigating to ${viewId}`, params);
+
+        // Auto-close sidebar on mobile
+        document.getElementById('app-sidebar')?.classList.remove('active');
+        document.getElementById('sidebar-overlay')?.classList.remove('active');
 
         // RBAC: Protect team view - Allow if Business+ OR Trial
         if (viewId === 'team' && this.subscription?.plan === 'starter' && !this.subscription?.isInTrial) {

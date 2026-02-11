@@ -1934,208 +1934,84 @@ ul {
 }
 
 @media (max-width: 991px) {
+    .container {
+        padding: 0 1.5rem;
+    }
+
+    .hero-title {
+        font-size: 2.8rem;
+    }
+
     .security-grid {
-        display: grid;
-        grid-template-columns: 1fr 1.2fr;
-        gap: 4rem;
-        align-items: center;
-        margin-top: 3rem;
+        grid-template-columns: 1fr;
+        gap: 3rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .hero-title {
+        font-size: 2.2rem;
+        line-height: 1.3;
     }
 
-    .security-item {
-        display: flex;
-        gap: 1.5rem;
-        margin-bottom: 2rem;
+    .hero .container {
+        padding-top: 4rem;
+        padding-bottom: 4rem;
     }
 
-    .security-item i {
-        font-size: 1.5rem;
-        color: var(--color-primary);
-        background: rgba(161, 126, 26, 0.05);
-        width: 50px;
-        height: 50px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 12px;
-        flex-shrink: 0;
+    .section-title h2 {
+        font-size: 2rem;
     }
 
-    .security-item h4 {
-        font-size: 1.1rem;
-        margin-bottom: 0.5rem;
-        color: #333;
-    }
-
-    .security-item p {
-        font-size: 0.9rem;
-        color: #666;
-        line-height: 1.6;
-    }
-
-    .security-diagram-container {
-        background: #fff;
-        padding: 2.5rem;
-        border-radius: var(--radius-md);
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
-        border: 1px solid #eee;
-    }
-
-    .diagram-title {
-        margin-bottom: 2rem;
-        font-size: 1.2rem;
-        color: #333;
-        font-weight: 700;
-    }
-
-    .security-diagram {
-        display: flex;
-        align-items: stretch;
-        gap: 1.5rem;
-    }
-
-    .diagram-side {
-        flex: 1;
-        display: flex;
+    .nav {
+        display: none;
+        position: absolute;
+        top: 70px;
+        left: 0;
+        right: 0;
+        background: #1a1512;
+        padding: 2rem;
         flex-direction: column;
-        align-items: center;
-    }
-
-    .diagram-node {
-        padding: 0.8rem 1.2rem;
-        background: #f8f9fa;
-        border: 1px solid #dee2e6;
-        border-radius: 4px;
-        font-size: 0.9rem;
-        font-weight: 600;
-    }
-
-    .diagram-arrow {
-        padding: 0.5rem 0;
-        color: #adb5bd;
-    }
-
-    .diagram-box {
-        width: 100%;
-        flex: 1;
-        padding: 1.5rem;
-        border-radius: 8px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         text-align: center;
     }
 
-    .box-danger {
-        background: #fff5f5;
-        border: 1px solid #ffd8d8;
+    .nav.active {
+        display: flex;
     }
 
-    .box-safe {
-        background: #f0f7ff;
-        border: 1px solid #d0e7ff;
+    .nav a {
+        margin: 1rem 0;
+        font-size: 1.1rem;
+    }
+
+    .auth-buttons {
+        margin: 1.5rem 0 0;
+        flex-direction: column;
+        width: 100%;
+        gap: 1rem;
+    }
+
+    .auth-buttons a {
+        margin: 0;
+        width: 100%;
+    }
+
+    .menu-toggle {
+        display: block;
+    }
+}
+
+@media (max-width: 576px) {
+    .hero-title {
+        font-size: 1.8rem;
+    }
+
+    .security-diagram {
+        flex-direction: column;
     }
 
     .diagram-vs {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: 800;
-        color: #dee2e6;
-        padding-top: 80px;
-    }
-
-    .diagram-box h5 {
-        font-size: 1rem;
-        margin-bottom: 1rem;
-    }
-
-    .box-danger h5 {
-        color: #e03131;
-    }
-
-    .box-safe h5 {
-        color: #1971c2;
-    }
-
-    .diagram-box .box-icon {
-        font-size: 1.5rem;
-        margin-bottom: 0.8rem;
-    }
-
-    .box-danger .box-icon {
-        color: #fa5252;
-    }
-
-    .box-safe .box-icon {
-        color: #228be6;
-    }
-
-    .diagram-box ul {
-        list-style: none;
-        text-align: left;
-        padding: 0;
-    }
-
-    .diagram-box ul li {
-        font-size: 0.8rem;
-        margin-bottom: 0.5rem;
-        color: #495057;
-        padding-left: 1.2rem;
-        position: relative;
-    }
-
-    .box-danger ul li::before {
-        content: '×';
-        position: absolute;
-        left: 0;
-        color: #fa5252;
-        font-weight: bold;
-    }
-
-    .safe-flow {
-        text-align: left;
-    }
-
-    .flow-step {
-        font-size: 0.8rem;
-        background: #fff;
-        padding: 6px 10px;
-        border-radius: 4px;
-        margin-bottom: 6px;
-        border: 1px solid #e7f5ff;
-        color: #1864ab;
-        font-weight: 600;
-    }
-
-    .flow-note {
-        font-size: 0.7rem;
-        color: #1971c2;
-        margin-top: 10px;
-        opacity: 0.8;
-    }
-
-    .security-footer {
-        margin-top: 3rem;
-        padding: 1.5rem;
-        background: rgba(161, 126, 26, 0.03);
-        border-radius: 12px;
-        color: var(--color-primary);
-        font-weight: 600;
-        font-size: 0.95rem;
-    }
-
-    @media (max-width: 991px) {
-        .security-grid {
-            grid-template-columns: 1fr;
-            gap: 3rem;
-        }
-    }
-
-    @media (max-width: 576px) {
-        .security-diagram {
-            flex-direction: column;
-        }
-
-        .diagram-vs {
-            padding: 1rem 0;
-        }
+        padding: 1rem 0;
     }
 }

@@ -1249,7 +1249,77 @@ ul {
     gap: 8px;
 }
 
-/* Responsive Overrides */
+/* --- Responsive Overrides --- */
+
+/* Mobile Drawer Logic */
+@media (max-width: 768px) {
+    #app-sidebar {
+        position: fixed;
+        left: -240px;
+        top: 0;
+        bottom: 0;
+        z-index: 11000;
+        transition: left 0.3s ease;
+        box-shadow: 10px 0 30px rgba(0, 0, 0, 0.2);
+    }
+
+    #app-sidebar.active {
+        left: 0;
+    }
+
+    .sidebar-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 10900;
+        backdrop-filter: blur(2px);
+    }
+
+    .sidebar-overlay.active {
+        display: block;
+    }
+
+    #app-main {
+        width: 100%;
+    }
+
+    #app-header {
+        padding: 0 16px;
+    }
+
+    .breadcrumb {
+        font-size: 14px;
+    }
+
+    /* Table Responsiveness */
+    .table-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        border-radius: 6px;
+        border: 1px solid var(--border-subtle);
+    }
+
+    .data-table {
+        min-width: 600px;
+        /* Ensure columns don't squash too much */
+    }
+
+    /* Header Actions for Mobile */
+    .header-actions .btn-dashboard {
+        padding: 8px 12px;
+        font-size: 13px;
+    }
+
+    .header-actions .btn-dashboard i {
+        margin-right: 4px;
+    }
+}
+
+/* Detail Split View Responsive */
 @media (max-width: 1024px) {
     .detail-split-body {
         flex-direction: column;
@@ -1265,6 +1335,11 @@ ul {
         flex: none;
         height: auto;
         margin-bottom: 20px;
+        width: 100% !important;
+    }
+
+    .document-paper {
+        padding: 30px 15px;
     }
 }
 
