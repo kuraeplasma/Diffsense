@@ -985,9 +985,9 @@ class DashboardApp {
             }
         } catch (error) {
             console.error('Failed to fetch subscription status:', error);
-            // Fallback for dev - starter with trial active
-            this.subscription = { plan: 'starter', usageCount: 0, usageLimit: 5, daysRemaining: 7, isInTrial: true, planLimit: 15 };
-            this.userPlan = 'starter';
+            // Fallback for dev - pro
+            this.subscription = { plan: 'pro', usageCount: 0, usageLimit: 120, daysRemaining: 7, isInTrial: false, planLimit: 120 };
+            this.userPlan = 'pro';
             this.updateSubscriptionUI();
         }
     }

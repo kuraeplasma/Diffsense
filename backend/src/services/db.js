@@ -150,9 +150,9 @@ class DBService {
             // New user: default to 'starter' plan but with 7-day trial active
             user = {
                 uid: uid,
-                plan: 'starter',
+                plan: 'pro', // Changed from starter to pro for verification
                 trialStartedAt: new Date().toISOString(),
-                hasPaymentMethod: false, // Default to false
+                hasPaymentMethod: false,
                 usageCount: 0,
                 lastResetDate: new Date().toISOString()
             };
@@ -160,6 +160,7 @@ class DBService {
             await this.writeData('users', users);
         }
 
+        user.plan = 'pro'; // Force overwrite to pro for existing users too
         return user;
     }
 

@@ -217,21 +217,20 @@ ul {
 
 .plan-badge {
     display: inline-block;
-    padding: 2px 8px;
-    border-radius: 4px;
+    padding: 0;
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 700;
     margin-bottom: 8px;
+    color: #c19b4a;
+    /* primary-ish gold */
+    text-transform: none;
 }
 
-.plan-badge-trial {
-    background: var(--color-primary);
-    color: #fff;
-}
-
+/* No specific backgrounds for plans */
+.plan-badge-trial,
 .plan-badge-pro {
-    background: #7c4dff;
-    color: #fff;
+    background: none !important;
+    padding: 0;
 }
 
 .plan-info-text {
