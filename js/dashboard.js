@@ -1007,6 +1007,17 @@ class DashboardApp {
         const usagePercent = Math.min(100, (sub.usageCount / sub.usageLimit) * 100);
         const planName = planNames[sub.plan] || sub.plan;
 
+        let upgradeAdvice = '';
+        if (sub.usageCount >= sub.usageLimit) {
+            if (sub.plan === 'starter') {
+                upgradeAdvice = '<div class="upgrade-advice">月間上限に達しました。翌月まで待つか、Business以上のプランにすると回数が増えます。</div>';
+            } else if (sub.plan === 'business') {
+                upgradeAdvice = '<div class="upgrade-advice">月間上限に達しました。翌月まで待つか、Proプランにアップグレードすると回数が増えます。</div>';
+            } else if (sub.plan === 'pro') {
+                upgradeAdvice = '<div class="upgrade-advice">月間上限に達しました。翌月までお待ちいただくか、追加枠についてお問い合わせください。</div>';
+            }
+        }
+
         let statusHtml = `
             <div class="plan-status-card">
                 <div class="plan-badge plan-badge-${sub.plan}">${planName}${sub.isInTrial ? '（トライアル）' : ''}</div>
@@ -1015,9 +1026,7 @@ class DashboardApp {
                     AI解析: <strong>${sub.usageCount}</strong> / ${sub.usageLimit}回
                     ${sub.isInTrial ? `<br><small style="font-size: 0.75rem; opacity: 0.7;">通常枠: ${sub.planLimit}回</small>` : ''}
                 </div>
-                <div class="plan-usage-bar">
-                    <div class="plan-usage-progress" style="width: ${usagePercent}%"></div>
-                </div>
+                ${upgradeAdvice}
                 ${sub.isInTrial ? `
                 <div style="margin-top: 12px; font-size: 0.75rem; color: #a17e1a; border-top: 1px solid rgba(255, 255, 255, 0.05); padding-top: 8px;">
                     <i class="fa-solid fa-circle-info"></i> トライアル終了後は ${planName} プランへ自動移行します。
