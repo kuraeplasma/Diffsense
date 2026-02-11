@@ -1,6 +1,8 @@
 const admin = require('firebase-admin');
 const logger = require('./utils/logger');
 
+let firebaseInitialized = false;
+
 // Initialize Firebase Admin
 if (!admin.apps.length) {
     const projectId = process.env.FIREBASE_PROJECT_ID || 'diffsense-9a718';
@@ -16,31 +18,32 @@ if (!admin.apps.length) {
                 }),
                 storageBucket: bucketName
             });
+            firebaseInitialized = true;
             logger.info('Firebase Admin initialized with service account');
         } catch (error) {
-            logger.error('Failed to initialize Firebase Admin:', error);
+            logger.error('Failed to initialize Firebase Admin:', error.message);
+            logger.warn('Server will start without Firebase. Auth bypass required for API access.');
         }
     } else {
-        // Fallback for Cloud Functions environment
-        try {
-            admin.initializeApp({
-                projectId: projectId,
-                storageBucket: bucketName
-            });
-            logger.info(`Firebase Admin initialized with default credentials for ${projectId}`);
-        } catch (error) {
-            logger.warn('Firebase Admin basic initialization failed, trying default.');
-            try {
-                admin.initializeApp();
-            } catch (e) {
-                logger.error('Total Firebase initialization failure');
-            }
-        }
+        logger.warn('Firebase credentials not configured. Set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY in .env');
+        logger.warn('Server will start without Firebase. Set AUTH_BYPASS=true in .env for local development.');
+    }
+} else {
+    firebaseInitialized = true;
+}
+
+// Create safe proxies that don't crash if Firebase isn't initialized
+let db = null;
+let bucket = null;
+
+if (firebaseInitialized) {
+    try {
+        db = admin.firestore();
+        const storage = admin.storage();
+        bucket = storage.bucket();
+    } catch (error) {
+        logger.error('Failed to access Firebase services:', error.message);
     }
 }
 
-const db = admin.firestore();
-const storage = admin.storage();
-const bucket = storage.bucket(); // Default bucket
-
-module.exports = { admin, db, bucket };
+module.exports = { admin, db, bucket, firebaseInitialized };

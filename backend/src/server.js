@@ -109,8 +109,6 @@ app.use((req, res) => {
 // Error handling middleware (must be last)
 app.use(errorHandler);
 
-const functions = require('firebase-functions');
-
 // Graceful shutdown
 if (require.main === module) {
     const PORT = process.env.PORT || 3001;
@@ -134,5 +132,10 @@ if (require.main === module) {
     });
 }
 
-// Export as Cloud Function
-exports.api = functions.https.onRequest(app);
+// Export as Cloud Function (only when firebase-functions is available)
+try {
+    const functions = require('firebase-functions');
+    exports.api = functions.https.onRequest(app);
+} catch (e) {
+    // firebase-functions not available in local dev
+}

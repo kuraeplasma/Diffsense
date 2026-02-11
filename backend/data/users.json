@@ -13,5 +13,13 @@
     "usageCount": 7,
     "lastResetDate": "2026-02-10T02:27:04.336Z",
     "lastUsedAt": "2026-02-11T05:12:38.980Z"
+  },
+  {
+    "uid": "dev-user-001",
+    "plan": "starter",
+    "trialStartedAt": "2026-02-11T15:34:40.195Z",
+    "hasPaymentMethod": false,
+    "usageCount": 0,
+    "lastResetDate": "2026-02-11T15:34:40.195Z"
   }
 ]
