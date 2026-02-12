@@ -381,7 +381,7 @@ const Views = {
                         </div>
                         
                         ${contract.source_type === 'URL' && (window.app.subscription?.plan === 'pro' || window.app.subscription?.isInTrial) ? `
-                        <div class="analysis-section" style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #eee;">
+                        <div style="margin-top: 24px; padding: 20px; border-top: 1px solid #eee;">
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                                 <div style="display:flex; align-items:center; gap:10px;">
                                     <i class="fa-solid fa-satellite-dish" style="color:var(--accent-gold, #c19b4a); font-size:16px;"></i>
