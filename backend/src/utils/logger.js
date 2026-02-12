@@ -1,5 +1,36 @@
 const winston = require('winston');
 
+const isCloudFunction = !!process.env.FUNCTION_TARGET || !!process.env.K_SERVICE;
+
+const transports = [
+    // Write all logs to console
+    new winston.transports.Console({
+        format: winston.format.combine(
+            winston.format.colorize(),
+            winston.format.printf(
+                info => `${info.timestamp} ${info.level}: ${info.message}`
+            )
+        )
+    })
+];
+
+// Only add file transports in non-cloud environments
+if (!isCloudFunction) {
+    transports.push(
+        new winston.transports.File({
+            filename: 'logs/error.log',
+            level: 'error',
+            maxsize: 5242880,
+            maxFiles: 5
+        }),
+        new winston.transports.File({
+            filename: 'logs/combined.log',
+            maxsize: 5242880,
+            maxFiles: 5
+        })
+    );
+}
+
 const logger = winston.createLogger({
     level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
     format: winston.format.combine(
@@ -11,30 +42,7 @@ const logger = winston.createLogger({
         winston.format.json()
     ),
     defaultMeta: { service: 'diffsense-api' },
-    transports: [
-        // Write all logs to console
-        new winston.transports.Console({
-            format: winston.format.combine(
-                winston.format.colorize(),
-                winston.format.printf(
-                    info => `${info.timestamp} ${info.level}: ${info.message}`
-                )
-            )
-        }),
-        // Write all logs with level 'error' and below to error.log
-        new winston.transports.File({
-            filename: 'logs/error.log',
-            level: 'error',
-            maxsize: 5242880, // 5MB
-            maxFiles: 5
-        }),
-        // Write all logs to combined.log
-        new winston.transports.File({
-            filename: 'logs/combined.log',
-            maxsize: 5242880, // 5MB
-            maxFiles: 5
-        })
-    ]
+    transports
 });
 
 // Create a stream object for Morgan

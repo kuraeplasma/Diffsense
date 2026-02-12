@@ -25,13 +25,15 @@ const Views = {
             const isCurrent = sub.plan === p.id;
             return `
                 <div class="pricing-card ${isCurrent ? 'business highlight-plan' : ''}" style="border: 1px solid #eee; padding: 20px; border-radius: 8px; flex: 1; background: #fff; display:flex; flex-direction:column;">
-                    ${isCurrent ? '<div class="pricing-badge" style="background:#c19b4a; color:#fff; font-size:10px; padding:2px 8px; border-radius:10px; display:inline-block; margin-bottom:10px;">現在のプラン</div>' : ''}
+                    <div style="height:22px; margin-bottom:6px;">
+                        ${isCurrent ? '<span style="background:#c19b4a; color:#fff; font-size:10px; padding:2px 8px; border-radius:10px;">現在のプラン</span>' : ''}
+                    </div>
                     <h3 style="margin-bottom:10px;">${p.name}</h3>
                     <div style="font-size: 24px; font-weight: bold; margin-bottom: 20px;">${p.price}<small style="font-size:12px; color:#666;"> / 月</small></div>
                     <ul style="list-style: none; padding: 0; margin-bottom: 20px; font-size: 0.85rem; color: #555; flex:1;">
                         ${p.features.map(f => `<li style="margin-bottom:8px;"><i class="fa-solid fa-check" style="color:#c19b4a; margin-right:8px;"></i>${f}</li>`).join('')}
                     </ul>
-                    ${!isCurrent ? '<button class="btn-dashboard full-width" style="background:#c19b4a; color:#fff; border:none;">アップグレード</button>' : ''}
+                    ${!isCurrent ? `<button class="btn-dashboard full-width" style="background:#c19b4a; color:#fff; border:none;" onclick="window.app.startPayPalSubscription('${p.id}')">アップグレード</button>` : ''}
                 </div>
             `;
         }).join('');
@@ -1020,7 +1022,8 @@ class DashboardApp {
                 // Handle PayPal return callback
                 const urlParams = new URLSearchParams(window.location.search);
                 if (urlParams.get('payment') === 'success' && urlParams.get('subscription_id')) {
-                    await this.confirmPayPalSubscription(urlParams.get('subscription_id'));
+                    const plan = urlParams.get('plan') || null;
+                    await this.confirmPayPalSubscription(urlParams.get('subscription_id'), plan);
                     // Clean URL
                     history.replaceState(null, '', window.location.pathname);
                 } else if (urlParams.get('payment') === 'cancelled') {
@@ -1042,9 +1045,7 @@ class DashboardApp {
 
     async registerSelectedPlan(token, plan) {
         try {
-            const protocol = location.hostname === 'localhost' ? 'http' : 'https';
-            const port = location.hostname === 'localhost' ? ':3001' : '';
-            const apiUrl = `${protocol}://${location.hostname}${port}/user/select-plan`;
+            const apiUrl = `${aiService.API_BASE}/user/select-plan`;
 
             await fetch(apiUrl, {
                 method: 'POST',
@@ -1062,9 +1063,7 @@ class DashboardApp {
 
     async fetchSubscriptionStatus(token) {
         try {
-            const protocol = location.hostname === 'localhost' ? 'http' : 'https';
-            const port = location.hostname === 'localhost' ? ':3001' : '';
-            const apiUrl = `${protocol}://${location.hostname}${port}/user/subscription`;
+            const apiUrl = `${aiService.API_BASE}/user/subscription`;
 
             const response = await fetch(apiUrl, {
                 headers: {
@@ -1089,9 +1088,7 @@ class DashboardApp {
 
     async fetchPaymentStatus(token) {
         try {
-            const protocol = location.hostname === 'localhost' ? 'http' : 'https';
-            const port = location.hostname === 'localhost' ? ':3001' : '';
-            const apiUrl = `${protocol}://${location.hostname}${port}/payment/status`;
+            const apiUrl = `${aiService.API_BASE}/payment/status`;
 
             const response = await fetch(apiUrl, {
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -1107,20 +1104,19 @@ class DashboardApp {
         }
     }
 
-    async startPayPalSubscription() {
+    async startPayPalSubscription(plan) {
         try {
             const authModule = await import('./auth.js');
             const token = await authModule.getIdToken();
-            const protocol = location.hostname === 'localhost' ? 'http' : 'https';
-            const port = location.hostname === 'localhost' ? ':3001' : '';
-            const apiUrl = `${protocol}://${location.hostname}${port}/payment/create-subscription`;
+            const apiUrl = `${aiService.API_BASE}/payment/create-subscription`;
 
             const response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
-                }
+                },
+                body: JSON.stringify({ plan: plan || this.subscription?.plan || 'starter' })
             });
             const result = await response.json();
 
@@ -1136,13 +1132,11 @@ class DashboardApp {
         }
     }
 
-    async confirmPayPalSubscription(subscriptionId) {
+    async confirmPayPalSubscription(subscriptionId, plan) {
         try {
             const authModule = await import('./auth.js');
             const token = await authModule.getIdToken();
-            const protocol = location.hostname === 'localhost' ? 'http' : 'https';
-            const port = location.hostname === 'localhost' ? ':3001' : '';
-            const apiUrl = `${protocol}://${location.hostname}${port}/payment/confirm-subscription`;
+            const apiUrl = `${aiService.API_BASE}/payment/confirm-subscription`;
 
             const response = await fetch(apiUrl, {
                 method: 'POST',
@@ -1150,12 +1144,19 @@ class DashboardApp {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ subscriptionId })
+                body: JSON.stringify({ subscriptionId, plan })
             });
             const result = await response.json();
 
             if (result.success) {
                 this.paymentStatus = { hasPaymentMethod: true };
+                // Update local plan state
+                if (result.data.plan) {
+                    this.subscription.plan = result.data.plan;
+                    this.userPlan = result.data.plan;
+                }
+                // Refresh subscription data from server
+                await this.fetchSubscriptionStatus(token);
                 this.updateSubscriptionUI();
                 alert('お支払い方法が正常に登録されました！');
                 this.navigate('plan');
@@ -1198,9 +1199,7 @@ class DashboardApp {
         try {
             const authModule = await import('./auth.js');
             const token = await authModule.getIdToken();
-            const protocol = location.hostname === 'localhost' ? 'http' : 'https';
-            const port = location.hostname === 'localhost' ? ':3001' : '';
-            const apiUrl = `${protocol}://${location.hostname}${port}/payment/cancel-subscription`;
+            const apiUrl = `${aiService.API_BASE}/payment/cancel-subscription`;
 
             const response = await fetch(apiUrl, {
                 method: 'POST',
@@ -2132,7 +2131,7 @@ class DashboardApp {
         try {
             this.showLoading('URLをチェックしています...');
 
-            const response = await fetch(`${this.backendUrl}/crawl`, {
+            const response = await fetch(`${aiService.API_BASE}/crawl`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -2190,7 +2189,7 @@ class DashboardApp {
             // 履歴用の前バージョン内容を取得
             const previousVersion = contract.original_content;
 
-            const response = await fetch(`${this.backendUrl}/contracts/analyze`, {
+            const response = await fetch(`${aiService.API_BASE}/contracts/analyze`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

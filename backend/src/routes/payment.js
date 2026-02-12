@@ -12,7 +12,12 @@ router.post('/create-subscription', async (req, res) => {
     try {
         const uid = req.user.uid;
         const userProfile = await dbService.getUserProfile(uid);
-        const plan = userProfile.plan || 'starter';
+        // Use requested plan if provided (for upgrades), otherwise use current plan
+        const requestedPlan = req.body.plan;
+        const validPlans = ['starter', 'business', 'pro'];
+        const plan = (requestedPlan && validPlans.includes(requestedPlan))
+            ? requestedPlan
+            : (userProfile.plan || 'starter');
 
         if (!paypalService.isConfigured()) {
             return res.status(503).json({
@@ -21,19 +26,29 @@ router.post('/create-subscription', async (req, res) => {
             });
         }
 
-        const protocol = req.headers['x-forwarded-proto'] || req.protocol;
-        const host = req.headers['x-forwarded-host'] || req.headers.host;
-        const origin = process.env.DASHBOARD_URL || `${protocol}://${host}`;
+        const dashboardUrl = process.env.DASHBOARD_URL || 'http://localhost:3000/dashboard';
 
-        const returnUrl = `${origin}/dashboard.html?payment=success`;
-        const cancelUrl = `${origin}/dashboard.html?payment=cancelled`;
+        const returnUrl = `${dashboardUrl}?payment=success&plan=${plan}`;
+        const cancelUrl = `${dashboardUrl}?payment=cancelled`;
+
+        // If user has an existing active subscription and is changing plans, cancel the old one
+        if (userProfile.paypalSubscriptionId && userProfile.paypalStatus === 'ACTIVE' && plan !== userProfile.plan) {
+            try {
+                await paypalService.cancelSubscription(userProfile.paypalSubscriptionId, 'プラン変更');
+                logger.info(`Old subscription ${userProfile.paypalSubscriptionId} cancelled for plan change`);
+            } catch (e) {
+                logger.warn('Failed to cancel old subscription during upgrade:', e.message);
+            }
+        }
 
         const result = await paypalService.createSubscription(plan, returnUrl, cancelUrl);
 
-        // Save pending subscription ID
+        // Save pending subscription ID and the target plan
         await dbService.updatePaymentInfo(uid, {
             paypalSubscriptionId: result.subscriptionId,
-            paypalStatus: 'APPROVAL_PENDING'
+            paypalStatus: 'APPROVAL_PENDING',
+            pendingPlan: plan,
+            previousPlan: userProfile.plan
         });
 
         res.json({
@@ -71,15 +86,23 @@ router.post('/confirm-subscription', async (req, res) => {
         }
 
         if (status === 'ACTIVE' || status === 'APPROVED') {
+            // Get the pending plan that was set during create-subscription
+            const userProfile = await dbService.getUserProfile(uid);
+            const targetPlan = req.body.plan || userProfile.pendingPlan || userProfile.plan || 'starter';
+
             await dbService.updatePaymentInfo(uid, {
                 hasPaymentMethod: true,
                 paypalSubscriptionId: subscriptionId,
                 paypalStatus: 'ACTIVE',
-                paymentRegisteredAt: new Date().toISOString()
+                paymentRegisteredAt: new Date().toISOString(),
+                pendingPlan: null
             });
 
-            logger.info(`User ${uid} subscription confirmed: ${subscriptionId}`);
-            res.json({ success: true, data: { status: 'ACTIVE' } });
+            // Update user's plan to the target plan
+            await dbService.setUserPlan(uid, targetPlan);
+
+            logger.info(`User ${uid} subscription confirmed: ${subscriptionId}, plan: ${targetPlan}`);
+            res.json({ success: true, data: { status: 'ACTIVE', plan: targetPlan } });
         } else {
             res.status(400).json({
                 success: false,

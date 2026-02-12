@@ -1,0 +1,19 @@
+# Backend (Firebase Functionsで動作するため不要)
+backend/
+
+# Backups
+backups/
+_backup_*/
+
+# Logs
+logs/
+
+# Dev files
+.claude/
+node_modules/
+.env
+.env.local
+nul
+firebase.json
+.firebaserc
+firebase-debug.log*

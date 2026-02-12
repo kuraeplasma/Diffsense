@@ -226,6 +226,32 @@ class DBService {
         return null;
     }
 
+    /**
+     * Find a user by their PayPal subscription ID (for webhook processing)
+     * @param {string} subscriptionId
+     */
+    async findUserBySubscriptionId(subscriptionId) {
+        const users = await this.readData('users');
+        return users.find(u => u.paypalSubscriptionId === subscriptionId) || null;
+    }
+
+    /**
+     * Reset monthly usage count for a user (called on monthly payment success)
+     * @param {string} uid
+     */
+    async resetMonthlyUsage(uid) {
+        const users = await this.readData('users');
+        const index = users.findIndex(u => u.uid === uid);
+
+        if (index > -1) {
+            users[index].usageCount = 0;
+            users[index].lastResetDate = new Date().toISOString();
+            await this.writeData('users', users);
+            return users[index];
+        }
+        return null;
+    }
+
     // --- Crawling Support ---
 
     /**

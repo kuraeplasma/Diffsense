@@ -14,6 +14,7 @@ const authMiddleware = require('./middleware/authMiddleware');
 const errorHandler = require('./middleware/errorHandler');
 const logger = require('./utils/logger');
 const crawlRoutes = require('./routes/crawl');
+const webhookRoutes = require('./routes/webhook');
 const cronService = require('./services/cronService');
 
 
@@ -22,10 +23,13 @@ const { admin, db, bucket } = require('./firebase');
 
 const app = express();
 
-// Create logs directory if it doesn't exist
-const logsDir = path.join(__dirname, '..', 'logs');
-if (!fs.existsSync(logsDir)) {
-    fs.mkdirSync(logsDir, { recursive: true });
+// Create logs directory if it doesn't exist (skip in Cloud Functions)
+const isCloudFunction = !!process.env.FUNCTION_TARGET || !!process.env.K_SERVICE;
+if (!isCloudFunction) {
+    const logsDir = path.join(__dirname, '..', 'logs');
+    if (!fs.existsSync(logsDir)) {
+        fs.mkdirSync(logsDir, { recursive: true });
+    }
 }
 
 // Security headers with custom CSP to allow framing from frontend
@@ -88,13 +92,16 @@ app.get('/health', (req, res) => {
     });
 });
 
+// Webhook routes (NO auth - called directly by PayPal)
+app.use('/webhook', webhookRoutes);
+
 // API routes (Protected by Auth Middleware)
 app.use('/contracts', authMiddleware, contractRoutes);
 app.use('/db', authMiddleware, dbRoutes);
-app.use('/invite', authMiddleware, inviteRoutes); // Added
-app.use('/user', authMiddleware, userRoutes); // Added
-app.use('/payment', authMiddleware, paymentRoutes); // Added
-app.use('/crawl', authMiddleware, crawlRoutes); // New crawling route
+app.use('/invite', authMiddleware, inviteRoutes);
+app.use('/user', authMiddleware, userRoutes);
+app.use('/payment', authMiddleware, paymentRoutes);
+app.use('/crawl', authMiddleware, crawlRoutes);
 
 
 // Static files (PDF Uploads)
@@ -134,10 +141,5 @@ if (require.main === module) {
     });
 }
 
-// Export as Cloud Function (only when firebase-functions is available)
-try {
-    const functions = require('firebase-functions');
-    exports.api = functions.https.onRequest(app);
-} catch (e) {
-    // firebase-functions not available in local dev
-}
+// Export for Cloud Functions
+module.exports = { app };

@@ -2,9 +2,9 @@
   "name": "diffsense-backend",
   "version": "1.0.0",
   "description": "DIFFsense AI Contract Analysis Backend API",
-  "main": "src/server.js",
+  "main": "index.js",
   "engines": {
-    "node": "22"
+    "node": "20"
   },
   "scripts": {
     "start": "node src/server.js",

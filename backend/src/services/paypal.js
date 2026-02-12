@@ -164,6 +164,74 @@ class PayPalService {
     }
 
     /**
+     * Verify PayPal webhook signature (for production security)
+     * @param {object} headers - Request headers from PayPal
+     * @param {object} body - Request body
+     * @returns {boolean}
+     */
+    async verifyWebhookSignature(headers, body) {
+        const token = await this.getAccessToken();
+        const webhookId = process.env.PAYPAL_WEBHOOK_ID;
+
+        if (!webhookId) {
+            logger.warn('PAYPAL_WEBHOOK_ID not set, skipping verification');
+            return true;
+        }
+
+        try {
+            const response = await axios.post(
+                `${this.baseUrl}/v1/notifications/verify-webhook-signature`,
+                {
+                    auth_algo: headers['paypal-auth-algo'],
+                    cert_url: headers['paypal-cert-url'],
+                    transmission_id: headers['paypal-transmission-id'],
+                    transmission_sig: headers['paypal-transmission-sig'],
+                    transmission_time: headers['paypal-transmission-time'],
+                    webhook_id: webhookId,
+                    webhook_event: body
+                },
+                {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            return response.data.verification_status === 'SUCCESS';
+        } catch (error) {
+            logger.error('Webhook signature verification error:', error.response?.data || error.message);
+            return false;
+        }
+    }
+
+    /**
+     * Suspend a subscription (for plan changes - suspend old before creating new)
+     * @param {string} subscriptionId
+     * @param {string} reason
+     */
+    async suspendSubscription(subscriptionId, reason = 'プラン変更のため一時停止') {
+        const token = await this.getAccessToken();
+
+        try {
+            await axios.post(
+                `${this.baseUrl}/v1/billing/subscriptions/${subscriptionId}/suspend`,
+                { reason },
+                {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+            return { success: true };
+        } catch (error) {
+            logger.error('PayPal suspend subscription error:', error.response?.data || error.message);
+            throw new Error('サブスクリプションの一時停止に失敗しました');
+        }
+    }
+
+    /**
      * Check if PayPal credentials are configured
      */
     isConfigured() {

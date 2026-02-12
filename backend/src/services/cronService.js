@@ -14,13 +14,19 @@ class CronService {
      * For local testing, we might want to run it more frequently or provide a trigger.
      */
     init() {
-        // Run every day at 03:00 JST (Local time of the server)
+        // Run every day at 03:00 JST - URL monitoring crawl
         cron.schedule('0 3 * * *', () => {
             logger.info('Starting scheduled daily crawling task...');
             this.executeDailyCrawl();
         });
 
-        logger.info('Cron Service initialized (Task scheduled for 03:00 daily)');
+        // Run at 00:05 on the 1st of every month - reset usage counts
+        cron.schedule('5 0 1 * *', () => {
+            logger.info('Starting monthly usage reset...');
+            this.executeMonthlyReset();
+        });
+
+        logger.info('Cron Service initialized (Crawl: 03:00 daily, Usage reset: 1st of month)');
     }
 
     /**
@@ -117,6 +123,28 @@ class CronService {
         }
 
         await dbService.updateContract(contract.id, updates);
+    }
+    /**
+     * Reset monthly usage counts for all paid users
+     * Runs on the 1st of every month
+     */
+    async executeMonthlyReset() {
+        try {
+            const users = await dbService.readData('users');
+            let resetCount = 0;
+
+            for (const user of users) {
+                // Only reset for users with active payment (not trial users)
+                if (user.hasPaymentMethod && user.paypalStatus === 'ACTIVE') {
+                    await dbService.resetMonthlyUsage(user.uid);
+                    resetCount++;
+                }
+            }
+
+            logger.info(`Monthly usage reset completed: ${resetCount} users reset`);
+        } catch (error) {
+            logger.error('Monthly reset error:', error);
+        }
     }
 }
 
