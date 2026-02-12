@@ -339,7 +339,7 @@ const Views = {
                     </div>
                     <div class="flex gap-sm">
                         <button class="btn-dashboard" onclick="window.app.shareReport(${contract.id})"><i class="fa-solid fa-share-nodes"></i> 共有</button>
-                        <button class="btn-dashboard" onclick="window.app.exportPDF(${contract.id})"><i class="fa-solid fa-file-pdf"></i> PDF出力</button>
+                        ${(window.app.subscription?.plan === 'pro') ? `<button class="btn-dashboard" onclick="window.app.exportPDF(${contract.id})"><i class="fa-solid fa-file-pdf"></i> PDF出力</button>` : ''}
                         ${window.app.can('operate_contract') ? `<button class="btn-dashboard" onclick="window.app.showHistoryModal(${id})"><i class="fa-solid fa-note-sticky"></i> メモ</button>` : ''}
                         ${window.app.can('operate_contract')
                 ? (contract.status === '未処理'
@@ -2494,6 +2494,7 @@ class DashboardApp {
     }
 
     async exportPDF(contractId) {
+        if (this.subscription?.plan !== 'pro') return;
         const contract = dbService.getContractById(contractId);
         if (!contract) return;
 
