@@ -4,7 +4,8 @@ const analyzeRequestSchema = Joi.object({
     contractId: Joi.number().integer().required(),
     method: Joi.string().valid('pdf', 'url', 'text').required(),
     source: Joi.string().required(),
-    previousVersion: Joi.string().optional().allow(null, '')
+    previousVersion: Joi.string().optional().allow(null, ''),
+    skipAI: Joi.boolean().optional()
 });
 
 function validateAnalyzeRequest(data) {
