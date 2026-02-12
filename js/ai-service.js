@@ -18,22 +18,26 @@ export const aiService = {
      * @param {string|null} previousVersion - 旧バージョンのテキスト（オプション）
      * @returns {Promise<Object>} 解析結果
      */
-    async analyzeContract(contractId, method, source, previousVersion = null) {
+    async analyzeContract(contractId, method, source, previousVersion = null, options = {}) {
         try {
             const token = await getIdToken();
             console.log("AI Service: Token retrieval status:", token ? "Success" : "Failed");
+            const body = {
+                contractId,
+                method,
+                source,
+                previousVersion
+            };
+            if (options.skipAI) {
+                body.skipAI = true;
+            }
             const response = await fetch(`${this.API_BASE}/contracts/analyze`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': token ? `Bearer ${token}` : ''
                 },
-                body: JSON.stringify({
-                    contractId,
-                    method,
-                    source,
-                    previousVersion
-                })
+                body: JSON.stringify(body)
             });
 
             const result = await response.json();

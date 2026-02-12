@@ -825,12 +825,13 @@ class RegistrationFlow {
                 sourceData = await aiService.convertFileToBase64(this.tempData.fileData);
             }
 
-            // バックエンドAPIにテキスト抽出リクエスト
+            // バックエンドAPIにテキスト抽出リクエスト（AI解析スキップ、カウント消費なし）
             const result = await aiService.analyzeContract(
                 contractId,
                 this.tempData.method,
                 sourceData,
-                null  // previousVersion なし
+                null,  // previousVersion なし
+                { skipAI: true }
             );
 
             if (result.success) {

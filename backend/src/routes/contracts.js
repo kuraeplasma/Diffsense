@@ -25,40 +25,53 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
         }
 
         const { contractId, method, source, previousVersion } = value;
+        const skipAI = req.body.skipAI === true;
         const uid = req.user.uid;
 
         logger.info(`Starting analysis for contract ${contractId} by user ${uid}`, { method });
 
-        // 0. Usage & Plan Limit Check
+        // 0. Usage & Plan Limit Check (skip for text-only extraction)
         const userProfile = await dbService.getUserProfile(uid);
         const limit = dbService.getUsageLimit(userProfile);
         const isInTrial = dbService.isTrialActive(userProfile);
 
-        // Trial Expiration Check - Only if trial was ever started
-        if (userProfile.trialStartedAt && isInTrial === false) {
-            // Check if user has registered a payment method for auto-transition
-            if (!userProfile.hasPaymentMethod) {
-                logger.warn(`Trial expired and no payment method for user ${uid}`);
+        logger.info(`Usage check for ${uid}:`, {
+            plan: userProfile.plan,
+            usageCount: userProfile.usageCount,
+            limit: limit,
+            isInTrial: isInTrial,
+            skipAI: skipAI,
+            trialStartedAt: userProfile.trialStartedAt,
+            hasPaymentMethod: userProfile.hasPaymentMethod
+        });
+
+        if (!skipAI) {
+            // Trial Expiration Check - Only if trial was ever started
+            if (userProfile.trialStartedAt && isInTrial === false) {
+                // Check if user has registered a payment method for auto-transition
+                if (!userProfile.hasPaymentMethod) {
+                    logger.warn(`Trial expired and no payment method for user ${uid}`);
+                    return res.status(403).json({
+                        success: false,
+                        error: "無料トライアル期間（7日間）が終了しました。継続して利用するには、お支払い方法（PayPal/クレジットカード）の登録が必要です。",
+                        code: "TRIAL_EXPIRED"
+                    });
+                } else {
+                    logger.info(`Trial expired but user ${uid} has payment method. Auto-continuing to paid plan.`);
+                }
+            }
+
+            if (userProfile.usageCount >= limit) {
+                const limitMsg = isInTrial
+                    ? `無料トライアルの解析上限（${limit}回）に達しました。継続して利用するにはプランの契約が必要です。`
+                    : `プランの月間解析上限（${limit}回）に達しました。アップグレードをご検討ください。`;
+
+                logger.warn(`Usage limit reached for user ${uid}`, { plan: userProfile.plan, current: userProfile.usageCount });
                 return res.status(403).json({
                     success: false,
-                    error: "無料トライアル期間（7日間）が終了しました。継続して利用するには、お支払い方法（PayPal/クレジットカード）の登録が必要です。",
-                    code: "TRIAL_EXPIRED"
+                    error: limitMsg
                 });
-            } else {
-                logger.info(`Trial expired but user ${uid} has payment method. Auto-continuing to paid plan.`);
             }
-        }
-
-        if (userProfile.usageCount >= limit) {
-            const limitMsg = isInTrial
-                ? `無料トライアルの解析上限（${limit}回）に達しました。継続して利用するにはプランの契約が必要です。`
-                : `プランの月間解析上限（${limit}回）に達しました。アップグレードをご検討ください。`;
-
-            logger.warn(`Usage limit reached for user ${uid}`, { plan: userProfile.plan, current: userProfile.usageCount });
-            return res.status(403).json({
-                success: false,
-                error: limitMsg
-            });
         }
 
         // 1. Save PDF file early if method is 'pdf'
@@ -142,8 +155,11 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                 extractedText = source;
             }
 
-            // 3. Analyze with Gemini AI
-            if (extractedText && extractedText.trim().length > 0) {
+            // 3. Analyze with Gemini AI (skip if text-only extraction)
+            if (skipAI) {
+                logger.info('skipAI=true: Skipping Gemini analysis, text extraction only');
+                aiResult.summary = 'テキスト抽出のみ完了（AI解析はスキップ）';
+            } else if (extractedText && extractedText.trim().length > 0) {
                 aiResult = await geminiService.analyzeContract(
                     extractedText,
                     previousVersion
