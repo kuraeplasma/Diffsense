@@ -339,7 +339,7 @@ const Views = {
                     </div>
                     <div class="flex gap-sm">
                         <button class="btn-dashboard" onclick="window.app.shareReport(${contract.id})"><i class="fa-solid fa-share-nodes"></i> 共有</button>
-                        ${(window.app.subscription?.plan === 'pro') ? `<button class="btn-dashboard" onclick="window.app.exportPDF(${contract.id})"><i class="fa-solid fa-file-pdf"></i> PDF出力</button>` : ''}
+                        <button class="btn-dashboard" onclick="window.app.exportPDF(${contract.id})"><i class="fa-solid fa-file-pdf"></i> PDF出力</button>
                         ${window.app.can('operate_contract') ? `<button class="btn-dashboard" onclick="window.app.showHistoryModal(${id})"><i class="fa-solid fa-note-sticky"></i> メモ</button>` : ''}
                         ${window.app.can('operate_contract')
                 ? (contract.status === '未処理'
@@ -915,7 +915,18 @@ class DashboardApp {
             // Auto-register current user as Admin if needed
             this.checkAndRegisterAdmin();
 
-            this.navigate('dashboard');
+            // Check URL hash for deep-link (e.g. #diff/123 from share)
+            const hash = window.location.hash;
+            if (hash && hash.startsWith('#diff/')) {
+                const contractId = parseInt(hash.replace('#diff/', ''), 10);
+                if (!isNaN(contractId)) {
+                    this.navigate('diff', contractId);
+                } else {
+                    this.navigate('dashboard');
+                }
+            } else {
+                this.navigate('dashboard');
+            }
             console.log('Dashboard App Initialized Successfully');
         } catch (error) {
             console.error('Initialization Error:', error);
@@ -2483,8 +2494,6 @@ class DashboardApp {
     }
 
     async exportPDF(contractId) {
-        if (this.subscription?.plan !== 'pro') return;
-
         const contract = dbService.getContractById(contractId);
         if (!contract) return;
 
