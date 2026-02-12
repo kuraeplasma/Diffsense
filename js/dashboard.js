@@ -338,6 +338,7 @@ const Views = {
                         </div>
                     </div>
                     <div class="flex gap-sm">
+                        <button class="btn-dashboard" onclick="window.app.shareReport(${contract.id})"><i class="fa-solid fa-share-nodes"></i> 共有</button>
                         ${(window.app.subscription?.plan === 'pro') ? `<button class="btn-dashboard" onclick="window.app.exportPDF(${contract.id})"><i class="fa-solid fa-file-pdf"></i> PDF出力</button>` : ''}
                         ${window.app.can('operate_contract') ? `<button class="btn-dashboard" onclick="window.app.showHistoryModal(${id})"><i class="fa-solid fa-note-sticky"></i> メモ</button>` : ''}
                         ${window.app.can('operate_contract')
@@ -2435,6 +2436,50 @@ class DashboardApp {
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
+    }
+
+    async shareReport(contractId) {
+        const contract = dbService.getContractById(contractId);
+        if (!contract) return;
+
+        const riskLabel = contract.risk_level || 'Low';
+        const summary = contract.ai_summary || '解析データなし';
+        const name = contract.original_filename || contract.name || '契約書';
+        const shareUrl = `${window.location.origin}/dashboard.html#diff/${contractId}`;
+
+        const shareText = `【DIFFsense 解析レポート】\n📄 ${name}\n⚠️ リスク: ${riskLabel}\n\n${summary}\n\n${shareUrl}`;
+
+        // Web Share APIが使える場合はネイティブ共有
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: `DIFFsense - ${name}`,
+                    text: shareText,
+                    url: shareUrl
+                });
+                return;
+            } catch (e) {
+                // ユーザーがキャンセルした場合は何もしない
+                if (e.name === 'AbortError') return;
+            }
+        }
+
+        // フォールバック: クリップボードにコピー
+        try {
+            await navigator.clipboard.writeText(shareText);
+            Notify.success('レポート内容をクリップボードにコピーしました');
+        } catch (e) {
+            // clipboard APIも使えない場合
+            const textarea = document.createElement('textarea');
+            textarea.value = shareText;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            Notify.success('レポート内容をクリップボードにコピーしました');
+        }
     }
 
     async exportPDF(contractId) {
