@@ -1646,12 +1646,15 @@ class DashboardApp {
             loadingMsg.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="font-size:32px; color:#4CAF50;"></i><br><br><strong>AI解析中...</strong><br><span style="font-size:12px; color:#666;">数秒お待ちください</span>';
             document.body.appendChild(loadingMsg);
 
-            // AI解析を実行（previousVersionとして元のテキストを使用）
+            // AI解析を実行（旧バージョンがあれば差分比較モード）
+            const previousVersion = (contract.history && contract.history.length > 0)
+                ? contract.history[contract.history.length - 1].content
+                : null;
             const result = await aiService.analyzeContract(
                 id,
                 'text',  // テキストとして送信
                 contract.original_content,
-                null  // 将来的には旧バージョンとの比較に使用
+                previousVersion
             );
 
             // ローディング削除
