@@ -92,12 +92,9 @@ class GeminiService {
 
         } catch (error) {
             if (error.response) {
-                logger.error('Gemini API Error Response:', {
-                    status: error.response.status,
-                    data: JSON.stringify(error.response.data)
-                });
+                logger.error(`Gemini API Error: status=${error.response.status} data=${JSON.stringify(error.response.data).substring(0, 500)}`);
             } else {
-                logger.error('Gemini Analysis Failed:', error.message);
+                logger.error(`Gemini Analysis Failed: ${error.message}`);
             }
 
             // Fallback: Return specific structure so frontend can still show text

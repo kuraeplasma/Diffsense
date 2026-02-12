@@ -1694,10 +1694,22 @@ class DashboardApp {
                     status: '未確認'  // 解析完了、確認待ち
                 });
 
+                // サブスクリプション情報を再取得（使用回数を更新）
+                try {
+                    const authModule = await import('./auth.js');
+                    const token = await authModule.getIdToken();
+                    if (token) await this.fetchSubscriptionStatus(token);
+                } catch (e) { console.warn('Failed to refresh subscription:', e); }
+
                 // 画面を再読み込み
                 this.navigate('diff', id);
 
-                Notify.success('AI解析が完了しました！リスク判定と差分抽出が完了しました。');
+                // AI解析失敗チェック
+                if (result.data.aiFailed) {
+                    Notify.error('AI解析に失敗しました。利用回数は消費されていません。再度お試しください。');
+                } else {
+                    Notify.success('AI解析が完了しました！リスク判定と差分抽出が完了しました。');
+                }
             } else {
                 throw new Error(result.error || '解析に失敗しました');
             }
@@ -1903,10 +1915,22 @@ class DashboardApp {
                         status: '未確認'
                     });
 
+                    // サブスクリプション情報を再取得（使用回数を更新）
+                    try {
+                        const authModule = await import('./auth.js');
+                        const token = await authModule.getIdToken();
+                        if (token) await this.fetchSubscriptionStatus(token);
+                    } catch (e) { console.warn('Failed to refresh subscription:', e); }
+
                     // 画面を再読み込み (差分表示を優先)
                     this.activeDetailTab = 'diff';
                     this.navigate('diff', id);
-                    Notify.success('最新バージョンの取り込みとAI解析が完了しました！');
+
+                    if (result.data.aiFailed) {
+                        Notify.error('AI解析に失敗しました。利用回数は消費されていません。再度お試しください。');
+                    } else {
+                        Notify.success('最新バージョンの取り込みとAI解析が完了しました！');
+                    }
                 } else {
                     throw new Error(result.error || '解析に失敗しました');
                 }
