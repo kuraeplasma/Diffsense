@@ -1610,3 +1610,78 @@ ul {
 .btn-danger-action:hover {
     background-color: #fecaca;
 }
+
+/* --- Toggle Switch --- */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+    flex-shrink: 0;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-switch .toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    border-radius: 24px;
+    transition: background-color 0.25s;
+}
+
+.toggle-switch .toggle-slider::before {
+    content: "";
+    position: absolute;
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: #fff;
+    border-radius: 50%;
+    transition: transform 0.25s;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.toggle-switch input:checked+.toggle-slider {
+    background-color: var(--accent-gold, #c19b4a);
+}
+
+.toggle-switch input:checked+.toggle-slider::before {
+    transform: translateX(20px);
+}
+
+/* --- Crawl Check Button --- */
+.btn-crawl-check {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 10px 16px;
+    border: 1px solid var(--accent-gold, #c19b4a);
+    border-radius: 8px;
+    background: linear-gradient(135deg, rgba(193, 155, 74, 0.06), rgba(193, 155, 74, 0.12));
+    color: var(--accent-gold, #c19b4a);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-crawl-check:hover {
+    background: linear-gradient(135deg, rgba(193, 155, 74, 0.12), rgba(193, 155, 74, 0.2));
+    box-shadow: 0 2px 8px rgba(193, 155, 74, 0.2);
+}
+
+.btn-crawl-check i {
+    font-size: 14px;
+}

@@ -382,29 +382,33 @@ const Views = {
                         
                         ${contract.source_type === 'URL' && (window.app.subscription?.plan === 'pro' || window.app.subscription?.isInTrial) ? `
                         <div class="analysis-section" style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #eee;">
-                            <div class="analysis-section-title" style="display:flex; justify-content:space-between; align-items:center;">
-                                <span><i class="fa-solid fa-eye text-primary"></i> 定期監視（クローリング）</span>
-                                <label class="switch">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                                <div style="display:flex; align-items:center; gap:10px;">
+                                    <i class="fa-solid fa-satellite-dish" style="color:var(--accent-gold, #c19b4a); font-size:16px;"></i>
+                                    <span style="font-weight:600; font-size:14px;">定期監視</span>
+                                </div>
+                                <label class="toggle-switch">
                                     <input type="checkbox" ${contract.monitoring_enabled ? 'checked' : ''} onchange="window.app.toggleMonitoring(${id}, this.checked)">
-                                    <span class="slider round"></span>
+                                    <span class="toggle-slider"></span>
                                 </label>
                             </div>
-                            <div style="font-size: 13px; color: #666; margin-bottom:16px;">
-                                URLの変更を毎日自動でチェックします。差分がある場合のみAI解析を実行します。
-                            </div>
-                            <div style="background: #f8f9fa; border-radius: 8px; padding: 12px; font-size: 12px;">
-                                <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-                                    <span class="text-muted">最終チェック:</span>
-                                    <span>${contract.last_checked_at ? new Date(contract.last_checked_at).toLocaleString('ja-JP') : '未実行'}</span>
+                            <p style="font-size:12px; color:#888; margin:0 0 16px; line-height:1.5;">
+                                URLの変更を自動チェックし、差分がある場合のみAI解析を実行します。
+                            </p>
+                            <div style="background:#f8f9fa; border-radius:8px; padding:14px; font-size:13px; margin-bottom:14px;">
+                                <div style="display:flex; justify-content:space-between; margin-bottom:8px; color:#555;">
+                                    <span>最終チェック</span>
+                                    <span style="font-weight:500;">${contract.last_checked_at ? new Date(contract.last_checked_at).toLocaleString('ja-JP') : '—'}</span>
                                 </div>
-                                <div style="display:flex; justify-content:space-between; margin-bottom:12px;">
-                                    <span class="text-muted">監視頻度:</span>
-                                    <span>${contract.stable_count >= 14 ? '3日に1回（安定）' : (contract.stable_count >= 7 ? '2日に1回' : '毎日')}</span>
+                                <div style="display:flex; justify-content:space-between; color:#555;">
+                                    <span>監視頻度</span>
+                                    <span style="font-weight:500;">${contract.stable_count >= 14 ? '3日に1回（安定）' : (contract.stable_count >= 7 ? '2日に1回' : '毎日')}</span>
                                 </div>
-                                <button class="btn-dashboard btn-outline" style="width:100%; justify-content:center;" onclick="window.app.manualCrawl(${id})">
-                                    <i class="fa-solid fa-sync"></i> 今すぐ更新を確認（AI回数消費）
-                                </button>
                             </div>
+                            <button class="btn-crawl-check" onclick="window.app.manualCrawl(${id})">
+                                <i class="fa-solid fa-arrows-rotate"></i> 今すぐ更新を確認
+                            </button>
+                            <p style="font-size:11px; color:#aaa; margin:8px 0 0; text-align:center;">※ 変更検出時にAI解析回数を1回消費します</p>
                         </div>
                         ` : ''}
                     </div>
