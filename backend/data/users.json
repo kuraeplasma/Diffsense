@@ -20,6 +20,11 @@
     "trialStartedAt": "2026-02-11T15:34:40.195Z",
     "hasPaymentMethod": false,
     "usageCount": 0,
-    "lastResetDate": "2026-02-11T15:34:40.195Z"
+    "lastResetDate": "2026-02-11T15:34:40.195Z",
+    "paypalSubscriptionId": "I-FTCJX2NJY1WA",
+    "paypalStatus": "APPROVAL_PENDING",
+    "cancelledAt": "2026-02-12T02:51:47.023Z",
+    "pendingPlan": "business",
+    "previousPlan": "starter"
   }
 ]

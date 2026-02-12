@@ -338,7 +338,7 @@ const Views = {
                         </div>
                     </div>
                     <div class="flex gap-sm">
-                        <button class="btn-dashboard" onclick="window.app.shareReport(${contract.id})"><i class="fa-solid fa-share-nodes"></i> 共有</button>
+                        ${window.app.can('operate_contract') ? `<button class="btn-dashboard" onclick="window.app.shareReport(${contract.id})"><i class="fa-solid fa-share-nodes"></i> 共有</button>` : ''}
                         ${(window.app.subscription?.plan === 'pro') ? `<button class="btn-dashboard" onclick="window.app.exportPDF(${contract.id})"><i class="fa-solid fa-file-pdf"></i> PDF出力</button>` : ''}
                         ${window.app.can('operate_contract') ? `<button class="btn-dashboard" onclick="window.app.showHistoryModal(${id})"><i class="fa-solid fa-note-sticky"></i> メモ</button>` : ''}
                         ${window.app.can('operate_contract')
@@ -610,6 +610,10 @@ class RegistrationFlow {
     }
 
     open() {
+        if (!window.app.can('operate_contract')) {
+            Notify.warning('閲覧のみの権限では新規登録できません');
+            return;
+        }
         this.currentStep = 1;
         this.tempData = {};
 
@@ -939,8 +943,8 @@ class DashboardApp {
             this.bindEvents();
             this.registration.init();
 
-            // Auto-register current user as Admin if needed
-            this.checkAndRegisterAdmin();
+            // Auto-register current user as Admin if needed (must await for ownerUid scope switch)
+            await this.checkAndRegisterAdmin();
 
             // Check URL hash for deep-link (e.g. #diff/123 from share)
             const hash = window.location.hash;
@@ -973,16 +977,43 @@ class DashboardApp {
             if (user) {
                 this.currentUser = user; // Store for later use
 
+                // Fetch role and team info from backend (Firestore-backed, reliable)
+                let ownerUid = user.uid; // Default: own data
+                this.isTeamMember = false;
+                try {
+                    const roleRes = await fetch(`${aiService.API_BASE}/user/role`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (roleRes.ok) {
+                        const roleData = await roleRes.json();
+                        if (roleData.success) {
+                            this.userRole = roleData.data.role;
+                            this.isTeamMember = roleData.data.isTeamMember || false;
+                            if (roleData.data.ownerUid) {
+                                ownerUid = roleData.data.ownerUid;
+                            }
+                            console.log('User role from backend:', this.userRole, 'ownerUid:', ownerUid, 'isTeamMember:', this.isTeamMember);
+                        }
+                    }
+                } catch (roleErr) {
+                    console.warn('Could not fetch role from backend:', roleErr);
+                }
+
+                // If team member, switch data scope to owner's UID
+                if (this.isTeamMember && ownerUid !== user.uid) {
+                    console.log('Switching data scope to owner UID:', ownerUid);
+                    dbService.setCurrentUser(ownerUid);
+                }
+
+                // Register user in local localStorage if not present
                 const users = dbService.getUsers();
                 const matchedUser = users.find(u => u.email === user.email);
-
                 if (!matchedUser) {
-                    console.log('Auto-registering admin user:', user.email);
                     const displayName = user.displayName || user.email.split('@')[0];
-                    dbService.addUser(displayName, user.email, '管理者');
-                    this.userRole = '管理者';
-                } else {
-                    this.userRole = matchedUser.role;
+                    dbService.addUser(displayName, user.email, this.userRole);
+                } else if (matchedUser.role !== this.userRole) {
+                    // Sync local role with backend
+                    dbService.updateUserRole(user.email, this.userRole);
                 }
 
                 // Check if user just selected a plan from signup flow
@@ -1007,10 +1038,32 @@ class DashboardApp {
 
                 console.log('Current User Role:', this.userRole);
 
-                // Hide Team menu for non-admins
-                const teamNavLink = document.querySelector('.nav-item[onclick*="team"]');
-                if (teamNavLink && !this.can('manage_team')) {
-                    teamNavLink.style.display = 'none';
+                // Show Team/Plan menus only for admins (hidden by default in HTML)
+                if (this.can('manage_team')) {
+                    const teamNav = document.getElementById('nav-team');
+                    if (teamNav) teamNav.style.display = '';
+                    const planNav = document.getElementById('nav-plan');
+                    if (planNav) planNav.style.display = '';
+                }
+
+                // Hide registration button for view-only users
+                const regBtn = document.getElementById('open-registration-btn');
+                if (regBtn && !this.can('operate_contract')) {
+                    regBtn.style.display = 'none';
+                }
+
+                // Show role badge in header for team members
+                if (this.isTeamMember) {
+                    const roleBadge = document.getElementById('user-role-badge');
+                    if (roleBadge) {
+                        const roleColors = {
+                            '管理者': '#4CAF50',
+                            '作業者': '#2196F3',
+                            '閲覧のみ': '#FF9800'
+                        };
+                        roleBadge.textContent = this.userRole;
+                        roleBadge.style.cssText = `display:inline-block; background:${roleColors[this.userRole] || '#999'}; color:#fff; padding:2px 10px; border-radius:12px; font-size:11px; font-weight:600; margin-left:8px;`;
+                    }
                 }
             }
         } catch (e) {
@@ -1638,6 +1691,10 @@ class DashboardApp {
     }
 
     confirmContract(id) {
+        if (!this.can('operate_contract')) {
+            Notify.warning('閲覧のみの権限ではステータスを変更できません');
+            return;
+        }
         if (dbService.updateContractStatus(id, '確認済')) {
             // Switch to 'Monitoring' (Total) view and go back to dashboard
             this.dashboardFilter = 'total';
@@ -1646,6 +1703,10 @@ class DashboardApp {
     }
 
     async analyzeContract(id) {
+        if (!this.can('operate_contract')) {
+            Notify.warning('閲覧のみの権限ではAI解析を実行できません');
+            return;
+        }
         const contract = dbService.getContractById(id);
         if (!contract) {
             Notify.error('契約が見つかりません');
@@ -1864,6 +1925,10 @@ class DashboardApp {
      * URL版の新しいバージョンを解析して保存
      */
     async handleUrlVersionSubmit(id, url) {
+        if (!this.can('operate_contract')) {
+            Notify.warning('閲覧のみの権限ではバージョン更新を実行できません');
+            return;
+        }
         const urlModal = document.getElementById('url-input-modal');
         const contract = dbService.getContractById(id);
 
@@ -2274,6 +2339,10 @@ class DashboardApp {
      * 定期監視のON/OFFを切り替える
      */
     toggleMonitoring(id, enabled) {
+        if (!this.can('operate_contract')) {
+            Notify.warning('閲覧のみの権限では監視設定を変更できません');
+            return;
+        }
         dbService.toggleMonitoring(id, enabled);
         this.navigate('diff', id);
     }

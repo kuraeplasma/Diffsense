@@ -66,4 +66,71 @@ router.post('/select-plan', async (req, res) => {
     }
 });
 
+/**
+ * GET /api/user/role
+ * Get current user's team role (管理者/作業者/閲覧のみ)
+ * Checks if the user's email exists as a team member invited by someone else.
+ * If not found as an invited member, the user is an owner (管理者).
+ */
+router.get('/role', async (req, res) => {
+    try {
+        const uid = req.user.uid;
+        const email = req.user.email;
+
+        // Check if this user was invited as a team member by someone
+        const teamInfo = await dbService.getTeamRole(email, uid);
+
+        res.json({
+            success: true,
+            data: {
+                role: teamInfo.role,
+                ownerUid: teamInfo.ownerUid,
+                isTeamMember: teamInfo.isTeamMember
+            }
+        });
+    } catch (error) {
+        logger.error('Error fetching user role:', error);
+        res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+});
+
+/**
+ * POST /api/user/admin/set-plan
+ * Admin-only: Force set a user's plan in Firestore
+ * Requires the caller to be an admin (owner, not team member)
+ * Body: { targetUid?: string, plan: string }
+ * If targetUid is omitted, sets the plan for the current user
+ */
+router.post('/admin/set-plan', async (req, res) => {
+    try {
+        const uid = req.user.uid;
+        const email = req.user.email;
+        const { targetUid, plan } = req.body;
+
+        // Verify caller is an admin (not a team member)
+        const teamInfo = await dbService.getTeamRole(email, uid);
+        if (teamInfo.isTeamMember) {
+            return res.status(403).json({ success: false, error: 'Only admins can use this endpoint' });
+        }
+
+        const validPlans = ['starter', 'business', 'pro'];
+        if (!plan || !validPlans.includes(plan)) {
+            return res.status(400).json({ success: false, error: 'Invalid plan' });
+        }
+
+        const uidToSet = targetUid || uid;
+        await dbService.setUserPlan(uidToSet, plan);
+        logger.info(`Admin ${uid} force-set plan for ${uidToSet}: ${plan}`);
+
+        // Verify it was saved
+        const profile = await dbService.getUserProfile(uidToSet);
+        logger.info(`Verification - getUserProfile(${uidToSet}).plan = ${profile.plan}`);
+
+        res.json({ success: true, data: { uid: uidToSet, plan: profile.plan } });
+    } catch (error) {
+        logger.error('Error in admin set-plan:', error);
+        res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+});
+
 module.exports = router;
