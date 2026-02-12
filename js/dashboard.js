@@ -2178,11 +2178,15 @@ class DashboardApp {
 
             // Send Email via Backend
             try {
-                await aiService.sendInvite(email, name, role);
-                this.showSuccessModal('招待送信完了', 'メンバーを追加し、招待メールを送信しました。');
+                const inviteResult = await aiService.sendInvite(email, name, role);
+                if (inviteResult.emailSent) {
+                    this.showSuccessModal('招待送信完了', 'メンバーを追加し、招待メールを送信しました。');
+                } else {
+                    this.showSuccessModal('メンバー追加完了', `${name} さんをチームに追加しました。<br><br><small style="color:#888;">※ メール通知は現在設定されていません。<br>招待先に直接ダッシュボードURLをお伝えください。</small>`);
+                }
             } catch (error) {
                 console.error('Email send failed:', error);
-                this.showAlertModal('送信エラー', 'メンバーは追加されましたが、招待メールの送信に失敗しました。<br>サーバーログを確認してください。', 'warning');
+                this.showSuccessModal('メンバー追加完了', `${name} さんをチームに追加しました。<br><br><small style="color:#888;">※ 招待メールの送信に失敗しました。<br>招待先に直接ダッシュボードURLをお伝えください。</small>`);
             }
         } else {
             if (result.error === 'already_exists') {

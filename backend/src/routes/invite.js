@@ -23,14 +23,30 @@ router.post('/', authMiddleware, async (req, res) => {
             });
         }
 
-        // In a real app, you might check if the user already exists here
-        // or generate a unique invite token. For now, we just send the email.
-        await emailService.sendInviteEmail(email, name, role, inviterName || '管理者');
+        // Try to send invitation email
+        let emailSent = false;
+        const hasEmailConfig = process.env.SENDGRID_API_KEY && process.env.SENDGRID_API_KEY.startsWith('SG.');
 
-        res.status(200).json({ message: 'Invitation sent successfully' });
+        if (hasEmailConfig) {
+            try {
+                await emailService.sendInviteEmail(email, name, role, inviterName || '管理者');
+                emailSent = true;
+            } catch (emailError) {
+                logger.warn(`Email send failed (non-fatal): ${emailError.message}`);
+            }
+        } else {
+            logger.info('SendGrid not configured - skipping email, member registered only');
+        }
+
+        res.status(200).json({
+            message: emailSent
+                ? 'Invitation sent successfully'
+                : 'Member registered successfully (email notification skipped - SendGrid not configured)',
+            emailSent: emailSent
+        });
     } catch (error) {
-        logger.error('Failed to send invitation:', error);
-        res.status(500).json({ error: 'Failed to send invitation email' });
+        logger.error('Failed to process invitation:', error);
+        res.status(500).json({ error: 'Failed to process invitation' });
     }
 });
 
