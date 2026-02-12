@@ -380,7 +380,7 @@ const Views = {
                             </div>
                         </div>
                         
-                        ${contract.source_type === 'URL' && (window.app.subscription?.plan === 'pro' || window.app.subscription?.isInTrial) ? `
+                        ${contract.source_type === 'URL' && window.app.subscription?.plan === 'pro' ? `
                         <div style="margin-top: 24px; padding: 20px; border-top: 1px solid #eee;">
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                                 <div style="display:flex; align-items:center; gap:10px;">
