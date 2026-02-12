@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DIFFsense Logo Generator</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            padding: 40px;
+            background: #fdfcfb;
+            color: #2b2623;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #c5a059;
+            margin-bottom: 30px;
+        }
+
+        /* Logo preview matching the exact site header style */
+        .logo-preview {
+            font-size: 96px;
+            /* Scaled up for high-res */
+            font-family: "Helvetica", "Arial", sans-serif;
+            letter-spacing: 0.02em;
+            color: #c5a059;
+            font-weight: 800;
+            line-height: 1;
+            display: inline-flex;
+            align-items: center;
+            gap: 16px;
+            padding: 80px;
+            background: transparent;
+        }
+
+        .logo-preview i {
+            font-size: 96px;
+        }
+
+        canvas {
+            border: 2px solid #eee;
+            margin: 20px 0;
+            display: block;
+        }
+
+        button {
+            background: #c5a059;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+
+        button:hover {
+            background: #9e8047;
+        }
+
+        .info {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>DIFFsense ロゴ生成ツール</h1>
+        <div class="info">
+            <p>サイトのヘッダーで使用されているロゴ（天秤アイコン + DIFFsenseテキスト）を高解像度PNGとして保存します。</p>
+        </div>
+
+        <!-- Logo Preview (hidden, used for rendering) -->
+        <div id="logoContainer" style="position: absolute; left: -9999px;">
+            <div class="logo-preview" id="logoPreview">
+                <i class="fa-solid fa-scale-balanced"></i>DIFFsense
+            </div>
+        </div>
+
+        <canvas id="canvas" width="2048" height="2048"></canvas>
+
+        <div>
+            <button onclick="generateLogo()">ロゴを生成</button>
+            <button onclick="downloadPNG2048()">PNG (2048x2048) ダウンロード</button>
+            <button onclick="downloadPNG512()">PNG (512x512) ダウンロード</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        function generateLogo() {
+            // Clear canvas with transparent background
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Set font and style matching the site header
+            ctx.font = '800 192px Helvetica, Arial, sans-serif';
+            ctx.fillStyle = '#c5a059';
+            ctx.textBaseline = 'middle';
+            ctx.letterSpacing = '0.02em';
+
+            // Draw the scale icon (using Unicode character for balance scale)
+            const scaleIcon = '⚖';
+            const iconX = 600;
+            const iconY = 1024;
+            ctx.font = '800 240px Arial';
+            ctx.fillText(scaleIcon, iconX, iconY);
+
+            // Draw the text "DIFFsense"
+            ctx.font = '800 192px Helvetica, Arial, sans-serif';
+            const textX = iconX + 280;
+            const textY = iconY;
+            ctx.fillText('DIFFsense', textX, textY);
+
+            console.log('Logo generated on canvas');
+        }
+
+        function downloadPNG2048() {
+            canvas.toBlob(function (blob) {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'diffsense-logo-2048.png';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 'image/png');
+        }
+
+        function downloadPNG512() {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = 512;
+            tempCanvas.height = 512;
+            const tempCtx = tempCanvas.getContext('2d');
+
+            // Scale down the main canvas to 512x512
+            tempCtx.drawImage(canvas, 0, 0, 2048, 2048, 0, 0, 512, 512);
+
+            tempCanvas.toBlob(function (blob) {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'diffsense-logo-512.png';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 'image/png');
+        }
+
+        // Auto-generate on page load
+        window.onload = function () {
+            generateLogo();
+        };
+    </script>
+</body>
+
+</html>

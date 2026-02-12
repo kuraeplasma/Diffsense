@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SVG to PNG Converter</title>
+    <style>
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            padding: 40px;
+            background: #fdfcfb;
+            color: #2b2623;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #c5a059;
+            margin-bottom: 30px;
+        }
+
+        canvas {
+            border: 2px solid #eee;
+            margin: 20px 0;
+            display: block;
+        }
+
+        button {
+            background: #c5a059;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+
+        button:hover {
+            background: #9e8047;
+        }
+
+        .info {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>DIFFsense ロゴ - PNG変換ツール</h1>
+        <div class="info">
+            <p>天秤のロゴを高解像度PNG（2048x2048px）として保存します。</p>
+        </div>
+
+        <canvas id="canvas" width="2048" height="2048"></canvas>
+
+        <div>
+            <button onclick="downloadPNG()">PNG形式でダウンロード (2048x2048)</button>
+            <button onclick="downloadPNG512()">PNG形式でダウンロード (512x512)</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // SVG content
+        const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Minimalist Scale Icon matching the DIFFsense logo exactly -->
+  <g fill="none" stroke="#c5a059" stroke-width="24" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Base -->
+    <line x1="150" y1="400" x2="362" y2="400" />
+    <!-- Pillar -->
+    <line x1="256" y1="400" x2="256" y2="120" />
+    <!-- Beam (Crossbar) -->
+    <line x1="120" y1="120" x2="392" y2="120" />
+    
+    <!-- Left Pan (Strings + Pan) -->
+    <path d="M120 120 L80 250 L160 250 Z" /> <!-- String structure -->
+    <path fill="#c5a059" stroke="none" d="M70 250 L170 250 L155 285 L85 285 Z" /> <!-- Pan body -->
+    
+    <!-- Right Pan (Strings + Pan) -->
+    <path d="M392 120 L352 250 L432 250 Z" /> <!-- String structure -->
+    <path fill="#c5a059" stroke="none" d="M342 250 L442 250 L427 285 L357 285 Z" /> <!-- Pan body -->
+  </g>
+</svg>`;
+
+        // Convert SVG to Image and draw on canvas
+        function renderSVG() {
+            const img = new Image();
+            const blob = new Blob([svgContent], { type: 'image/svg+xml' });
+            const url = URL.createObjectURL(blob);
+
+            img.onload = function () {
+                // Clear canvas with transparent background
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Draw SVG scaled to canvas size
+                ctx.drawImage(img, 0, 0, 2048, 2048);
+                URL.revokeObjectURL(url);
+            };
+
+            img.src = url;
+        }
+
+        function downloadPNG() {
+            canvas.toBlob(function (blob) {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'diffsense-social-icon-2048.png';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 'image/png');
+        }
+
+        function downloadPNG512() {
+            // Create temporary 512x512 canvas
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = 512;
+            tempCanvas.height = 512;
+            const tempCtx = tempCanvas.getContext('2d');
+
+            const img = new Image();
+            const blob = new Blob([svgContent], { type: 'image/svg+xml' });
+            const url = URL.createObjectURL(blob);
+
+            img.onload = function () {
+                tempCtx.clearRect(0, 0, 512, 512);
+                tempCtx.drawImage(img, 0, 0, 512, 512);
+
+                tempCanvas.toBlob(function (blob) {
+                    const downloadUrl = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = downloadUrl;
+                    a.download = 'diffsense-social-icon-512.png';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(downloadUrl);
+                }, 'image/png');
+
+                URL.revokeObjectURL(url);
+            };
+
+            img.src = url;
+        }
+
+        // Render on page load
+        renderSVG();
+    </script>
+</body>
+
+</html>
