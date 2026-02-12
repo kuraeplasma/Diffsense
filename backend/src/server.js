@@ -95,6 +95,23 @@ app.get('/health', (req, res) => {
 // Webhook routes (NO auth - called directly by PayPal)
 app.use('/webhook', webhookRoutes);
 
+// Public payment config (no auth - needed for PayPal JS SDK on frontend)
+app.get('/payment/config', (req, res) => {
+    const mode = process.env.PAYPAL_MODE || 'sandbox';
+    res.json({
+        success: true,
+        data: {
+            clientId: process.env.PAYPAL_CLIENT_ID,
+            mode: mode,
+            planIds: {
+                starter: process.env.PAYPAL_PLAN_STARTER,
+                business: process.env.PAYPAL_PLAN_BUSINESS,
+                pro: process.env.PAYPAL_PLAN_PRO
+            }
+        }
+    });
+});
+
 // API routes (Protected by Auth Middleware)
 app.use('/contracts', authMiddleware, contractRoutes);
 app.use('/db', authMiddleware, dbRoutes);

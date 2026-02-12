@@ -2,8 +2,6 @@ import { dbService } from './db-service.js';
 import { aiService } from './ai-service.js';
 
 // --- Static Content ---
-// --- Static Content ---
-// (Deleted: Backend integration completed)
 
 // --- View Renderers ---
 const Views = {
@@ -33,7 +31,7 @@ const Views = {
                     <ul style="list-style: none; padding: 0; margin-bottom: 20px; font-size: 0.85rem; color: #555; flex:1;">
                         ${p.features.map(f => `<li style="margin-bottom:8px;"><i class="fa-solid fa-check" style="color:#c19b4a; margin-right:8px;"></i>${f}</li>`).join('')}
                     </ul>
-                    ${!isCurrent ? `<button class="btn-dashboard full-width" style="background:#c19b4a; color:#fff; border:none;" onclick="window.app.startPayPalSubscription('${p.id}')">アップグレード</button>` : ''}
+                    ${!isCurrent ? `<button class="btn-dashboard full-width" style="background:#c19b4a; color:#fff; border:none;" onclick="window.app.startPayPalSubscription('${p.id}')">プランを変更する</button>` : ''}
                 </div>
             `;
         }).join('');
@@ -47,7 +45,7 @@ const Views = {
                         <i class="fa-solid fa-circle-check" style="color:#22c55e; font-size:1.2rem;"></i>
                         <strong style="color:#166534;">お支払い方法が登録されています</strong>
                     </div>
-                    <p style="font-size:0.85rem; color:#555; margin:0;">PayPalサブスクリプション: アクティブ</p>
+                    <p style="font-size:0.85rem; color:#555; margin:0;">サブスクリプション: アクティブ</p>
                 </div>
             `;
         } else {
@@ -59,11 +57,11 @@ const Views = {
                     </div>
                     <p style="font-size:0.85rem; color:#555; margin-bottom:16px;">
                         ${sub.isInTrial
-                            ? 'トライアル終了前にお支払い方法を登録すると、自動的に有料プランに移行します。'
+                            ? 'トライアル終了後も継続利用するには、お支払い方法（PayPal/クレジットカード）の登録が必要です。'
                             : 'トライアルが終了しました。継続利用にはお支払い方法の登録が必要です。'}
                     </p>
-                    <button onclick="window.app.startPayPalSubscription()" class="btn-dashboard" style="background:#0070ba; color:#fff; border:none; padding:10px 24px; border-radius:6px; font-weight:600; cursor:pointer;">
-                        <i class="fa-brands fa-paypal" style="margin-right:8px;"></i>PayPalでお支払い方法を登録
+                    <button onclick="window.app.startPayPalSubscription()" class="btn-dashboard" style="background:#c19b4a; color:#fff; border:none; padding:10px 24px; border-radius:6px; font-weight:600; cursor:pointer;">
+                        <i class="fa-solid fa-credit-card" style="margin-right:8px;"></i>お支払い方法を登録する
                     </button>
                 </div>
             `;
@@ -89,9 +87,6 @@ const Views = {
                 ${cards}
             </div>
             ${cancelSection}
-            <div class="upgrade-promo-box">
-                <p><i class="fa-solid fa-gift"></i> ご不明な点はサポートチームまでお気軽にお問い合わせください。</p>
-            </div>
         `;
     },
     // 1. Dashboard Overview
@@ -307,18 +302,8 @@ const Views = {
             };
         }
 
-        // デバッグ情報の表示（ユーザー要件：検証用）
-        const debugInfoHtml = `
-            <div class="debug-info-panel" style="margin-bottom: 20px; padding: 10px; background: #fff0f0; border: 2px solid red; font-size: 11px; color: #333;">
-                <strong>🛠 強制デバッグモード (PDF検証)</strong><br>
-                Contract ID: <b>${contract.id}</b><br>
-                Source Type: <b>${contract.source_type}</b><br>
-                PDF URL (DB): <b>${contract.pdf_url ? contract.pdf_url : '<span style="color:red">NULL</span>'}</b><br>
-                Storage Path: <b>${contract.pdf_storage_path ? contract.pdf_storage_path : '<span style="color:red">NULL</span>'}</b><br>
-                Original Filename: ${contract.original_filename}<br>
-                <button onclick="alert('PDF URL: ' + '${contract.pdf_url}')">URL確認</button>
-            </div>
-        `;
+        // デバッグ情報（開発時のみ表示）
+        const debugInfoHtml = '';
 
         const changesHtml = (diffData.changes.length > 0 ? diffData.changes : []).map(c => `
             <div style="margin-bottom: 24px; border:1px solid #eee; border-radius:4px; overflow:hidden;">
@@ -347,10 +332,6 @@ const Views = {
                             <i class="fa-solid fa-arrow-left"></i>
                         </a>
                         <h2 style="font-size:18px; font-weight:700; color:var(--text-main); margin:0;">${diffData.title}</h2>
-                        <div class="flex gap-sm">
-                            <span class="badge ${contract.risk_level === 'High' ? 'badge-danger' : 'badge-warning'}">${contract.risk_level === 'High' ? 'High' : (contract.risk_level === 'Medium' ? 'Medium' : 'Low')}</span>
-                            <span class="badge ${contract.status === '確認済' ? 'badge-neutral' : 'badge-warning'}">${contract.status}</span>
-                        </div>
                         <div style="font-size:12px; color:#666; margin-top:4px;">
                             ${contract.source_url ? `<i class="fa-solid fa-link"></i> Source: <a href="${contract.source_url}" target="_blank" style="color:#2196F3; text-decoration:underline;">${contract.source_url}</a>` : ''}
                             ${contract.original_filename ? `<i class="fa-solid fa-file-pdf"></i> Original File: ${contract.original_filename}` : ''}
@@ -359,7 +340,6 @@ const Views = {
                     <div class="flex gap-sm">
                         ${(window.app.subscription?.plan === 'pro') ? `<button class="btn-dashboard" onclick="window.app.exportPDF(${contract.id})"><i class="fa-solid fa-file-pdf"></i> PDF出力</button>` : ''}
                         ${window.app.can('operate_contract') ? `<button class="btn-dashboard" onclick="window.app.showHistoryModal(${id})"><i class="fa-solid fa-note-sticky"></i> メモ</button>` : ''}
-                        <button class="btn-dashboard" style="background:#fff;"><i class="fa-solid fa-share-nodes"></i> 共有</button>
                         ${window.app.can('operate_contract')
                 ? (contract.status === '未処理'
                     ? ''
@@ -379,16 +359,24 @@ const Views = {
                         </div>
                         <div class="pane-scroll-area">
                             <div class="analysis-section-title">
-                                <i class="fa-solid fa-circle-exclamation text-warning"></i> 検知された重要な変更点
+                                <i class="fa-solid fa-robot text-primary"></i> AIリスク要約
                             </div>
-                            <div style="margin-bottom:32px;">
-                                ${changesHtml}
+                            <div style="margin-bottom:24px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:16px;">
+                                <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+                                    <span class="badge ${diffData.riskLevel >= 3 ? 'badge-danger' : diffData.riskLevel >= 2 ? 'badge-warning' : 'badge-success'}">
+                                        ${diffData.riskLevel >= 3 ? 'High' : diffData.riskLevel >= 2 ? 'Medium' : 'Low'}
+                                    </span>
+                                    <span style="font-size:12px; color:#666;">${diffData.riskReason || ''}</span>
+                                </div>
+                                <div style="font-size:13px; color:#333; line-height:1.7; white-space:pre-wrap;">${diffData.summary || 'AI解析結果がありません'}</div>
                             </div>
 
                             <div class="analysis-section-title">
-                                <i class="fa-solid fa-robot text-primary"></i> AIリスク要約
+                                <i class="fa-solid fa-circle-exclamation text-warning"></i> 検知された重要な変更点
                             </div>
-
+                            <div style="margin-bottom:32px;">
+                                ${changesHtml || '<div style="padding:20px; text-align:center; color:#999; font-size:13px;">変更点は検知されませんでした</div>'}
+                            </div>
                         </div>
                         
                         ${contract.source_type === 'URL' && (window.app.subscription?.plan === 'pro' || window.app.subscription?.isInTrial) ? `
@@ -453,7 +441,7 @@ const Views = {
                             <button class="tab-item ${activeTab === 'diff' ? 'active' : ''}" onclick="window.app.setDetailTab('diff')">差分表示</button>
                             <button class="tab-item ${activeTab === 'original' ? 'active' : ''}" onclick="window.app.setDetailTab('original')">原本全文</button>
                         </div>
-                        <div class="pane-scroll-area ${activeTab === 'original' && (contract.pdf_url || contract.pdf_storage_path) ? '' : 'document-pane-bg is-frameless'}" style="padding:0; flex:1; display:flex; flex-direction:column; overflow:hidden;">
+                        <div class="pane-scroll-area ${activeTab === 'original' && (contract.pdf_url || contract.pdf_storage_path) ? '' : 'document-pane-bg is-frameless'}" style="padding:0; flex:1; display:flex; flex-direction:column; overflow-y:auto;">
                                 ${activeTab === 'original' && (contract.pdf_url || contract.pdf_storage_path)
                 ? `<div style="width:100%; height:100%; display:flex; flex-direction:column;">
                         <iframe src="${contract.pdf_url || contract.pdf_storage_path}" style="width:100%; flex:1; border:none; background:#525659; min-height:600px;"></iframe>
@@ -731,7 +719,7 @@ class RegistrationFlow {
     handleFileSelect(file) {
         if (!file) return;
         if (file.type !== 'application/pdf') {
-            alert('PDFファイルを選択してください');
+            Notify.warning('PDFファイルを選択してください');
             return;
         }
 
@@ -759,7 +747,7 @@ class RegistrationFlow {
         const source = sourceInput ? sourceInput.value : "";
 
         if (!name) {
-            alert('管理名を入力してください');
+            Notify.warning('管理名を入力してください');
             return;
         }
 
@@ -819,7 +807,7 @@ class RegistrationFlow {
             console.error('Registration Error:', error);
             if (document.getElementById('reg-loading')) document.getElementById('reg-loading').remove();
             if (document.getElementById('reg-overlay')) document.getElementById('reg-overlay').remove();
-            alert('登録中にエラーが発生しました: ' + error.message);
+            Notify.error('登録中にエラーが発生しました: ' + error.message);
         }
     }
 
@@ -865,62 +853,12 @@ class RegistrationFlow {
             dbService.updateContractStatus(contractId, '登録失敗');
 
             // ユーザーにエラーを通知
-            alert(`申し訳ありません。PDFからのテキスト抽出に失敗しました。\n\n原因: ${error.message}\n\n※画像PDFやパスワード付きPDFは対応していない場合があります。`);
+            Notify.alert(`申し訳ありません。PDFからのテキスト抽出に失敗しました。\n\n原因: ${error.message}\n\n※画像PDFやパスワード付きPDFは対応していない場合があります。`, { type: 'error' });
 
             console.warn(`テキスト抽出に失敗: ${error.message}`);
         }
     }
 
-    async startAIAnalysis(contractId) {
-        try {
-            console.log(`Starting AI analysis for contract ${contractId}`);
-
-            let sourceData = this.tempData.source;
-
-            // PDFの場合はFileReaderでBase64に変換
-            if (this.tempData.method === 'pdf' && this.tempData.fileData) {
-                sourceData = await aiService.convertFileToBase64(this.tempData.fileData);
-            }
-
-            // バックエンドAPIに解析リクエスト
-            const result = await aiService.analyzeContract(
-                contractId,
-                this.tempData.method,
-                sourceData,
-                null  // previousVersion は将来の機能
-            );
-
-            if (result.success) {
-                // 解析結果をDBに保存
-                dbService.updateContractAnalysis(contractId, {
-                    extractedText: result.data.extractedText,
-                    changes: result.data.changes,
-                    riskLevel: result.data.riskLevel,
-                    riskReason: result.data.riskReason,
-                    summary: result.data.summary,
-                    status: '未確認'  // 解析完了、確認待ち
-                });
-
-                // UIを更新
-                if (this.app.currentView === 'dashboard' || this.app.currentView === 'contracts') {
-                    this.app.navigate(this.app.currentView);
-                }
-
-                alert('✅ AI解析が完了しました！\n\n契約書の差分とリスク判定が完了しました。');
-            } else {
-                throw new Error(result.error || '解析に失敗しました');
-            }
-
-        } catch (error) {
-            console.error('AI解析エラー:', error);
-
-            // エラーステータスに更新
-            dbService.updateContractStatus(contractId, '解析失敗');
-
-            // ユーザーにエラーを通知
-            alert(`❌ AI解析中にエラーが発生しました\n\n${error.message}\n\nバックエンドサーバーが起動しているか確認してください。`);
-        }
-    }
 }
 
 // --- App Logic ---
@@ -980,7 +918,7 @@ class DashboardApp {
             console.log('Dashboard App Initialized Successfully');
         } catch (error) {
             console.error('Initialization Error:', error);
-            alert('ダッシュボードの初期化中にエラーが発生しました。詳細はコンソールを確認してください。');
+            Notify.error('ダッシュボードの初期化中にエラーが発生しました。詳細はコンソールを確認してください。');
         }
     }
 
@@ -1019,14 +957,12 @@ class DashboardApp {
                 await this.fetchSubscriptionStatus(token);
                 await this.fetchPaymentStatus(token);
 
-                // Handle PayPal return callback
+                // Check if trial expired and no payment method
+                this.checkTrialExpired();
+
+                // Clean any legacy payment URL params
                 const urlParams = new URLSearchParams(window.location.search);
-                if (urlParams.get('payment') === 'success' && urlParams.get('subscription_id')) {
-                    const plan = urlParams.get('plan') || null;
-                    await this.confirmPayPalSubscription(urlParams.get('subscription_id'), plan);
-                    // Clean URL
-                    history.replaceState(null, '', window.location.pathname);
-                } else if (urlParams.get('payment') === 'cancelled') {
+                if (urlParams.has('payment')) {
                     history.replaceState(null, '', window.location.pathname);
                 }
 
@@ -1105,31 +1041,145 @@ class DashboardApp {
     }
 
     async startPayPalSubscription(plan) {
+        const targetPlan = plan || this.subscription?.plan || 'starter';
         try {
-            const authModule = await import('./auth.js');
-            const token = await authModule.getIdToken();
-            const apiUrl = `${aiService.API_BASE}/payment/create-subscription`;
-
-            const response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ plan: plan || this.subscription?.plan || 'starter' })
-            });
-            const result = await response.json();
-
-            if (result.success && result.data.approvalUrl) {
-                // Redirect to PayPal for approval
-                window.location.href = result.data.approvalUrl;
-            } else {
-                alert('PayPalサブスクリプションの作成に失敗しました。\n' + (result.error || ''));
+            // Fetch PayPal config from backend
+            const configRes = await fetch(`${aiService.API_BASE}/payment/config`);
+            const configData = await configRes.json();
+            if (!configData.success) {
+                Notify.error('PayPal設定の取得に失敗しました。');
+                return;
             }
+            const { clientId, planIds } = configData.data;
+            const paypalPlanId = planIds[targetPlan];
+            if (!paypalPlanId) {
+                Notify.error('プランIDが見つかりません。');
+                return;
+            }
+
+            // If user has existing active subscription and is changing plans, cancel old one first
+            if (this.paymentStatus?.hasPaymentMethod && this.subscription?.plan !== targetPlan) {
+                const authModule = await import('./auth.js');
+                const token = await authModule.getIdToken();
+                try {
+                    await fetch(`${aiService.API_BASE}/payment/cancel-subscription`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+                    });
+                } catch (e) {
+                    console.warn('Failed to cancel old subscription:', e);
+                }
+            }
+
+            // Show modal with PayPal button container
+            this.showPayPalModal(targetPlan);
+
+            // Load PayPal JS SDK dynamically
+            await this.loadPayPalSDK(clientId);
+
+            // Render PayPal Buttons inside the modal
+            const container = document.getElementById('paypal-button-container');
+            if (!container) return;
+            // Clear loading spinner
+            container.innerHTML = '';
+            container.style = '';
+
+            paypal.Buttons({
+                style: {
+                    shape: 'rect',
+                    color: 'gold',
+                    layout: 'vertical',
+                    label: 'subscribe'
+                },
+                createSubscription: (data, actions) => {
+                    return actions.subscription.create({
+                        plan_id: paypalPlanId
+                    });
+                },
+                onApprove: async (data) => {
+                    console.log('Subscription approved:', data.subscriptionID);
+                    // Close the PayPal modal
+                    const modal = document.getElementById('paypal-modal-overlay');
+                    if (modal) modal.remove();
+
+                    // Confirm with backend
+                    await this.confirmPayPalSubscription(data.subscriptionID, targetPlan);
+                },
+                onCancel: () => {
+                    console.log('User cancelled PayPal subscription');
+                    const modal = document.getElementById('paypal-modal-overlay');
+                    if (modal) modal.remove();
+                    Notify.info('お支払いがキャンセルされました。');
+                },
+                onError: (err) => {
+                    console.error('PayPal Buttons error:', err);
+                    const modal = document.getElementById('paypal-modal-overlay');
+                    if (modal) modal.remove();
+                    Notify.error('お支払い処理でエラーが発生しました。');
+                }
+            }).render('#paypal-button-container');
+
         } catch (error) {
             console.error('PayPal subscription error:', error);
-            alert('お支払い処理でエラーが発生しました。');
+            Notify.error('お支払い処理でエラーが発生しました。');
         }
+    }
+
+    showPayPalModal(plan) {
+        // Remove existing modal if any
+        const existing = document.getElementById('paypal-modal-overlay');
+        if (existing) existing.remove();
+
+        const planNames = { starter: 'Starter', business: 'Business', pro: 'Pro / Legal' };
+        const planPrices = { starter: '¥1,480/月', business: '¥4,980/月', pro: '¥9,800/月' };
+
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay active';
+        overlay.id = 'paypal-modal-overlay';
+        overlay.innerHTML = `
+            <div class="modal-content" style="max-width:480px;">
+                <div class="modal-header">
+                    <h3 style="margin:0; font-size:1.1rem;">
+                        <i class="fa-solid fa-credit-card" style="margin-right:8px; color:#c19b4a;"></i>お支払い方法を登録
+                    </h3>
+                    <button class="btn-close" onclick="document.getElementById('paypal-modal-overlay').remove()">&times;</button>
+                </div>
+                <div class="modal-body" style="padding:24px;">
+                    <div style="background:#faf8f5; border:1px solid #e8e0d4; border-radius:8px; padding:16px; margin-bottom:20px; text-align:center;">
+                        <div style="font-size:0.8rem; color:#888; margin-bottom:4px;">選択プラン</div>
+                        <div style="font-size:1.1rem; font-weight:700; color:#24292E;">${planNames[plan] || plan}</div>
+                        <div style="font-size:1.3rem; font-weight:700; color:#c19b4a; margin-top:4px;">${planPrices[plan] || ''}</div>
+                    </div>
+                    <p style="font-size:0.82rem; color:#666; margin-bottom:16px; text-align:center;">
+                        PayPalアカウントまたはクレジットカード/デビットカードで<br>お支払いいただけます。
+                    </p>
+                    <div id="paypal-button-container" style="min-height:150px; display:flex; align-items:center; justify-content:center;">
+                        <div style="color:#999; font-size:0.85rem;"><i class="fa-solid fa-spinner fa-spin" style="margin-right:8px;"></i>読み込み中...</div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+    }
+
+    loadPayPalSDK(clientId) {
+        return new Promise((resolve, reject) => {
+            // If already loaded, resolve immediately
+            if (window.paypal) {
+                resolve();
+                return;
+            }
+            // Remove any existing PayPal script
+            const existingScript = document.getElementById('paypal-sdk-script');
+            if (existingScript) existingScript.remove();
+
+            const script = document.createElement('script');
+            script.id = 'paypal-sdk-script';
+            script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&vault=true&intent=subscription&locale=ja_JP`;
+            script.onload = () => resolve();
+            script.onerror = () => reject(new Error('PayPal SDKの読み込みに失敗しました'));
+            document.head.appendChild(script);
+        });
     }
 
     async confirmPayPalSubscription(subscriptionId, plan) {
@@ -1149,20 +1199,60 @@ class DashboardApp {
             const result = await response.json();
 
             if (result.success) {
-                this.paymentStatus = { hasPaymentMethod: true };
-                // Update local plan state
-                if (result.data.plan) {
-                    this.subscription.plan = result.data.plan;
-                    this.userPlan = result.data.plan;
-                }
-                // Refresh subscription data from server
-                await this.fetchSubscriptionStatus(token);
-                this.updateSubscriptionUI();
-                alert('お支払い方法が正常に登録されました！');
-                this.navigate('plan');
+                const confirmedPlan = result.data.plan || plan || this.subscription?.plan || 'starter';
+                // Redirect to thanks page for GA conversion tracking
+                window.location.replace(`thanks-payment.html?plan=${confirmedPlan}`);
             }
         } catch (error) {
             console.error('Confirm subscription error:', error);
+        }
+    }
+
+    checkTrialExpired() {
+        const sub = this.subscription;
+        const payment = this.paymentStatus;
+        if (!sub) return;
+
+        // トライアル切れ + 決済未登録の場合にポップアップ表示
+        const isTrialExpired = sub.trialStartedAt && !sub.isInTrial;
+        const hasNoPayment = !payment || !payment.hasPaymentMethod;
+
+        if (isTrialExpired && hasNoPayment) {
+            const overlay = document.createElement('div');
+            overlay.className = 'modal-overlay';
+            overlay.id = 'trial-expired-overlay';
+            overlay.innerHTML = `
+                <div class="modal-content" style="max-width:520px;">
+                    <div class="modal-header" style="background:#fffbeb; border-bottom:1px solid #fbbf24;">
+                        <h3 style="color:#92400e; margin:0; font-size:1.1rem;">
+                            <i class="fa-solid fa-clock" style="margin-right:8px;"></i>無料トライアルが終了しました
+                        </h3>
+                        <button class="btn-close" onclick="document.getElementById('trial-expired-overlay').remove()">×</button>
+                    </div>
+                    <div class="modal-body" style="padding:24px;">
+                        <p style="margin-bottom:16px; color:#333; font-size:0.95rem;">
+                            7日間の無料トライアル期間が終了しました。<br>
+                            引き続きDIFFsenseをご利用いただくには、お支払い方法の登録が必要です。
+                        </p>
+                        <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:8px; padding:16px; margin-bottom:20px;">
+                            <p style="font-size:0.85rem; color:#0369a1; margin:0 0 8px 0; font-weight:600;">
+                                <i class="fa-solid fa-info-circle" style="margin-right:6px;"></i>お支払い方法
+                            </p>
+                            <ul style="font-size:0.82rem; color:#555; margin:0; padding-left:20px;">
+                                <li style="margin-bottom:4px;">PayPalアカウント</li>
+                                <li>クレジットカード / デビットカード</li>
+                            </ul>
+                        </div>
+                        <div style="display:flex; gap:12px; justify-content:flex-end;">
+                            <button onclick="document.getElementById('trial-expired-overlay').remove()" class="btn-dashboard" style="padding:10px 20px;">後で</button>
+                            <button onclick="document.getElementById('trial-expired-overlay').remove(); window.app.navigate('plan');" class="btn-dashboard" style="background:#0070ba; color:#fff; border:none; padding:10px 24px; font-weight:600;">
+                                <i class="fa-solid fa-credit-card" style="margin-right:6px;"></i>お支払い方法を登録する
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
         }
     }
 
@@ -1176,12 +1266,12 @@ class DashboardApp {
                     <h3 style="color:#991b1b; margin:0; font-size:1.1rem;">
                         <i class="fa-solid fa-triangle-exclamation" style="margin-right:8px;"></i>プランのキャンセル
                     </h3>
-                    <button class="modal-close" onclick="document.getElementById('cancel-modal-overlay').remove()">×</button>
+                    <button class="btn-close" onclick="document.getElementById('cancel-modal-overlay').remove()">×</button>
                 </div>
                 <div class="modal-body" style="padding:24px;">
                     <p style="margin-bottom:16px; color:#333;">本当にプランをキャンセルしますか？</p>
                     <ul style="font-size:0.85rem; color:#666; margin-bottom:20px; padding-left:20px;">
-                        <li style="margin-bottom:6px;">PayPalサブスクリプションが停止されます</li>
+                        <li style="margin-bottom:6px;">サブスクリプションが停止されます</li>
                         <li style="margin-bottom:6px;">Starterプラン（無料）に戻ります</li>
                         <li style="margin-bottom:6px;">AI解析回数が月15回に制限されます</li>
                     </ul>
@@ -1219,14 +1309,14 @@ class DashboardApp {
                 this.subscription.plan = 'starter';
                 this.userPlan = 'starter';
                 this.updateSubscriptionUI();
-                alert('プランがキャンセルされました。Starterプランに移行しました。');
+                Notify.success('プランがキャンセルされました。Starterプランに移行しました。');
                 this.navigate('plan');
             } else {
-                alert('キャンセル処理でエラーが発生しました。');
+                Notify.error('キャンセル処理でエラーが発生しました。');
             }
         } catch (error) {
             console.error('Cancel subscription error:', error);
-            alert('キャンセル処理でエラーが発生しました。');
+            Notify.error('キャンセル処理でエラーが発生しました。');
         }
     }
 
@@ -1268,7 +1358,7 @@ class DashboardApp {
                 ${upgradeAdvice}
                 ${sub.isInTrial ? `
                 <div style="margin-top: 12px; font-size: 0.75rem; color: #a17e1a; border-top: 1px solid rgba(255, 255, 255, 0.05); padding-top: 8px;">
-                    <i class="fa-solid fa-circle-info"></i> トライアル終了後は ${planName} プランへ自動移行します。
+                    <i class="fa-solid fa-circle-info"></i> トライアル終了後、継続には決済登録が必要です。
                 </div>
                 ` : ''}
                 ${(sub.isInTrial && this.paymentStatus && !this.paymentStatus.hasPaymentMethod) ? `
@@ -1332,7 +1422,7 @@ class DashboardApp {
                 const urlInput = document.getElementById('new-version-url');
                 const url = urlInput ? urlInput.value.trim() : "";
                 if (!url) {
-                    alert("URLを入力してください");
+                    Notify.warning('URLを入力してください');
                     return;
                 }
                 const contractId = submitUrlBtn.getAttribute('data-contract-id');
@@ -1503,10 +1593,6 @@ class DashboardApp {
         this.navigate('diff', this.currentViewParams);
     }
 
-    searchContracts(query) {
-        this.updateFilter('query', query);
-    }
-
     changePage(newPage) {
         this.currentPage = newPage;
         this.navigate('contracts', { page: newPage });
@@ -1523,17 +1609,17 @@ class DashboardApp {
     async analyzeContract(id) {
         const contract = dbService.getContractById(id);
         if (!contract) {
-            alert('契約が見つかりません');
+            Notify.error('契約が見つかりません');
             return;
         }
 
         if (!contract.original_content) {
-            alert('元のテキストが見つかりません。再度登録してください。');
+            Notify.error('元のテキストが見つかりません。再度登録してください。');
             return;
         }
 
         // 確認ダイアログ
-        if (!confirm(`「${contract.name}」の差分解析を実行しますか？\n\nAI解析により、リスク判定と変更箇所の抽出を行います。`)) {
+        if (!await Notify.confirm(`「${contract.name}」の差分解析を実行しますか？\n\nAI解析により、リスク判定と変更箇所の抽出を行います。`, { title: '確認', type: 'info' })) {
             return;
         }
 
@@ -1569,21 +1655,21 @@ class DashboardApp {
                 // 画面を再読み込み
                 this.navigate('diff', id);
 
-                alert('✅ AI解析が完了しました！\n\nリスク判定と差分抽出が完了しました。');
+                Notify.success('AI解析が完了しました！リスク判定と差分抽出が完了しました。');
             } else {
                 throw new Error(result.error || '解析に失敗しました');
             }
 
         } catch (error) {
             console.error('AI解析エラー:', error);
-            alert(`❌ AI解析中にエラーが発生しました\n\n${error.message}`);
+            Notify.error(`AI解析中にエラーが発生しました: ${error.message}`);
         }
     }
 
     uploadNewVersion(id) {
         const contract = dbService.getContractById(id);
         if (!contract) {
-            alert('契約が見つかりません');
+            Notify.error('契約が見つかりません');
             return;
         }
 
@@ -1612,7 +1698,7 @@ class DashboardApp {
             if (!file) return;
 
             if (file.type !== 'application/pdf') {
-                alert('PDFファイルを選択してください');
+                Notify.warning('PDFファイルを選択してください');
                 return;
             }
 
@@ -1686,8 +1772,9 @@ class DashboardApp {
                         this.navigate('diff', id);
 
                         // 部分的な失敗（AI解析のみ失敗）のチェック
-                        if (result.data.riskReason && result.data.riskReason.includes("AI解析サーバーからの応答がありませんでした")) {
-                            if (confirm("⚠️ AI解析に失敗しました。\n\nテキストデータの取り込みは完了しましたが、AIによるリスク判定ができませんでした。\n\nもう一度解析を試みますか？\n（[OK]を押すと再試行します）")) {
+                        const aiFailed = result.data.aiFailed || (result.data.riskReason && result.data.riskReason.includes("AI解析サーバーからの応答がありませんでした"));
+                        if (aiFailed) {
+                            if (await Notify.confirm('AI解析に失敗しました。\n\nテキストデータの取り込みは完了しましたが、AIによるリスク判定ができませんでした。\n\n※ 解析失敗時は利用回数を消費しません。\nもう一度解析を試みますか？', { title: '確認', type: 'warning' })) {
                                 await performAnalysis(retryCount + 1);
                                 return;
                             } else {
@@ -1706,7 +1793,7 @@ class DashboardApp {
                     if (document.getElementById('analysis-loading')) document.getElementById('analysis-loading').remove();
                     if (document.getElementById('analysis-overlay')) document.getElementById('analysis-overlay').remove();
 
-                    if (confirm(`❌ エラーが発生しました\n\n${error.message}\n\nもう一度試しますか？`)) {
+                    if (await Notify.confirm(`エラーが発生しました: ${error.message}\n\nもう一度試しますか？`, { title: '確認', type: 'error' })) {
                         await performAnalysis(retryCount + 1);
                     }
                 }
@@ -1777,7 +1864,7 @@ class DashboardApp {
                     // 画面を再読み込み (差分表示を優先)
                     this.activeDetailTab = 'diff';
                     this.navigate('diff', id);
-                    alert('✅ 最新バージョンの取り込みとAI解析が完了しました！');
+                    Notify.success('最新バージョンの取り込みとAI解析が完了しました！');
                 } else {
                     throw new Error(result.error || '解析に失敗しました');
                 }
@@ -1787,7 +1874,7 @@ class DashboardApp {
                 if (document.getElementById('analysis-loading')) document.getElementById('analysis-loading').remove();
                 if (document.getElementById('analysis-overlay')) document.getElementById('analysis-overlay').remove();
 
-                if (confirm(`❌ エラーが発生しました: ${error.message}\n\nもう一度試しますか？`)) {
+                if (await Notify.confirm(`エラーが発生しました: ${error.message}\n\nもう一度試しますか？`, { title: '確認', type: 'error' })) {
                     await performUrlAnalysis(retryCount + 1);
                 }
             }
@@ -2013,7 +2100,7 @@ class DashboardApp {
         const role = document.getElementById('invite-role').value;
 
         if (!name || !email) {
-            alert('名前とメールアドレスを入力してください');
+            Notify.warning('名前とメールアドレスを入力してください');
             return;
         }
 
@@ -2084,7 +2171,7 @@ class DashboardApp {
             document.getElementById('edit-member-modal').classList.remove('active');
             this.navigate('team');
         } else {
-            alert('更新に失敗しました');
+            Notify.error('更新に失敗しました');
         }
     }
 
@@ -2093,7 +2180,7 @@ class DashboardApp {
 
         // Final safeguard against self-deletion
         if (this.currentUser && email === this.currentUser.email) {
-            alert('自分自身のアカウントは削除できません。');
+            Notify.warning('自分自身のアカウントは削除できません。');
             return;
         }
 
@@ -2108,7 +2195,7 @@ class DashboardApp {
             document.getElementById('edit-member-modal').classList.remove('active');   // Close edit modal
             this.navigate('team');
         } else {
-            alert('削除に失敗しました（管理者は削除できない場合があります）');
+            Notify.error('削除に失敗しました（管理者は削除できない場合があります）');
             document.getElementById('delete-confirm-modal').classList.remove('active');
         }
     }
@@ -2118,7 +2205,7 @@ class DashboardApp {
      */
     toggleMonitoring(id, enabled) {
         dbService.toggleMonitoring(id, enabled);
-        this.navigate('diff', { id }); // Refresh view
+        this.navigate('diff', id);
     }
 
     /**
@@ -2129,13 +2216,16 @@ class DashboardApp {
         if (!contract || !contract.source_url) return;
 
         try {
-            this.showLoading('URLをチェックしています...');
+            Notify.info('URLをチェックしています...');
+
+            const authModule = await import('./auth.js');
+            const token = await authModule.getIdToken();
 
             const response = await fetch(`${aiService.API_BASE}/crawl`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${sessionStorage.getItem('idToken')}`
+                    'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify({
                     url: contract.source_url,
@@ -2144,28 +2234,28 @@ class DashboardApp {
             });
 
             const result = await response.json();
-            this.hideLoading();
+            // loading complete
 
             if (result.success) {
                 dbService.updateCrawlResult(id, result);
 
                 if (result.changed) {
-                    if (confirm('更新（差分）が検知されました。AI解析を実行して内容を確認しますか？\n（解析回数を1回消費します）')) {
+                    if (await Notify.confirm('更新（差分）が検知されました。AI解析を実行して内容を確認しますか？\n（解析回数を1回消費します）', { title: '確認', type: 'info' })) {
                         await this.performAIAnalysis(id);
                     } else {
-                        this.navigate('diff', { id });
+                        this.navigate('diff', id);
                     }
                 } else {
-                    alert('更新はありませんでした。');
+                    Notify.info('更新はありませんでした。');
                     this.navigate('diff', { id });
                 }
             } else {
                 throw new Error(result.error || 'クローリングに失敗しました');
             }
         } catch (error) {
-            this.hideLoading();
+            // loading complete
             console.error('Manual Crawl Error:', error);
-            alert('エラー: ' + error.message);
+            Notify.error('エラー: ' + error.message);
         }
     }
 
@@ -2178,12 +2268,12 @@ class DashboardApp {
         const user = fbModule.auth.currentUser;
 
         if (!user) {
-            alert('セッションが切れました。再ログインしてください。');
+            Notify.warning('セッションが切れました。再ログインしてください。');
             return;
         }
 
         try {
-            this.showLoading('AI解析を実行中...');
+            Notify.info('AI解析を実行中...');
             const idToken = await fbModule.auth.currentUser.getIdToken();
 
             // 履歴用の前バージョン内容を取得
@@ -2204,18 +2294,18 @@ class DashboardApp {
             });
 
             const resData = await response.json();
-            this.hideLoading();
+            // loading complete
 
             if (resData.success) {
                 dbService.updateContractAnalysis(id, resData.data);
-                this.navigate('diff', { id });
+                this.navigate('diff', id);
             } else {
                 throw new Error(resData.error || '解析に失敗しました');
             }
         } catch (error) {
-            this.hideLoading();
+            // loading complete
             console.error('AI Analysis Error:', error);
-            alert('解析エラー: ' + error.message);
+            Notify.error('解析エラー: ' + error.message);
         }
     }
 
@@ -2376,119 +2466,167 @@ class DashboardApp {
             const riskColor = contract.risk_level === 'High' ? '#D73A49' : (contract.risk_level === 'Medium' ? '#f1c40f' : '#2ecc71');
             const analysisDate = new Date().toLocaleString('ja-JP');
 
+            // Each direct child div = one section for page-break control
             container.innerHTML = `
                 <div style="padding: 40px; line-height: 1.6;">
-                    <div style="border-bottom: 2px solid #c19b4a; padding-bottom: 10px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: flex-end;">
+                    <!-- Section: Header -->
+                    <div style="border-bottom: 2px solid #c19b4a; padding-bottom: 10px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end;">
                         <h1 style="margin: 0; color: #c19b4a; font-size: 24px;">DIFFsense AI解析レポート</h1>
                         <span style="font-size: 12px; color: #888;">出力日: ${analysisDate}</span>
                     </div>
 
-                    <div style="margin-bottom: 25px; padding: 15px; background: #f9f9f9; border-radius: 4px;">
+                    <!-- Section: Document Info -->
+                    <div style="margin-bottom: 20px; padding: 15px; background: #f9f9f9; border-radius: 4px;">
                         <div style="margin-bottom: 8px;"><strong>対象ドキュメント:</strong> ${contract.original_filename || contract.name}</div>
                         ${contract.source_url ? `<div style="margin-bottom: 8px;"><strong>対象URL:</strong> ${contract.source_url}</div>` : ''}
                         <div style="display: flex; align-items: center; gap: 10px;">
-                            <strong>AIリスク判定:</strong> 
+                            <strong>AIリスク判定:</strong>
                             <span style="padding: 2px 10px; border-radius: 4px; background: ${riskColor}; color: white; font-weight: bold;">${contract.risk_level || 'Low'}</span>
                         </div>
                     </div>
 
-                    <h2 style="font-size: 18px; border-left: 4px solid #c19b4a; padding-left: 10px; margin: 30px 0 15px;">【解析要約】</h2>
-                    <div style="white-space: pre-wrap; margin-bottom: 30px;">${contract.ai_summary || '解析データなし'}</div>
-
-                    <h2 style="font-size: 18px; border-left: 4px solid #c19b4a; padding-left: 10px; margin: 30px 0 15px;">【AIリスク判定結果・理由】</h2>
-                    <div style="white-space: pre-wrap; margin-bottom: 30px;">${contract.ai_risk_reason || '判定データなし'}</div>
-
-                    <h2 style="font-size: 18px; border-left: 4px solid #c19b4a; padding-left: 10px; margin: 30px 0 15px;">【主要な差分箇所】</h2>
-                    <div style="margin-bottom: 30px;">
-                        ${(contract.ai_changes || []).map(c => `
-                            <div style="margin-bottom: 20px; border: 1px solid #eee; border-radius: 4px;">
-                                <div style="background: #f5f5f5; padding: 8px 12px; font-weight: bold; border-bottom: 1px solid #eee;">${c.section}</div>
-                                <div style="padding: 12px;">
-                                    <div style="background: #fff5f5; padding: 5px; margin-bottom: 5px;"><span style="color: #D73A49;">原文:</span> ${c.old}</div>
-                                    <div style="background: #f0fff4; padding: 5px;"><span style="color: #2ecc71;">修正後:</span> ${c.new}</div>
-                                    <div style="margin-top: 10px; font-size: 12px; color: #666;">
-                                        <strong>法的影響:</strong> ${c.impact || '-'}<br>
-                                        <strong>懸念点:</strong> ${c.concern || '-'}
-                                    </div>
-                                </div>
-                            </div>
-                        `).join('') || '<p style="color:#999;">差分データはありません</p>'}
+                    <!-- Section: AI Summary -->
+                    <div style="margin-bottom: 20px;">
+                        <h2 style="font-size: 18px; border-left: 4px solid #c19b4a; padding-left: 10px; margin: 0 0 15px;">【解析要約】</h2>
+                        <div style="white-space: pre-wrap;">${contract.ai_summary || '解析データなし'}</div>
                     </div>
 
-                    <h2 style="font-size: 18px; border-left: 4px solid #c19b4a; padding-left: 10px; margin: 30px 0 15px;">【原本（全文）】</h2>
-                    <div style="white-space: pre-wrap; background: #fafafa; padding: 20px; font-size: 12px; border: 1px solid #eee;">${contract.original_content || '原本データはありません'}</div>
-                    
-                    <div style="margin-top: 50px; text-align: center; border-top: 1px solid #eee; padding-top: 10px; font-size: 10px; color: #aaa;">
+                    <!-- Section: Risk Reason -->
+                    <div style="margin-bottom: 20px;">
+                        <h2 style="font-size: 18px; border-left: 4px solid #c19b4a; padding-left: 10px; margin: 0 0 15px;">【AIリスク判定結果・理由】</h2>
+                        <div style="white-space: pre-wrap;">${contract.ai_risk_reason || '判定データなし'}</div>
+                    </div>
+
+                    <!-- Section: Each change as separate section -->
+                    <div style="margin-bottom: 10px;">
+                        <h2 style="font-size: 18px; border-left: 4px solid #c19b4a; padding-left: 10px; margin: 0 0 15px;">【主要な差分箇所】</h2>
+                    </div>
+                    ${(contract.ai_changes || []).map(c => `
+                    <div style="margin-bottom: 15px; border: 1px solid #eee; border-radius: 4px;">
+                        <div style="background: #f5f5f5; padding: 8px 12px; font-weight: bold; border-bottom: 1px solid #eee;">${c.section}</div>
+                        <div style="padding: 12px;">
+                            <div style="background: #fff5f5; padding: 8px; margin-bottom: 5px; border-radius: 2px;"><span style="color: #D73A49; font-weight:600;">原文:</span> ${c.old}</div>
+                            <div style="background: #f0fff4; padding: 8px; border-radius: 2px;"><span style="color: #2ecc71; font-weight:600;">修正後:</span> ${c.new}</div>
+                            <div style="margin-top: 10px; font-size: 12px; color: #666;">
+                                <strong>法的影響:</strong> ${c.impact || '-'}<br>
+                                <strong>懸念点:</strong> ${c.concern || '-'}
+                            </div>
+                        </div>
+                    </div>
+                    `).join('') || '<div style="margin-bottom:20px;"><p style="color:#999;">差分データはありません</p></div>'}
+
+                    <!-- Section: Original Content -->
+                    <div style="margin-bottom: 20px;">
+                        <h2 style="font-size: 18px; border-left: 4px solid #c19b4a; padding-left: 10px; margin: 0 0 15px;">【原本（全文）】</h2>
+                        <div style="white-space: pre-wrap; background: #fafafa; padding: 20px; font-size: 12px; border: 1px solid #eee;">${contract.original_content || '原本データはありません'}</div>
+                    </div>
+
+                    <!-- Section: Footer -->
+                    <div style="text-align: center; border-top: 1px solid #eee; padding-top: 10px; font-size: 10px; color: #aaa;">
                         Generated by DIFFsense - Professional Contract Analysis Service
                     </div>
                 </div>
             `;
 
-            // 3. Render to Canvas then PDF
-            const canvas = await html2canvas(container, {
-                scale: 2, // High clarity
-                useCORS: true,
-                logging: false,
-                backgroundColor: '#ffffff'
-            });
-
-            const imgData = canvas.toDataURL('image/png');
+            // 3. Render each section separately to avoid mid-content page breaks
             const { jsPDF } = window.jspdf;
-
-            // Standard A4 dimensions
             const pdf = new jsPDF('p', 'mm', 'a4');
-            const imgWidth = 210; // A4 width
-            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            const pageWidth = 210;
+            const pageHeight = 297;
+            const margin = 15;
+            const contentWidth = pageWidth - margin * 2;
+            const usableHeight = pageHeight - margin * 2;
 
-            // If the content is longer than one A4 page
-            let heightLeft = imgHeight;
-            let position = 0;
+            // Get all direct child sections of the report
+            const reportInner = container.querySelector(':scope > div');
+            const sections = reportInner.children;
 
-            pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-            heightLeft -= 297;
+            let currentY = margin;
 
-            while (heightLeft >= 0) {
-                position = heightLeft - imgHeight;
-                pdf.addPage();
-                pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-                heightLeft -= 297;
+            for (let i = 0; i < sections.length; i++) {
+                const section = sections[i];
+
+                const canvas = await html2canvas(section, {
+                    scale: 2,
+                    useCORS: true,
+                    logging: false,
+                    backgroundColor: '#ffffff',
+                    width: 800
+                });
+
+                const imgData = canvas.toDataURL('image/png');
+                const sectionImgHeight = (canvas.height * contentWidth) / canvas.width;
+
+                // If this section is taller than a full page, fall back to slicing
+                if (sectionImgHeight > usableHeight) {
+                    // For very tall sections, slice into page-sized chunks
+                    let sliceY = 0;
+                    const sliceHeightPx = Math.floor((usableHeight / sectionImgHeight) * canvas.height);
+
+                    while (sliceY < canvas.height) {
+                        if (currentY > margin && currentY !== margin) {
+                            pdf.addPage();
+                            currentY = margin;
+                        }
+
+                        const remainPx = canvas.height - sliceY;
+                        const thisSlicePx = Math.min(sliceHeightPx, remainPx);
+                        const thisSliceMm = (thisSlicePx * contentWidth) / canvas.width;
+
+                        // Create a sub-canvas for this slice
+                        const sliceCanvas = document.createElement('canvas');
+                        sliceCanvas.width = canvas.width;
+                        sliceCanvas.height = thisSlicePx;
+                        const ctx = sliceCanvas.getContext('2d');
+                        ctx.drawImage(canvas, 0, sliceY, canvas.width, thisSlicePx, 0, 0, canvas.width, thisSlicePx);
+
+                        const sliceImg = sliceCanvas.toDataURL('image/png');
+                        pdf.addImage(sliceImg, 'PNG', margin, currentY, contentWidth, thisSliceMm);
+
+                        sliceY += thisSlicePx;
+                        if (sliceY < canvas.height) {
+                            pdf.addPage();
+                            currentY = margin;
+                        } else {
+                            currentY += thisSliceMm;
+                        }
+                    }
+                } else {
+                    // Check if section fits on current page
+                    if (currentY + sectionImgHeight > pageHeight - margin) {
+                        pdf.addPage();
+                        currentY = margin;
+                    }
+
+                    pdf.addImage(imgData, 'PNG', margin, currentY, contentWidth, sectionImgHeight);
+                    currentY += sectionImgHeight;
+                }
             }
 
-            pdf.save(`DIFFsense_Reprot_${contract.name}_${new Date().toISOString().split('T')[0]}.pdf`);
+            pdf.save(`DIFFsense_Report_${contract.name}_${new Date().toISOString().split('T')[0]}.pdf`);
             this.showToast('PDFを出力しました', 'success');
 
         } catch (error) {
             console.error('PDF Export Error:', error);
             this.showToast('PDFの生成中にエラーが発生しました', 'error');
+        } finally {
+            // Clean up off-screen container
+            const el = document.getElementById('pdf-export-container');
+            if (el) el.remove();
         }
     }
 
-    showToast(message, type = 'info') {
-        const toast = document.createElement('div');
-        toast.className = 'toast-modal';
-        // 中央モーダル通知を表示
-        toast.innerHTML = `
-            <div class="toast-modal-content">
-                <i class="fa-solid ${type === 'success' ? 'fa-circle-check' : type === 'error' ? 'fa-circle-xmark' : 'fa-info-circle'}" style="font-size:48px; color:${type === 'success' ? '#4CAF50' : type === 'error' ? '#D73A49' : '#2196F3'}; margin-bottom:16px;"></i>
-                <p style="font-size:16px; font-weight:500; color:#24292E; margin-bottom:24px;">${message}</p>
-                <button class="btn-check-doc" onclick="this.closest('.toast-modal').remove()">取り込んだ資料を確認する</button>
-            </div>
-        `;
-
-        document.body.appendChild(toast);
-
-        // アニメーション表示
-        setTimeout(() => toast.classList.add('show'), 10);
-
-        // 5秒後に自動削除（少し長くする）
-        setTimeout(() => {
-            toast.classList.remove('show');
-            setTimeout(() => {
-                if (document.body.contains(toast)) {
-                    document.body.removeChild(toast);
-                }
-            }, 300);
-        }, 5000);
+    showToast(message, type = 'info', duration = 3000) {
+        // Use Notify system for consistency
+        if (type === 'success') {
+            Notify.success(message);
+        } else if (type === 'error') {
+            Notify.error(message);
+        } else if (type === 'warning') {
+            Notify.warning(message);
+        } else {
+            Notify.info(message);
+        }
     }
 }
 

@@ -101,7 +101,7 @@
     <div id="url-input-modal" class="modal-overlay">
         <div class="modal-content" style="max-width: 500px;">
             <div class="modal-header">
-                <h3 id="modal-title">URLを更新</h3>
+                <h3 id="url-modal-title">URLを更新</h3>
                 <button class="btn-close"
                     onclick="document.getElementById('url-input-modal').classList.remove('active')">&times;</button>
             </div>
@@ -245,8 +245,10 @@
         </div>
     </div>
 
+    <!-- Notification System -->
+    <script src="js/notify.js"></script>
     <!-- App Logic -->
-    <script type="module" src="js/dashboard.js?v=1.1.2"></script>
+    <script type="module" src="js/dashboard.js?v=1.4.0"></script>
     <script type="module">
         import { requireAuth, handleLogout } from './js/auth.js';
 

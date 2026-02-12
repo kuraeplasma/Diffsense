@@ -8,22 +8,20 @@ import {
 
 /**
  * Handle Sign Up
- * @param {string} email 
- * @param {string} password 
+ * @param {string} email
+ * @param {string} password
  */
 export async function handleSignUp(email, password) {
     try {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
         console.log("Signed up user:", user);
-        // Alert is used for simplicity, in production custom UI is better
-        alert("アカウント作成に成功しました！");
-        // プランがLP経由で既に選択済みならダッシュボードへ直行、未選択ならプラン選択画面へ
+        // プランがLP経由で既に選択済みならサンクスページ経由でダッシュボードへ
         const selectedPlan = localStorage.getItem('diffsense_selected_plan');
         if (selectedPlan) {
-            window.location.replace("dashboard.html");
+            window.location.replace("thanks-signup.html?next=dashboard");
         } else {
-            window.location.replace("select-plan.html");
+            window.location.replace("thanks-signup.html");
         }
     } catch (error) {
         console.error("Error signing up:", error);
@@ -33,16 +31,16 @@ export async function handleSignUp(email, password) {
         } else if (error.code === 'auth/weak-password') {
             msg = "パスワードは6文字以上で設定してください。";
         } else if (error.code === 'auth/operation-not-allowed') {
-            msg = "【重要】Firebaseの設定で「メール/パスワード」ログインが有効になっていません。\nFirebaseコンソールのAuthentication設定を確認してください。";
+            msg = "Firebaseの設定で「メール/パスワード」ログインが有効になっていません。";
         }
-        alert(msg);
+        Notify.error(msg);
     }
 }
 
 /**
  * Handle Login
- * @param {string} email 
- * @param {string} password 
+ * @param {string} email
+ * @param {string} password
  */
 export async function handleLogin(email, password) {
     try {
@@ -52,7 +50,7 @@ export async function handleLogin(email, password) {
         window.location.replace("dashboard.html");
     } catch (error) {
         console.error("Error logging in:", error);
-        alert("メールアドレスまたはパスワードが間違っています。");
+        Notify.error("メールアドレスまたはパスワードが間違っています。", { title: 'ログイン失敗' });
     }
 }
 
@@ -76,13 +74,10 @@ export async function handleLogout() {
 export function requireAuth() {
     onAuthStateChanged(auth, (user) => {
         if (!user) {
-            // No user is signed in, redirect to login
             console.log("No user found, redirecting to login.");
             window.location.replace("login.html");
         } else {
-            // User is signed in
             console.log("User is authenticated:", user.email);
-            // Optionally update UI with user info
             const userEmailEl = document.getElementById('user-email-display');
             if (userEmailEl) {
                 userEmailEl.textContent = user.email;
@@ -99,7 +94,7 @@ export function getIdToken() {
             unsubscribe();
             if (user) {
                 try {
-                    const token = await user.getIdToken(true); // Force refresh
+                    const token = await user.getIdToken();
                     resolve(token);
                 } catch (e) {
                     reject(e);

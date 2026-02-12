@@ -41,7 +41,8 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                 logger.warn(`Trial expired and no payment method for user ${uid}`);
                 return res.status(403).json({
                     success: false,
-                    error: "無料トライアル期間（7日間）が終了しました。継続して利用するには、プランの契約とクレジットカードの登録が必要です。"
+                    error: "無料トライアル期間（7日間）が終了しました。継続して利用するには、お支払い方法（PayPal/クレジットカード）の登録が必要です。",
+                    code: "TRIAL_EXPIRED"
                 });
             } else {
                 logger.info(`Trial expired but user ${uid} has payment method. Auto-continuing to paid plan.`);
@@ -65,81 +66,57 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
         let pdfStoragePath = null;
         if (method === 'pdf') {
             const { bucket } = require('../firebase');
-            const admin = require('firebase-admin'); // Assuming firebase-admin is initialized elsewhere
-
-            // Check if Firebase Storage is available (Production or correctly configured Dev)
-            // We use a simple check: if we are in production OR if we have credentials
-            const isProduction = process.env.NODE_ENV === 'production';
-            const hasFirebaseCredentials = process.env.FIREBASE_PRIVATE_KEY || (admin.apps.length > 0 && admin.app().options.credential);
-            const useFirebase = isProduction || hasFirebaseCredentials;
 
             // Remove data URL prefix
             const base64Clean = source.replace(/^data:application\/pdf;base64,/, '');
             const buffer = Buffer.from(base64Clean, 'base64');
 
-            if (useFirebase) {
-                // Production / Firebase Mode
+            // Try to upload to Firebase Storage (optional - analysis continues even if this fails)
+            if (bucket) {
                 try {
-                    // Storage path: contracts/{contractId}/{timestamp}.pdf
                     pdfStoragePath = `contracts/${contractId}/${Date.now()}.pdf`;
                     const file = bucket.file(pdfStoragePath);
 
-                    // Upload to Firebase Storage
                     await file.save(buffer, {
                         metadata: { contentType: 'application/pdf' }
                     });
 
-                    // Generate Signed URL (valid for 1 year)
                     const [signedUrl] = await file.getSignedUrl({
                         action: 'read',
-                        expires: Date.now() + 31536000000 // 1 year
+                        expires: Date.now() + 31536000000
                     });
 
                     pdfUrl = signedUrl;
                     logger.info(`PDF uploaded to Firebase Storage: ${pdfStoragePath}`);
-                } catch (firebaseError) {
-                    // If Firebase fails in dev, fall back to local (renaming variable to avoid conflict)
-                    if (!isProduction) {
-                        logger.warn('Firebase upload failed in dev, falling back to local storage:', firebaseError.message);
-                        await saveLocally();
-                    } else {
-                        throw firebaseError;
-                    }
+                } catch (storageError) {
+                    logger.warn('Firebase Storage upload failed (analysis will continue):', storageError.message);
+                    pdfUrl = null;
+                    pdfStoragePath = null;
                 }
             } else {
-                // Development / Local Mode (No credentials)
-                await saveLocally();
-            }
-
-            // Helper function for local save
-            async function saveLocally() {
-                const fs = require('fs');
-                const path = require('path');
-
-                // Local storage path: backend/uploads/contract-{id}-{timestamp}.pdf
-                const filename = `contract-${contractId}-${Date.now()}.pdf`;
-                const uploadsDir = path.join(__dirname, '../../uploads');
-
-                if (!fs.existsSync(uploadsDir)) {
-                    fs.mkdirSync(uploadsDir, { recursive: true });
+                // No bucket available - try local save in dev
+                const isCloudFunction = !!process.env.FUNCTION_TARGET || !!process.env.K_SERVICE;
+                if (!isCloudFunction) {
+                    try {
+                        const fs = require('fs');
+                        const path = require('path');
+                        const filename = `contract-${contractId}-${Date.now()}.pdf`;
+                        const uploadsDir = path.join(__dirname, '../../uploads');
+                        if (!fs.existsSync(uploadsDir)) {
+                            fs.mkdirSync(uploadsDir, { recursive: true });
+                        }
+                        pdfStoragePath = path.join(uploadsDir, filename);
+                        await fs.promises.writeFile(pdfStoragePath, buffer);
+                        const protocol = req.protocol;
+                        const baseUrl = `${protocol}://${req.get('host')}`;
+                        pdfUrl = `${baseUrl}/uploads/${filename}`;
+                        logger.info(`PDF saved locally: ${pdfStoragePath}`);
+                    } catch (localError) {
+                        logger.warn('Local PDF save failed:', localError.message);
+                    }
+                } else {
+                    logger.warn('No storage available in Cloud Functions - PDF will not be persisted');
                 }
-
-                pdfStoragePath = path.join(uploadsDir, filename);
-
-                // Write to local file
-                await fs.promises.writeFile(pdfStoragePath, buffer);
-
-                // Construct URL
-                // In dev, we use the backend port
-                // Construct URL
-                // In dev, we use the backend port. In prod (even if NODE_ENV is dev), we need HTTPS.
-                const protocol = (req.get('host').includes('run.app') || process.env.NODE_ENV === 'production') ? 'https' : req.protocol;
-                const baseUrl = `${protocol}://${req.get('host')}`;
-
-                pdfUrl = `${baseUrl}/uploads/${filename}`;
-
-                logger.info(`PDF saved locally (Dev/Fallback): ${pdfStoragePath}`);
-                logger.info(`PDF URL: ${pdfUrl}`);
             }
 
         } else if (method === 'url') {
@@ -172,8 +149,13 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                     previousVersion
                 );
 
-                // 3.1 Increment Usage Count on SUCCESS
-                await dbService.incrementUsage(uid);
+                // 3.1 Increment Usage Count ONLY on successful AI analysis
+                const aiSucceeded = aiResult && aiResult.summary && !aiResult.summary.includes('AI解析に失敗');
+                if (aiSucceeded) {
+                    await dbService.incrementUsage(uid);
+                } else {
+                    logger.info(`AI analysis failed for user ${uid} - usage count NOT incremented`);
+                }
             } else {
                 logger.warn('No text extracted, skipping AI analysis');
                 aiResult.summary = 'テキストを抽出できませんでした（画像ベースの可能性があります）';
@@ -202,6 +184,8 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
             }));
         }
 
+        const aiFailed = !aiResult.summary || aiResult.summary.includes('AI解析に失敗') || aiResult.summary.includes('エラーが発生');
+
         res.json({
             success: true,
             data: {
@@ -214,7 +198,8 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                 changes: gatedChanges,
                 riskLevel: aiResult.riskLevel,
                 riskReason: aiResult.riskReason,
-                summary: aiResult.summary
+                summary: aiResult.summary,
+                aiFailed: aiFailed
             }
         });
     } catch (error) {

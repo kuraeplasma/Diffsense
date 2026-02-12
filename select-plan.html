@@ -371,8 +371,8 @@
             プランを選択してください
         </button>
         <p class="plan-note">
-            ※7日間の無料トライアル終了後、選択したプランに自動移行します。<br>
-            ※期間内に解約した場合、料金は発生しません。
+            ※7日間の無料トライアル終了後、継続利用にはお支払い方法（PayPal/クレジットカード）の登録が必要です。<br>
+            ※トライアル期間中は料金は発生しません。
         </p>
         <a href="index.html" class="plan-back-link">← トップページへ戻る</a>
     </div>
@@ -415,8 +415,8 @@
             // Save selected plan to localStorage
             localStorage.setItem('diffsense_selected_plan', selectedPlan);
 
-            // Redirect to dashboard
-            window.location.replace("dashboard.html");
+            // Redirect to thanks page
+            window.location.replace(`thanks-plan.html?plan=${selectedPlan}`);
         };
     </script>
 </body>

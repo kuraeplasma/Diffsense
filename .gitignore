@@ -8,3 +8,6 @@ logs/
 backend/uploads/
 backend/test_pdf_extraction.js
 firebase-debug.log*
+
+# Local Netlify folder
+.netlify

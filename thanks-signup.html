@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登録完了 - DIFFsense</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+
+    <!-- Google Analytics / Google Ads Conversion（ここにタグを設置） -->
+    <!-- gtag('event', 'conversion', { 'send_to': 'AW-XXXXXXXXX/XXXX' }); -->
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background: linear-gradient(135deg, #f8f6f3 0%, #eee8e0 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .thanks-container {
+            text-align: center;
+            max-width: 560px;
+            width: 90%;
+            padding: 60px 40px;
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 12px 48px rgba(0,0,0,0.08);
+        }
+        .thanks-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #c5a059, #d4b46a);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 28px;
+            animation: pop-in 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .thanks-icon i {
+            font-size: 2rem;
+            color: #fff;
+        }
+        @keyframes pop-in {
+            0% { transform: scale(0); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .thanks-title {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: #24292E;
+            margin-bottom: 12px;
+        }
+        .thanks-subtitle {
+            font-size: 0.95rem;
+            color: #586069;
+            line-height: 1.8;
+            margin-bottom: 32px;
+        }
+        .thanks-info {
+            background: #faf8f5;
+            border: 1px solid #e8e0d4;
+            border-radius: 10px;
+            padding: 20px 24px;
+            margin-bottom: 32px;
+            text-align: left;
+        }
+        .thanks-info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            font-size: 0.88rem;
+            color: #444;
+        }
+        .thanks-info-row:not(:last-child) {
+            border-bottom: 1px solid #f0ece6;
+        }
+        .thanks-info-label { color: #888; }
+        .thanks-info-value { font-weight: 600; color: #24292E; }
+        .thanks-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 14px 36px;
+            background: linear-gradient(135deg, #c5a059, #b08d45);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+        .thanks-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px rgba(197, 160, 89, 0.3);
+        }
+        .thanks-note {
+            margin-top: 24px;
+            font-size: 0.78rem;
+            color: #999;
+        }
+        .confetti {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            overflow: hidden;
+            z-index: 0;
+        }
+        .confetti span {
+            position: absolute;
+            top: -10px;
+            width: 8px;
+            height: 8px;
+            border-radius: 2px;
+            animation: confetti-fall linear forwards;
+            opacity: 0.7;
+        }
+        @keyframes confetti-fall {
+            0% { transform: translateY(0) rotate(0deg); opacity: 0.8; }
+            100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="confetti" id="confetti"></div>
+
+    <div class="thanks-container" style="position:relative; z-index:1;">
+        <div class="thanks-icon">
+            <i class="fa-solid fa-circle-check"></i>
+        </div>
+        <h1 class="thanks-title">アカウント登録が完了しました</h1>
+        <p class="thanks-subtitle">
+            DIFFsenseへようこそ。<br>
+            7日間の無料トライアルが開始されました。<br>
+            AI契約書解析をぜひお試しください。
+        </p>
+
+        <div class="thanks-info">
+            <div class="thanks-info-row">
+                <span class="thanks-info-label">ステータス</span>
+                <span class="thanks-info-value" style="color:#22c55e;">無料トライアル中</span>
+            </div>
+            <div class="thanks-info-row">
+                <span class="thanks-info-label">トライアル期間</span>
+                <span class="thanks-info-value">7日間</span>
+            </div>
+            <div class="thanks-info-row">
+                <span class="thanks-info-label">AI解析回数</span>
+                <span class="thanks-info-value">5回まで</span>
+            </div>
+        </div>
+
+        <a id="next-btn" href="select-plan.html" class="thanks-btn">
+            <i class="fa-solid fa-arrow-right"></i>
+            プランを選択する
+        </a>
+
+        <p class="thanks-note">トライアル期間中は料金は発生しません</p>
+    </div>
+
+    <script>
+        // LP経由でプラン選択済みならダッシュボードへ
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('next') === 'dashboard') {
+            const btn = document.getElementById('next-btn');
+            btn.href = 'dashboard.html';
+            btn.innerHTML = '<i class="fa-solid fa-gauge-high"></i> ダッシュボードへ';
+        }
+
+        // Confetti animation
+        const confetti = document.getElementById('confetti');
+        const colors = ['#c5a059', '#d4b46a', '#22c55e', '#3b82f6', '#f59e0b', '#ef4444'];
+        for (let i = 0; i < 40; i++) {
+            const span = document.createElement('span');
+            span.style.left = Math.random() * 100 + '%';
+            span.style.background = colors[Math.floor(Math.random() * colors.length)];
+            span.style.animationDuration = (2 + Math.random() * 3) + 's';
+            span.style.animationDelay = Math.random() * 2 + 's';
+            span.style.width = (6 + Math.random() * 6) + 'px';
+            span.style.height = (6 + Math.random() * 6) + 'px';
+            confetti.appendChild(span);
+        }
+    </script>
+</body>
+
+</html>

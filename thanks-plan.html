@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>プラン選択完了 - DIFFsense</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+
+    <!-- Google Analytics / Google Ads Conversion（ここにタグを設置） -->
+    <!-- gtag('event', 'conversion', { 'send_to': 'AW-XXXXXXXXX/XXXX', 'event_category': 'plan_selected' }); -->
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background: linear-gradient(135deg, #f8f6f3 0%, #eee8e0 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .thanks-container {
+            text-align: center;
+            max-width: 560px;
+            width: 90%;
+            padding: 60px 40px;
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 12px 48px rgba(0,0,0,0.08);
+        }
+        .thanks-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #c5a059, #d4b46a);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 28px;
+            animation: pop-in 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .thanks-icon i {
+            font-size: 2rem;
+            color: #fff;
+        }
+        @keyframes pop-in {
+            0% { transform: scale(0); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .thanks-title {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: #24292E;
+            margin-bottom: 12px;
+        }
+        .thanks-subtitle {
+            font-size: 0.95rem;
+            color: #586069;
+            line-height: 1.8;
+            margin-bottom: 32px;
+        }
+        .plan-badge {
+            display: inline-block;
+            padding: 6px 20px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            margin-bottom: 24px;
+        }
+        .plan-badge.starter { background: #f0f0f0; color: #555; }
+        .plan-badge.business { background: rgba(197,160,89,0.12); color: #a17e1a; }
+        .plan-badge.pro { background: rgba(59,130,246,0.1); color: #2563eb; }
+        .thanks-info {
+            background: #faf8f5;
+            border: 1px solid #e8e0d4;
+            border-radius: 10px;
+            padding: 20px 24px;
+            margin-bottom: 32px;
+            text-align: left;
+        }
+        .thanks-info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            font-size: 0.88rem;
+            color: #444;
+        }
+        .thanks-info-row:not(:last-child) {
+            border-bottom: 1px solid #f0ece6;
+        }
+        .thanks-info-label { color: #888; }
+        .thanks-info-value { font-weight: 600; color: #24292E; }
+        .thanks-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 14px 36px;
+            background: linear-gradient(135deg, #c5a059, #b08d45);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+        .thanks-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px rgba(197, 160, 89, 0.3);
+        }
+        .thanks-note {
+            margin-top: 24px;
+            font-size: 0.78rem;
+            color: #999;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="thanks-container">
+        <div class="thanks-icon">
+            <i class="fa-solid fa-circle-check"></i>
+        </div>
+        <h1 class="thanks-title">プランが設定されました</h1>
+        <div id="plan-badge"></div>
+        <p class="thanks-subtitle">
+            無料トライアルが開始されました。<br>
+            ダッシュボードからAI契約書解析をお試しください。
+        </p>
+
+        <div class="thanks-info">
+            <div class="thanks-info-row">
+                <span class="thanks-info-label">選択プラン</span>
+                <span class="thanks-info-value" id="plan-name">-</span>
+            </div>
+            <div class="thanks-info-row">
+                <span class="thanks-info-label">ステータス</span>
+                <span class="thanks-info-value" style="color:#22c55e;">無料トライアル中</span>
+            </div>
+            <div class="thanks-info-row">
+                <span class="thanks-info-label">トライアル期間</span>
+                <span class="thanks-info-value">7日間</span>
+            </div>
+            <div class="thanks-info-row">
+                <span class="thanks-info-label">AI解析回数（トライアル中）</span>
+                <span class="thanks-info-value">5回まで</span>
+            </div>
+        </div>
+
+        <a href="dashboard.html" class="thanks-btn">
+            <i class="fa-solid fa-gauge-high"></i>
+            ダッシュボードへ
+        </a>
+
+        <p class="thanks-note">トライアル期間中は料金は発生しません。継続利用にはお支払い方法の登録が必要です。</p>
+    </div>
+
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const plan = params.get('plan') || 'starter';
+        const planNames = { starter: 'Starter', business: 'Business', pro: 'Pro / Legal' };
+        const planPrices = { starter: '¥1,480', business: '¥4,980', pro: '¥9,800' };
+
+        document.getElementById('plan-name').textContent = `${planNames[plan] || plan} (${planPrices[plan] || ''}/月)`;
+
+        const badge = document.getElementById('plan-badge');
+        badge.innerHTML = `<span class="plan-badge ${plan}">${planNames[plan] || plan}</span>`;
+    </script>
+</body>
+
+</html>
