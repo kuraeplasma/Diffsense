@@ -910,9 +910,31 @@ class DashboardApp {
         }
     }
 
-    init() {
+    async init() {
         try {
             console.log('Dashboard App Initializing...');
+
+            // Get current user UID first for data isolation
+            try {
+                const { auth } = await import('./firebase-config.js');
+                const { onAuthStateChanged } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
+                const user = auth.currentUser;
+                if (user) {
+                    dbService.setCurrentUser(user.uid);
+                } else {
+                    // Wait for auth state
+                    await new Promise((resolve) => {
+                        const unsubscribe = onAuthStateChanged(auth, (u) => {
+                            unsubscribe();
+                            if (u) dbService.setCurrentUser(u.uid);
+                            resolve();
+                        });
+                    });
+                }
+            } catch (e) {
+                console.warn('Could not get UID for data isolation:', e);
+            }
+
             dbService.init();
             this.bindEvents();
             this.registration.init();

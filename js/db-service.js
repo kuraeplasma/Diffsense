@@ -1,13 +1,37 @@
 /**
  * DIFFsense Simulated Database Service (localStorage based)
+ * Data is isolated per user (UID-based keys)
  */
 export const dbService = {
-    // Key names for localStorage
-    KEYS: {
-        CONTRACTS: 'diffsense_contracts',
-        ACTIVITY_LOGS: 'diffsense_logs',
-        USERS: 'diffsense_users',
-        INITIALIZED: 'diffsense_initialized'
+    // Current user UID (set on login)
+    _uid: null,
+
+    // Base key names (UID prefix added dynamically)
+    _BASE_KEYS: {
+        CONTRACTS: 'contracts',
+        ACTIVITY_LOGS: 'logs',
+        USERS: 'users',
+        INITIALIZED: 'initialized'
+    },
+
+    // Dynamic KEYS getter (with UID prefix)
+    get KEYS() {
+        const prefix = this._uid ? `diffsense_${this._uid}_` : 'diffsense_';
+        return {
+            CONTRACTS: `${prefix}contracts`,
+            ACTIVITY_LOGS: `${prefix}logs`,
+            USERS: `${prefix}users`,
+            INITIALIZED: `${prefix}initialized`
+        };
+    },
+
+    /**
+     * Set current user UID for data isolation
+     * Must be called before init() after login
+     */
+    setCurrentUser(uid) {
+        this._uid = uid;
+        console.log(`DB Service: User set to ${uid}`);
     },
 
     PLAN_LIMITS: {
@@ -20,14 +44,46 @@ export const dbService = {
      * Initialize DB if not already done
      */
     init() {
+        // Migrate legacy data (no UID prefix) to current user if needed
+        this._migrateLegacyData();
+
         const currentContracts = JSON.parse(localStorage.getItem(this.KEYS.CONTRACTS) || '[]');
 
-        // データが全くない場合のみシードデータを投入する
-        // (以前は count < 10 で強制リセットしていたため、ユーザーが追加したデータが消えていた可能性あり)
         if (!localStorage.getItem(this.KEYS.INITIALIZED) && currentContracts.length === 0) {
             console.log('Initializing Seed Data...');
             this._seed();
             localStorage.setItem(this.KEYS.INITIALIZED, 'true');
+        }
+    },
+
+    /**
+     * Migrate old non-UID data to the current user (one-time)
+     */
+    _migrateLegacyData() {
+        if (!this._uid) return;
+        const legacyKey = 'diffsense_contracts';
+        const legacyData = localStorage.getItem(legacyKey);
+        const userKey = this.KEYS.CONTRACTS;
+
+        // Only migrate if legacy data exists AND user has no data yet
+        if (legacyData && !localStorage.getItem(userKey)) {
+            console.log('Migrating legacy data to user-scoped storage...');
+            localStorage.setItem(userKey, legacyData);
+
+            const legacyLogs = localStorage.getItem('diffsense_logs');
+            if (legacyLogs) localStorage.setItem(this.KEYS.ACTIVITY_LOGS, legacyLogs);
+
+            const legacyUsers = localStorage.getItem('diffsense_users');
+            if (legacyUsers) localStorage.setItem(this.KEYS.USERS, legacyUsers);
+
+            localStorage.setItem(this.KEYS.INITIALIZED, 'true');
+
+            // Remove legacy keys to avoid re-migration
+            localStorage.removeItem('diffsense_contracts');
+            localStorage.removeItem('diffsense_logs');
+            localStorage.removeItem('diffsense_users');
+            localStorage.removeItem('diffsense_initialized');
+            console.log('Legacy data migration complete.');
         }
     },
 
