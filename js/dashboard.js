@@ -878,7 +878,7 @@ class DashboardApp {
         this.mainContent = document.getElementById('app-content');
         this.pageTitle = document.getElementById('page-header-title');
         this.currentViewParams = null;
-        this.userRole = '閲覧のみ'; // Default to safest
+        this.userRole = '管理者'; // Default: オーナー（API失敗時はチームメンバーではないのでオーナー扱い）
 
 
         // Navigation State
@@ -996,7 +996,10 @@ class DashboardApp {
                         }
                     }
                 } catch (roleErr) {
-                    console.warn('Could not fetch role from backend:', roleErr);
+                    console.warn('Could not fetch role from backend, defaulting to 管理者:', roleErr);
+                    // API失敗時はオーナー（管理者）としてデフォルト動作（バックエンドと同じロジック）
+                    this.userRole = '管理者';
+                    this.isTeamMember = false;
                 }
 
                 // If team member, switch data scope to owner's UID
@@ -1107,9 +1110,9 @@ class DashboardApp {
             }
         } catch (error) {
             console.error('Failed to fetch subscription status:', error);
-            // Fallback for dev - pro
-            this.subscription = { plan: 'pro', usageCount: 0, usageLimit: 120, daysRemaining: 7, isInTrial: false, planLimit: 120 };
-            this.userPlan = 'pro';
+            // API接続失敗時：starterをデフォルトにする（proハードコードを防止）
+            this.subscription = { plan: 'starter', usageCount: 0, usageLimit: 5, daysRemaining: null, isInTrial: false, planLimit: 15 };
+            this.userPlan = 'starter';
             this.updateSubscriptionUI();
         }
     }

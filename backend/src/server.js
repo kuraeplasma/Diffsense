@@ -41,7 +41,7 @@ app.use(helmet({
     contentSecurityPolicy: {
         directives: {
             ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-            "frame-ancestors": ["'self'", "http://localhost:3000", "http://localhost:8000", "https://diffsense.netlify.app"],
+            "frame-ancestors": ["'self'", "http://localhost:3000", "http://localhost:8000", "https://diffsense.netlify.app", "https://diffsense.spacegleam.co.jp"],
         },
     },
     crossOriginResourcePolicy: { policy: "cross-origin" },
@@ -49,9 +49,12 @@ app.use(helmet({
 }));
 
 // CORS configuration
-const allowedOrigins = process.env.ALLOWED_ORIGINS
+const envOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',')
     : ['http://localhost:3000', 'http://localhost:8000'];
+// 本番ドメインを常に許可（環境変数の設定漏れ対策）
+const requiredOrigins = ['https://diffsense.spacegleam.co.jp', 'https://diffsense.netlify.app'];
+const allowedOrigins = [...new Set([...envOrigins, ...requiredOrigins])];
 
 app.use(cors({
     origin: (origin, callback) => {
