@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>お支払い完了 | DIFFsense</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=AW-17941578077"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
+        gtag('config', 'AW-17941578077');
+    </script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Noto+Sans+JP:wght@400;700&display=swap"
+        rel="stylesheet">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-gold: #c19b4a;
+            --text-main: #24292e;
+            --bg-light: #fafbfc;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+            background-color: var(--bg-light);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            color: var(--text-main);
+        }
+
+        .container {
+            text-align: center;
+            background: white;
+            padding: 60px 40px;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.05);
+            max-width: 500px;
+            width: 90%;
+        }
+
+        .success-icon {
+            font-size: 64px;
+            color: var(--primary-gold);
+            margin-bottom: 24px;
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+
+        p {
+            font-size: 16px;
+            color: #586069;
+            line-height: 1.6;
+            margin-bottom: 40px;
+        }
+
+        .btn-primary {
+            display: inline-block;
+            background-color: var(--primary-gold);
+            color: white;
+            padding: 14px 40px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 16px;
+            transition: opacity 0.2s;
+        }
+
+        .btn-primary:hover {
+            opacity: 0.9;
+        }
+
+        .logo {
+            display: block;
+            margin-bottom: 40px;
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--text-main);
+            text-decoration: none;
+        }
+
+        .logo i {
+            margin-right: 10px;
+            color: var(--primary-gold);
+        }
+    </style>
+    <!-- Google Analytics (Example) -->
+    <!-- <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXX"></script> -->
+    <!-- <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-XXXXX');
+      // Purchase event
+      gtag('event', 'purchase', {
+          'transaction_id': 'T_' + new Date().getTime(),
+          'value': 4980,
+          'currency': 'JPY',
+          'items': [{
+              'item_id': 'business_plan',
+              'item_name': 'Business Plan'
+          }]
+      });
+    </script> -->
+</head>
+
+<body>
+    <div class="container">
+        <a href="index.html" class="logo">
+            <i class="fa-solid fa-scale-balanced"></i>DIFFsense
+        </a>
+        <div class="success-icon">
+            <i class="fa-solid fa-crown"></i>
+        </div>
+        <h1>お支払いが完了しました</h1>
+        <p>プランのアップグレードが完了しました。<br>すべての機能をご利用いただけます。</p>
+        <a href="dashboard.html" class="btn-primary">ダッシュボードへ</a>
+    </div>
+</body>
+
+</html>

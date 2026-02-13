@@ -6,7 +6,7 @@ import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.7.1/firebase
 // Your web app's Firebase configuration
 const firebaseConfig = {
     apiKey: "AIzaSyDq-rEHQcpmuVyNjKrVKDheCBBRFtNsoJ0",
-    authDomain: "diffsense-9a718.firebaseapp.com",
+    authDomain: "diffsense.spacegleam.co.jp",
     projectId: "diffsense-9a718",
     storageBucket: "diffsense-9a718.firebasestorage.app",
     messagingSenderId: "707048573054",
