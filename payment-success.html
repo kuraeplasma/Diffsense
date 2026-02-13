@@ -101,24 +101,31 @@
             color: var(--primary-gold);
         }
     </style>
-    <!-- Google Analytics (Example) -->
-    <!-- <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXX"></script> -->
-    <!-- <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', 'G-XXXXX');
-      // Purchase event
-      gtag('event', 'purchase', {
-          'transaction_id': 'T_' + new Date().getTime(),
-          'value': 4980,
-          'currency': 'JPY',
-          'items': [{
-              'item_id': 'business_plan',
-              'item_name': 'Business Plan'
-          }]
-      });
-    </script> -->
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=AW-17941578077"></script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-MC8HQSR938"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
+
+        gtag('config', 'AW-17941578077');
+        gtag('config', 'G-MC8HQSR938');
+
+        // Purchase Conversion
+        gtag('event', 'purchase', {
+            'transaction_id': 'T_' + new Date().getTime(),
+            'value': 4980,
+            'currency': 'JPY',
+            'items': [{
+                'item_id': 'business_plan',
+                'item_name': 'Business Plan'
+            }]
+        });
+
+        // Google Ads specific conversion
+        gtag('event', 'conversion', { 'send_to': 'AW-17941578077/payment_complete' });
+    </script>
 </head>
 
 <body>

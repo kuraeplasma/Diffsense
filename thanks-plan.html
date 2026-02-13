@@ -8,14 +8,32 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap"
+        rel="stylesheet">
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
 
-    <!-- Google Analytics / Google Ads Conversion（ここにタグを設置） -->
-    <!-- gtag('event', 'conversion', { 'send_to': 'AW-XXXXXXXXX/XXXX', 'event_category': 'plan_selected' }); -->
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=AW-17941578077"></script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-MC8HQSR938"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
+
+        gtag('config', 'AW-17941578077');
+        gtag('config', 'G-MC8HQSR938');
+
+        // Plan Selection Conversion
+        gtag('event', 'conversion', { 'send_to': 'AW-17941578077/plan_selected' });
+    </script>
 
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
             font-family: 'Noto Sans JP', sans-serif;
             background: linear-gradient(135deg, #f8f6f3 0%, #eee8e0 100%);
@@ -24,6 +42,7 @@
             align-items: center;
             justify-content: center;
         }
+
         .thanks-container {
             text-align: center;
             max-width: 560px;
@@ -31,8 +50,9 @@
             padding: 60px 40px;
             background: #fff;
             border-radius: 16px;
-            box-shadow: 0 12px 48px rgba(0,0,0,0.08);
+            box-shadow: 0 12px 48px rgba(0, 0, 0, 0.08);
         }
+
         .thanks-icon {
             width: 80px;
             height: 80px;
@@ -44,26 +64,38 @@
             margin: 0 auto 28px;
             animation: pop-in 0.5s cubic-bezier(0.16, 1, 0.3, 1);
         }
+
         .thanks-icon i {
             font-size: 2rem;
             color: #fff;
         }
+
         @keyframes pop-in {
-            0% { transform: scale(0); opacity: 0; }
-            100% { transform: scale(1); opacity: 1; }
+            0% {
+                transform: scale(0);
+                opacity: 0;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
         }
+
         .thanks-title {
             font-size: 1.6rem;
             font-weight: 700;
             color: #24292E;
             margin-bottom: 12px;
         }
+
         .thanks-subtitle {
             font-size: 0.95rem;
             color: #586069;
             line-height: 1.8;
             margin-bottom: 32px;
         }
+
         .plan-badge {
             display: inline-block;
             padding: 6px 20px;
@@ -72,9 +104,22 @@
             font-weight: 700;
             margin-bottom: 24px;
         }
-        .plan-badge.starter { background: #f0f0f0; color: #555; }
-        .plan-badge.business { background: rgba(197,160,89,0.12); color: #a17e1a; }
-        .plan-badge.pro { background: rgba(59,130,246,0.1); color: #2563eb; }
+
+        .plan-badge.starter {
+            background: #f0f0f0;
+            color: #555;
+        }
+
+        .plan-badge.business {
+            background: rgba(197, 160, 89, 0.12);
+            color: #a17e1a;
+        }
+
+        .plan-badge.pro {
+            background: rgba(59, 130, 246, 0.1);
+            color: #2563eb;
+        }
+
         .thanks-info {
             background: #faf8f5;
             border: 1px solid #e8e0d4;
@@ -83,6 +128,7 @@
             margin-bottom: 32px;
             text-align: left;
         }
+
         .thanks-info-row {
             display: flex;
             justify-content: space-between;
@@ -90,11 +136,20 @@
             font-size: 0.88rem;
             color: #444;
         }
+
         .thanks-info-row:not(:last-child) {
             border-bottom: 1px solid #f0ece6;
         }
-        .thanks-info-label { color: #888; }
-        .thanks-info-value { font-weight: 600; color: #24292E; }
+
+        .thanks-info-label {
+            color: #888;
+        }
+
+        .thanks-info-value {
+            font-weight: 600;
+            color: #24292E;
+        }
+
         .thanks-btn {
             display: inline-flex;
             align-items: center;
@@ -110,10 +165,12 @@
             text-decoration: none;
             transition: all 0.2s;
         }
+
         .thanks-btn:hover {
             transform: translateY(-1px);
             box-shadow: 0 4px 16px rgba(197, 160, 89, 0.3);
         }
+
         .thanks-note {
             margin-top: 24px;
             font-size: 0.78rem;
