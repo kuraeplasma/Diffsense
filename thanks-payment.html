@@ -24,16 +24,18 @@
         gtag('config', 'G-MC8HQSR938');
 
         // Purchase Conversion
-        const params = new URLSearchParams(window.location.search);
-        const plan = params.get('plan') || 'starter';
-        const prices = { starter: 1480, business: 4980, pro: 9800 };
+        {
+            const params = new URLSearchParams(window.location.search);
+            const plan = params.get('plan') || 'starter';
+            const prices = { starter: 1480, business: 4980, pro: 9800 };
 
-        gtag('event', 'conversion', {
-            'send_to': 'AW-17941578077/payment_complete',
-            'value': prices[plan],
-            'currency': 'JPY',
-            'transaction_id': 'T_' + new Date().getTime()
-        });
+            gtag('event', 'conversion', {
+                'send_to': 'AW-17941578077/payment_complete',
+                'value': prices[plan],
+                'currency': 'JPY',
+                'transaction_id': 'T_' + new Date().getTime()
+            });
+        }
     </script>
 
     <style>
