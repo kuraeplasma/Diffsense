@@ -36,12 +36,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }, observerOptions);
 
-    const fadeElements = document.querySelectorAll('.card, .step-item, .section-title, .hero-content');
+    const fadeElements = document.querySelectorAll('.card, .step-item, .section-title, .hero-content, .scroll-fade');
 
     fadeElements.forEach(el => {
+        const rawDelay = Number(el.dataset.delay || 0);
+        const delay = Number.isFinite(rawDelay) ? Math.max(rawDelay, 0) : 0;
         el.style.opacity = '0';
         el.style.transform = 'translateY(20px)';
-        el.style.transition = 'opacity 0.6s ease-out, transform 0.6s ease-out';
+        el.style.transition = `opacity 0.65s ease-out ${delay}ms, transform 0.65s ease-out ${delay}ms`;
         observer.observe(el);
     });
 
@@ -61,6 +63,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!dashboard || !container) return;
 
+        // Static screenshot mode: avoid transform scaling to keep text crisp.
+        if (dashboard.classList.contains('lp-static-frame')) {
+            dashboard.style.transform = '';
+            dashboard.style.transformOrigin = '';
+            dashboard.style.boxShadow = '';
+            dashboard.style.transition = '';
+            container.style.height = '';
+            container.style.display = 'flex';
+            container.style.justifyContent = 'center';
+            container.style.alignItems = 'center';
+            return;
+        }
+
         const windowWidth = window.innerWidth;
 
         if (windowWidth < 770) {
@@ -77,9 +92,9 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const baseWidth = 1100;
-        // Current height doesn't matter for desktop scale logic which uses baseHeight
-        const baseHeight = 750;
+        // Use actual frame size so both HTML mock and static screenshot are scaled correctly
+        const baseWidth = dashboard.offsetWidth || 1100;
+        const baseHeight = dashboard.offsetHeight || 750;
 
         // Get container width
         const availableWidth = container.clientWidth;
@@ -93,11 +108,10 @@ document.addEventListener('DOMContentLoaded', () => {
             scale = Math.min(scale * 1.08, 1.15);
         }
 
-        // Apply scale and RETAIN 3D transform
+        // Apply scale only (no tilt)
         let transformString = `scale(${scale})`;
         if (windowWidth >= 992) {
-            transformString += ' rotateY(-12deg) rotateX(2deg)';
-            dashboard.style.boxShadow = '-20px 30px 60px rgba(0, 0, 0, 0.25)';
+            dashboard.style.boxShadow = '0 24px 60px rgba(0, 0, 0, 0.25)';
             dashboard.style.transition = 'transform 0.5s ease, box-shadow 0.5s ease';
         } else {
             dashboard.style.boxShadow = '0 20px 50px -10px rgba(0, 0, 0, 0.3)';
