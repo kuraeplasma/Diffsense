@@ -57,8 +57,8 @@ const Views = {
                     </div>
                     <p style="font-size:0.85rem; color:#555; margin-bottom:16px;">
                         ${sub.isInTrial
-                            ? 'トライアル終了後も継続利用するには、お支払い方法（PayPal/クレジットカード）の登録が必要です。'
-                            : 'トライアルが終了しました。継続利用にはお支払い方法の登録が必要です。'}
+                    ? 'トライアル終了後も継続利用するには、お支払い方法（PayPal/クレジットカード）の登録が必要です。'
+                    : 'トライアルが終了しました。継続利用にはお支払い方法の登録が必要です。'}
                     </p>
                     <button onclick="window.app.startPayPalSubscription()" class="btn-dashboard" style="background:#c19b4a; color:#fff; border:none; padding:10px 24px; border-radius:6px; font-weight:600; cursor:pointer;">
                         <i class="fa-solid fa-credit-card" style="margin-right:8px;"></i>お支払い方法を登録する
@@ -946,6 +946,22 @@ class DashboardApp {
             // Auto-register current user as Admin if needed (must await for ownerUid scope switch)
             await this.checkAndRegisterAdmin();
 
+            const urlParams = new URLSearchParams(window.location.search);
+            const shouldStartPayment = urlParams.get('start_payment') === '1';
+            const paymentPlan = urlParams.get('plan');
+
+            // 無料期間終了後の決済開始フロー
+            if (shouldStartPayment) {
+                this.navigate('plan');
+                setTimeout(() => {
+                    this.startPayPalSubscription(paymentPlan || this.subscription?.plan || 'starter');
+                }, 250);
+
+                history.replaceState(null, '', window.location.pathname);
+                console.log('Redirected to payment flow from select-plan');
+                return;
+            }
+
             // Check URL hash for deep-link (e.g. #diff/123 from share)
             const hash = window.location.hash;
             if (hash && hash.startsWith('#diff/')) {
@@ -1296,7 +1312,7 @@ class DashboardApp {
             if (result.success) {
                 const confirmedPlan = result.data.plan || plan || this.subscription?.plan || 'starter';
                 // Redirect to thanks page for GA conversion tracking
-                window.location.replace(`thanks-payment.html?plan=${confirmedPlan}`);
+                window.location.replace(`${window.location.origin}/thanks-payment.html?plan=${confirmedPlan}`);
             }
         } catch (error) {
             console.error('Confirm subscription error:', error);
@@ -1307,47 +1323,16 @@ class DashboardApp {
         const sub = this.subscription;
         const payment = this.paymentStatus;
         if (!sub) return;
+        const urlParams = new URLSearchParams(window.location.search);
+        const skipGateForPaymentFlow = urlParams.get('start_payment') === '1';
+        if (skipGateForPaymentFlow) return;
 
-        // トライアル切れ + 決済未登録の場合にポップアップ表示
+        // トライアル切れ + 決済未登録なら即プラン選択へ遷移
         const isTrialExpired = sub.trialStartedAt && !sub.isInTrial;
         const hasNoPayment = !payment || !payment.hasPaymentMethod;
-
         if (isTrialExpired && hasNoPayment) {
-            const overlay = document.createElement('div');
-            overlay.className = 'modal-overlay';
-            overlay.id = 'trial-expired-overlay';
-            overlay.innerHTML = `
-                <div class="modal-content" style="max-width:520px;">
-                    <div class="modal-header" style="background:#fffbeb; border-bottom:1px solid #fbbf24;">
-                        <h3 style="color:#92400e; margin:0; font-size:1.1rem;">
-                            <i class="fa-solid fa-clock" style="margin-right:8px;"></i>無料トライアルが終了しました
-                        </h3>
-                        <button class="btn-close" onclick="document.getElementById('trial-expired-overlay').remove()">×</button>
-                    </div>
-                    <div class="modal-body" style="padding:24px;">
-                        <p style="margin-bottom:16px; color:#333; font-size:0.95rem;">
-                            7日間の無料トライアル期間が終了しました。<br>
-                            引き続きDIFFsenseをご利用いただくには、お支払い方法の登録が必要です。
-                        </p>
-                        <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:8px; padding:16px; margin-bottom:20px;">
-                            <p style="font-size:0.85rem; color:#0369a1; margin:0 0 8px 0; font-weight:600;">
-                                <i class="fa-solid fa-info-circle" style="margin-right:6px;"></i>お支払い方法
-                            </p>
-                            <ul style="font-size:0.82rem; color:#555; margin:0; padding-left:20px;">
-                                <li style="margin-bottom:4px;">PayPalアカウント</li>
-                                <li>クレジットカード / デビットカード</li>
-                            </ul>
-                        </div>
-                        <div style="display:flex; gap:12px; justify-content:flex-end;">
-                            <button onclick="document.getElementById('trial-expired-overlay').remove()" class="btn-dashboard" style="padding:10px 20px;">後で</button>
-                            <button onclick="document.getElementById('trial-expired-overlay').remove(); window.app.navigate('plan');" class="btn-dashboard" style="background:#0070ba; color:#fff; border:none; padding:10px 24px; font-weight:600;">
-                                <i class="fa-solid fa-credit-card" style="margin-right:6px;"></i>お支払い方法を登録する
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(overlay);
+            localStorage.setItem('diffsense_trial_expired', '1');
+            window.location.replace(`${window.location.origin}/select-plan-preview?reason=trial_expired`);
         }
     }
 

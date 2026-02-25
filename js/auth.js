@@ -6,6 +6,53 @@ import {
     onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
+function resolveSafeNextUrl(nextRaw, fallbackPath = 'dashboard.html') {
+    if (!nextRaw || typeof nextRaw !== 'string') {
+        return `${window.location.origin}/${fallbackPath}`;
+    }
+    // Block absolute/protocol-relative external redirects
+    if (/^https?:\/\//i.test(nextRaw) || nextRaw.startsWith('//')) {
+        return `${window.location.origin}/${fallbackPath}`;
+    }
+    const normalized = nextRaw.startsWith('/') ? nextRaw : `/${nextRaw}`;
+    return `${window.location.origin}${normalized}`;
+}
+
+function getApiBase() {
+    return (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+        ? 'http://localhost:3001'
+        : 'https://api-qf37m5ba2q-an.a.run.app';
+}
+
+async function isTrialExpiredWithoutPayment(user) {
+    try {
+        if (!user) return false;
+        const token = await user.getIdToken();
+        if (!token) return false;
+
+        const apiBase = getApiBase();
+        const [subRes, paymentRes] = await Promise.all([
+            fetch(`${apiBase}/user/subscription`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            }),
+            fetch(`${apiBase}/payment/status`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+        ]);
+
+        if (!subRes.ok || !paymentRes.ok) return false;
+        const subJson = await subRes.json();
+        const paymentJson = await paymentRes.json();
+
+        const sub = subJson?.data || {};
+        const payment = paymentJson?.data || {};
+        return !!sub.trialStartedAt && !sub.isInTrial && !payment.hasPaymentMethod;
+    } catch (error) {
+        console.warn('Trial expired check failed on login:', error);
+        return false;
+    }
+}
+
 /**
  * Handle Sign Up
  * @param {string} email
@@ -47,7 +94,18 @@ export async function handleLogin(email, password) {
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
         console.log("Logged in user:", user);
-        window.location.replace("dashboard.html");
+
+        // 無料期間が切れており決済未登録なら、ログイン直後にプラン選択画面へ
+        const mustShowPlanSelect = await isTrialExpiredWithoutPayment(user);
+        if (mustShowPlanSelect) {
+            localStorage.setItem('diffsense_trial_expired', '1');
+            window.location.replace(`${window.location.origin}/select-plan-preview?reason=trial_expired`);
+            return;
+        }
+
+        const params = new URLSearchParams(window.location.search);
+        const next = params.get('next');
+        window.location.replace(resolveSafeNextUrl(next, 'dashboard.html'));
     } catch (error) {
         console.error("Error logging in:", error);
         Notify.error("メールアドレスまたはパスワードが間違っています。", { title: 'ログイン失敗' });
@@ -75,7 +133,8 @@ export function requireAuth() {
     onAuthStateChanged(auth, (user) => {
         if (!user) {
             console.log("No user found, redirecting to login.");
-            window.location.replace("login.html");
+            const next = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+            window.location.replace(`${window.location.origin}/login.html?next=${encodeURIComponent(next)}`);
         } else {
             console.log("User is authenticated:", user.email);
             const userEmailEl = document.getElementById('user-email-display');
@@ -84,6 +143,18 @@ export function requireAuth() {
             }
         }
     });
+}
+
+function processDevBypass() {
+    console.log("DEV AUTH BYPASS ACTIVE");
+    const userEmailEl = document.getElementById('user-email-display');
+    if (userEmailEl) {
+        userEmailEl.textContent = 'dev@localhost';
+    }
+    const userNameEl = document.getElementById('user-name-display');
+    if (userNameEl) {
+        userNameEl.textContent = 'テストユーザー';
+    }
 }
 /**
  * Get current user's ID Token

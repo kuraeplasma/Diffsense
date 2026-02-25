@@ -185,9 +185,9 @@
         <div class="thanks-icon">
             <i class="fa-solid fa-circle-check"></i>
         </div>
-        <h1 class="thanks-title">プランが設定されました</h1>
+        <h1 class="thanks-title" id="thanks-title">プランが設定されました</h1>
         <div id="plan-badge"></div>
-        <p class="thanks-subtitle">
+        <p class="thanks-subtitle" id="thanks-subtitle">
             無料トライアルが開始されました。<br>
             ダッシュボードからAI契約書解析をお試しください。
         </p>
@@ -199,15 +199,15 @@
             </div>
             <div class="thanks-info-row">
                 <span class="thanks-info-label">ステータス</span>
-                <span class="thanks-info-value" style="color:#22c55e;">無料トライアル中</span>
+                <span class="thanks-info-value" id="thanks-status" style="color:#22c55e;">無料トライアル中</span>
             </div>
             <div class="thanks-info-row">
-                <span class="thanks-info-label">トライアル期間</span>
-                <span class="thanks-info-value">7日間</span>
+                <span class="thanks-info-label" id="thanks-row3-label">トライアル期間</span>
+                <span class="thanks-info-value" id="thanks-row3-value">7日間</span>
             </div>
             <div class="thanks-info-row">
-                <span class="thanks-info-label">AI解析回数（トライアル中）</span>
-                <span class="thanks-info-value">5回まで</span>
+                <span class="thanks-info-label" id="thanks-row4-label">AI解析回数（トライアル中）</span>
+                <span class="thanks-info-value" id="thanks-row4-value">5回まで</span>
             </div>
         </div>
 
@@ -216,19 +216,41 @@
             ダッシュボードへ
         </a>
 
-        <p class="thanks-note">トライアル期間中は料金は発生しません。継続利用にはお支払い方法の登録が必要です。</p>
+        <p class="thanks-note" id="thanks-note">トライアル期間中は料金は発生しません。継続利用にはお支払い方法の登録が必要です。</p>
     </div>
 
     <script>
         const params = new URLSearchParams(window.location.search);
         const plan = params.get('plan') || 'starter';
+        const isTrialExpiredFlow = params.get('reason') === 'trial_expired' || localStorage.getItem('diffsense_trial_expired_flow') === '1';
         const planNames = { starter: 'Starter', business: 'Business', pro: 'Pro / Legal' };
         const planPrices = { starter: '¥1,480', business: '¥4,980', pro: '¥9,800' };
+        const planLimits = { starter: '月15回', business: '月120回', pro: '月400回' };
 
-        document.getElementById('plan-name').textContent = `${planNames[plan] || plan} (${planPrices[plan] || ''}/月)`;
+        document.getElementById('plan-name').textContent = `${planNames[plan] || plan}`;
 
         const badge = document.getElementById('plan-badge');
         badge.innerHTML = `<span class="plan-badge ${plan}">${planNames[plan] || plan}</span>`;
+
+        if (isTrialExpiredFlow) {
+            document.getElementById('thanks-title').textContent = 'プラン変更が完了しました';
+            document.getElementById('thanks-subtitle').innerHTML = '選択したプランで継続利用できます。<br>ダッシュボードからご利用ください。';
+
+            const status = document.getElementById('thanks-status');
+            status.textContent = '有料プラン有効';
+            status.style.color = '#22c55e';
+
+            document.getElementById('thanks-row3-label').textContent = '月額料金';
+            document.getElementById('thanks-row3-value').textContent = `${planPrices[plan] || '-'} / 月`;
+            document.getElementById('thanks-row4-label').textContent = 'AI解析回数';
+            document.getElementById('thanks-row4-value').textContent = planLimits[plan] || '-';
+
+            document.getElementById('thanks-note').textContent = 'プランの変更・解約はダッシュボードのプラン管理から行えます。';
+            localStorage.removeItem('diffsense_trial_expired_flow');
+        } else {
+            document.getElementById('thanks-row3-value').textContent = '7日間';
+            document.getElementById('thanks-row4-value').textContent = '5回まで';
+        }
     </script>
 </body>
 

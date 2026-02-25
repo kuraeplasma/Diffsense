@@ -1,20 +1,9 @@
 <!DOCTYPE html>
 <html lang="ja">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>プラン選択 - DIFFsense</title>
-
-    <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=AW-17941578077"></script>
-    <script>
-        window.dataLayer = window.dataLayer || [];
-        function gtag() { dataLayer.push(arguments); }
-        gtag('js', new Date());
-        gtag('config', 'AW-17941578077');
-    </script>
-
+    <title>プラン選択プレビュー - DIFFsense</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -47,13 +36,8 @@
             color: #c5a059;
         }
 
-        .plan-logo a {
-            color: inherit;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-            text-decoration: none;
+        .plan-logo i {
+            margin-right: 8px;
         }
 
         .plan-heading {
@@ -69,13 +53,6 @@
             margin: 0;
         }
 
-        .plan-subtitle {
-            text-align: center;
-            color: #888;
-            font-size: 0.9rem;
-            margin-bottom: 2.5rem;
-        }
-
         .plan-entry-notice {
             margin: 0 auto 1rem;
             max-width: 720px;
@@ -87,19 +64,7 @@
             font-size: 0.92rem;
             font-weight: 600;
             text-align: center;
-        }
-
-        .plan-trial-badge {
-            display: inline-block;
-            background: rgba(197, 160, 89, 0.1);
-            color: #a17e1a;
-            border: 1px solid #c5a059;
-            padding: 6px 16px;
-            border-radius: 20px;
-            font-weight: 600;
-            font-size: 0.85rem;
-            margin-bottom: 1.5rem;
-            letter-spacing: 0.03em;
+            line-height: 1.7;
         }
 
         .plan-grid {
@@ -241,16 +206,10 @@
             font-family: var(--font-body);
         }
 
-        .plan-confirm-btn:hover {
-            background: #9e8047;
-            transform: translateY(-1px);
-        }
-
         .plan-confirm-btn:disabled {
             background: #ddd;
             color: #999;
             cursor: not-allowed;
-            transform: none;
         }
 
         .plan-note {
@@ -260,49 +219,6 @@
             margin-top: 12px;
         }
 
-        .plan-back-link {
-            display: inline-block;
-            margin-top: 1.5rem;
-            color: #999;
-            font-size: 0.85rem;
-            text-decoration: none;
-            text-align: center;
-            width: 100%;
-        }
-
-        .plan-back-link:hover {
-            color: #c5a059;
-        }
-
-        /* Loading */
-        .btn-loading {
-            position: relative;
-            color: transparent !important;
-            pointer-events: none;
-        }
-
-        .btn-loading::after {
-            content: "";
-            position: absolute;
-            width: 20px;
-            height: 20px;
-            top: 50%;
-            left: 50%;
-            margin-top: -10px;
-            margin-left: -10px;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            border-top-color: #fff;
-            animation: spin 0.8s linear infinite;
-        }
-
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
-            }
-        }
-
-        /* Responsive */
         @media (max-width: 768px) {
             .plan-grid {
                 flex-direction: column;
@@ -317,25 +233,23 @@
             }
         }
     </style>
-    <link rel="icon" type="image/svg+xml" href="favicon.svg">
 </head>
-
 <body>
     <div class="plan-container">
         <h1 class="plan-logo">
-            <a href="index.html">
-                <i class="fa-solid fa-scale-balanced"></i>
-                <span>DIFFsense</span>
-            </a>
+            <i class="fa-solid fa-scale-balanced"></i>
+            DIFFsense
         </h1>
 
         <div class="plan-heading">
             <h2>ご利用プランを選択してください</h2>
         </div>
-        <div id="plan-entry-notice" class="plan-entry-notice" style="display:none;"></div>
+        <div class="plan-entry-notice">
+            無料トライアルが終了しました<br>
+            引き続き使うにはプランを選択してください。
+        </div>
 
         <div class="plan-grid">
-            <!-- Starter -->
             <div class="plan-card" data-plan="starter" onclick="selectPlan('starter')">
                 <div class="plan-badge">個人・検証用</div>
                 <h3>Starter</h3>
@@ -352,7 +266,6 @@
                 <div class="plan-select-indicator">選択する</div>
             </div>
 
-            <!-- Business -->
             <div class="plan-card recommended" data-plan="business" onclick="selectPlan('business')">
                 <div class="plan-badge recommended">おすすめ</div>
                 <h3>Business</h3>
@@ -369,7 +282,6 @@
                 <div class="plan-select-indicator">選択する</div>
             </div>
 
-            <!-- Pro -->
             <div class="plan-card" data-plan="pro" onclick="selectPlan('pro')">
                 <div class="plan-badge">士業・専門職向け</div>
                 <h3>Pro / Legal</h3>
@@ -389,13 +301,8 @@
             </div>
         </div>
 
-        <button class="plan-confirm-btn" id="confirm-btn" disabled onclick="confirmPlan()">
-            プランを選択してください
-        </button>
-        <p class="plan-note">
-            ※継続利用にはお支払い方法（PayPal/クレジットカード）の登録が必要です。
-        </p>
-        <a href="index.html" class="plan-back-link">← トップページへ戻る</a>
+        <button class="plan-confirm-btn" id="confirm-btn" disabled onclick="confirmPlan()">プランを選択してください</button>
+        <p class="plan-note">※継続利用にはお支払い方法（PayPal/クレジットカード）の登録が必要です。</p>
     </div>
 
     <script type="module">
@@ -404,32 +311,12 @@
         import { getIdToken } from './js/auth.js';
 
         let selectedPlan = null;
-        let trialExpiredEntry = false;
-        let planStatusCheckPromise = null;
+        let canContinue = false;
+        const planNames = { starter: 'Starter', business: 'Business', pro: 'Pro / Legal' };
         const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
             ? 'http://localhost:3001'
             : 'https://api-qf37m5ba2q-an.a.run.app';
 
-        const applyTrialExpiredMode = () => {
-            trialExpiredEntry = true;
-            const notice = document.getElementById('plan-entry-notice');
-            if (notice) {
-                notice.innerHTML = '無料トライアルが終了しました<br>引き続き使うにはプランを選択してください。';
-                notice.style.display = 'block';
-            }
-
-            const note = document.querySelector('.plan-note');
-            if (note) {
-                note.innerHTML = '※継続利用にはお支払い方法（PayPal/クレジットカード）の登録が必要です。';
-            }
-
-            const confirmBtn = document.getElementById('confirm-btn');
-            if (confirmBtn && !selectedPlan) {
-                confirmBtn.textContent = 'プランを選択して続行';
-            }
-        };
-
-        // Require auth - redirect to login if not authenticated
         onAuthStateChanged(auth, async (user) => {
             if (!user) {
                 const next = `${window.location.pathname}${window.location.search}`;
@@ -437,104 +324,61 @@
                 return;
             }
 
-            // reasonが無くても、実アカウント状態で「無料期間終了」を判定する
-            if (!trialExpiredEntry) {
-                planStatusCheckPromise = (async () => {
-                    try {
-                        const token = await getIdToken();
-                        if (token) {
-                            const [subRes, paymentRes] = await Promise.all([
-                                fetch(`${API_BASE}/user/subscription`, {
-                                    headers: { 'Authorization': `Bearer ${token}` }
-                                }),
-                                fetch(`${API_BASE}/payment/status`, {
-                                    headers: { 'Authorization': `Bearer ${token}` }
-                                })
-                            ]);
+            try {
+                const token = await getIdToken();
+                if (!token) {
+                    window.location.replace(`${window.location.origin}/login.html`);
+                    return;
+                }
 
-                            if (subRes.ok && paymentRes.ok) {
-                                const subJson = await subRes.json();
-                                const paymentJson = await paymentRes.json();
-                                const sub = subJson?.data || {};
-                                const payment = paymentJson?.data || {};
-                                const isTrialExpired = !!sub.trialStartedAt && !sub.isInTrial;
-                                const hasNoPayment = !payment.hasPaymentMethod;
+                const [subRes, paymentRes] = await Promise.all([
+                    fetch(`${API_BASE}/user/subscription`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    }),
+                    fetch(`${API_BASE}/payment/status`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    })
+                ]);
 
-                                if (isTrialExpired && hasNoPayment) {
-                                    applyTrialExpiredMode();
-                                }
-                            }
-                        }
-                    } catch (e) {
-                        console.warn('trial expired status check failed on select-plan:', e);
-                    }
-                })();
+                if (!subRes.ok || !paymentRes.ok) {
+                    window.location.replace(`${window.location.origin}/dashboard.html`);
+                    return;
+                }
+
+                const subJson = await subRes.json();
+                const paymentJson = await paymentRes.json();
+                const sub = subJson?.data || {};
+                const payment = paymentJson?.data || {};
+                const isTrialExpired = !!sub.trialStartedAt && !sub.isInTrial;
+                const hasNoPayment = !payment.hasPaymentMethod;
+
+                if (!(isTrialExpired && hasNoPayment)) {
+                    window.location.replace(`${window.location.origin}/dashboard.html`);
+                    return;
+                }
+
+                canContinue = true;
+            } catch (error) {
+                console.warn('Failed to validate trial-expired user on preview page:', error);
+                window.location.replace(`${window.location.origin}/dashboard.html`);
             }
         });
 
-        const params = new URLSearchParams(window.location.search);
-        trialExpiredEntry = params.get('reason') === 'trial_expired' || localStorage.getItem('diffsense_trial_expired') === '1';
-
-        if (trialExpiredEntry) {
-            applyTrialExpiredMode();
-            localStorage.removeItem('diffsense_trial_expired');
-        }
-
         window.selectPlan = (planId) => {
             selectedPlan = planId;
-
-            // Update UI
-            document.querySelectorAll('.plan-card').forEach(card => {
-                card.classList.remove('selected');
-            });
+            document.querySelectorAll('.plan-card').forEach(card => card.classList.remove('selected'));
             document.querySelector(`[data-plan="${planId}"]`).classList.add('selected');
-
-            // Update button
             const btn = document.getElementById('confirm-btn');
-            const planNames = { starter: 'Starter', business: 'Business', pro: 'Pro / Legal' };
-            btn.textContent = trialExpiredEntry
-                ? `${planNames[planId]} を選択して続行`
-                : `${planNames[planId]} で始める`;
+            btn.textContent = `${planNames[planId]} を選択して続行`;
             btn.disabled = false;
         };
 
-        window.confirmPlan = async () => {
-            if (!selectedPlan) return;
-
-            const btn = document.getElementById('confirm-btn');
-            btn.classList.add('btn-loading');
-
-            // 無料期間終了判定が未完了なら待つ（誤文言での遷移防止）
-            if (planStatusCheckPromise) {
-                try {
-                    await planStatusCheckPromise;
-                } catch (e) {
-                    console.warn('plan status check await failed:', e);
-                }
-            }
-
-            // Save selected plan to localStorage
+        window.confirmPlan = () => {
+            if (!selectedPlan || !canContinue) return;
             localStorage.setItem('diffsense_selected_plan', selectedPlan);
-
-            // クリック時点で再判定（URL直アクセス時のブレ防止）
-            const confirmParams = new URLSearchParams(window.location.search);
-            const forceTrialExpiredFlow =
-                trialExpiredEntry ||
-                confirmParams.get('reason') === 'trial_expired' ||
-                localStorage.getItem('diffsense_trial_expired') === '1' ||
-                localStorage.getItem('diffsense_trial_expired_flow') === '1';
-
-            if (forceTrialExpiredFlow) {
-                localStorage.setItem('diffsense_trial_expired_flow', '1');
-                // 無料期間終了後は「設定完了画面」を挟まず、決済開始フローへ直接遷移
-                window.location.replace(`${window.location.origin}/dashboard.html?start_payment=1&plan=${selectedPlan}&from=trial_expired`);
-                return;
-            }
-
-            // Redirect to thanks page
-            window.location.replace(`${window.location.origin}/thanks-plan.html?plan=${selectedPlan}`);
+            localStorage.setItem('diffsense_trial_expired_flow', '1');
+            window.location.replace(`${window.location.origin}/dashboard.html?start_payment=1&plan=${selectedPlan}&from=trial_expired`);
         };
     </script>
 </body>
-
 </html>

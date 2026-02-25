@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="refresh" content="0; url=/select-plan-preview.html">
+    <title>Redirecting...</title>
+    <script>
+        window.location.replace('/select-plan-preview.html');
+    </script>
+</head>
+<body></body>
+</html>
