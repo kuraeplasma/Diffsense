@@ -56,6 +56,68 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     `;
     document.head.appendChild(style);
+
+    // Auto horizontal scroll for "user voices" cards
+    function initUserVoicesAutoScroll() {
+        const tracks = Array.from(document.querySelectorAll('.user-voices-scroll'));
+        if (!tracks.length) return;
+
+        tracks.forEach((track) => {
+            if (track.dataset.autoScrollInitialized === 'true') return;
+            if (track.offsetParent === null) return;
+
+            const cards = Array.from(track.querySelectorAll('.user-voice-card'));
+            if (cards.length < 2) return;
+
+            // Shuffle cards to avoid fixed order feeling
+            const shuffled = [...cards];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+
+            track.innerHTML = '';
+            shuffled.forEach(card => {
+                track.appendChild(card);
+            });
+
+            // Duplicate once to make seamless infinite loop
+            shuffled.forEach(card => {
+                const clone = card.cloneNode(true);
+                clone.setAttribute('aria-hidden', 'true');
+                track.appendChild(clone);
+            });
+
+            const loopWidth = track.scrollWidth / 2;
+            if (loopWidth <= 0) return;
+
+            track.dataset.autoScrollInitialized = 'true';
+
+            let rafId = null;
+            let position = 0;
+            let lastTs = null;
+            const speedPxPerSec = window.innerWidth <= 768 ? 14 : 18;
+
+            const tick = (ts) => {
+                if (lastTs === null) lastTs = ts;
+                const deltaSec = (ts - lastTs) / 1000;
+                lastTs = ts;
+
+                position += speedPxPerSec * deltaSec;
+                if (position >= loopWidth) {
+                    position -= loopWidth;
+                }
+                track.scrollLeft = position;
+                rafId = requestAnimationFrame(tick);
+            };
+
+            rafId = requestAnimationFrame(tick);
+
+            window.addEventListener('beforeunload', () => {
+                if (rafId) cancelAnimationFrame(rafId);
+            });
+        });
+    }
     // Dashboard Scaler
     function scaleDashboard() {
         const dashboard = document.querySelector('.dashboard-frame');
@@ -129,6 +191,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Run on load and resize
+    initUserVoicesAutoScroll();
     scaleDashboard();
+    window.addEventListener('resize', initUserVoicesAutoScroll);
     window.addEventListener('resize', scaleDashboard);
 });
