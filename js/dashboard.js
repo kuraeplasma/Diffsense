@@ -897,6 +897,8 @@ class DashboardApp {
 
         // Registration Flow
         this.registration = new RegistrationFlow(this);
+        // 無料期間終了フロー時は決済モーダルを閉じられないようにする
+        this.forceSubscriptionPayment = false;
     }
 
     can(action) {
@@ -949,12 +951,14 @@ class DashboardApp {
             const urlParams = new URLSearchParams(window.location.search);
             const shouldStartPayment = urlParams.get('start_payment') === '1';
             const paymentPlan = urlParams.get('plan');
+            const fromTrialExpired = urlParams.get('from') === 'trial_expired';
 
             // 無料期間終了後の決済開始フロー
             if (shouldStartPayment) {
+                this.forceSubscriptionPayment = fromTrialExpired;
                 this.navigate('plan');
                 setTimeout(() => {
-                    this.startPayPalSubscription(paymentPlan || this.subscription?.plan || 'starter');
+                    this.startPayPalSubscription(paymentPlan || this.subscription?.plan || 'starter', fromTrialExpired);
                 }, 250);
 
                 history.replaceState(null, '', window.location.pathname);
@@ -1151,7 +1155,7 @@ class DashboardApp {
         }
     }
 
-    async startPayPalSubscription(plan) {
+    async startPayPalSubscription(plan, forcePayment = this.forceSubscriptionPayment) {
         const targetPlan = plan || this.subscription?.plan || 'starter';
         try {
             // Fetch PayPal config from backend
@@ -1159,12 +1163,18 @@ class DashboardApp {
             const configData = await configRes.json();
             if (!configData.success) {
                 Notify.error('PayPal設定の取得に失敗しました。');
+                if (forcePayment) {
+                    window.location.replace(`${window.location.origin}/select-plan-preview.html?reason=trial_expired`);
+                }
                 return;
             }
             const { clientId, planIds } = configData.data;
             const paypalPlanId = planIds[targetPlan];
             if (!paypalPlanId) {
                 Notify.error('プランIDが見つかりません。');
+                if (forcePayment) {
+                    window.location.replace(`${window.location.origin}/select-plan-preview.html?reason=trial_expired`);
+                }
                 return;
             }
 
@@ -1183,7 +1193,7 @@ class DashboardApp {
             }
 
             // Show modal with PayPal button container
-            this.showPayPalModal(targetPlan);
+            this.showPayPalModal(targetPlan, forcePayment);
 
             // Load PayPal JS SDK dynamically
             await this.loadPayPalSDK(clientId);
@@ -1212,18 +1222,28 @@ class DashboardApp {
                     // Close the PayPal modal
                     const modal = document.getElementById('paypal-modal-overlay');
                     if (modal) modal.remove();
+                    this.forceSubscriptionPayment = false;
+                    localStorage.removeItem('diffsense_trial_expired_flow');
 
                     // Confirm with backend
                     await this.confirmPayPalSubscription(data.subscriptionID, targetPlan);
                 },
                 onCancel: () => {
                     console.log('User cancelled PayPal subscription');
+                    if (forcePayment) {
+                        Notify.warning('継続利用にはお支払い方法の登録が必要です。');
+                        return;
+                    }
                     const modal = document.getElementById('paypal-modal-overlay');
                     if (modal) modal.remove();
                     Notify.info('お支払いがキャンセルされました。');
                 },
                 onError: (err) => {
                     console.error('PayPal Buttons error:', err);
+                    if (forcePayment) {
+                        Notify.error('お支払い処理でエラーが発生しました。再度お試しください。');
+                        return;
+                    }
                     const modal = document.getElementById('paypal-modal-overlay');
                     if (modal) modal.remove();
                     Notify.error('お支払い処理でエラーが発生しました。');
@@ -1233,10 +1253,13 @@ class DashboardApp {
         } catch (error) {
             console.error('PayPal subscription error:', error);
             Notify.error('お支払い処理でエラーが発生しました。');
+            if (forcePayment) {
+                window.location.replace(`${window.location.origin}/select-plan-preview.html?reason=trial_expired`);
+            }
         }
     }
 
-    showPayPalModal(plan) {
+    showPayPalModal(plan, forcePayment = this.forceSubscriptionPayment) {
         // Remove existing modal if any
         const existing = document.getElementById('paypal-modal-overlay');
         if (existing) existing.remove();
@@ -1253,9 +1276,10 @@ class DashboardApp {
                     <h3 style="margin:0; font-size:1.1rem;">
                         <i class="fa-solid fa-credit-card" style="margin-right:8px; color:#c19b4a;"></i>お支払い方法を登録
                     </h3>
-                    <button class="btn-close" onclick="document.getElementById('paypal-modal-overlay').remove()">&times;</button>
+                    ${forcePayment ? '' : '<button class="btn-close" onclick="document.getElementById(\'paypal-modal-overlay\').remove()">&times;</button>'}
                 </div>
                 <div class="modal-body" style="padding:24px;">
+                    ${forcePayment ? '<p style="font-size:0.8rem; color:#92400e; background:#fff8e9; border:1px solid #ead9b0; padding:8px 10px; border-radius:6px; text-align:center; margin:0 0 12px 0;">無料トライアルが終了しています。継続利用にはお支払い登録が必要です。</p>' : ''}
                     <div style="background:#faf8f5; border:1px solid #e8e0d4; border-radius:8px; padding:16px; margin-bottom:20px; text-align:center;">
                         <div style="font-size:0.8rem; color:#888; margin-bottom:4px;">選択プラン</div>
                         <div style="font-size:1.1rem; font-weight:700; color:#24292E;">${planNames[plan] || plan}</div>
@@ -1267,6 +1291,13 @@ class DashboardApp {
                     <div id="paypal-button-container" style="min-height:150px; display:flex; align-items:center; justify-content:center;">
                         <div style="color:#999; font-size:0.85rem;"><i class="fa-solid fa-spinner fa-spin" style="margin-right:8px;"></i>読み込み中...</div>
                     </div>
+                    ${forcePayment ? `
+                        <div style="margin-top:12px;">
+                            <button onclick="window.location.replace('${window.location.origin}/index.html')" class="btn-dashboard full-width" style="background:#fff; color:#333; border:1px solid #ddd;">
+                                TOPへ戻る
+                            </button>
+                        </div>
+                    ` : ''}
                 </div>
             </div>
         `;
