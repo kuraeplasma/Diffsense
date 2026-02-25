@@ -1332,7 +1332,7 @@ class DashboardApp {
         const hasNoPayment = !payment || !payment.hasPaymentMethod;
         if (isTrialExpired && hasNoPayment) {
             localStorage.setItem('diffsense_trial_expired', '1');
-            window.location.replace(`${window.location.origin}/select-plan-preview?reason=trial_expired`);
+            window.location.replace(`${window.location.origin}/select-plan-preview.html?reason=trial_expired`);
         }
     }
 

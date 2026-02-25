@@ -99,7 +99,7 @@ export async function handleLogin(email, password) {
         const mustShowPlanSelect = await isTrialExpiredWithoutPayment(user);
         if (mustShowPlanSelect) {
             localStorage.setItem('diffsense_trial_expired', '1');
-            window.location.replace(`${window.location.origin}/select-plan-preview?reason=trial_expired`);
+            window.location.replace(`${window.location.origin}/select-plan-preview.html?reason=trial_expired`);
             return;
         }
 
