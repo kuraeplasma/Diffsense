@@ -219,6 +219,14 @@
             margin-top: 12px;
         }
 
+        .plan-error {
+            text-align: center;
+            font-size: 0.82rem;
+            color: #b91c1c;
+            margin-top: 10px;
+            min-height: 1.2em;
+        }
+
         @media (max-width: 768px) {
             .plan-grid {
                 flex-direction: column;
@@ -302,7 +310,8 @@
         </div>
 
         <button class="plan-confirm-btn" id="confirm-btn" disabled onclick="confirmPlan()">プランを選択してください</button>
-        <p class="plan-note">※継続利用にはお支払い方法（PayPal/クレジットカード）の登録が必要です。</p>
+        <p class="plan-note">※継続利用にはお支払い方法の登録が必要です。</p>
+        <p class="plan-error" id="plan-error"></p>
     </div>
 
     <script type="module">
@@ -369,15 +378,50 @@
             document.querySelectorAll('.plan-card').forEach(card => card.classList.remove('selected'));
             document.querySelector(`[data-plan="${planId}"]`).classList.add('selected');
             const btn = document.getElementById('confirm-btn');
-            btn.textContent = `${planNames[planId]} を選択して続行`;
+            btn.textContent = `${planNames[planId]}プランで続ける`;
             btn.disabled = false;
+            const errorEl = document.getElementById('plan-error');
+            if (errorEl) errorEl.textContent = '';
         };
 
-        window.confirmPlan = () => {
+        window.confirmPlan = async () => {
             if (!selectedPlan || !canContinue) return;
-            localStorage.setItem('diffsense_selected_plan', selectedPlan);
-            localStorage.setItem('diffsense_trial_expired_flow', '1');
-            window.location.replace(`${window.location.origin}/dashboard.html?start_payment=1&plan=${selectedPlan}&from=trial_expired`);
+            const btn = document.getElementById('confirm-btn');
+            const errorEl = document.getElementById('plan-error');
+            const planLabel = planNames[selectedPlan] || selectedPlan;
+            btn.disabled = true;
+            btn.textContent = '決済画面へ移動中...';
+            if (errorEl) errorEl.textContent = '';
+
+            try {
+                const token = await getIdToken();
+                if (!token) {
+                    throw new Error('ログイン情報を確認できませんでした。再度ログインしてください。');
+                }
+
+                localStorage.setItem('diffsense_trial_expired_flow', '1');
+
+                const response = await fetch(`${API_BASE}/payment/create-subscription`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ plan: selectedPlan })
+                });
+                const result = await response.json();
+
+                if (!response.ok || !result?.success || !result?.data?.approvalUrl) {
+                    throw new Error(result?.error || '決済ページを開けませんでした。時間をおいて再度お試しください。');
+                }
+
+                window.location.replace(result.data.approvalUrl);
+            } catch (error) {
+                console.error('Failed to open PayPal approval page:', error);
+                if (errorEl) errorEl.textContent = error.message || '決済ページへの移動に失敗しました。';
+                btn.disabled = false;
+                btn.textContent = `${planLabel}プランで続ける`;
+            }
         };
     </script>
 </body>

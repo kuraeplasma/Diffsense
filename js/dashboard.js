@@ -1039,9 +1039,11 @@ class DashboardApp {
                     dbService.updateUserRole(user.email, this.userRole);
                 }
 
+                const trialExpiredFlowFlag = localStorage.getItem('diffsense_trial_expired_flow') === '1';
+
                 // Check if user just selected a plan from signup flow
                 const selectedPlan = localStorage.getItem('diffsense_selected_plan');
-                if (selectedPlan) {
+                if (selectedPlan && !trialExpiredFlowFlag) {
                     await this.registerSelectedPlan(token, selectedPlan);
                     localStorage.removeItem('diffsense_selected_plan');
                 }
@@ -1050,12 +1052,36 @@ class DashboardApp {
                 await this.fetchSubscriptionStatus(token);
                 await this.fetchPaymentStatus(token);
 
+                const urlParams = new URLSearchParams(window.location.search);
+                const paymentState = urlParams.get('payment');
+
+                // PayPal遷移戻りの確定処理
+                if (paymentState === 'success') {
+                    const returnedPlan = urlParams.get('plan') || this.subscription?.plan || 'starter';
+                    const returnedSubscriptionId =
+                        urlParams.get('subscription_id') ||
+                        urlParams.get('ba_token') ||
+                        urlParams.get('token');
+
+                    if (returnedSubscriptionId) {
+                        const confirmed = await this.confirmPayPalSubscription(returnedSubscriptionId, returnedPlan, { redirectOnSuccess: true });
+                        if (confirmed) return;
+                    } else if (this.paymentStatus?.hasPaymentMethod) {
+                        window.location.replace(`${window.location.origin}/thanks-payment.html?plan=${returnedPlan}`);
+                        return;
+                    }
+                }
+
+                if (paymentState === 'cancelled' && trialExpiredFlowFlag) {
+                    window.location.replace(`${window.location.origin}/select-plan-preview.html?reason=trial_expired`);
+                    return;
+                }
+
                 // Check if trial expired and no payment method
                 this.checkTrialExpired();
 
-                // Clean any legacy payment URL params
-                const urlParams = new URLSearchParams(window.location.search);
-                if (urlParams.has('payment')) {
+                // Clean payment URL params
+                if (paymentState) {
                     history.replaceState(null, '', window.location.pathname);
                 }
 
@@ -1210,7 +1236,7 @@ class DashboardApp {
                     shape: 'rect',
                     color: 'gold',
                     layout: 'vertical',
-                    label: 'subscribe'
+                    label: 'pay'
                 },
                 createSubscription: (data, actions) => {
                     return actions.subscription.create({
@@ -1286,10 +1312,10 @@ class DashboardApp {
                         <div style="font-size:1.3rem; font-weight:700; color:#c19b4a; margin-top:4px;">${planPrices[plan] || ''}</div>
                     </div>
                     <p style="font-size:0.82rem; color:#666; margin-bottom:16px; text-align:center;">
-                        PayPalアカウントまたはクレジットカード/デビットカードで<br>お支払いいただけます。
+                        クレジットカード/デビットカードで決済できます。
                     </p>
                     <div id="paypal-button-container" style="min-height:150px; display:flex; align-items:center; justify-content:center;">
-                        <div style="color:#999; font-size:0.85rem;"><i class="fa-solid fa-spinner fa-spin" style="margin-right:8px;"></i>読み込み中...</div>
+                        <div style="color:#999; font-size:0.85rem;"><i class="fa-solid fa-spinner fa-spin" style="margin-right:8px;"></i>決済ボタンを読み込み中...</div>
                     </div>
                     ${forcePayment ? `
                         <div style="margin-top:12px;">
@@ -1324,7 +1350,8 @@ class DashboardApp {
         });
     }
 
-    async confirmPayPalSubscription(subscriptionId, plan) {
+    async confirmPayPalSubscription(subscriptionId, plan, options = {}) {
+        const redirectOnSuccess = options.redirectOnSuccess !== false;
         try {
             const authModule = await import('./auth.js');
             const token = await authModule.getIdToken();
@@ -1343,10 +1370,15 @@ class DashboardApp {
             if (result.success) {
                 const confirmedPlan = result.data.plan || plan || this.subscription?.plan || 'starter';
                 // Redirect to thanks page for GA conversion tracking
-                window.location.replace(`${window.location.origin}/thanks-payment.html?plan=${confirmedPlan}`);
+                if (redirectOnSuccess) {
+                    window.location.replace(`${window.location.origin}/thanks-payment.html?plan=${confirmedPlan}`);
+                }
+                return true;
             }
+            return false;
         } catch (error) {
             console.error('Confirm subscription error:', error);
+            return false;
         }
     }
 
