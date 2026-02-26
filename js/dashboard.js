@@ -9,29 +9,57 @@ const Views = {
     plan: () => {
         const sub = window.app ? window.app.subscription : null;
         const payment = window.app ? window.app.paymentStatus : null;
-        if (!sub) return '<div class="text-center p-5">利用状況を読み込んでいます...</div>';
+        if (!sub) {
+            return `
+                <div class="text-center p-5">
+                    <p style="margin-bottom:14px;">利用状況を読み込んでいます...</p>
+                    <button class="btn-dashboard" onclick="window.app.reloadPlanData()" style="padding:8px 16px;">
+                        再読み込み
+                    </button>
+                </div>
+            `;
+        }
 
+        const currentBillingCycle = sub.billingCycle === 'annual' ? 'annual' : 'monthly';
+        const cycleLabel = currentBillingCycle === 'annual' ? '年額' : '月額';
         const plans = [
-            { id: 'starter', name: 'Starter', price: '¥1,480', features: ['AI解析 15回/月', '履歴管理', '判定: High/Med/Low'] },
-            { id: 'business', name: 'Business', price: '¥4,980', features: ['AI解析 120回/月', 'AI詳細解説', 'ステータス管理', 'チーム3人'] },
-            { id: 'pro', name: 'Pro / Legal', price: '¥9,800', features: ['AI解析 400回/月', '定期URL監視', 'CSV/PDFエクスポート', 'チーム5人'] }
+            {
+                id: 'starter',
+                name: 'Starter',
+                prices: { monthly: '¥1,480', annual: '¥14,800' },
+                features: ['AI解析 15回/月', '履歴管理', '判定: High/Med/Low']
+            },
+            {
+                id: 'business',
+                name: 'Business',
+                prices: { monthly: '¥4,980', annual: '¥49,800' },
+                features: ['AI解析 120回/月', 'AI詳細解説', 'ステータス管理', 'チーム3人']
+            },
+            {
+                id: 'pro',
+                name: 'Pro / Legal',
+                prices: { monthly: '¥9,800', annual: '¥98,000' },
+                features: ['AI解析 400回/月', '定期URL監視', 'CSV/PDFエクスポート', 'チーム5人']
+            }
         ];
 
         const hasPayment = payment && payment.hasPaymentMethod;
 
         const cards = plans.map(p => {
             const isCurrent = sub.plan === p.id;
+            const price = p.prices[currentBillingCycle] || p.prices.monthly;
+            const priceUnit = currentBillingCycle === 'annual' ? ' / 年' : ' / 月';
             return `
                 <div class="pricing-card ${isCurrent ? 'business highlight-plan' : ''}" style="border: 1px solid #eee; padding: 20px; border-radius: 8px; flex: 1; background: #fff; display:flex; flex-direction:column;">
                     <div style="height:22px; margin-bottom:6px;">
-                        ${isCurrent ? '<span style="background:#c19b4a; color:#fff; font-size:10px; padding:2px 8px; border-radius:10px;">現在のプラン</span>' : ''}
+                        ${isCurrent ? `<span style="background:#c19b4a; color:#fff; font-size:10px; padding:2px 8px; border-radius:10px;">現在のプラン（${cycleLabel}）</span>` : ''}
                     </div>
                     <h3 style="margin-bottom:10px;">${p.name}</h3>
-                    <div style="font-size: 24px; font-weight: bold; margin-bottom: 20px;">${p.price}<small style="font-size:12px; color:#666;"> / 月</small></div>
+                    <div style="font-size: 24px; font-weight: bold; margin-bottom: 20px;">${price}<small style="font-size:12px; color:#666;">${priceUnit}</small></div>
                     <ul style="list-style: none; padding: 0; margin-bottom: 20px; font-size: 0.85rem; color: #555; flex:1;">
                         ${p.features.map(f => `<li style="margin-bottom:8px;"><i class="fa-solid fa-check" style="color:#c19b4a; margin-right:8px;"></i>${f}</li>`).join('')}
                     </ul>
-                    ${!isCurrent ? `<button class="btn-dashboard full-width" style="background:#c19b4a; color:#fff; border:none;" onclick="window.app.startPayPalSubscription('${p.id}')">プランを変更する</button>` : ''}
+                    ${!isCurrent ? `<button class="btn-dashboard full-width" style="background:#c19b4a; color:#fff; border:none;" onclick="window.app.startPayPalSubscription('${p.id}', '${currentBillingCycle}')">プランを変更する</button>` : ''}
                 </div>
             `;
         }).join('');
@@ -60,7 +88,7 @@ const Views = {
                     ? 'トライアル終了後も継続利用するには、お支払い方法（PayPal/クレジットカード）の登録が必要です。'
                     : 'トライアルが終了しました。継続利用にはお支払い方法の登録が必要です。'}
                     </p>
-                    <button onclick="window.app.startPayPalSubscription()" class="btn-dashboard" style="background:#c19b4a; color:#fff; border:none; padding:10px 24px; border-radius:6px; font-weight:600; cursor:pointer;">
+                    <button onclick="window.app.startPayPalSubscription(undefined, '${currentBillingCycle}')" class="btn-dashboard" style="background:#c19b4a; color:#fff; border:none; padding:10px 24px; border-radius:6px; font-weight:600; cursor:pointer;">
                         <i class="fa-solid fa-credit-card" style="margin-right:8px;"></i>お支払い方法を登録する
                     </button>
                 </div>
@@ -82,6 +110,7 @@ const Views = {
 
         return `
             <div class="page-title">プラン管理</div>
+            <p style="font-size:0.82rem; color:#8a7048; margin:0 0 14px;">現在の請求サイクル: <strong>${cycleLabel}</strong></p>
             ${paymentSection}
             <div style="display: flex; gap: 20px; margin-bottom: 30px;">
                 ${cards}
@@ -948,9 +977,15 @@ class DashboardApp {
             // Auto-register current user as Admin if needed (must await for ownerUid scope switch)
             await this.checkAndRegisterAdmin();
 
+            // Fallback: 何らかの理由でcheckAndRegisterAdmin内の取得に失敗しても復旧させる
+            if (!this.subscription) {
+                await this.reloadPlanData({ silent: true });
+            }
+
             const urlParams = new URLSearchParams(window.location.search);
             const shouldStartPayment = urlParams.get('start_payment') === '1';
             const paymentPlan = urlParams.get('plan');
+            const paymentBilling = urlParams.get('billing');
             const fromTrialExpired = urlParams.get('from') === 'trial_expired';
 
             // 無料期間終了後の決済開始フロー
@@ -958,7 +993,11 @@ class DashboardApp {
                 this.forceSubscriptionPayment = fromTrialExpired;
                 this.navigate('plan');
                 setTimeout(() => {
-                    this.startPayPalSubscription(paymentPlan || this.subscription?.plan || 'starter', fromTrialExpired);
+                    this.startPayPalSubscription(
+                        paymentPlan || this.subscription?.plan || 'starter',
+                        paymentBilling || this.subscription?.billingCycle || 'monthly',
+                        fromTrialExpired
+                    );
                 }, 250);
 
                 history.replaceState(null, '', window.location.pathname);
@@ -1043,9 +1082,11 @@ class DashboardApp {
 
                 // Check if user just selected a plan from signup flow
                 const selectedPlan = localStorage.getItem('diffsense_selected_plan');
+                const selectedBillingCycle = localStorage.getItem('diffsense_selected_billing_cycle') || 'monthly';
                 if (selectedPlan && !trialExpiredFlowFlag) {
-                    await this.registerSelectedPlan(token, selectedPlan);
+                    await this.registerSelectedPlan(token, selectedPlan, selectedBillingCycle);
                     localStorage.removeItem('diffsense_selected_plan');
+                    localStorage.removeItem('diffsense_selected_billing_cycle');
                 }
 
                 // Fetch real subscription status from backend
@@ -1058,22 +1099,29 @@ class DashboardApp {
                 // PayPal遷移戻りの確定処理
                 if (paymentState === 'success') {
                     const returnedPlan = urlParams.get('plan') || this.subscription?.plan || 'starter';
+                    const returnedBillingCycle = urlParams.get('billing') || this.subscription?.billingCycle || 'monthly';
                     const returnedSubscriptionId =
                         urlParams.get('subscription_id') ||
                         urlParams.get('ba_token') ||
                         urlParams.get('token');
 
                     if (returnedSubscriptionId) {
-                        const confirmed = await this.confirmPayPalSubscription(returnedSubscriptionId, returnedPlan, { redirectOnSuccess: true });
+                        const confirmed = await this.confirmPayPalSubscription(
+                            returnedSubscriptionId,
+                            returnedPlan,
+                            returnedBillingCycle,
+                            { redirectOnSuccess: true }
+                        );
                         if (confirmed) return;
                     } else if (this.paymentStatus?.hasPaymentMethod) {
-                        window.location.replace(`${window.location.origin}/thanks-payment.html?plan=${returnedPlan}`);
+                        window.location.replace(`${window.location.origin}/thanks-payment.html?plan=${returnedPlan}&billing=${returnedBillingCycle}`);
                         return;
                     }
                 }
 
                 if (paymentState === 'cancelled' && trialExpiredFlowFlag) {
-                    window.location.replace(`${window.location.origin}/select-plan-preview.html?reason=trial_expired`);
+                    const returnedBillingCycle = urlParams.get('billing') || this.subscription?.billingCycle || 'monthly';
+                    window.location.replace(`${window.location.origin}/select-plan-preview.html?reason=trial_expired&billing=${returnedBillingCycle}`);
                     return;
                 }
 
@@ -1120,7 +1168,8 @@ class DashboardApp {
         }
     }
 
-    async registerSelectedPlan(token, plan) {
+    async registerSelectedPlan(token, plan, billingCycle = 'monthly') {
+        const selectedBillingCycle = billingCycle === 'annual' ? 'annual' : 'monthly';
         try {
             const apiUrl = `${aiService.API_BASE}/user/select-plan`;
 
@@ -1130,11 +1179,35 @@ class DashboardApp {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ plan })
+                body: JSON.stringify({ plan, billingCycle: selectedBillingCycle })
             });
-            console.log('Selected plan registered:', plan);
+            console.log('Selected plan registered:', plan, selectedBillingCycle);
         } catch (error) {
             console.error('Failed to register selected plan:', error);
+        }
+    }
+
+    async reloadPlanData(options = {}) {
+        const silent = options.silent === true;
+        try {
+            const authModule = await import('./auth.js');
+            const token = await authModule.getIdToken();
+            if (!token) {
+                if (!silent) Notify.warning('ログイン状態を確認できませんでした。');
+                return false;
+            }
+
+            await this.fetchSubscriptionStatus(token);
+            await this.fetchPaymentStatus(token);
+
+            if (this.currentView === 'plan') {
+                this.navigate('plan');
+            }
+            return true;
+        } catch (error) {
+            console.error('reloadPlanData error:', error);
+            if (!silent) Notify.error('利用状況の再取得に失敗しました。');
+            return false;
         }
     }
 
@@ -1150,14 +1223,17 @@ class DashboardApp {
             const result = await response.json();
 
             if (result.success) {
-                this.subscription = result.data;
+                this.subscription = {
+                    ...result.data,
+                    billingCycle: result.data?.billingCycle === 'annual' ? 'annual' : 'monthly'
+                };
                 this.userPlan = result.data.plan;
                 this.updateSubscriptionUI();
             }
         } catch (error) {
             console.error('Failed to fetch subscription status:', error);
             // API接続失敗時：starterをデフォルトにする（proハードコードを防止）
-            this.subscription = { plan: 'starter', usageCount: 0, usageLimit: 5, daysRemaining: null, isInTrial: false, planLimit: 15 };
+            this.subscription = { plan: 'starter', billingCycle: 'monthly', usageCount: 0, usageLimit: 5, daysRemaining: null, isInTrial: false, planLimit: 15 };
             this.userPlan = 'starter';
             this.updateSubscriptionUI();
         }
@@ -1181,8 +1257,9 @@ class DashboardApp {
         }
     }
 
-    async startPayPalSubscription(plan, forcePayment = this.forceSubscriptionPayment) {
+    async startPayPalSubscription(plan, billingCycle = this.subscription?.billingCycle || 'monthly', forcePayment = this.forceSubscriptionPayment) {
         const targetPlan = plan || this.subscription?.plan || 'starter';
+        const selectedBillingCycle = billingCycle === 'annual' ? 'annual' : 'monthly';
         try {
             // Fetch PayPal config from backend
             const configRes = await fetch(`${aiService.API_BASE}/payment/config`);
@@ -1195,17 +1272,18 @@ class DashboardApp {
                 return;
             }
             const { clientId, planIds } = configData.data;
-            const paypalPlanId = planIds[targetPlan];
+            const paypalPlanId = planIds?.[selectedBillingCycle]?.[targetPlan] || planIds?.[targetPlan];
             if (!paypalPlanId) {
                 Notify.error('プランIDが見つかりません。');
                 if (forcePayment) {
-                    window.location.replace(`${window.location.origin}/select-plan-preview.html?reason=trial_expired`);
+                    window.location.replace(`${window.location.origin}/select-plan-preview.html?reason=trial_expired&billing=${selectedBillingCycle}`);
                 }
                 return;
             }
 
-            // If user has existing active subscription and is changing plans, cancel old one first
-            if (this.paymentStatus?.hasPaymentMethod && this.subscription?.plan !== targetPlan) {
+            // If user has existing active subscription and is changing plan/cycle, cancel old one first
+            const currentCycle = this.subscription?.billingCycle || 'monthly';
+            if (this.paymentStatus?.hasPaymentMethod && (this.subscription?.plan !== targetPlan || currentCycle !== selectedBillingCycle)) {
                 const authModule = await import('./auth.js');
                 const token = await authModule.getIdToken();
                 try {
@@ -1219,7 +1297,7 @@ class DashboardApp {
             }
 
             // Show modal with PayPal button container
-            this.showPayPalModal(targetPlan, forcePayment);
+            this.showPayPalModal(targetPlan, selectedBillingCycle, forcePayment);
 
             // Load PayPal JS SDK dynamically
             await this.loadPayPalSDK(clientId);
@@ -1252,7 +1330,7 @@ class DashboardApp {
                     localStorage.removeItem('diffsense_trial_expired_flow');
 
                     // Confirm with backend
-                    await this.confirmPayPalSubscription(data.subscriptionID, targetPlan);
+                    await this.confirmPayPalSubscription(data.subscriptionID, targetPlan, selectedBillingCycle);
                 },
                 onCancel: () => {
                     console.log('User cancelled PayPal subscription');
@@ -1280,18 +1358,23 @@ class DashboardApp {
             console.error('PayPal subscription error:', error);
             Notify.error('お支払い処理でエラーが発生しました。');
             if (forcePayment) {
-                window.location.replace(`${window.location.origin}/select-plan-preview.html?reason=trial_expired`);
+                window.location.replace(`${window.location.origin}/select-plan-preview.html?reason=trial_expired&billing=${selectedBillingCycle}`);
             }
         }
     }
 
-    showPayPalModal(plan, forcePayment = this.forceSubscriptionPayment) {
+    showPayPalModal(plan, billingCycle = 'monthly', forcePayment = this.forceSubscriptionPayment) {
         // Remove existing modal if any
         const existing = document.getElementById('paypal-modal-overlay');
         if (existing) existing.remove();
 
         const planNames = { starter: 'Starter', business: 'Business', pro: 'Pro / Legal' };
-        const planPrices = { starter: '¥1,480/月', business: '¥4,980/月', pro: '¥9,800/月' };
+        const cycle = billingCycle === 'annual' ? 'annual' : 'monthly';
+        const billingLabel = cycle === 'annual' ? '年額（一括）' : '月額';
+        const planPrices = {
+            monthly: { starter: '¥1,480 / 月（税込）', business: '¥4,980 / 月（税込）', pro: '¥9,800 / 月（税込）' },
+            annual: { starter: '¥14,800 / 年（税込）', business: '¥49,800 / 年（税込）', pro: '¥98,000 / 年（税込）' }
+        };
 
         const overlay = document.createElement('div');
         overlay.className = 'modal-overlay active';
@@ -1309,7 +1392,8 @@ class DashboardApp {
                     <div style="background:#faf8f5; border:1px solid #e8e0d4; border-radius:8px; padding:16px; margin-bottom:20px; text-align:center;">
                         <div style="font-size:0.8rem; color:#888; margin-bottom:4px;">選択プラン</div>
                         <div style="font-size:1.1rem; font-weight:700; color:#24292E;">${planNames[plan] || plan}</div>
-                        <div style="font-size:1.3rem; font-weight:700; color:#c19b4a; margin-top:4px;">${planPrices[plan] || ''}</div>
+                        <div style="font-size:0.8rem; color:#8a6f40; margin-top:4px;">請求サイクル: ${billingLabel}</div>
+                        <div style="font-size:1.3rem; font-weight:700; color:#c19b4a; margin-top:4px;">${planPrices[cycle]?.[plan] || ''}</div>
                     </div>
                     <p style="font-size:0.82rem; color:#666; margin-bottom:16px; text-align:center;">
                         クレジットカード/デビットカードで決済できます。
@@ -1350,8 +1434,9 @@ class DashboardApp {
         });
     }
 
-    async confirmPayPalSubscription(subscriptionId, plan, options = {}) {
+    async confirmPayPalSubscription(subscriptionId, plan, billingCycle = 'monthly', options = {}) {
         const redirectOnSuccess = options.redirectOnSuccess !== false;
+        const selectedBillingCycle = billingCycle === 'annual' ? 'annual' : 'monthly';
         try {
             const authModule = await import('./auth.js');
             const token = await authModule.getIdToken();
@@ -1363,15 +1448,16 @@ class DashboardApp {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ subscriptionId, plan })
+                body: JSON.stringify({ subscriptionId, plan, billingCycle: selectedBillingCycle })
             });
             const result = await response.json();
 
             if (result.success) {
                 const confirmedPlan = result.data.plan || plan || this.subscription?.plan || 'starter';
+                const confirmedBillingCycle = result.data.billingCycle || selectedBillingCycle;
                 // Redirect to thanks page for GA conversion tracking
                 if (redirectOnSuccess) {
-                    window.location.replace(`${window.location.origin}/thanks-payment.html?plan=${confirmedPlan}`);
+                    window.location.replace(`${window.location.origin}/thanks-payment.html?plan=${confirmedPlan}&billing=${confirmedBillingCycle}`);
                 }
                 return true;
             }
@@ -1478,6 +1564,7 @@ class DashboardApp {
 
         const usagePercent = Math.min(100, (sub.usageCount / sub.usageLimit) * 100);
         const planName = planNames[sub.plan] || sub.plan;
+        const billingCycleLabel = sub.billingCycle === 'annual' ? '年額' : '月額';
 
         let upgradeAdvice = '';
         if (sub.usageCount >= sub.usageLimit) {
@@ -1492,7 +1579,7 @@ class DashboardApp {
 
         let statusHtml = `
             <div class="plan-status-card">
-                <div class="plan-badge plan-badge-${sub.plan}">${planName}${sub.isInTrial ? '（トライアル）' : ''}</div>
+                <div class="plan-badge plan-badge-${sub.plan}">${planName}${sub.isInTrial ? '（トライアル）' : `（${billingCycleLabel}）`}</div>
                 <div class="plan-info-text">
                     ${sub.isInTrial ? `残り期間: <strong>${sub.daysRemaining}日間</strong><br>` : ''}
                     AI解析: <strong>${sub.usageCount}</strong> / ${sub.usageLimit}回

@@ -24,6 +24,22 @@ function getApiBase() {
         : 'https://api-qf37m5ba2q-an.a.run.app';
 }
 
+function normalizeBillingCycle(value) {
+    return value === 'annual' ? 'annual' : 'monthly';
+}
+
+function persistPlanIntentFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const plan = params.get('plan');
+    const billing = normalizeBillingCycle(params.get('billing'));
+    const validPlans = ['starter', 'business', 'pro'];
+
+    if (!plan || !validPlans.includes(plan)) return;
+
+    localStorage.setItem('diffsense_selected_plan', plan);
+    localStorage.setItem('diffsense_selected_billing_cycle', billing);
+}
+
 async function isTrialExpiredWithoutPayment(user) {
     try {
         if (!user) return false;
@@ -60,13 +76,15 @@ async function isTrialExpiredWithoutPayment(user) {
  */
 export async function handleSignUp(email, password) {
     try {
+        persistPlanIntentFromUrl();
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
         console.log("Signed up user:", user);
         // プランがLP経由で既に選択済みならサンクスページ経由でダッシュボードへ
         const selectedPlan = localStorage.getItem('diffsense_selected_plan');
+        const selectedBillingCycle = normalizeBillingCycle(localStorage.getItem('diffsense_selected_billing_cycle'));
         if (selectedPlan) {
-            window.location.replace("thanks-signup.html?next=dashboard");
+            window.location.replace(`thanks-signup.html?next=dashboard&billing=${selectedBillingCycle}`);
         } else {
             window.location.replace("thanks-signup.html");
         }
@@ -91,6 +109,7 @@ export async function handleSignUp(email, password) {
  */
 export async function handleLogin(email, password) {
     try {
+        persistPlanIntentFromUrl();
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
         console.log("Logged in user:", user);
@@ -99,7 +118,8 @@ export async function handleLogin(email, password) {
         const mustShowPlanSelect = await isTrialExpiredWithoutPayment(user);
         if (mustShowPlanSelect) {
             localStorage.setItem('diffsense_trial_expired', '1');
-            window.location.replace(`${window.location.origin}/select-plan-preview.html?reason=trial_expired`);
+            const selectedBillingCycle = normalizeBillingCycle(localStorage.getItem('diffsense_selected_billing_cycle'));
+            window.location.replace(`${window.location.origin}/select-plan-preview.html?reason=trial_expired&billing=${selectedBillingCycle}`);
             return;
         }
 

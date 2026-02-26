@@ -27,11 +27,16 @@
         {
             const params = new URLSearchParams(window.location.search);
             const plan = params.get('plan') || 'starter';
-            const prices = { starter: 1480, business: 4980, pro: 9800 };
+            const billing = params.get('billing') === 'annual' ? 'annual' : 'monthly';
+            const prices = {
+                monthly: { starter: 1480, business: 4980, pro: 9800 },
+                annual: { starter: 14800, business: 49800, pro: 98000 }
+            };
+            const conversionValue = prices[billing]?.[plan] || prices.monthly.starter;
 
             gtag('event', 'conversion', {
                 'send_to': 'AW-17941578077/payment_complete',
-                'value': prices[plan],
+                'value': conversionValue,
                 'currency': 'JPY',
                 'transaction_id': 'T_' + new Date().getTime()
             });
@@ -250,7 +255,7 @@
                 </span>
             </div>
             <div class="thanks-info-row">
-                <span class="thanks-info-label">月額料金</span>
+                <span class="thanks-info-label" id="plan-price-label">月額料金</span>
                 <span class="thanks-info-value" id="plan-price">-</span>
             </div>
             <div class="thanks-info-row">
@@ -270,16 +275,22 @@
     <script>
         const params = new URLSearchParams(window.location.search);
         const plan = params.get('plan') || 'starter';
+        const billing = params.get('billing') === 'annual' ? 'annual' : 'monthly';
         const planNames = { starter: 'Starter', business: 'Business', pro: 'Pro / Legal' };
-        const planPrices = { starter: '¥1,480/月', business: '¥4,980/月', pro: '¥9,800/月' };
+        const billingLabels = { monthly: '月額', annual: '年額' };
+        const planPrices = {
+            monthly: { starter: '¥1,480 / 月（税込）', business: '¥4,980 / 月（税込）', pro: '¥9,800 / 月（税込）' },
+            annual: { starter: '¥14,800 / 年（税込）', business: '¥49,800 / 年（税込）', pro: '¥98,000 / 年（税込）' }
+        };
         const planLimits = { starter: '月15回', business: '月120回', pro: '月400回' };
 
         document.getElementById('plan-name').textContent = planNames[plan] || plan;
-        document.getElementById('plan-price').textContent = planPrices[plan] || '-';
+        document.getElementById('plan-price-label').textContent = billing === 'annual' ? '年額料金' : '月額料金';
+        document.getElementById('plan-price').textContent = planPrices[billing]?.[plan] || '-';
         document.getElementById('plan-limit').textContent = planLimits[plan] || '-';
 
         const badge = document.getElementById('plan-badge');
-        badge.innerHTML = `<span class="plan-badge ${plan}">${planNames[plan] || plan}</span>`;
+        badge.innerHTML = `<span class="plan-badge ${plan}">${planNames[plan] || plan}（${billingLabels[billing]}）</span>`;
 
         // Confetti animation
         const confetti = document.getElementById('confetti');

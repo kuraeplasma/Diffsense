@@ -43,14 +43,16 @@ router.post('/paypal', express.json(), async (req, res) => {
                 const user = await dbService.findUserBySubscriptionId(subscriptionId);
                 if (user) {
                     const targetPlan = user.pendingPlan || user.plan || 'starter';
+                    const targetBillingCycle = user.pendingBillingCycle || user.billingCycle || 'monthly';
                     await dbService.updatePaymentInfo(user.uid, {
                         hasPaymentMethod: true,
                         paypalStatus: 'ACTIVE',
                         paymentRegisteredAt: new Date().toISOString(),
-                        pendingPlan: null
+                        pendingPlan: null,
+                        pendingBillingCycle: null
                     });
-                    await dbService.setUserPlan(user.uid, targetPlan);
-                    logger.info(`Webhook: Subscription activated for user ${user.uid}, plan: ${targetPlan}`);
+                    await dbService.setUserPlan(user.uid, targetPlan, targetBillingCycle);
+                    logger.info(`Webhook: Subscription activated for user ${user.uid}, plan: ${targetPlan}, billingCycle: ${targetBillingCycle}`);
                 }
                 break;
             }
@@ -63,9 +65,11 @@ router.post('/paypal', express.json(), async (req, res) => {
                     await dbService.updatePaymentInfo(user.uid, {
                         hasPaymentMethod: false,
                         paypalStatus: 'CANCELLED',
-                        cancelledAt: new Date().toISOString()
+                        cancelledAt: new Date().toISOString(),
+                        pendingPlan: null,
+                        pendingBillingCycle: null
                     });
-                    await dbService.setUserPlan(user.uid, 'starter');
+                    await dbService.setUserPlan(user.uid, 'starter', 'monthly');
                     logger.info(`Webhook: Subscription cancelled for user ${user.uid}`);
                 }
                 break;
@@ -91,9 +95,11 @@ router.post('/paypal', express.json(), async (req, res) => {
                 if (user) {
                     await dbService.updatePaymentInfo(user.uid, {
                         hasPaymentMethod: false,
-                        paypalStatus: 'EXPIRED'
+                        paypalStatus: 'EXPIRED',
+                        pendingPlan: null,
+                        pendingBillingCycle: null
                     });
-                    await dbService.setUserPlan(user.uid, 'starter');
+                    await dbService.setUserPlan(user.uid, 'starter', 'monthly');
                     logger.info(`Webhook: Subscription expired for user ${user.uid}`);
                 }
                 break;

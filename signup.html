@@ -19,8 +19,10 @@
         // プランパラメータがあればlocalStorageに保存してから遷移
         const params = new URLSearchParams(window.location.search);
         const plan = params.get('plan');
+        const billing = params.get('billing') === 'annual' ? 'annual' : 'monthly';
         if (plan) {
             localStorage.setItem('diffsense_selected_plan', plan);
+            localStorage.setItem('diffsense_selected_billing_cycle', billing);
         }
         window.location.replace("login.html?tab=signup");
     </script>

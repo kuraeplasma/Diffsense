@@ -466,6 +466,13 @@
 
         // --- Initial State Check ---
         const urlParams = new URLSearchParams(window.location.search);
+        const selectedPlan = urlParams.get('plan');
+        const selectedBilling = urlParams.get('billing') === 'annual' ? 'annual' : 'monthly';
+        if (selectedPlan && ['starter', 'business', 'pro'].includes(selectedPlan)) {
+            localStorage.setItem('diffsense_selected_plan', selectedPlan);
+            localStorage.setItem('diffsense_selected_billing_cycle', selectedBilling);
+        }
+
         if (urlParams.get('tab') === 'signup') {
             switchTab('signup');
         }

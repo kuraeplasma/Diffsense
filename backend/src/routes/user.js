@@ -13,6 +13,7 @@ router.get('/subscription', async (req, res) => {
         const userProfile = await dbService.getUserProfile(uid);
 
         const plan = userProfile.plan || 'starter';
+        const billingCycle = userProfile.billingCycle || 'monthly';
         const limit = dbService.getUsageLimit(userProfile);
         const isInTrial = dbService.isTrialActive(userProfile);
 
@@ -28,6 +29,7 @@ router.get('/subscription', async (req, res) => {
             success: true,
             data: {
                 plan: plan,
+                billingCycle: billingCycle,
                 usageCount: userProfile.usageCount || 0,
                 usageLimit: limit,
                 daysRemaining: daysRemaining,
@@ -49,17 +51,22 @@ router.get('/subscription', async (req, res) => {
 router.post('/select-plan', async (req, res) => {
     try {
         const uid = req.user.uid;
-        const { plan } = req.body;
+        const { plan, billingCycle } = req.body;
 
         const validPlans = ['starter', 'business', 'pro'];
         if (!plan || !validPlans.includes(plan)) {
             return res.status(400).json({ success: false, error: 'Invalid plan' });
         }
 
-        await dbService.setUserPlan(uid, plan);
-        logger.info(`User ${uid} selected plan: ${plan}`);
+        const validBillingCycles = ['monthly', 'annual'];
+        const selectedBillingCycle = (billingCycle && validBillingCycles.includes(billingCycle))
+            ? billingCycle
+            : 'monthly';
 
-        res.json({ success: true, data: { plan } });
+        await dbService.setUserPlan(uid, plan, selectedBillingCycle);
+        logger.info(`User ${uid} selected plan: ${plan}, billingCycle: ${selectedBillingCycle}`);
+
+        res.json({ success: true, data: { plan, billingCycle: selectedBillingCycle } });
     } catch (error) {
         logger.error('Error setting user plan:', error);
         res.status(500).json({ success: false, error: 'Internal server error' });

@@ -48,27 +48,41 @@ class PayPalService {
     }
 
     /**
-     * Plan ID mapping (must be created in PayPal Dashboard first)
+     * Plan ID mapping by billing cycle (must be created in PayPal Dashboard first)
      */
-    getPlanId(plan) {
+    getPlanId(plan, billingCycle = 'monthly') {
+        const cycle = billingCycle === 'annual' ? 'annual' : 'monthly';
         const planIds = {
-            starter: process.env.PAYPAL_PLAN_STARTER || 'P-STARTER-PLACEHOLDER',
-            business: process.env.PAYPAL_PLAN_BUSINESS || 'P-BUSINESS-PLACEHOLDER',
-            pro: process.env.PAYPAL_PLAN_PRO || 'P-PRO-PLACEHOLDER'
+            monthly: {
+                starter: process.env.PAYPAL_PLAN_STARTER || 'P-STARTER-MONTHLY-PLACEHOLDER',
+                business: process.env.PAYPAL_PLAN_BUSINESS || 'P-BUSINESS-MONTHLY-PLACEHOLDER',
+                pro: process.env.PAYPAL_PLAN_PRO || 'P-PRO-MONTHLY-PLACEHOLDER'
+            },
+            annual: {
+                starter: process.env.PAYPAL_PLAN_STARTER_ANNUAL || 'P-STARTER-ANNUAL-PLACEHOLDER',
+                business: process.env.PAYPAL_PLAN_BUSINESS_ANNUAL || 'P-BUSINESS-ANNUAL-PLACEHOLDER',
+                pro: process.env.PAYPAL_PLAN_PRO_ANNUAL || 'P-PRO-ANNUAL-PLACEHOLDER'
+            }
         };
-        return planIds[plan];
+        return planIds[cycle][plan];
     }
 
     /**
      * Create a PayPal subscription
      * @param {string} plan - Plan ID (starter, business, pro)
+     * @param {string} billingCycle - Billing cycle (monthly, annual)
      * @param {string} returnUrl - URL after PayPal approval
      * @param {string} cancelUrl - URL if user cancels
      * @returns {object} - { subscriptionId, approvalUrl }
      */
-    async createSubscription(plan, returnUrl, cancelUrl) {
+    async createSubscription(plan, billingCycle, returnUrl, cancelUrl) {
         const token = await this.getAccessToken();
-        const paypalPlanId = this.getPlanId(plan);
+        const cycle = billingCycle === 'annual' ? 'annual' : 'monthly';
+        const paypalPlanId = this.getPlanId(plan, cycle);
+
+        if (!paypalPlanId || paypalPlanId.includes('PLACEHOLDER')) {
+            throw new Error(`PayPalプランIDが未設定です: plan=${plan}, billingCycle=${cycle}`);
+        }
 
         try {
             const response = await axios.post(
@@ -104,7 +118,11 @@ class PayPalService {
                 status: response.data.status
             };
         } catch (error) {
-            logger.error('PayPal create subscription error:', error.response?.data || error.message);
+            logger.error('PayPal create subscription error:', {
+                plan,
+                billingCycle: cycle,
+                error: error.response?.data || error.message
+            });
             throw new Error('サブスクリプションの作成に失敗しました');
         }
     }

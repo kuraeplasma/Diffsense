@@ -964,6 +964,48 @@ ul {
     margin: 0 auto;
 }
 
+.pricing-billing-toggle-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 0 auto 2rem;
+}
+
+.pricing-billing-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem;
+    border: 1px solid #e6dccd;
+    border-radius: 999px;
+    background: #f9f5ee;
+}
+
+.pricing-toggle-btn {
+    border: 0;
+    border-radius: 999px;
+    padding: 0.62rem 1.2rem;
+    background: transparent;
+    color: #6c6254;
+    font-size: 0.92rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.pricing-toggle-btn.is-active {
+    background: #fff;
+    color: #8f6e2d;
+    box-shadow: 0 6px 18px rgba(143, 110, 45, 0.14);
+}
+
+.pricing-billing-note {
+    margin: 0;
+    font-size: 0.82rem;
+    color: #8a7a62;
+}
+
 .pricing-card {
     background: #fff;
     padding: 3rem 2rem;
@@ -1051,12 +1093,47 @@ ul {
     text-align: left;
 }
 
+.price-annual-meta {
+    min-height: 2.7rem;
+    margin-top: -0.2rem;
+}
+
+.price-effective {
+    margin: 0 0 0.15rem;
+    font-size: 0.95rem;
+    color: #3d3329;
+    font-weight: 700;
+}
+
+.price-compare {
+    margin: 0;
+    font-size: 0.76rem;
+    color: #7d7365;
+}
+
+.price-regular {
+    text-decoration: line-through;
+    color: #9c9385;
+}
+
+.price-discount {
+    display: inline-block;
+    margin-top: 0.35rem;
+    padding: 0.1rem 0.55rem;
+    border-radius: 999px;
+    background: rgba(161, 126, 26, 0.12);
+    color: #8f6e2d;
+    font-weight: 700;
+}
+
 .pricing-description {
-    min-height: 80px;
+    min-height: 102px;
     /* Standardize height to align feature lists */
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    align-items: stretch;
     justify-content: center;
+    gap: 0.5rem;
     margin-bottom: 2rem;
 }
 
@@ -1145,6 +1222,127 @@ ul {
     font-size: 0.68rem;
     color: #a17e1a;
     opacity: 0.9;
+}
+
+.pricing-annual-reasons {
+    margin: 1.8rem auto 0;
+    max-width: 860px;
+    padding: 1.15rem 1.35rem;
+    background: linear-gradient(180deg, #fdfbf7 0%, #f8f2e8 100%);
+    border: 1px solid rgba(197, 160, 89, 0.3);
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(17, 17, 17, 0.04);
+}
+
+.pricing-annual-reasons h3 {
+    margin: 0 0 0.75rem;
+    font-size: 1.02rem;
+    color: #3b2f20;
+    font-weight: 700;
+}
+
+.pricing-annual-reasons ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.7rem 1rem;
+}
+
+.pricing-annual-reasons li {
+    margin: 0;
+    color: #4f463d;
+    font-size: 0.9rem;
+    line-height: 1.58;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.pricing-annual-reasons li::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: #c5a059;
+    flex-shrink: 0;
+}
+
+.pricing-trust-list {
+    margin: 1rem auto 0;
+    max-width: 860px;
+    padding: 0.95rem 1.2rem;
+    background: #fff;
+    border: 1px solid rgba(197, 160, 89, 0.25);
+    border-radius: 12px;
+}
+
+.pricing-trust-list h3 {
+    margin: 0 0 0.55rem;
+    font-size: 0.96rem;
+    color: #3b2f20;
+    font-weight: 700;
+}
+
+.pricing-trust-list ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 0.45rem;
+}
+
+.pricing-trust-list li {
+    font-size: 0.84rem;
+    color: #5b5245;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.42rem;
+    line-height: 1.55;
+}
+
+.pricing-trust-list li::before {
+    content: "✓";
+    color: #a17e1a;
+    font-weight: 800;
+}
+
+@media (min-width: 769px) {
+    .pricing-annual-reasons {
+        text-align: center;
+    }
+
+    .pricing-annual-reasons ul {
+        justify-items: center;
+    }
+
+    .pricing-annual-reasons li {
+        justify-content: center;
+    }
+
+    .pricing-trust-list {
+        text-align: center;
+    }
+
+    .pricing-trust-list ul {
+        justify-items: center;
+    }
+
+    .pricing-trust-list li {
+        justify-content: center;
+    }
+}
+
+.pricing-section-footnote {
+    margin: 0.8rem 0 0;
+    text-align: center;
+    font-size: 0.7rem;
+    color: #8f816b;
+}
+
+.pricing-section.is-annual-pricing .amount {
+    font-size: 3rem;
 }
 
 /* CTA */
@@ -1474,6 +1672,30 @@ ul {
     .pricing-grid {
         grid-template-columns: 1fr;
         gap: 3rem;
+    }
+
+    .pricing-billing-toggle {
+        width: 100%;
+        max-width: 380px;
+    }
+
+    .pricing-toggle-btn {
+        flex: 1 1 0;
+        text-align: center;
+        padding: 0.62rem 0.75rem;
+        font-size: 0.85rem;
+    }
+
+    .pricing-section.is-annual-pricing .amount {
+        font-size: 2.7rem;
+    }
+
+    .pricing-annual-reasons ul {
+        grid-template-columns: 1fr;
+    }
+
+    .pricing-trust-list ul {
+        grid-template-columns: 1fr;
     }
 
     .pricing-card.highlight-plan {

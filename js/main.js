@@ -190,8 +190,72 @@ document.addEventListener('DOMContentLoaded', () => {
         container.style.alignItems = 'center';
     }
 
+    function initPricingBillingToggle() {
+        const pricingSection = document.querySelector('.pricing-section');
+        const toggleButtons = Array.from(document.querySelectorAll('[data-billing-toggle]'));
+        const planCards = Array.from(document.querySelectorAll('[data-plan-card]'));
+
+        if (!pricingSection || !toggleButtons.length || !planCards.length) return;
+
+        const buildPlanLink = (baseHref, cycle) => {
+            if (!baseHref) return '#';
+            const separator = baseHref.includes('?') ? '&' : '?';
+            return `${baseHref}${separator}billing=${cycle}`;
+        };
+
+        const setBillingCycle = (cycle) => {
+            const isAnnual = cycle === 'annual';
+
+            toggleButtons.forEach((btn) => {
+                const isActive = btn.dataset.billingToggle === cycle;
+                btn.classList.toggle('is-active', isActive);
+                btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+            });
+
+            pricingSection.classList.toggle('is-annual-pricing', isAnnual);
+
+            planCards.forEach((card) => {
+                const amountEl = card.querySelector('[data-price-amount]');
+                const subEl = card.querySelector('[data-price-sub]');
+                const annualMetaEl = card.querySelector('[data-price-annual-meta]');
+                const ctaEl = card.querySelector('[data-plan-cta]');
+
+                const monthlyPrice = card.dataset.monthlyPrice;
+                const annualPrice = card.dataset.annualPrice;
+                const basePlanLink = card.dataset.planLink;
+                const monthlyCta = card.dataset.ctaMonthly || '無料で始める';
+                const annualCta = card.dataset.ctaAnnual || '年額で7日無料体験';
+
+                if (isAnnual) {
+                    if (amountEl && annualPrice) amountEl.textContent = annualPrice;
+                    if (subEl) subEl.textContent = '/ 年（税込）';
+                    if (annualMetaEl) annualMetaEl.hidden = false;
+                    if (ctaEl) {
+                        ctaEl.textContent = annualCta;
+                        ctaEl.href = buildPlanLink(basePlanLink, 'annual');
+                    }
+                } else {
+                    if (amountEl && monthlyPrice) amountEl.textContent = monthlyPrice;
+                    if (subEl) subEl.textContent = '/ 月（税込）';
+                    if (annualMetaEl) annualMetaEl.hidden = true;
+                    if (ctaEl) {
+                        ctaEl.textContent = monthlyCta;
+                        ctaEl.href = buildPlanLink(basePlanLink, 'monthly');
+                    }
+                }
+            });
+        };
+
+        toggleButtons.forEach((btn) => {
+            btn.addEventListener('click', () => setBillingCycle(btn.dataset.billingToggle));
+        });
+
+        setBillingCycle('monthly');
+    }
+
     // Run on load and resize
     initUserVoicesAutoScroll();
+    initPricingBillingToggle();
     scaleDashboard();
     window.addEventListener('resize', initUserVoicesAutoScroll);
     window.addEventListener('resize', scaleDashboard);

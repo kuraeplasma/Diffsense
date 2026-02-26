@@ -67,6 +67,50 @@
             line-height: 1.7;
         }
 
+        .billing-toggle-wrap {
+            margin: 0 0 1.1rem;
+            display: flex;
+            justify-content: center;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.55rem;
+        }
+
+        .billing-toggle {
+            display: inline-flex;
+            border: 1px solid #d8c8a6;
+            border-radius: 999px;
+            background: #fffaf1;
+            padding: 4px;
+            gap: 4px;
+        }
+
+        .billing-toggle button {
+            border: none;
+            background: transparent;
+            color: #7d6a49;
+            font-size: 0.82rem;
+            font-weight: 700;
+            padding: 8px 14px;
+            border-radius: 999px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: var(--font-body);
+        }
+
+        .billing-toggle button.is-active {
+            background: #c5a059;
+            color: #fff;
+            box-shadow: 0 4px 14px rgba(197, 160, 89, 0.24);
+        }
+
+        .billing-note {
+            margin: 0;
+            text-align: center;
+            font-size: 0.79rem;
+            color: #8a7a62;
+        }
+
         .plan-grid {
             display: flex;
             gap: 24px;
@@ -138,6 +182,45 @@
             font-size: 0.75rem;
             font-weight: 400;
             color: #888;
+        }
+
+        .plan-price-annual-meta {
+            display: none;
+            margin: 0 0 8px;
+        }
+
+        .plan-price-annual-meta.is-visible {
+            display: block;
+        }
+
+        .plan-effective {
+            margin: 0;
+            font-size: 0.82rem;
+            color: #3d3329;
+            font-weight: 700;
+        }
+
+        .plan-compare {
+            margin: 4px 0 0;
+            font-size: 0.72rem;
+            color: #7d7365;
+            line-height: 1.55;
+        }
+
+        .plan-regular {
+            text-decoration: line-through;
+            color: #9c9385;
+        }
+
+        .plan-discount {
+            display: inline-block;
+            margin-top: 6px;
+            padding: 2px 9px;
+            border-radius: 999px;
+            background: rgba(161, 126, 26, 0.12);
+            color: #8f6e2d;
+            font-weight: 700;
+            font-size: 0.72rem;
         }
 
         .plan-desc {
@@ -227,9 +310,60 @@
             min-height: 1.2em;
         }
 
+        .annual-reasons {
+            margin: 0 auto 0.8rem;
+            max-width: 960px;
+            width: 100%;
+            padding: 0.95rem 1.1rem;
+            background: linear-gradient(180deg, #fdfbf7 0%, #f8f2e8 100%);
+            border: 1px solid rgba(197, 160, 89, 0.3);
+            border-radius: 12px;
+        }
+
+        .annual-reasons h3 {
+            margin: 0 0 0.6rem;
+            font-size: 0.92rem;
+            color: #3b2f20;
+            font-weight: 700;
+            text-align: center;
+        }
+
+        .annual-reasons ul {
+            margin: 0;
+            padding: 0;
+            list-style: none;
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.55rem;
+        }
+
+        .annual-reasons li {
+            margin: 0;
+            color: #4f463d;
+            font-size: 0.8rem;
+            line-height: 1.55;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.42rem;
+        }
+
+        .annual-reasons li::before {
+            content: "";
+            width: 7px;
+            height: 7px;
+            border-radius: 999px;
+            background: #c5a059;
+            flex-shrink: 0;
+        }
+
         @media (max-width: 768px) {
             .plan-grid {
                 flex-direction: column;
+            }
+
+            .annual-reasons ul {
+                grid-template-columns: 1fr;
             }
 
             .plan-container {
@@ -257,11 +391,26 @@
             引き続き使うにはプランを選択してください。
         </div>
 
+        <div class="billing-toggle-wrap">
+            <div class="billing-toggle" role="tablist" aria-label="請求サイクル">
+                <button type="button" id="billing-monthly-btn" class="is-active" onclick="setBillingCycle('monthly')">月額</button>
+                <button type="button" id="billing-annual-btn" onclick="setBillingCycle('annual')">年額（2ヶ月分お得）</button>
+            </div>
+            <p class="billing-note">年額は一括請求です（年間で安定運用する企業に選ばれています）。</p>
+        </div>
+
         <div class="plan-grid">
-            <div class="plan-card" data-plan="starter" onclick="selectPlan('starter')">
+            <div class="plan-card" data-plan="starter" data-monthly-price="1,480" data-annual-price="14,800"
+                data-annual-effective="1,233" data-annual-regular="17,760" onclick="selectPlan('starter')">
                 <div class="plan-badge">個人・検証用</div>
                 <h3>Starter</h3>
-                <div class="plan-price">¥1,480<small> / 月（税抜）</small></div>
+                <div class="plan-price">¥<span data-plan-price-value>1,480</span><small data-plan-price-sub> / 月（税込）</small></div>
+                <div class="plan-price-annual-meta" data-plan-annual-meta>
+                    <p class="plan-effective">実質 ¥<span data-plan-effective>1,233</span>/月</p>
+                    <p class="plan-compare">通常 <span class="plan-regular" data-plan-regular>¥17,760</span> → <span
+                            data-plan-annual-total>¥14,800</span></p>
+                    <p class="plan-discount">2ヶ月分お得</p>
+                </div>
                 <p class="plan-desc">個人向け・契約変更チェックの最小プラン</p>
                 <ul class="plan-features">
                     <li><i class="fa-solid fa-check"></i>PDF / URL 登録：無制限</li>
@@ -274,10 +423,17 @@
                 <div class="plan-select-indicator">選択する</div>
             </div>
 
-            <div class="plan-card recommended" data-plan="business" onclick="selectPlan('business')">
+            <div class="plan-card recommended" data-plan="business" data-monthly-price="4,980" data-annual-price="49,800"
+                data-annual-effective="4,150" data-annual-regular="59,760" onclick="selectPlan('business')">
                 <div class="plan-badge recommended">おすすめ</div>
                 <h3>Business</h3>
-                <div class="plan-price">¥4,980<small> / 月（税抜）</small></div>
+                <div class="plan-price">¥<span data-plan-price-value>4,980</span><small data-plan-price-sub> / 月（税込）</small></div>
+                <div class="plan-price-annual-meta" data-plan-annual-meta>
+                    <p class="plan-effective">実質 ¥<span data-plan-effective>4,150</span>/月</p>
+                    <p class="plan-compare">通常 <span class="plan-regular" data-plan-regular>¥59,760</span> → <span
+                            data-plan-annual-total>¥49,800</span></p>
+                    <p class="plan-discount">2ヶ月分お得</p>
+                </div>
                 <p class="plan-desc">社内実務での利用に最適</p>
                 <ul class="plan-features">
                     <li><i class="fa-solid fa-check"></i>PDF / URL 登録：無制限</li>
@@ -290,10 +446,17 @@
                 <div class="plan-select-indicator">選択する</div>
             </div>
 
-            <div class="plan-card" data-plan="pro" onclick="selectPlan('pro')">
+            <div class="plan-card" data-plan="pro" data-monthly-price="9,800" data-annual-price="98,000"
+                data-annual-effective="8,166" data-annual-regular="117,600" onclick="selectPlan('pro')">
                 <div class="plan-badge">士業・専門職向け</div>
                 <h3>Pro / Legal</h3>
-                <div class="plan-price">¥9,800<small> / 月（税抜）</small></div>
+                <div class="plan-price">¥<span data-plan-price-value>9,800</span><small data-plan-price-sub> / 月（税込）</small></div>
+                <div class="plan-price-annual-meta" data-plan-annual-meta>
+                    <p class="plan-effective">実質 ¥<span data-plan-effective>8,166</span>/月</p>
+                    <p class="plan-compare">通常 <span class="plan-regular" data-plan-regular>¥117,600</span> → <span
+                            data-plan-annual-total>¥98,000</span></p>
+                    <p class="plan-discount">2ヶ月分お得</p>
+                </div>
                 <p class="plan-desc">外部確認・監査・継続監視まで</p>
                 <ul class="plan-features">
                     <li><i class="fa-solid fa-check"></i>PDF / URL 登録：無制限</li>
@@ -309,8 +472,17 @@
             </div>
         </div>
 
+        <div class="annual-reasons" aria-label="年額が選ばれている理由">
+            <h3>年額が選ばれている理由</h3>
+            <ul>
+                <li>年間で契約管理を行う企業が多数</li>
+                <li>経費処理が年1回で簡単</li>
+                <li>月額より実質コストが低い</li>
+            </ul>
+        </div>
+
         <button class="plan-confirm-btn" id="confirm-btn" disabled onclick="confirmPlan()">プランを選択してください</button>
-        <p class="plan-note">※継続利用にはお支払い方法の登録が必要です。</p>
+        <p class="plan-note" id="plan-note">※継続利用にはお支払い方法の登録が必要です。</p>
         <p class="plan-error" id="plan-error"></p>
     </div>
 
@@ -319,12 +491,79 @@
         import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { getIdToken } from './js/auth.js';
 
+        const params = new URLSearchParams(window.location.search);
         let selectedPlan = null;
+        let selectedBillingCycle = params.get('billing') === 'annual' ? 'annual' : 'monthly';
         let canContinue = false;
         const planNames = { starter: 'Starter', business: 'Business', pro: 'Pro / Legal' };
+        const billingLabels = { monthly: '月額', annual: '年額' };
+        const annualCtaLabels = {
+            starter: '年額で始める',
+            business: '年額で始める（2ヶ月分お得）',
+            pro: '年額で監査・法務運用を開始'
+        };
         const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
             ? 'http://localhost:3001'
             : 'https://api-qf37m5ba2q-an.a.run.app';
+
+        function updateConfirmButtonText() {
+            const btn = document.getElementById('confirm-btn');
+            if (!btn) return;
+            if (!selectedPlan) {
+                btn.textContent = 'プランを選択してください';
+                return;
+            }
+            if (selectedBillingCycle === 'annual') {
+                btn.textContent = annualCtaLabels[selectedPlan] || `${planNames[selectedPlan]} 年額で続ける`;
+                return;
+            }
+            btn.textContent = `${planNames[selectedPlan]}プラン（${billingLabels[selectedBillingCycle]}）で続ける`;
+        }
+
+        function updatePlanCardPrices() {
+            document.querySelectorAll('.plan-card').forEach((card) => {
+                const priceValueEl = card.querySelector('[data-plan-price-value]');
+                const priceSubEl = card.querySelector('[data-plan-price-sub]');
+                const annualMetaEl = card.querySelector('[data-plan-annual-meta]');
+                const monthlyPrice = card.dataset.monthlyPrice;
+                const annualPrice = card.dataset.annualPrice;
+                const annualEffective = card.dataset.annualEffective;
+                const annualRegular = card.dataset.annualRegular;
+                const annualEffectiveEl = card.querySelector('[data-plan-effective]');
+                const annualRegularEl = card.querySelector('[data-plan-regular]');
+                const annualTotalEl = card.querySelector('[data-plan-annual-total]');
+
+                if (selectedBillingCycle === 'annual') {
+                    if (priceValueEl) priceValueEl.textContent = annualPrice || monthlyPrice || '';
+                    if (priceSubEl) priceSubEl.textContent = ' / 年（税込）';
+                    if (annualMetaEl) annualMetaEl.classList.add('is-visible');
+                    if (annualEffectiveEl && annualEffective) annualEffectiveEl.textContent = annualEffective;
+                    if (annualRegularEl && annualRegular) annualRegularEl.textContent = `¥${annualRegular}`;
+                    if (annualTotalEl && annualPrice) annualTotalEl.textContent = `¥${annualPrice}`;
+                } else {
+                    if (priceValueEl) priceValueEl.textContent = monthlyPrice || '';
+                    if (priceSubEl) priceSubEl.textContent = ' / 月（税込）';
+                    if (annualMetaEl) annualMetaEl.classList.remove('is-visible');
+                }
+            });
+
+            const planNote = document.getElementById('plan-note');
+            if (planNote) {
+                planNote.textContent = selectedBillingCycle === 'annual'
+                    ? '※年額は一括請求です。継続利用にはお支払い方法の登録が必要です。'
+                    : '※継続利用にはお支払い方法の登録が必要です。';
+            }
+        }
+
+        window.setBillingCycle = (cycle) => {
+            selectedBillingCycle = cycle === 'annual' ? 'annual' : 'monthly';
+            const monthlyBtn = document.getElementById('billing-monthly-btn');
+            const annualBtn = document.getElementById('billing-annual-btn');
+            if (monthlyBtn) monthlyBtn.classList.toggle('is-active', selectedBillingCycle === 'monthly');
+            if (annualBtn) annualBtn.classList.toggle('is-active', selectedBillingCycle === 'annual');
+            updatePlanCardPrices();
+            updateConfirmButtonText();
+        };
 
         onAuthStateChanged(auth, async (user) => {
             if (!user) {
@@ -378,8 +617,8 @@
             document.querySelectorAll('.plan-card').forEach(card => card.classList.remove('selected'));
             document.querySelector(`[data-plan="${planId}"]`).classList.add('selected');
             const btn = document.getElementById('confirm-btn');
-            btn.textContent = `${planNames[planId]}プランで続ける`;
             btn.disabled = false;
+            updateConfirmButtonText();
             const errorEl = document.getElementById('plan-error');
             if (errorEl) errorEl.textContent = '';
         };
@@ -388,7 +627,6 @@
             if (!selectedPlan || !canContinue) return;
             const btn = document.getElementById('confirm-btn');
             const errorEl = document.getElementById('plan-error');
-            const planLabel = planNames[selectedPlan] || selectedPlan;
             btn.disabled = true;
             btn.textContent = '決済画面へ移動中...';
             if (errorEl) errorEl.textContent = '';
@@ -407,7 +645,7 @@
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ plan: selectedPlan })
+                    body: JSON.stringify({ plan: selectedPlan, billingCycle: selectedBillingCycle })
                 });
                 const result = await response.json();
 
@@ -420,9 +658,11 @@
                 console.error('Failed to open PayPal approval page:', error);
                 if (errorEl) errorEl.textContent = error.message || '決済ページへの移動に失敗しました。';
                 btn.disabled = false;
-                btn.textContent = `${planLabel}プランで続ける`;
+                updateConfirmButtonText();
             }
         };
+
+        setBillingCycle(selectedBillingCycle);
     </script>
 </body>
 </html>

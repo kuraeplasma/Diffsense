@@ -19,6 +19,11 @@ const AI_USAGE_LIMITS = {
 
 const TRIAL_AI_LIMIT = 5;
 const TRIAL_DURATION_DAYS = 7;
+const VALID_BILLING_CYCLES = ['monthly', 'annual'];
+
+function normalizeBillingCycle(value) {
+    return VALID_BILLING_CYCLES.includes(value) ? value : 'monthly';
+}
 
 class DBService {
     // ...
@@ -233,6 +238,7 @@ class DBService {
         // 1. Try Firestore first (persistent, survives cold starts)
         const firestoreUser = await this._firestoreGetUser(uid);
         if (firestoreUser) {
+            firestoreUser.billingCycle = normalizeBillingCycle(firestoreUser.billingCycle);
             logger.info(`getUserProfile(${uid}): Found in Firestore, plan=${firestoreUser.plan}`);
             // Also update local file cache
             const users = await this.readData('users');
@@ -252,6 +258,7 @@ class DBService {
         let user = users.find(u => u.uid === uid);
 
         if (user) {
+            user.billingCycle = normalizeBillingCycle(user.billingCycle);
             logger.info(`getUserProfile(${uid}): Found in file (not Firestore), plan=${user.plan}, syncing to Firestore`);
             // Found in file but not in Firestore - sync to Firestore
             await this._firestoreSetUser(uid, user);
@@ -263,6 +270,7 @@ class DBService {
         user = {
             uid: uid,
             plan: 'starter',
+            billingCycle: 'monthly',
             trialStartedAt: new Date().toISOString(),
             hasPaymentMethod: false,
             usageCount: 0,
@@ -301,18 +309,25 @@ class DBService {
      * Set user's selected plan
      * @param {string} uid - Firebase UID
      * @param {string} plan - Plan ID (starter, business, pro)
+     * @param {string|null} billingCycle - Billing cycle (monthly, annual)
      */
-    async setUserPlan(uid, plan) {
-        logger.info(`setUserPlan: uid=${uid}, plan=${plan}`);
+    async setUserPlan(uid, plan, billingCycle = null) {
+        const normalizedBillingCycle = billingCycle ? normalizeBillingCycle(billingCycle) : null;
+        logger.info(`setUserPlan: uid=${uid}, plan=${plan}, billingCycle=${normalizedBillingCycle || 'keep'}`);
 
         // Always persist to Firestore first
-        await this._firestoreSetUser(uid, { uid, plan });
+        await this._firestoreSetUser(uid, normalizedBillingCycle ? { uid, plan, billingCycle: normalizedBillingCycle } : { uid, plan });
 
         const users = await this.readData('users');
         const index = users.findIndex(u => u.uid === uid);
 
         if (index > -1) {
             users[index].plan = plan;
+            if (normalizedBillingCycle) {
+                users[index].billingCycle = normalizedBillingCycle;
+            } else {
+                users[index].billingCycle = normalizeBillingCycle(users[index].billingCycle);
+            }
             await this.writeData('users', users);
             return users[index];
         } else {
@@ -320,6 +335,7 @@ class DBService {
             const user = {
                 uid: uid,
                 plan: plan,
+                billingCycle: normalizedBillingCycle || 'monthly',
                 trialStartedAt: new Date().toISOString(),
                 hasPaymentMethod: false,
                 usageCount: 0,

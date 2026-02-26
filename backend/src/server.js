@@ -107,10 +107,18 @@ app.get('/payment/config', (req, res) => {
             clientId: process.env.PAYPAL_CLIENT_ID,
             mode: mode,
             planIds: {
-                starter: process.env.PAYPAL_PLAN_STARTER,
-                business: process.env.PAYPAL_PLAN_BUSINESS,
-                pro: process.env.PAYPAL_PLAN_PRO
-            }
+                monthly: {
+                    starter: process.env.PAYPAL_PLAN_STARTER,
+                    business: process.env.PAYPAL_PLAN_BUSINESS,
+                    pro: process.env.PAYPAL_PLAN_PRO
+                },
+                annual: {
+                    starter: process.env.PAYPAL_PLAN_STARTER_ANNUAL,
+                    business: process.env.PAYPAL_PLAN_BUSINESS_ANNUAL,
+                    pro: process.env.PAYPAL_PLAN_PRO_ANNUAL
+                }
+            },
+            defaultBillingCycle: 'monthly'
         }
     });
 });

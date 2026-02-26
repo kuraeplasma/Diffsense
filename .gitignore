@@ -3,6 +3,7 @@ backups/
 _backup_*/
 logs/
 .env
+*.env.txt
 .DS_Store
 
 backend/uploads/

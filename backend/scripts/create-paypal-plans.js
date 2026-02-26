@@ -28,7 +28,7 @@ async function createProduct(token) {
     console.log('Creating product...');
     const res = await axios.post(`${BASE_URL}/v1/catalogs/products`, {
         name: 'DIFFsense AI Contract Analysis',
-        description: 'AI契約差分検知SaaS - 月額サブスクリプション',
+        description: 'AI契約差分検知SaaS - 月額・年額サブスクリプション',
         type: 'SERVICE',
         category: 'SOFTWARE'
     }, {
@@ -41,16 +41,21 @@ async function createProduct(token) {
     return res.data.id;
 }
 
-async function createPlan(token, productId, name, price) {
-    console.log(`Creating plan: ${name} (¥${price}/月)...`);
+async function createPlan(token, productId, name, price, billingCycle = 'monthly') {
+    const isAnnual = billingCycle === 'annual';
+    const intervalUnit = isAnnual ? 'YEAR' : 'MONTH';
+    const cycleLabel = isAnnual ? '年額' : '月額';
+    const periodLabel = isAnnual ? '年' : '月';
+
+    console.log(`Creating plan: ${name} ${cycleLabel} (¥${price}/${periodLabel})...`);
     const res = await axios.post(`${BASE_URL}/v1/billing/plans`, {
         product_id: productId,
-        name: `DIFFsense ${name}`,
-        description: `DIFFsense ${name}プラン - ¥${price}/月`,
+        name: `DIFFsense ${name} ${cycleLabel}`,
+        description: `DIFFsense ${name}プラン - ${cycleLabel} ¥${price}/${periodLabel}`,
         billing_cycles: [
             {
                 frequency: {
-                    interval_unit: 'MONTH',
+                    interval_unit: intervalUnit,
                     interval_count: 1
                 },
                 tenure_type: 'REGULAR',
@@ -89,15 +94,22 @@ async function main() {
         const productId = await createProduct(token);
         console.log('');
 
-        const starterPlanId = await createPlan(token, productId, 'Starter', '1480');
-        const businessPlanId = await createPlan(token, productId, 'Business', '4980');
-        const proPlanId = await createPlan(token, productId, 'Pro', '9800');
+        const starterMonthlyPlanId = await createPlan(token, productId, 'Starter', '1480', 'monthly');
+        const businessMonthlyPlanId = await createPlan(token, productId, 'Business', '4980', 'monthly');
+        const proMonthlyPlanId = await createPlan(token, productId, 'Pro', '9800', 'monthly');
+        console.log('');
+        const starterAnnualPlanId = await createPlan(token, productId, 'Starter', '14800', 'annual');
+        const businessAnnualPlanId = await createPlan(token, productId, 'Business', '49800', 'annual');
+        const proAnnualPlanId = await createPlan(token, productId, 'Pro', '98000', 'annual');
 
         console.log('\n=== 完了 ===');
         console.log('以下を .env に設定してください:\n');
-        console.log(`PAYPAL_PLAN_STARTER=${starterPlanId}`);
-        console.log(`PAYPAL_PLAN_BUSINESS=${businessPlanId}`);
-        console.log(`PAYPAL_PLAN_PRO=${proPlanId}`);
+        console.log(`PAYPAL_PLAN_STARTER=${starterMonthlyPlanId}`);
+        console.log(`PAYPAL_PLAN_BUSINESS=${businessMonthlyPlanId}`);
+        console.log(`PAYPAL_PLAN_PRO=${proMonthlyPlanId}`);
+        console.log(`PAYPAL_PLAN_STARTER_ANNUAL=${starterAnnualPlanId}`);
+        console.log(`PAYPAL_PLAN_BUSINESS_ANNUAL=${businessAnnualPlanId}`);
+        console.log(`PAYPAL_PLAN_PRO_ANNUAL=${proAnnualPlanId}`);
     } catch (error) {
         console.error('Error:', error.response?.data || error.message);
     }
