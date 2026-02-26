@@ -464,6 +464,53 @@ ul {
     margin-top: 8px;
 }
 
+/* Tablet / compact laptop: avoid squeezed hero composition */
+@media (max-width: 1400px) and (min-width: 769px) {
+    .hero {
+        min-height: auto;
+        align-items: flex-start;
+        padding: clamp(4.8rem, 7vh, 5.8rem) 0 clamp(1.8rem, 3vh, 2.6rem);
+    }
+
+    .hero-container.lp-static-layout {
+        display: grid;
+        grid-template-columns: 1fr;
+        width: min(1080px, 100%);
+        max-width: 1080px;
+        gap: 1.4rem;
+        justify-items: center;
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+
+    .hero-container.lp-static-layout .hero-content {
+        flex: none;
+        width: min(100%, 900px);
+        max-width: 900px;
+        margin-top: 0;
+    }
+
+    .hero-container.lp-static-layout .hero-visual.lp-static-visual {
+        flex: none;
+        width: min(100%, 980px);
+        max-width: 980px;
+        margin-top: 0;
+    }
+
+    .hero-title {
+        font-size: clamp(2rem, 4.4vw, 3.2rem);
+    }
+
+    .hero-subtitle {
+        max-width: 760px;
+    }
+
+    .dashboard-frame.lp-static-frame .lp-dashboard-screenshot {
+        width: 100%;
+        height: auto;
+    }
+}
+
 .hero-content {
     flex: 0 0 500px;
     /* Fixed width for text block to stay consistent */
