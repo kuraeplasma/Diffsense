@@ -1205,6 +1205,13 @@ ul {
     justify-content: center;
     text-align: center;
     margin-left: 0 !important;
+    padding: 0.85rem 1rem;
+    font-size: 0.94rem;
+    letter-spacing: 0.01em;
+    line-height: 1.25;
+    white-space: nowrap !important;
+    word-break: keep-all !important;
+    overflow-wrap: normal !important;
 }
 
 .pricing-trial-note {
