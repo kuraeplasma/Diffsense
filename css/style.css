@@ -1362,6 +1362,53 @@ ul {
     font-weight: 800;
 }
 
+.pricing-corporate-safety {
+    margin: 0.85rem auto 0;
+    max-width: 860px;
+    padding: 1.05rem 1.25rem;
+    background: linear-gradient(180deg, #f8fbff 0%, #f1f7ff 100%);
+    border: 1px solid rgba(67, 111, 164, 0.24);
+    border-radius: 12px;
+    box-shadow: 0 10px 24px rgba(17, 17, 17, 0.04);
+}
+
+.pricing-corporate-safety h3 {
+    margin: 0 0 0.6rem;
+    font-size: 0.98rem;
+    color: #24364d;
+    font-weight: 700;
+}
+
+.pricing-corporate-safety ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 0.45rem;
+}
+
+.pricing-corporate-safety li {
+    font-size: 0.84rem;
+    color: #3f4e60;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.42rem;
+    line-height: 1.55;
+}
+
+.pricing-corporate-safety li::before {
+    content: "✓";
+    color: #2f6fb0;
+    font-weight: 800;
+}
+
+.pricing-corporate-safety-note {
+    margin: 0.7rem 0 0;
+    font-size: 0.74rem;
+    color: #5f6f82;
+    line-height: 1.6;
+}
+
 @media (min-width: 769px) {
     .pricing-annual-reasons {
         text-align: center;
@@ -1384,6 +1431,18 @@ ul {
     }
 
     .pricing-trust-list li {
+        justify-content: center;
+    }
+
+    .pricing-corporate-safety {
+        text-align: center;
+    }
+
+    .pricing-corporate-safety ul {
+        justify-items: center;
+    }
+
+    .pricing-corporate-safety li {
         justify-content: center;
     }
 }
@@ -1749,6 +1808,10 @@ ul {
     }
 
     .pricing-trust-list ul {
+        grid-template-columns: 1fr;
+    }
+
+    .pricing-corporate-safety ul {
         grid-template-columns: 1fr;
     }
 
