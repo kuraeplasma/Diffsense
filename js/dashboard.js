@@ -1001,6 +1001,13 @@ class DashboardApp {
         }
     }
 
+    updateRegistrationButtonVisibility(viewId = this.currentView) {
+        const regBtn = document.getElementById('open-registration-btn');
+        if (!regBtn) return;
+        const canShowOnView = viewId === 'dashboard' || viewId === 'contracts';
+        regBtn.style.display = (this.can('operate_contract') && canShowOnView) ? 'inline-flex' : 'none';
+    }
+
     async init() {
         try {
             console.log('Dashboard App Initializing...');
@@ -1201,11 +1208,7 @@ class DashboardApp {
                     if (teamNav) teamNav.style.display = '';
                 }
 
-                // Hide registration button for view-only users
-                const regBtn = document.getElementById('open-registration-btn');
-                if (regBtn && !this.can('operate_contract')) {
-                    regBtn.style.display = 'none';
-                }
+                this.updateRegistrationButtonVisibility(this.currentView);
 
                 // Show role badge in header for team members
                 if (this.isTeamMember) {
@@ -1809,6 +1812,7 @@ class DashboardApp {
         }
 
         this.currentView = viewId;
+        this.updateRegistrationButtonVisibility(viewId);
 
         // Toggle Fluid Layout Mode for Detail View
         if (viewId === 'diff') {
@@ -1875,7 +1879,9 @@ class DashboardApp {
                     'history': '履歴・ログ',
                     'team': 'チーム設定'
                 };
-                this.pageTitle.textContent = titles[viewId] || 'DIFFsense';
+                if (this.pageTitle) {
+                    this.pageTitle.textContent = titles[viewId] || 'DIFFsense';
+                }
 
                 window.scrollTo(0, 0);
 

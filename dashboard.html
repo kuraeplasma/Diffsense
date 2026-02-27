@@ -72,22 +72,16 @@
         </div>
     </nav>
 
+    <button id="sidebar-toggle" class="btn-icon mobile-only sidebar-floating-toggle" aria-label="メニューを開く">
+        <i class="fa-solid fa-bars"></i>
+    </button>
+    <button class="btn-dashboard btn-primary-action global-registration-btn" id="open-registration-btn"
+        style="display:none;">
+        <i class="fa-solid fa-plus"></i> 新規登録
+    </button>
+
     <!-- Main Content -->
     <main id="app-main">
-        <!-- Header -->
-        <header id="app-header">
-            <button id="sidebar-toggle" class="btn-icon mobile-only">
-                <i class="fa-solid fa-bars"></i>
-            </button>
-            <div class="breadcrumb" id="page-header-title">ダッシュボード</div>
-            <span id="user-role-badge" style="display:none;"></span>
-            <div class="header-actions">
-                <button class="btn-dashboard btn-primary-action" id="open-registration-btn">
-                    <i class="fa-solid fa-plus"></i> 新規登録
-                </button>
-            </div>
-        </header>
-
         <!-- Dynamic Content Area -->
         <div id="app-content">
             <!-- Content will be injected here by JS -->
