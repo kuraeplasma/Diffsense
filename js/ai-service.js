@@ -43,7 +43,11 @@ export const aiService = {
             const result = await response.json();
 
             if (!response.ok) {
-                throw new Error(result.error || `HTTP error! status: ${response.status}`);
+                const apiError = new Error(result.error || `HTTP error! status: ${response.status}`);
+                if (result.code) {
+                    apiError.code = result.code;
+                }
+                throw apiError;
             }
 
             return result;

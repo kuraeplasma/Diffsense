@@ -2,3 +2,9 @@
   # masterブランチへのプッシュ時に自動ビルドが走るのを防ぐ設定です。
   # このコマンドが 0 (true) を返すと、Netlify はビルドをスキップします。
   ignore = "true"
+  functions = "netlify/functions"
+
+[[redirects]]
+  from = "/api/paypal-checkout"
+  to = "/.netlify/functions/paypal-checkout"
+  status = 200

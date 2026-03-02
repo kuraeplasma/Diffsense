@@ -1,0 +1,1782 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DIFFsense | 導入支援付きオンボーディングプラン（法人向け）</title>
+  <meta name="description" content="契約確認業務を仕組み化する、法人向け導入支援プラン。10万円で実務定着まで伴走します。">
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon2.png?v=2">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;700&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    /* ─── Tokens ─── */
+    :root {
+      --bg: #0b1121;
+      --surface: #1e293b;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --soft: #475569;
+      --line: #334155;
+      --gold: #c3924f;
+      --gold-lt: #d1a870;
+      --gold-pale: rgba(195, 146, 79, 0.1);
+      --shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+      --r: 20px;
+      --r-sm: 12px;
+    }
+
+    /* ─── Global zoom ─── */
+    html {
+      zoom: 1.2;
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    ul,
+    ol {
+      list-style: none;
+    }
+
+    body {
+      font-family: "Noto Sans JP", sans-serif;
+      font-size: 17px;
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.75;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+      width: 100%;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4 {
+      font-family: "Outfit", "Noto Sans JP", sans-serif;
+      line-height: 1.12;
+      letter-spacing: -0.02em;
+    }
+
+    /* ─── Wide container ─── */
+    .wrap {
+      width: 100%;
+      max-width: 1920px;
+      margin: 0 auto;
+      padding: 0 32px;
+    }
+
+    /* ─── Eyebrow ─── */
+    .eyebrow {
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 18px;
+    }
+
+    /* ─── Buttons ─── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border-radius: var(--r-sm);
+      border: 1.5px solid transparent;
+      text-decoration: none;
+      cursor: pointer;
+      font-family: "Noto Sans JP", sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      padding: 14px 30px;
+      transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), background 0.25s ease;
+      white-space: nowrap;
+      letter-spacing: .02em;
+    }
+
+    .btn-dark {
+      color: #fff;
+      background: var(--text);
+      border-color: var(--text);
+    }
+
+    .btn-dark:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 24px rgba(15, 23, 42, .22);
+    }
+
+    .btn-gold {
+      color: #fff;
+      background: linear-gradient(135deg, #d3a158 0%, #ab752a 100%);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 4px 12px rgba(171, 117, 42, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.3);
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+      font-weight: 700;
+    }
+
+    .btn-gold:hover {
+      background: linear-gradient(135deg, #e3b673 0%, #b8853b 100%);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(171, 117, 42, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.4);
+    }
+
+    .btn-ghost {
+      color: #0b1121;
+      border: 1px solid rgba(255, 255, 255, 0.9);
+      background: #ffffff;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      font-weight: 700;
+    }
+
+    .btn-ghost:hover {
+      background: #f8fafc;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+    }
+
+    .btn-lg {
+      font-size: 18px;
+      padding: 18px 48px;
+      border-radius: 14px;
+    }
+
+    .btn-full {
+      width: 100%;
+    }
+
+    /* ════════════════════════════
+       HEADER
+    ════════════════════════════ */
+    .site-header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(11, 17, 33, 0.85);
+      /* Dark navy translucent */
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--line);
+      width: 100%;
+    }
+
+    .header-inner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      min-height: 88px;
+    }
+
+    .brand {
+      font-family: "Noto Sans JP", sans-serif;
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--gold);
+      letter-spacing: .05em;
+      margin-left: -4px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+    }
+
+    .brand i {
+      font-size: 22px;
+      margin-top: -2px;
+      /* Optical optical alignment for the icon */
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }
+
+    .header-label {
+      font-size: 15px;
+      color: var(--muted);
+    }
+
+    /* ════════════════════════════
+       ① HERO — full-bleed split
+    ════════════════════════════ */
+    .hero {
+      display: flex;
+      align-items: stretch;
+      max-width: 1920px;
+      margin: 0 auto;
+    }
+
+    .hero-left {
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      flex: 0 0 600px;
+      padding: 64px 40px 64px 32px;
+    }
+
+    .hero-right {
+      background: var(--text);
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      align-items: stretch;
+      padding: 0;
+      position: relative;
+      flex: 1;
+    }
+
+    /* shimmer effect removed */
+
+    .hero-title {
+      font-size: clamp(38px, 4.5vw, 64px);
+      font-weight: 800;
+      letter-spacing: -.03em;
+      margin-bottom: 32px;
+      color: var(--text);
+      line-height: 1.25;
+    }
+
+    .hero-title em {
+      font-style: normal;
+      color: var(--gold);
+    }
+
+    .hero-sub {
+      font-size: 19px;
+      color: var(--muted);
+      max-width: 100%;
+      line-height: 1.7;
+      margin-bottom: 48px;
+    }
+
+    .hero-cta-row {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      justify-content: flex-start;
+      max-width: 280px;
+    }
+
+    .hero-cta-row .btn {
+      width: 100%;
+    }
+
+    /* Right panel card */
+    .hero-card {
+      background: rgba(255, 255, 255, .06);
+      border: 1px solid rgba(255, 255, 255, .12);
+      border-radius: var(--r);
+      padding: 40px 36px;
+      width: 100%;
+      max-width: 460px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero-card-label {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, .4);
+      margin-bottom: 14px;
+      display: block;
+    }
+
+    .hero-card h3 {
+      font-size: 26px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 14px;
+    }
+
+    .hero-card p {
+      font-size: 16px;
+      color: rgba(255, 255, 255, .55);
+      line-height: 1.7;
+      margin-bottom: 32px;
+    }
+
+    .hero-cta-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .hero-screen {
+      flex: 1;
+      width: 100%;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    .hero-screen img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: contain;
+      object-position: left center;
+    }
+
+    /* ════════════════════════════
+       ② PAIN — edge-to-edge
+    ════════════════════════════ */
+    .pain-section {
+      padding: 120px 0;
+      position: relative;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .pain-wrap {
+      display: flex;
+      gap: 64px;
+      align-items: flex-start;
+      margin: 0 auto;
+      max-width: 100%;
+    }
+
+    .pain-header {
+      margin-bottom: 60px;
+    }
+
+    .pain-heading {
+      font-size: clamp(30px, 3.8vw, 52px);
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .pain-cards {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1px;
+      background: var(--line);
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      overflow: hidden;
+    }
+
+    .pain-card {
+      padding: 44px 36px;
+      transition: background .3s, transform .3s;
+      background: var(--surface);
+    }
+
+    .pain-card:hover {
+      background: rgba(195, 146, 79, 0.05);
+      /* Premium dark gold hover */
+      transform: translateY(-2px);
+    }
+
+    .pain-num {
+      font-family: "Outfit", sans-serif;
+      font-size: 48px;
+      font-weight: 800;
+      color: rgba(255, 255, 255, 0.1);
+      /* Subtle dark mode number */
+      line-height: 1;
+      margin-bottom: 16px;
+      transition: color .3s;
+    }
+
+    .pain-card:hover .pain-num {
+      color: var(--gold);
+    }
+
+    .pain-icon-wrap {
+      width: 100%;
+      height: 180px;
+      border-radius: 16px;
+      background: rgba(195, 146, 79, 0.06);
+      border: 1px solid rgba(195, 146, 79, 0.2);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+
+    .pain-icon-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.4s ease;
+    }
+
+    .pain-card:hover .pain-icon-wrap img {
+      transform: scale(1.05);
+    }
+
+    .pain-text {
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    /* ════════════════════════════
+       ③ HOW IT WORKS
+    ════════════════════════════ */
+    .how-section {
+      padding: 120px 0;
+      background: var(--surface);
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .how-header {
+      margin-bottom: 72px;
+    }
+
+    .how-heading {
+      font-size: clamp(30px, 4vw, 54px);
+      font-weight: 700;
+      max-width: 600px;
+    }
+
+    .how-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: var(--line);
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      overflow: hidden;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.2);
+    }
+
+    .how-step {
+      background: var(--surface);
+      padding: 44px 36px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      transition: background .3s;
+    }
+
+    .how-step:hover {
+      background: rgba(195, 146, 79, 0.08);
+    }
+
+    .how-step-top {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .how-num {
+      font-family: "Outfit", sans-serif;
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--gold);
+      background: var(--gold-pale);
+      border: 1px solid #e8d5a8;
+      border-radius: 8px;
+      padding: 5px 12px;
+      letter-spacing: .04em;
+    }
+
+    /* Screenshot in How-It-Works steps */
+    .step-screen {
+      width: 100%;
+      height: 180px;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      box-shadow: 0 6px 24px rgba(15, 23, 42, .1);
+      margin-bottom: 4px;
+    }
+
+    .step-screen img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: top;
+      display: block;
+    }
+
+    .how-step-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .how-step-body {
+      font-size: 15px;
+      color: var(--muted);
+      line-height: 1.65;
+    }
+
+    /* ════════════════════════════
+       ④ ONBOARDING — full-bleed split
+    ════════════════════════════ */
+    .onboard-section {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      min-height: 560px;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .onboard-left {
+      background: var(--text);
+      padding: 100px 80px 100px 64px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .onboard-left .eyebrow {
+      color: var(--gold-lt);
+    }
+
+    .onboard-left h2 {
+      font-size: clamp(28px, 3.2vw, 46px);
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 16px;
+    }
+
+    .onboard-left p {
+      font-size: 17px;
+      color: rgba(255, 255, 255, .45);
+    }
+
+    /* checklist visual */
+    .onboard-visual {
+      margin-top: 44px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .onboard-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .onboard-bar-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: rgba(212, 160, 58, .15);
+      border: 1px solid rgba(212, 160, 58, .3);
+      color: var(--gold-lt);
+      font-size: 15px;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+
+    .onboard-bar-track {
+      flex: 1;
+      height: 6px;
+      border-radius: 3px;
+      background: rgba(255, 255, 255, .06);
+      overflow: hidden;
+    }
+
+    .onboard-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      background: linear-gradient(90deg, var(--gold), var(--gold-lt));
+    }
+
+    .onboard-bar-label {
+      font-size: 14px;
+      color: rgba(255, 255, 255, .5);
+      white-space: nowrap;
+      min-width: 90px;
+      text-align: right;
+    }
+
+    .onboard-right {
+      background: var(--bg);
+      padding: 80px 64px 80px 72px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .onboard-items {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .onboard-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 20px 18px;
+      border-radius: var(--r-sm);
+      border: 1px solid var(--line);
+      background: var(--surface);
+      transition: box-shadow .2s, border-color .2s;
+    }
+
+    .onboard-item:hover {
+      box-shadow: var(--shadow);
+      border-color: #d1c09a;
+    }
+
+    .onboard-item-icon {
+      font-size: 22px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .onboard-item-text {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    /* ════════════════════════════
+       ⑤ BEFORE / AFTER — full bleed
+    ════════════════════════════ */
+    .ba-section {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      min-height: 420px;
+    }
+
+    .ba-col {
+      padding: 72px 72px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+    }
+
+    .ba-before {
+      background: var(--surface);
+      border-right: 1px solid var(--line);
+    }
+
+    .ba-after {
+      background: var(--gold-pale);
+    }
+
+    .ba-label {
+      font-size: 44px;
+      font-weight: 900;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      margin-bottom: 24px;
+      display: block;
+      font-family: 'Space Grotesk', sans-serif;
+    }
+
+    .ba-before .ba-label {
+      color: #cbd5e1;
+      opacity: 0.8;
+      text-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    }
+
+    .ba-after .ba-label {
+      color: #fbbf24;
+      opacity: 0.95;
+      text-shadow: 0 4px 24px rgba(251, 191, 36, 0.3);
+    }
+
+    .ba-list {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .ba-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+    }
+
+    .ba-marker {
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      font-size: 14px;
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 4px;
+    }
+
+    .ba-before .ba-marker {
+      background: #f1f5f9;
+      color: #94a3b8;
+    }
+
+    .ba-after .ba-marker {
+      background: rgba(176, 125, 46, .15);
+      color: var(--gold);
+    }
+
+    .ba-text {
+      font-size: 18px;
+      color: var(--text);
+      line-height: 1.75;
+      font-weight: 500;
+    }
+
+    /* ════════════════════════════
+       ⑥ STEPS
+    ════════════════════════════ */
+    .steps-section {
+      padding: 120px 0;
+      background: var(--surface);
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .steps-heading {
+      font-size: clamp(28px, 3.5vw, 48px);
+      font-weight: 700;
+      margin-bottom: 72px;
+    }
+
+    .steps-flow {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 0;
+      position: relative;
+    }
+
+    /* horizontal connector */
+    .steps-flow::before {
+      content: "";
+      position: absolute;
+      top: 167px;
+      /* 120px (icon) + 24px (gap) + 23px (half dot) = 167px */
+      left: calc(10% + 10px);
+      right: calc(10% + 10px);
+      height: 2px;
+      background: linear-gradient(90deg, var(--line), var(--gold-lt), var(--line));
+    }
+
+    .step-icon-box {
+      width: 120px;
+      height: 120px;
+      margin: 0 auto 24px auto;
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+      display: grid;
+      place-items: center;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .step-icon-box::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: radial-gradient(circle at top right, rgba(212, 160, 58, 0.2), transparent 70%);
+      pointer-events: none;
+      opacity: 0.5;
+      transition: opacity 0.3s;
+    }
+
+    .step-node:hover .step-icon-box {
+      transform: translateY(-8px);
+      border-color: rgba(212, 160, 58, 0.4);
+      box-shadow: 0 12px 32px rgba(212, 160, 58, 0.15);
+      background: rgba(212, 160, 58, 0.05);
+    }
+
+    .step-node:hover .step-icon-box::before {
+      opacity: 1;
+    }
+
+    .step-icon-box svg {
+      width: 48px;
+      height: 48px;
+      color: var(--gold);
+      filter: drop-shadow(0 0 12px rgba(212, 160, 58, 0.4));
+      transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .step-node:hover .step-icon-box svg {
+      transform: scale(1.15);
+    }
+
+    .step-node {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding: 0 12px;
+      gap: 18px;
+    }
+
+    .step-dot {
+      width: 46px;
+      height: 46px;
+      border-radius: 999px;
+      background: var(--surface);
+      border: 2px solid var(--line);
+      display: grid;
+      place-items: center;
+      font-family: "Outfit", sans-serif;
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--text);
+      position: relative;
+      z-index: 1;
+      transition: border-color .2s, background .2s, color .2s;
+    }
+
+    .step-node:hover .step-dot {
+      border-color: var(--gold);
+      background: var(--gold-pale);
+      color: var(--gold);
+    }
+
+    .step-body {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .step-name {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.4;
+    }
+
+    .step-sub {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    /* ════════════════════════════
+       ⑦ COMPARISON TABLE
+    ════════════════════════════ */
+    .compare-section {
+      padding: 100px 0;
+      background: #f1f4f9;
+      border-top: 1px solid var(--line);
+    }
+
+    .compare-heading {
+      font-size: clamp(24px, 3vw, 40px);
+      font-weight: 700;
+      margin-bottom: 52px;
+    }
+
+    .compare-wrap {
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      overflow: hidden;
+      background: var(--surface);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 16px;
+    }
+
+    thead th {
+      background: #f8fafc;
+      padding: 16px 24px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    tbody td,
+    tbody th {
+      padding: 17px 24px;
+      border-top: 1px solid var(--line);
+      text-align: left;
+      color: var(--text);
+    }
+
+    tbody th {
+      font-weight: 600;
+    }
+
+    tr:last-child td,
+    tr:last-child th {
+      border-bottom: none;
+    }
+
+    .td-gold {
+      font-weight: 700;
+      color: var(--gold);
+    }
+
+    /* ════════════════════════════
+       ⑦ PRICING
+    ════════════════════════════ */
+    .pricing-section {
+      background: #ffffff;
+      padding: 140px 0;
+      border-top: 1px solid #e2e8f0;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .pricing-inner {
+      max-width: 700px;
+      margin: 0 auto;
+      text-align: center;
+    }
+
+    .pricing-eyebrow {
+      color: var(--gold-lt);
+      margin-bottom: 18px;
+    }
+
+    .pricing-heading {
+      font-size: clamp(24px, 3.2vw, 36px);
+      font-weight: 700;
+      color: #0b1121;
+      margin-bottom: 8px;
+    }
+
+    .pricing-sub {
+      font-size: 16px;
+      color: #64748b;
+      margin-bottom: 60px;
+    }
+
+    .price-badge {
+      display: inline-block;
+      background: rgba(212, 160, 58, .12);
+      border: 1px solid rgba(212, 160, 58, .35);
+      border-radius: 8px;
+      padding: 7px 18px;
+      font-size: 12px;
+      color: var(--gold-lt);
+      font-weight: 700;
+      letter-spacing: .06em;
+      margin-bottom: 22px;
+    }
+
+    .price-num {
+      font-family: "Outfit", sans-serif;
+      font-size: clamp(70px, 11vw, 104px);
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: -.04em;
+      color: var(--gold-lt);
+      margin-bottom: 8px;
+    }
+
+    .price-cap {
+      font-size: 13px;
+      color: #64748b;
+      margin-bottom: 48px;
+    }
+
+    .price-tags {
+      display: grid;
+      grid-template-columns: repeat(3, auto);
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 48px;
+    }
+
+    .price-tag {
+      font-size: 15px;
+      font-weight: 600;
+      color: #0b1121;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 10px 22px;
+      white-space: nowrap;
+      text-align: center;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .price-tag::before {
+      content: "✓";
+      color: var(--gold);
+      font-weight: 800;
+    }
+
+    .price-cta-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .price-note {
+      font-size: 12px;
+      color: #94a3b8;
+    }
+
+    /* ─── Footer ─── */
+    .footer {
+      padding: 48px 0 32px;
+      border-top: 1px solid var(--line);
+      background: var(--bg);
+    }
+
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: 32px;
+      flex-wrap: wrap;
+      margin-bottom: 24px;
+    }
+
+    .footer-links a {
+      font-size: 13px;
+      color: var(--muted);
+      text-decoration: none;
+      transition: color .2s;
+    }
+
+    .footer-links a:hover {
+      color: var(--gold-lt);
+    }
+
+    .footer-copy {
+      text-align: center;
+      font-size: 12px;
+      color: var(--soft);
+    }
+
+    /* ─── Modal ─── */
+    .payment-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      background: rgba(8, 12, 24, .65);
+      backdrop-filter: blur(6px);
+    }
+
+    .payment-modal.is-open {
+      display: flex;
+    }
+
+    .payment-box {
+      width: 100%;
+      max-width: 440px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      box-shadow: 0 40px 80px rgba(8, 12, 24, .3);
+      padding: 40px 36px 32px;
+    }
+
+    .payment-box h3 {
+      font-size: 22px;
+      margin-bottom: 8px;
+    }
+
+    .payment-price {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 28px;
+    }
+
+    .payment-actions {
+      display: grid;
+      gap: 10px;
+    }
+
+    .close-btn {
+      width: 100%;
+      margin-top: 10px;
+      border: 1px solid var(--line);
+      background: transparent;
+      color: var(--muted);
+      font-size: 13px;
+      padding: 11px;
+      border-radius: var(--r-sm);
+      cursor: pointer;
+      transition: background .15s;
+    }
+
+    .close-btn:hover {
+      background: var(--bg);
+    }
+
+    /* ─── Bottom Sticky Action Bar ─── */
+    .bottom-action-bar {
+      display: none;
+      /* Hidden on desktop */
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      background: rgba(11, 17, 33, 0.9);
+      backdrop-filter: blur(12px);
+      border-top: 1px solid var(--line);
+      padding: 16px 24px;
+      justify-content: center;
+      align-items: center;
+      gap: 16px;
+      z-index: 90;
+      box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.3);
+    }
+
+    .bottom-action-bar .btn {
+      padding: 14px 28px;
+      font-size: 15px;
+      white-space: nowrap;
+    }
+
+    /* Padding bottom to body to not hide content behind the sticky bar (handled in mobile view) */
+
+    /* ─── Responsive ─── */
+    @media (max-width:1100px) {
+      .wrap {
+        padding: 0 40px;
+      }
+
+      .hero,
+      .pain-wrap {
+        flex-direction: column;
+        gap: 24px;
+        align-items: center;
+        width: 100%;
+      }
+
+      .pain-item {
+        width: 100%;
+        padding: 24px 16px;
+      }
+
+      .hero-section {
+        width: 100%;
+      }
+
+      .onboard-section,
+      .ba-section {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-left {
+        flex: auto;
+        padding: 64px 40px 32px 40px;
+      }
+
+      .hero-right,
+      .onboard-left,
+      .onboard-right,
+      .ba-col {
+        padding: 40px;
+      }
+
+      .pain-cards,
+      .how-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .pain-card {
+        border-bottom: 1px solid var(--line);
+      }
+
+      .steps-flow {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 24px;
+      }
+
+      .steps-flow::before {
+        display: none;
+      }
+    }
+
+    @media (max-width:680px) {
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 100vw;
+        max-width: 100%;
+        overflow-x: hidden !important;
+        position: relative;
+      }
+
+      .header-inner {
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        height: auto;
+        padding: 16px 0 20px;
+        gap: 16px;
+        width: 100%;
+      }
+
+      .brand {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        width: 100%;
+        justify-content: center;
+        margin: 0;
+        padding: 0;
+        gap: 6px;
+        font-size: 18px;
+        /* Reduce font size on mobile to prevent awkward wrapping */
+      }
+
+      .brand span {
+        display: block;
+        font-size: 13px;
+        line-height: 1.4;
+        word-break: auto-phrase;
+        overflow-wrap: break-word;
+      }
+
+      .brand i {
+        font-size: 20px;
+      }
+
+      .header-right {
+        justify-content: center;
+        width: 100%;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .header-right .btn {
+        padding: 10px 16px;
+        font-size: 13px;
+      }
+
+      .wrap {
+        padding: 0 16px;
+        width: 100%;
+        max-width: 100vw;
+      }
+
+      .hero-left {
+        padding: 40px 16px 24px;
+        align-items: center;
+        text-align: center;
+        width: 100%;
+        overflow-wrap: break-word;
+      }
+
+      .hero-content h1 {
+        font-size: clamp(20px, 7vw, 32px);
+        line-height: 1.3;
+        word-break: auto-phrase;
+      }
+
+      .h1-sub {
+        font-size: clamp(24px, 8vw, 40px) !important;
+        white-space: normal;
+        word-break: auto-phrase;
+      }
+
+      .hero-desc {
+        font-size: 15px;
+      }
+
+      .hero-right,
+      .onboard-left,
+      .onboard-right,
+      .ba-col {
+        padding: 40px 24px;
+      }
+
+      .pain-cards,
+      .how-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .onboard-items {
+        grid-template-columns: 1fr;
+      }
+
+      .header-right {
+        display: none;
+        /* Hide header CTA on mobile */
+      }
+
+      .steps-flow {
+        grid-template-columns: 1fr;
+      }
+
+      .price-num {
+        font-size: 72px;
+      }
+
+      .btn-lg {
+        padding: 16px 28px;
+        font-size: 15px;
+      }
+
+      .bottom-action-bar {
+        display: flex;
+        padding: 12px 16px;
+        gap: 10px;
+      }
+
+      .bottom-action-bar .btn {
+        flex: 1;
+        padding: 12px 10px;
+        font-size: 13px;
+      }
+
+      body {
+        padding-bottom: 70px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ═══ HEADER ═══ -->
+  <header class="site-header">
+    <div class="header-inner wrap">
+      <a href="/" class="brand">
+        <i class="fa-solid fa-scale-balanced"></i>
+        DIFFsense 導入サポートパック
+      </a>
+      <div class="header-right">
+        <a class="btn btn-gold" href="/api/paypal-checkout" target="_blank" rel="noopener noreferrer">導入支援を申し込む</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ════════════════════════
+     ① HERO
+════════════════════════ -->
+    <section class="hero">
+      <!-- LEFT -->
+      <div class="hero-left">
+        <span class="eyebrow">Onboarding Solution</span>
+        <h1 class="hero-title">契約確認を、<br>作業から<br><em>“経営判断”</em>へ。</h1>
+        <p class="hero-sub">変更点を構造化し、確認すべき論点を整理。<br>導入初期から実務定着まで伴走します。</p>
+        <div class="hero-cta-row">
+          <a class="btn btn-gold" href="/api/paypal-checkout" target="_blank" rel="noopener noreferrer">導入支援を申し込む</a>
+          <a class="btn btn-ghost"
+            href="https://calendar.google.com/calendar/u/0/appointments/schedules/AcZssZ1vOuZKEJ_wbtUNZH1BpV2StHBkZgsYHnH0TgPLEIGnbr7u7SYkm5r4bjlhUS2TM1lPT6IRTW5l"
+            target="_blank" rel="noopener noreferrer">無料相談する</a>
+        </div>
+      </div>
+
+      <!-- RIGHT — dark panel with diff visualization -->
+      <div class="hero-right">
+        <!-- Real dashboard screenshot -->
+        <div class="hero-screen">
+          <img src="images/dashboard-latest-masked.png" alt="DIFFsense ダッシュボード — 差分ハイライトとAIリスク要約" loading="eager">
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ════════════════════════
+     ② PAIN POINTS
+════════════════════════ -->
+    <section class="pain-section">
+      <div class="wrap pain-wrap">
+        <div class="pain-left" style="flex: 1;">
+          <div class="pain-header" style="margin-bottom: 40px;">
+            <span class="eyebrow">Problems</span>
+            <h2 class="pain-heading">こんな状態に<br>なっていませんか？</h2>
+          </div>
+          <div style="text-align: center; padding: 20px 0;">
+            <img src="images/flat_problem_person.png" alt="煩雑な契約確認作業の課題"
+              style="max-width: 360px; width: 100%; border-radius: 16px; border: 1px solid var(--line); box-shadow: 0 16px 40px rgba(0,0,0,0.4);"
+              loading="lazy">
+          </div>
+        </div>
+
+        <div class="pain-right" style="flex: 1.2;">
+          <div class="pain-cards">
+            <div class="pain-card">
+              <div class="pain-num">01</div>
+              <div class="pain-icon-wrap">
+                <img src="images/illust_prob_1.png" alt="変更箇所を全文確認">
+              </div>
+              <p class="pain-text">変更箇所を毎回全文確認している</p>
+            </div>
+            <div class="pain-card">
+              <div class="pain-num">02</div>
+              <div class="pain-icon-wrap">
+                <img src="images/illust_prob_2.png" alt="誰がどこを見るか曖昧">
+              </div>
+              <p class="pain-text">誰がどこを見るか曖昧なまま進む</p>
+            </div>
+            <div class="pain-card">
+              <div class="pain-num">03</div>
+              <div class="pain-icon-wrap">
+                <img src="images/illust_prob_3.png" alt="差分整理だけで時間を消費">
+              </div>
+              <p class="pain-text">差分整理だけで時間を使い切る</p>
+            </div>
+            <div class="pain-card">
+              <div class="pain-num">04</div>
+              <div class="pain-icon-wrap">
+                <img src="images/illust_prob_4.png" alt="弁護士レビュー前の準備が重い">
+              </div>
+              <p class="pain-text">弁護士レビュー前の準備が重い</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ════════════════════════
+     ③ HOW IT WORKS
+════════════════════════ -->
+    <section class="how-section">
+      <div class="wrap">
+        <div class="how-header">
+          <span class="eyebrow">How It Works</span>
+          <h2 class="how-heading">STEP1〜4で、<br>契約確認を標準化。</h2>
+        </div>
+        <div class="how-grid">
+
+          <div class="how-step">
+            <div class="how-step-top">
+              <span class="how-num">STEP 1</span>
+            </div>
+            <div class="step-screen">
+              <img src="images/dashboard-diff-highlight-crop.png" alt="差分ハイライト画面" loading="lazy">
+            </div>
+            <h3 class="how-step-title">変更点抽出</h3>
+            <p class="how-step-body">旧版と新版を比較し、変更箇所を自動で構造化。</p>
+          </div>
+
+          <div class="how-step">
+            <div class="how-step-top"><span class="how-num">STEP 2</span></div>
+            <div class="step-screen">
+              <img src="images/dashboard-risk-summary-crop.png" alt="AIリスク要約画面" loading="lazy">
+            </div>
+            <h3 class="how-step-title">AIリスク整理</h3>
+            <p class="how-step-body">変更内容の影響論点と確認観点を提示。</p>
+          </div>
+
+          <div class="how-step">
+            <div class="how-step-top"><span class="how-num">STEP 3</span></div>
+            <!-- Risk badge mock-up -->
+            <div class="step-screen"
+              style="padding:20px 14px;background:#0f172a;border-radius:12px;border:1px solid #334155;display:flex;flex-direction:column;gap:10px;">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span
+                  style="font-size:12px;font-weight:800;letter-spacing:.08em;background:#fee2e2;color:#dc2626;border-radius:5px;padding:4px 12px;">High</span>
+                <div style="flex:1;height:6px;border-radius:3px;background:rgba(220,38,38,.25);"></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span
+                  style="font-size:12px;font-weight:800;letter-spacing:.08em;background:#fee2e2;color:#dc2626;border-radius:5px;padding:4px 12px;">High</span>
+                <div style="flex:1;height:6px;border-radius:3px;background:rgba(220,38,38,.2);"></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span
+                  style="font-size:12px;font-weight:800;letter-spacing:.08em;background:#fef3c7;color:#d97706;border-radius:5px;padding:4px 12px;">Mid</span>
+                <div style="flex:1;height:6px;border-radius:3px;background:rgba(217,119,6,.2);"></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span
+                  style="font-size:12px;font-weight:800;letter-spacing:.08em;background:#dcfce7;color:#16a34a;border-radius:5px;padding:4px 12px;">Low</span>
+                <div style="flex:1;height:6px;border-radius:3px;background:rgba(22,163,74,.15);"></div>
+              </div>
+            </div>
+            <h3 class="how-step-title">優先度分類</h3>
+            <p class="how-step-body">変更ごとにリスク度を自動判定。確認すべき順番が一目でわかる。</p>
+          </div>
+
+          <div class="how-step">
+            <div class="how-step-top"><span class="how-num">STEP 4</span></div>
+            <!-- Team settings mock-up -->
+            <div class="step-screen"
+              style="padding:16px 14px;background:#0f172a;border-radius:12px;border:1px solid #334155;display:flex;flex-direction:column;gap:8px;">
+              <div
+                style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:#1e293b;border-radius:8px;border:1px solid #334155;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <div
+                    style="width:28px;height:28px;border-radius:50%;background:#334155;display:grid;place-items:center;font-size:11px;color:#94a3b8;">
+                    田</div>
+                  <span style="font-size:12px;color:#e2e8f0;">田中 法務</span>
+                </div>
+                <span
+                  style="font-size:11px;font-weight:700;color:#c3924f;background:rgba(195,146,79,.12);border:1px solid rgba(195,146,79,.3);border-radius:5px;padding:2px 8px;">管理者</span>
+              </div>
+              <div
+                style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:#1e293b;border-radius:8px;border:1px solid #334155;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <div
+                    style="width:28px;height:28px;border-radius:50%;background:#334155;display:grid;place-items:center;font-size:11px;color:#94a3b8;">
+                    鈴</div>
+                  <span style="font-size:12px;color:#e2e8f0;">鈴木 総務</span>
+                </div>
+                <span
+                  style="font-size:11px;font-weight:700;color:#60a5fa;background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.25);border-radius:5px;padding:2px 8px;">作業者</span>
+              </div>
+              <div
+                style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:#1e293b;border-radius:8px;border:1px solid #334155;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <div
+                    style="width:28px;height:28px;border-radius:50%;background:#334155;display:grid;place-items:center;font-size:11px;color:#94a3b8;">
+                    山</div>
+                  <span style="font-size:12px;color:#e2e8f0;">山田 営業</span>
+                </div>
+                <span
+                  style="font-size:11px;font-weight:700;color:#94a3b8;background:rgba(148,163,184,.08);border:1px solid rgba(148,163,184,.2);border-radius:5px;padding:2px 8px;">閲覧者</span>
+              </div>
+            </div>
+            <h3 class="how-step-title">チーム設定</h3>
+            <p class="how-step-body">管理者・作業者・閲覧者の権限でメンバーを招待。複数人での運用体制をすぐに構築。</p>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+
+
+    <!-- ════════════════════════
+     ⑤ BEFORE / AFTER
+════════════════════════ -->
+    <div style="background:var(--bg);padding:100px 0 0;text-align:center;">
+      <div class="wrap">
+        <span class="eyebrow">Comparison</span>
+        <h2 style="font-size:32px;font-weight:700;color:var(--text);margin-top:20px;letter-spacing:.05em;">従来手法との違い</h2>
+      </div>
+    </div>
+    <section class="ba-section" style="padding-top:60px;background:var(--bg);">
+      <div class="ba-col ba-before">
+        <span class="ba-label">Before</span>
+        <!-- Before illustration: scattered docs -->
+        <div
+          style="margin:0 auto 50px;padding:0;width:100%;max-width:480px;height:300px;min-height:300px;flex-shrink:0;display:flex;align-items:center;justify-content:center;">
+          <img src="images/before_illustration_new.png" alt="従来の煩雑な契約確認"
+            style="width:100%;height:100%;object-fit:contain;mix-blend-mode:lighten;transform:scale(1.15);">
+        </div>
+        <ul class="ba-list">
+          <li class="ba-item">
+            <div class="ba-marker">–</div>
+            <p class="ba-text">判断材料が点在し、確認のたびに担当者依存</p>
+          </li>
+          <li class="ba-item">
+            <div class="ba-marker">–</div>
+            <p class="ba-text">変更点整理に時間を使い、承認が後ろ倒し</p>
+          </li>
+          <li class="ba-item">
+            <div class="ba-marker">–</div>
+            <p class="ba-text">フローが属人化し、担当変更で混乱</p>
+          </li>
+        </ul>
+      </div>
+      <div class="ba-col ba-after">
+        <span class="ba-label">After</span>
+        <div
+          style="margin:0 auto 50px;padding:0;width:100%;max-width:480px;height:300px;min-height:300px;flex-shrink:0;display:flex;align-items:center;justify-content:center;">
+          <!-- Dashboard image -->
+          <img src="images/dashboard-latest-masked.png" alt="標準化された確認フロー"
+            style="width:100%;object-fit:contain;mix-blend-mode:lighten;border-radius:6px;box-shadow:0 6px 30px rgba(0,0,0,0.6);">
+        </div>
+        <ul class="ba-list">
+          <li class="ba-item">
+            <div class="ba-marker">✓</div>
+            <p class="ba-text">論点が整理され、確認フローが標準化</p>
+          </li>
+          <li class="ba-item">
+            <div class="ba-marker">✓</div>
+            <p class="ba-text">承認に必要な情報が揃い、意思決定が速くなる</p>
+          </li>
+          <li class="ba-item">
+            <div class="ba-marker">✓</div>
+            <p class="ba-text">誰でも同じ品質で確認できる仕組みが完成</p>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ════════════════════════
+     ⑥ STEPS
+════════════════════════ -->
+    <section class="steps-section">
+      <div class="wrap">
+        <span class="eyebrow">Process</span>
+        <h2 class="steps-heading">導入ステップ</h2>
+        <div class="steps-flow">
+          <!-- Step 1 -->
+          <div class="step-node">
+            <div class="step-icon-box">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path fill-rule="evenodd"
+                  d="M10.5 3.75a6.75 6.75 0 100 13.5 6.75 6.75 0 000-13.5zM2.25 10.5a8.25 8.25 0 1114.59 5.28l4.69 4.69a.75.75 0 11-1.06 1.06l-4.69-4.69A8.25 8.25 0 012.25 10.5z"
+                  clip-rule="evenodd" />
+              </svg>
+            </div>
+            <div class="step-dot">1</div>
+            <div class="step-body">
+              <p class="step-name">現状ヒアリング</p>
+              <p class="step-sub">課題・確認体制を整理</p>
+            </div>
+          </div>
+          <!-- Step 2 -->
+          <div class="step-node">
+            <div class="step-icon-box">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path fill-rule="evenodd"
+                  d="M5.625 1.5H9a3.75 3.75 0 013.75 3.75v1.875c0 1.036.84 1.875 1.875 1.875H16.5a3.75 3.75 0 013.75 3.75v7.875c0 1.035-.84 1.875-1.875 1.875H5.625a1.875 1.875 0 01-1.875-1.875V3.375c0-1.036.84-1.875 1.875-1.875zM12.75 12a.75.75 0 00-1.5 0v2.25H9a.75.75 0 000 1.5h2.25V18a.75.75 0 001.5 0v-2.25H15a.75.75 0 000-1.5h-2.25V12z"
+                  clip-rule="evenodd" />
+                <path
+                  d="M14.25 5.25a5.23 5.23 0 00-1.279-3.434 9.768 9.768 0 016.963 6.963A5.23 5.23 0 0016.5 7.5h-1.875a.375.375 0 01-.375-.375V5.25z" />
+              </svg>
+            </div>
+            <div class="step-dot">2</div>
+            <div class="step-body">
+              <p class="step-name">初回レポート作成</p>
+              <p class="step-sub">実契約書で差分分析</p>
+            </div>
+          </div>
+          <!-- Step 3 -->
+          <div class="step-node">
+            <div class="step-icon-box">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path fill-rule="evenodd"
+                  d="M3 6.75A.75.75 0 013.75 6h16.5a.75.75 0 010 1.5H3.75A.75.75 0 013 6.75zM3 12a.75.75 0 01.75-.75h16.5a.75.75 0 010 1.5H3.75A.75.75 0 013 12zm0 5.25a.75.75 0 01.75-.75h16.5a.75.75 0 010 1.5H3.75a.75.75 0 01-.75-.75z"
+                  clip-rule="evenodd" />
+              </svg>
+            </div>
+            <div class="step-dot">3</div>
+            <div class="step-body">
+              <p class="step-name">優先度マップ整理</p>
+              <p class="step-sub">確認順序を可視化</p>
+            </div>
+          </div>
+          <!-- Step 4 -->
+          <div class="step-node">
+            <div class="step-icon-box">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path fill-rule="evenodd"
+                  d="M15.75 4.5a3 3 0 11.825 2.066l-8.421 4.679a3.002 3.002 0 010 1.51l8.421 4.679a3 3 0 11-.729 1.31l-8.421-4.678a3 3 0 110-4.132l8.421-4.679a3 3 0 01-.096-.755z"
+                  clip-rule="evenodd" />
+              </svg>
+            </div>
+            <div class="step-dot">4</div>
+            <div class="step-body">
+              <p class="step-name">社内フロー設計</p>
+              <p class="step-sub">承認動線を標準化</p>
+            </div>
+          </div>
+          <!-- Step 5 -->
+          <div class="step-node">
+            <div class="step-icon-box">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path fill-rule="evenodd"
+                  d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm14.024-.983a1.125 1.125 0 010 1.966l-5.603 3.113A1.125 1.125 0 019 15.113V8.887c0-.857.921-1.4 1.671-.983l5.603 3.113z"
+                  clip-rule="evenodd" />
+              </svg>
+            </div>
+            <div class="step-dot">5</div>
+            <div class="step-body">
+              <p class="step-name">運用開始</p>
+              <p class="step-sub">継続活用へ移行</p>
+            </div>
+          </div>
+        </div>
+    </section>
+
+
+
+    <!-- ════════════════════════
+     ⑦ PRICING
+════════════════════════ -->
+    <section class="pricing-section" style="background:#ffffff;color:#0b1121;">
+      <div class="wrap">
+        <div class="pricing-inner">
+          <span class="eyebrow pricing-eyebrow">Pricing</span>
+          <h2 class="pricing-heading">導入支援付きオンボーディングプラン</h2>
+          <p class="pricing-sub">業務設計から実務定着まで、一貫してサポートします。</p>
+          <div class="price-badge">5社限定　先着受付中</div>
+          <p class="price-num">¥100,000</p>
+          <p class="price-cap">税込 / 導入初期の業務設計支援を含む</p>
+          <div class="price-tags" style="display:flex;flex-direction:column;align-items:center;gap:12px;">
+            <span class="price-tag"
+              style="background:#f1f5f9;color:#334155;border-color:#cbd5e1;padding:12px 24px;width:100%;max-width:320px;text-align:center;">期間：30日間</span>
+            <span class="price-tag"
+              style="background:#f1f5f9;color:#334155;border-color:#cbd5e1;padding:12px 24px;width:100%;max-width:320px;text-align:center;">差分チェック代行：最大5契約書</span>
+            <span class="price-tag"
+              style="background:#f1f5f9;color:#334155;border-color:#cbd5e1;padding:12px 24px;width:100%;max-width:320px;text-align:center;">優先度マップ作成：最大5件</span>
+            <span class="price-tag"
+              style="background:#f1f5f9;color:#334155;border-color:#cbd5e1;padding:12px 24px;width:100%;max-width:320px;text-align:center;">社内フロー簡易設計：1回</span>
+            <span class="price-tag"
+              style="background:#f1f5f9;color:#334155;border-color:#cbd5e1;padding:12px 24px;width:100%;max-width:320px;text-align:center;">オンラインサポート：2回（各60分）</span>
+          </div>
+          <div class="price-cta-wrap">
+            <a class="btn btn-gold btn-lg" href="/api/paypal-checkout" target="_blank"
+              rel="noopener noreferrer">導入支援を申し込む
+              — ¥100,000</a>
+            <a class="btn btn-ghost"
+              href="https://calendar.google.com/calendar/u/0/appointments/schedules/AcZssZ1vOuZKEJ_wbtUNZH1BpV2StHBkZgsYHnH0TgPLEIGnbr7u7SYkm5r4bjlhUS2TM1lPT6IRTW5l"
+              target="_blank" rel="noopener noreferrer">無料相談する</a>
+            <p class="price-note">伴走品質確保のため、同時導入企業数を限定しています。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <div class="wrap">
+      <nav class="footer-links">
+        <a href="https://diffsense.spacegleam.co.jp/privacy" target="_blank" rel="noopener noreferrer">プライバシーポリシー</a>
+        <a href="https://diffsense.spacegleam.co.jp/law" target="_blank" rel="noopener noreferrer">特定商取引法に基づく表記</a>
+        <a href="https://diffsense.spacegleam.co.jp/terms" target="_blank" rel="noopener noreferrer">利用規約</a>
+        <a href="https://diffsense.spacegleam.co.jp/company" target="_blank" rel="noopener noreferrer">会社概要</a>
+      </nav>
+      <p class="footer-copy">© 2026 SpaceGleam All Rights Reserved.</p>
+    </div>
+  </footer>
+
+  <!-- ═══ Bottom Sticky Action Bar ═══ -->
+  <div class="bottom-action-bar">
+    <a class="btn btn-ghost"
+      href="https://calendar.google.com/calendar/u/0/appointments/schedules/AcZssZ1vOuZKEJ_wbtUNZH1BpV2StHBkZgsYHnH1BpV2StHBkZgsYHnH0TgPLEIGnbr7u7SYkm5r4bjlhUS2TM1lPT6IRTW5l"
+      target="_blank" rel="noopener noreferrer">無料相談</a>
+    <a class="btn btn-gold" href="/api/paypal-checkout" target="_blank" rel="noopener noreferrer">導入支援を申し込む</a>
+  </div>
+
+</body>
+
+</html>

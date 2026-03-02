@@ -843,9 +843,37 @@ ul {
 }
 
 .problem-card .icon-box {
-    font-size: 2.5rem;
     margin-bottom: 1.5rem;
-    /* Use emoji as is, no color override needed usually, but ok */
+    height: 180px;
+    width: 100%;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #ffffff;
+    /* pure white to blend with image background */
+    border: 1px solid rgba(197, 160, 89, 0.15);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.problem-card .icon-box img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    padding: 10px 0;
+    /* add slight padding so it doesn't touch the top/bottom edges tightly */
+}
+
+/* Specific zoom class for the rightmost image */
+.problem-card .icon-box img.zoom-img {
+    padding: 0;
+    object-fit: cover;
+    transform: scale(1.35);
+    transform-origin: center top;
+}
+
+.problem-card .icon-box img.zoom-img-bottom {
+    transform-origin: center 70%;
 }
 
 .problem-card h3 {
@@ -3352,6 +3380,7 @@ ul {
         display: none;
     }
 }
+
 /* FINAL RESPONSIVE OVERRIDES (FORCE PRIORITY) */
 @media (max-width: 768px) {
     .diagram-shared-source {
@@ -3745,6 +3774,7 @@ ul {
 }
 
 @media (max-width: 768px) {
+
     /* Mobile: unify CTA corner radius */
     .hero-btns .btn,
     .section-inline-cta .btn,

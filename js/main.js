@@ -190,12 +190,42 @@ document.addEventListener('DOMContentLoaded', () => {
         container.style.alignItems = 'center';
     }
 
-    function initPricingBillingToggle() {
+    function getApiBase() {
+        return (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+            ? 'http://localhost:3001'
+            : 'https://api-qf37m5ba2q-an.a.run.app';
+    }
+
+    async function hasAnnualBillingPlans() {
+        try {
+            const res = await fetch(`${getApiBase()}/payment/config`, { cache: 'no-store' });
+            if (!res.ok) return false;
+            const json = await res.json();
+            const annual = json?.data?.planIds?.annual;
+            return !!(annual?.starter && annual?.business && annual?.pro);
+        } catch (_) {
+            return false;
+        }
+    }
+
+    async function initPricingBillingToggle() {
         const pricingSection = document.querySelector('.pricing-section');
         const toggleButtons = Array.from(document.querySelectorAll('[data-billing-toggle]'));
         const planCards = Array.from(document.querySelectorAll('[data-plan-card]'));
+        const billingNoteEl = document.querySelector('.pricing-billing-note');
 
         if (!pricingSection || !toggleButtons.length || !planCards.length) return;
+
+        let annualEnabled = await hasAnnualBillingPlans();
+        const annualBtn = toggleButtons.find((btn) => btn.dataset.billingToggle === 'annual');
+        if (!annualEnabled && annualBtn) {
+            annualBtn.disabled = true;
+            annualBtn.setAttribute('aria-disabled', 'true');
+            annualBtn.textContent = '年額（準備中）';
+            if (billingNoteEl) {
+                billingNoteEl.textContent = '年額プランは現在準備中です。公開までしばらくお待ちください。';
+            }
+        }
 
         const buildPlanLink = (baseHref, cycle) => {
             if (!baseHref) return '#';
@@ -204,6 +234,9 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         const setBillingCycle = (cycle) => {
+            if (!annualEnabled && cycle === 'annual') {
+                cycle = 'monthly';
+            }
             const isAnnual = cycle === 'annual';
 
             toggleButtons.forEach((btn) => {
@@ -233,6 +266,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (ctaEl) {
                         ctaEl.textContent = annualCta;
                         ctaEl.href = buildPlanLink(basePlanLink, 'annual');
+                        ctaEl.style.whiteSpace = 'nowrap';
+                        ctaEl.style.wordBreak = 'keep-all';
+                        ctaEl.style.overflowWrap = 'normal';
+                        ctaEl.style.letterSpacing = '0.01em';
                     }
                 } else {
                     if (amountEl && monthlyPrice) amountEl.textContent = monthlyPrice;
@@ -241,13 +278,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (ctaEl) {
                         ctaEl.textContent = monthlyCta;
                         ctaEl.href = buildPlanLink(basePlanLink, 'monthly');
+                        ctaEl.style.whiteSpace = 'nowrap';
+                        ctaEl.style.wordBreak = 'keep-all';
+                        ctaEl.style.overflowWrap = 'normal';
+                        ctaEl.style.letterSpacing = '0.01em';
                     }
                 }
             });
         };
 
         toggleButtons.forEach((btn) => {
-            btn.addEventListener('click', () => setBillingCycle(btn.dataset.billingToggle));
+            btn.addEventListener('click', () => {
+                if (btn.disabled) return;
+                setBillingCycle(btn.dataset.billingToggle);
+            });
         });
 
         setBillingCycle('monthly');
