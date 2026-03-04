@@ -333,12 +333,12 @@
             </h1>
 
             <div class="auth-tabs">
-                <div class="auth-tab active" id="tab-login" onclick="switchTab('login')">ログイン</div>
-                <div class="auth-tab" id="tab-signup" onclick="switchTab('signup')">新規登録</div>
+                <div class="auth-tab" id="tab-login" onclick="switchTab('login')">ログイン</div>
+                <div class="auth-tab active" id="tab-signup" onclick="switchTab('signup')">新規登録</div>
             </div>
 
             <!-- LOGIN VIEW -->
-            <div id="view-login">
+            <div id="view-login" style="display: none;">
                 <form id="login-form">
                     <div class="form-group">
                         <label class="form-label" for="login-email">メールアドレス</label>
@@ -361,7 +361,7 @@
             </div>
 
             <!-- SIGNUP VIEW -->
-            <div id="view-signup" style="display: none;">
+            <div id="view-signup">
                 <form id="signup-form">
                     <div class="form-group">
                         <label class="form-label" for="signup-email">メールアドレス</label>
@@ -379,7 +379,7 @@
                         </div>
                     </div>
                     <button type="submit" class="btn full-width" id="signup-btn"
-                        style="border-radius: 4px; padding: 1.2rem; background: #c5a059; color: #fff; border: none; font-weight: 700;">新規登録</button>
+                        style="border-radius: 4px; padding: 1.2rem; background: #c5a059; color: #fff; border: none; font-weight: 700;">無料で始める</button>
                 </form>
             </div>
 
@@ -473,9 +473,13 @@
             localStorage.setItem('diffsense_selected_billing_cycle', selectedBilling);
         }
 
-        if (urlParams.get('tab') === 'signup') {
-            switchTab('signup');
+        // mode=signup または tab=signup でサインアップタブを表示
+        // パラメータなしの場合もデフォルトは新規登録（HTML初期値）
+        if (urlParams.get('mode') === 'login' || urlParams.get('tab') === 'login') {
+            // 明示的にloginが指定された場合のみログインタブへ切り替え
+            switchTab('login');
         }
+        // それ以外（mode=signup, tab=signup, パラメータなし）はデフォルトの新規登録タブのまま
     </script>
 </body>
 
