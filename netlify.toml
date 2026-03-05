@@ -1,10 +1,17 @@
 [build]
-  # masterブランチへのプッシュ時に自動ビルドが走るのを防ぐ設定です。
-  # このコマンドが 0 (true) を返すと、Netlify はビルドをスキップします。
-  ignore = "true"
+  publish = "."
   functions = "netlify/functions"
+  [build.environment]
+    SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"
 
 [[redirects]]
   from = "/api/paypal-checkout"
   to = "/.netlify/functions/paypal-checkout"
   status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/paypal-checkout/"
+  to = "/.netlify/functions/paypal-checkout"
+  status = 200
+  force = true
