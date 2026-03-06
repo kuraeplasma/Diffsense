@@ -26,10 +26,6 @@ function normalizeBillingCycle(value) {
 }
 
 class DBService {
-    // ...
-    getOriginalPlanLimit(plan) {
-        return AI_USAGE_LIMITS[plan] || 0;
-    }
     constructor() {
         this.dataDir = path.join(__dirname, '../../data');
         if (!fs.existsSync(this.dataDir)) {
@@ -41,6 +37,10 @@ class DBService {
         } else {
             logger.warn('DBService: Firestore not available, falling back to file-based storage (data may be lost on restart)');
         }
+    }
+
+    getOriginalPlanLimit(plan) {
+        return AI_USAGE_LIMITS[plan] || 0;
     }
 
     // --- Firestore helpers for user profiles ---
@@ -97,7 +97,7 @@ class DBService {
 
     async canAddMember(uid) {
         const user = await this.getUserProfile(uid);
-        const plan = user.plan || 'starter';
+        const plan = user.plan || 'pro';
         const limit = PLAN_LIMITS[plan] || 1;
 
         // Count only team members invited by this user
@@ -225,7 +225,7 @@ class DBService {
             return TRIAL_AI_LIMIT;
         }
         // Otherwise, use plan-based limit
-        const plan = userProfile.plan || 'starter';
+        const plan = userProfile.plan || 'pro';
         return AI_USAGE_LIMITS[plan] || 0;
     }
 
@@ -265,11 +265,11 @@ class DBService {
             return user;
         }
 
-        // 3. New user: create with starter plan and trial
-        logger.info(`getUserProfile(${uid}): NOT FOUND anywhere, creating new starter profile`);
+        // 3. New user: create with pro plan and trial
+        logger.info(`getUserProfile(${uid}): NOT FOUND anywhere, creating new pro profile`);
         user = {
             uid: uid,
-            plan: 'starter',
+            plan: 'pro',
             billingCycle: 'monthly',
             trialStartedAt: new Date().toISOString(),
             hasPaymentMethod: false,
@@ -279,7 +279,7 @@ class DBService {
         users.push(user);
         await this.writeData('users', users);
         await this._firestoreSetUser(uid, user);
-        logger.info(`New user profile created: ${uid}, plan: starter`);
+        logger.info(`New user profile created: ${uid}, plan: pro`);
 
         return user;
     }
