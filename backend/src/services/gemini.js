@@ -51,7 +51,10 @@ class GeminiService {
                 },
                 {
                     timeout: 120000, // Keep increased timeout (120s)
-                    headers: { 'Content-Type': 'application/json' }
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Referer': 'https://diffsense.spacegleam.co.jp'
+                    }
                 }
             );
 
