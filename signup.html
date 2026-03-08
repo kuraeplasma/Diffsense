@@ -21,6 +21,7 @@
         const billing = params.get('billing') === 'annual' ? 'annual' : 'monthly';
         localStorage.setItem('diffsense_selected_plan', 'pro');
         localStorage.setItem('diffsense_selected_billing_cycle', billing);
+        localStorage.setItem('diffsense_signup_flow', '1');
         window.location.replace("login.html?tab=signup");
     </script>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">

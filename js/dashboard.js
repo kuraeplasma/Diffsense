@@ -1587,11 +1587,13 @@ class DashboardApp {
                 // Check if user just selected a plan from signup flow
                 const selectedPlan = localStorage.getItem('diffsense_selected_plan');
                 const selectedBillingCycle = localStorage.getItem('diffsense_selected_billing_cycle') || 'monthly';
-                if (selectedPlan && !trialExpiredFlowFlag) {
+                const signupFlowFlag = localStorage.getItem('diffsense_signup_flow') === '1';
+                if (selectedPlan && signupFlowFlag && !trialExpiredFlowFlag) {
                     // 無料登録導線は常にPro開始に統一
                     await this.registerSelectedPlan(token, 'pro', selectedBillingCycle);
                     localStorage.removeItem('diffsense_selected_plan');
                     localStorage.removeItem('diffsense_selected_billing_cycle');
+                    localStorage.removeItem('diffsense_signup_flow');
                 }
 
                 this.setCachedItem(DASHBOARD_CACHE_KEYS.USER_META, {
