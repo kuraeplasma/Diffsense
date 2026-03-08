@@ -555,9 +555,10 @@ const Views = {
     diff: (id) => {
         const contract = dbService.getContractById(id);
         const activeTab = window.app ? window.app.activeDetailTab : 'diff';
+        const runtimePdfUrl = window.app?.getRuntimePdfPreviewUrl(id) || null;
         const sourceType = String(contract?.source_type || '').toUpperCase();
         const isPdfSource = sourceType === 'PDF' || (contract?.original_filename || '').toLowerCase().endsWith('.pdf');
-        const hasPdfPreview = Boolean(contract?.pdf_url || contract?.pdf_storage_path);
+        const hasPdfPreview = Boolean(contract?.pdf_url || contract?.pdf_storage_path || runtimePdfUrl);
 
         // AI解析結果があればそれを使用、なければ静的コンテンツまたはデフォルト
         const hasComparableVersion = Array.isArray(contract.history) && contract.history.length > 0;
@@ -744,9 +745,9 @@ const Views = {
                         <div class="pane-scroll-area ${activeTab === 'original' && isPdfSource && hasPdfPreview ? '' : 'document-pane-bg is-frameless'}" style="padding:0; flex:1; display:flex; flex-direction:column; overflow-y:auto;">
                                 ${activeTab === 'original' && isPdfSource && hasPdfPreview
                 ? `<div style="width:100%; height:100%; display:flex; flex-direction:column;">
-                        <iframe src="${contract.pdf_url || contract.pdf_storage_path}" style="width:100%; flex:1; border:none; background:#525659; min-height:600px;"></iframe>
+                        <iframe src="${contract.pdf_url || runtimePdfUrl || contract.pdf_storage_path}" style="width:100%; flex:1; border:none; background:#525659; min-height:600px;"></iframe>
                         <div style="padding:10px; text-align:center; background:#f9f9f9; border-top:1px solid #ddd; font-size:12px;">
-                            <a href="${contract.pdf_url || contract.pdf_storage_path}" target="_blank" class="text-primary"><i class="fa-solid fa-external-link-alt"></i> PDFを別ウィンドウで開く</a>
+                            <a href="${contract.pdf_url || runtimePdfUrl || contract.pdf_storage_path}" target="_blank" class="text-primary"><i class="fa-solid fa-external-link-alt"></i> PDFを別ウィンドウで開く</a>
                              <span style="margin-left:10px; color:#999;">(Shift+Clickでダウンロード)</span>
                         </div>
                    </div>`
@@ -1247,6 +1248,9 @@ class RegistrationFlow {
             // PDFまたはWordの場合はFileReaderでBase64に変換
             if ((this.tempData.method === 'pdf' || this.tempData.method === 'docx') && this.tempData.fileData) {
                 sourceData = await aiService.convertFileToBase64(this.tempData.fileData);
+                if (this.tempData.method === 'pdf') {
+                    this.app?.setRuntimePdfPreviewUrl(contractId, this.tempData.fileData);
+                }
             }
 
             // For DOCX + compare file, run full structural diff analysis immediately.
@@ -1335,6 +1339,7 @@ class DashboardApp {
         // Navigation State
         this.searchQuery = "";
         this.currentPage = 1;
+        this.runtimePdfPreviewUrls = new Map();
         this.dashboardFilter = "pending";
         this.activeDetailTab = 'diff';
         this.filters = {
@@ -1361,6 +1366,22 @@ class DashboardApp {
         this.memoryCache = new Map();
         this.bootstrapCompleted = false;
         this.hydrateCachedState();
+    }
+
+    setRuntimePdfPreviewUrl(contractId, file) {
+        if (!contractId || !file || !(file instanceof File)) return;
+        const key = String(contractId);
+        const previous = this.runtimePdfPreviewUrls.get(key);
+        if (previous) {
+            try { URL.revokeObjectURL(previous); } catch (_) { /* noop */ }
+        }
+        const blobUrl = URL.createObjectURL(file);
+        this.runtimePdfPreviewUrls.set(key, blobUrl);
+    }
+
+    getRuntimePdfPreviewUrl(contractId) {
+        if (!contractId) return null;
+        return this.runtimePdfPreviewUrls.get(String(contractId)) || null;
     }
 
     getCachedItem(key, maxAgeMs = 5 * 60 * 1000) {
@@ -2754,6 +2775,9 @@ class DashboardApp {
 
             const analysisMethod = isPdf ? 'pdf' : 'docx';
             const methodLabel = isPdf ? 'PDF' : 'Word';
+            if (isPdf) {
+                this.setRuntimePdfPreviewUrl(id, file);
+            }
 
             const performAnalysis = async (retryCount = 0) => {
                 try {
