@@ -401,7 +401,7 @@
         import { auth } from './js/firebase-config.js';
         import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-        let selectedPlan = null;
+        let selectedPlan = 'pro';
 
         // Require auth - redirect to login if not authenticated
         onAuthStateChanged(auth, (user) => {
@@ -412,33 +412,38 @@
         });
 
         window.selectPlan = (planId) => {
-            selectedPlan = planId;
+            selectedPlan = 'pro';
 
             // Update UI
             document.querySelectorAll('.plan-card').forEach(card => {
                 card.classList.remove('selected');
             });
-            document.querySelector(`[data-plan="${planId}"]`).classList.add('selected');
+            const enforcedCard = document.querySelector('[data-plan="pro"]');
+            if (enforcedCard) enforcedCard.classList.add('selected');
 
             // Update button
             const btn = document.getElementById('confirm-btn');
             const planNames = { starter: 'Starter', business: 'Business', pro: 'Pro / Legal' };
-            btn.textContent = `${planNames[planId]} で始める`;
+            btn.textContent = `${planNames.pro} で始める`;
             btn.disabled = false;
         };
 
         window.confirmPlan = () => {
-            if (!selectedPlan) return;
+            const enforcedPlan = 'pro';
 
             const btn = document.getElementById('confirm-btn');
             btn.classList.add('btn-loading');
 
-            // Save selected plan to localStorage
-            localStorage.setItem('diffsense_selected_plan', selectedPlan);
+            // Save Pro plan to localStorage
+            localStorage.setItem('diffsense_selected_plan', enforcedPlan);
 
             // Redirect to thanks page
-            window.location.replace(`${window.location.origin}/thanks-plan.html?plan=${selectedPlan}`);
+            window.location.replace(`${window.location.origin}/thanks-plan.html?plan=${enforcedPlan}`);
         };
+
+        window.addEventListener('DOMContentLoaded', () => {
+            window.selectPlan('pro');
+        });
     </script>
 </body>
 

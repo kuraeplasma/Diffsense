@@ -16,14 +16,11 @@
     </script>
 
     <script>
-        // プランパラメータがあればlocalStorageに保存してから遷移
+        // 無料登録導線は常にPro開始に固定
         const params = new URLSearchParams(window.location.search);
-        const plan = params.get('plan');
         const billing = params.get('billing') === 'annual' ? 'annual' : 'monthly';
-        if (plan) {
-            localStorage.setItem('diffsense_selected_plan', plan);
-            localStorage.setItem('diffsense_selected_billing_cycle', billing);
-        }
+        localStorage.setItem('diffsense_selected_plan', 'pro');
+        localStorage.setItem('diffsense_selected_billing_cycle', billing);
         window.location.replace("login.html?tab=signup");
     </script>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">

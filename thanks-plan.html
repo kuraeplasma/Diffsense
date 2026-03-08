@@ -221,7 +221,7 @@
 
     <script>
         const params = new URLSearchParams(window.location.search);
-        const plan = params.get('plan') || 'starter';
+        const plan = params.get('plan') || 'pro';
         const isTrialExpiredFlow = params.get('reason') === 'trial_expired' || localStorage.getItem('diffsense_trial_expired_flow') === '1';
         const planNames = { starter: 'Starter', business: 'Business', pro: 'Pro / Legal' };
         const planPrices = { starter: '¥1,480', business: '¥4,980', pro: '¥9,800' };

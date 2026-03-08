@@ -1588,7 +1588,8 @@ class DashboardApp {
                 const selectedPlan = localStorage.getItem('diffsense_selected_plan');
                 const selectedBillingCycle = localStorage.getItem('diffsense_selected_billing_cycle') || 'monthly';
                 if (selectedPlan && !trialExpiredFlowFlag) {
-                    await this.registerSelectedPlan(token, selectedPlan, selectedBillingCycle);
+                    // 無料登録導線は常にPro開始に統一
+                    await this.registerSelectedPlan(token, 'pro', selectedBillingCycle);
                     localStorage.removeItem('diffsense_selected_plan');
                     localStorage.removeItem('diffsense_selected_billing_cycle');
                 }
