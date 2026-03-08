@@ -624,14 +624,16 @@ const Views = {
             <div class="detail-split-container">
                 <!-- Breadcrumb & Top Actions -->
                 <div class="detail-split-header flex justify-between items-center">
-                    <div class="flex items-center gap-md">
+                    <div class="detail-header-main">
                         <a onclick="window.app.navigate('dashboard')" style="color:#666; font-size:12px; cursor:pointer;" title="戻る">
                             <i class="fa-solid fa-arrow-left"></i>
                         </a>
-                        <h2 style="font-size:18px; font-weight:700; color:var(--text-main); margin:0;">${diffData.title}</h2>
-                        <div style="font-size:12px; color:#666; margin-top:4px;">
-                            ${contract.source_url ? `<i class="fa-solid fa-link"></i> Source: <a href="${contract.source_url}" target="_blank" style="color:#2196F3; text-decoration:underline;">${contract.source_url}</a>` : ''}
-                            ${contract.original_filename ? `<i class="fa-solid fa-file-pdf"></i> Original File: ${contract.original_filename}` : ''}
+                        <div class="detail-header-title-wrap">
+                            <h2 style="font-size:18px; font-weight:700; color:var(--text-main); margin:0;">${diffData.title}</h2>
+                            <div class="detail-header-meta" style="font-size:12px; color:#666; margin-top:4px;">
+                                ${contract.source_url ? `<span class="detail-header-meta-item"><i class="fa-solid fa-link"></i> Source: <a href="${contract.source_url}" target="_blank" style="color:#2196F3; text-decoration:underline;">${contract.source_url}</a></span>` : ''}
+                                ${contract.original_filename ? `<span class="detail-header-meta-item"><i class="fa-solid fa-file-lines"></i> Original File: ${contract.original_filename}</span>` : ''}
+                            </div>
                         </div>
                     </div>
                     <div class="flex gap-sm">
@@ -713,8 +715,9 @@ const Views = {
                     <!-- Right Pane: Original Document -->
                     <div class="pane">
                         <div class="pane-header" style="display:flex; justify-content:space-between; align-items:center; min-height:56px; box-sizing:border-box;">
-                            <div style="display:flex; align-items:center; gap:8px;">
+                            <div style="display:flex; align-items:center; gap:8px; min-width:0;">
                                 <span><i class="fa-solid fa-file-contract"></i> ドキュメント表示</span>
+                                ${contract.original_filename ? `<span class="doc-source-name" title="${contract.original_filename}"><i class="fa-solid fa-file-lines"></i> ${contract.original_filename}</span>` : ''}
                                 <!-- History Dropdown -->
                                 <div class="header-dropdown-container">
                                     <button class="btn-dashboard" style="display:flex; align-items:center; gap:6px; padding:4px 10px; font-size:12px;" onclick="event.stopPropagation(); document.getElementById('history-menu-${id}').classList.toggle('show');" title="バージョン履歴">
@@ -2582,9 +2585,9 @@ class DashboardApp {
         }
     }
 
-    setDetailTab(tab) {
+    async setDetailTab(tab) {
         this.activeDetailTab = tab;
-        this.navigate('diff', this.currentViewParams);
+        await this.navigate('diff', this.currentViewParams);
 
         // Reset scroll positions when switching tabs in detail view.
         this.resetDetailPaneScroll();
@@ -2661,8 +2664,8 @@ class DashboardApp {
                 clauseCards.scrollTop = 0;
             }
 
-            // In original tab, pin to explicit top anchor to avoid mid-document reopen.
-            if (this.activeDetailTab === 'original' && scrollArea) {
+            // In both tabs, pin to explicit top anchor to avoid mid-document reopen.
+            if (scrollArea) {
                 const topAnchor = rightPane.querySelector('.document-top-anchor');
                 if (topAnchor) {
                     topAnchor.scrollIntoView({ block: 'start', behavior: 'auto' });
@@ -2675,6 +2678,8 @@ class DashboardApp {
             runReset();
             setTimeout(runReset, 50);
             setTimeout(runReset, 180);
+            setTimeout(runReset, 420);
+            setTimeout(runReset, 800);
         });
     }
 
