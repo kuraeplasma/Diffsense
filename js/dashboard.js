@@ -84,6 +84,129 @@ const normalizeStructuredDisplayContent = (content) => {
     return clone;
 };
 
+const escapeHtmlText = (value) => String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+const isStructuredDocumentContent = (content) => {
+    if (!content) return false;
+    if (Array.isArray(content)) return true;
+    return typeof content === 'object' && Array.isArray(content.articles);
+};
+
+const clauseIdentityKey = (clause) => `${clause?.title || ''}__${clause?.header || ''}`;
+
+const clauseBodyText = (clause) => Array.isArray(clause?.paragraphs)
+    ? clause.paragraphs.map((p) => String(p || '')).join('\n').trim()
+    : '';
+
+const renderClauseParagraphs = (text) => {
+    const lines = String(text || '').split(/\n+/).filter((line) => line.length > 0);
+    if (lines.length === 0) {
+        return '<p class="text-muted">本文なし</p>';
+    }
+    return lines.map((line) => `<p class="clause-p">${escapeHtmlText(line)}</p>`).join('');
+};
+
+const renderStructuredDiffView = (previousContent, currentContent, idPrefix = 'structured-diff') => {
+    const previousClauses = parseContractIntoClauses(previousContent);
+    const currentClauses = parseContractIntoClauses(currentContent);
+
+    if (previousClauses.length === 0 && currentClauses.length === 0) {
+        return '<div class="text-center text-muted" style="padding:40px;">比較できる条文データがありません</div>';
+    }
+
+    const previousMap = new Map(previousClauses.map((clause) => [clauseIdentityKey(clause), clause]));
+    const orderedKeys = [];
+
+    currentClauses.forEach((clause) => {
+        const key = clauseIdentityKey(clause);
+        if (!orderedKeys.includes(key)) orderedKeys.push(key);
+    });
+    previousClauses.forEach((clause) => {
+        const key = clauseIdentityKey(clause);
+        if (!orderedKeys.includes(key)) orderedKeys.push(key);
+    });
+
+    const renderChangedClause = (key, currentClause, previousClause) => {
+        const title = currentClause?.title || previousClause?.title || '条文';
+        const header = currentClause?.header || previousClause?.header || '';
+        const previousText = clauseBodyText(previousClause);
+        const currentText = clauseBodyText(currentClause);
+        const safeId = String(key).replace(/[^\w-]+/g, '-');
+        let previousHtml = escapeHtmlText(previousText || '（変更前なし）');
+        let currentHtml = escapeHtmlText(currentText || '（変更後なし）');
+
+        if (window.Diff && typeof window.Diff.diffWordsWithSpace === 'function') {
+            const chunks = window.Diff.diffWordsWithSpace(previousText, currentText);
+            previousHtml = '';
+            currentHtml = '';
+
+            for (const chunk of chunks) {
+                const safe = escapeHtmlText(chunk.value);
+                if (chunk.added) {
+                    currentHtml += `<span class="diff-add">${safe}</span>`;
+                } else if (chunk.removed) {
+                    previousHtml += `<span class="diff-del">${safe}</span>`;
+                } else {
+                    previousHtml += safe;
+                    currentHtml += safe;
+                }
+            }
+        }
+
+        return `
+            <article class="clause-card structured-diff-card" id="${idPrefix}-${safeId}">
+                <div class="clause-header">
+                    <span class="clause-num">${escapeHtmlText(title)}</span>
+                    ${header ? `<span class="clause-title-text">${escapeHtmlText(header)}</span>` : ''}
+                </div>
+                <div class="diff-container structured-diff-grid" style="height:auto; min-height:140px;">
+                    <div class="diff-pane diff-left structured-diff-pane">
+                        <div class="structured-diff-label">変更前</div>
+                        <div class="structured-diff-text">${previousHtml || '（変更前なし）'}</div>
+                    </div>
+                    <div class="diff-pane diff-right structured-diff-pane">
+                        <div class="structured-diff-label">変更後</div>
+                        <div class="structured-diff-text">${currentHtml || '（変更後なし）'}</div>
+                    </div>
+                </div>
+            </article>
+        `;
+    };
+
+    const renderUnchangedClause = (currentClause, previousClause) => {
+        const title = currentClause?.title || previousClause?.title || '条文';
+        const header = currentClause?.header || previousClause?.header || '';
+        const text = clauseBodyText(currentClause || previousClause);
+        return `
+            <article class="clause-card structured-diff-card structured-diff-plain">
+                <div class="clause-header">
+                    <span class="clause-num">${escapeHtmlText(title)}</span>
+                    ${header ? `<span class="clause-title-text">${escapeHtmlText(header)}</span>` : ''}
+                </div>
+                <div class="clause-body">
+                    ${renderClauseParagraphs(text)}
+                </div>
+            </article>
+        `;
+    };
+
+    const cards = orderedKeys.map((key) => {
+        const previousClause = previousMap.get(key) || null;
+        const currentClause = currentClauses.find((clause) => clauseIdentityKey(clause) === key) || null;
+        const previousText = clauseBodyText(previousClause);
+        const currentText = clauseBodyText(currentClause);
+        const changed = previousText !== currentText || (previousClause?.header || '') !== (currentClause?.header || '');
+        return changed
+            ? renderChangedClause(key, currentClause, previousClause)
+            : renderUnchangedClause(currentClause, previousClause);
+    }).join('');
+
+    return `<div class="structured-diff-stack">${cards}</div>`;
+};
+
 // --- Static Content ---
 
 // --- View Renderers Helpers ---
@@ -812,15 +935,10 @@ const Views = {
                                         ${activeTab === 'diff'
                     ? (() => {
                         // 差分表示ロジック
-                        const escapeHtml = (value) => String(value || '')
-                            .replace(/&/g, "&amp;")
-                            .replace(/</g, "&lt;")
-                            .replace(/>/g, "&gt;");
-
                         const renderAiChangeCards = () => {
                             const aiOnlyHtml = (contract.ai_changes || []).map((c, idx) => {
-                                const escapedOld = escapeHtml(c.old || '');
-                                const escapedNew = escapeHtml(c.new || '');
+                                const escapedOld = escapeHtmlText(c.old || '');
+                                const escapedNew = escapeHtmlText(c.new || '');
                                 const typeLabel = c.type === 'ADD' ? '追加' : (c.type === 'DELETE' ? '削除' : '変更');
                                 return `
                                     <div style="margin-bottom:18px; border:1px solid #e5e7eb; border-radius:8px; overflow:hidden; background:#fff;">
@@ -871,6 +989,10 @@ const Views = {
                         const previousVersion = contract.history[contract.history.length - 1].content;
                         const currentVersion = contract.original_content || '';
 
+                        if (!isPdfSource && (isStructuredDocumentContent(previousVersion) || isStructuredDocumentContent(currentVersion))) {
+                            return renderStructuredDiffView(previousVersion, currentVersion, `diff-${id}`);
+                        }
+
                         const previousVersionText = getPlainText(previousVersion);
                         const currentVersionText = getPlainText(currentVersion);
 
@@ -881,11 +1003,11 @@ const Views = {
                                         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:12px;">
                                             <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px;">
                                                 <div style="font-size:12px; font-weight:700; color:#b42318; margin-bottom:8px;">変更前（旧版全文）</div>
-                                                <div style="white-space:pre-wrap; line-height:1.9;">${escapeHtml(previousVersionText)}</div>
+                                                <div style="white-space:pre-wrap; line-height:1.9;">${escapeHtmlText(previousVersionText)}</div>
                                             </div>
                                             <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px;">
                                                 <div style="font-size:12px; font-weight:700; color:#027a48; margin-bottom:8px;">変更後（新版本文）</div>
-                                                <div style="white-space:pre-wrap; line-height:1.9;">${escapeHtml(currentVersionText)}</div>
+                                                <div style="white-space:pre-wrap; line-height:1.9;">${escapeHtmlText(currentVersionText)}</div>
                                             </div>
                                         </div>
                                     </div>
@@ -897,7 +1019,7 @@ const Views = {
                             let newHtml = '';
 
                             for (const chunk of chunks) {
-                                const safe = escapeHtml(chunk.value);
+                                const safe = escapeHtmlText(chunk.value);
                                 if (chunk.added) {
                                     newHtml += `<span class="diff-inline-add">${safe}</span>`;
                                 } else if (chunk.removed) {
@@ -938,7 +1060,7 @@ const Views = {
                                 part.removed ? 'diff-inline-del' : '';
 
                             // エスケープ処理（XSS対策）
-                            const escapedValue = escapeHtml(part.value);
+                            const escapedValue = escapeHtmlText(part.value);
 
                             return colorClass ? `<span class="${colorClass}">${escapedValue}</span>` : escapedValue;
                         }).join('');
