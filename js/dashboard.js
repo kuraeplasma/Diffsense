@@ -555,6 +555,9 @@ const Views = {
     diff: (id) => {
         const contract = dbService.getContractById(id);
         const activeTab = window.app ? window.app.activeDetailTab : 'diff';
+        const sourceType = String(contract?.source_type || '').toUpperCase();
+        const isPdfSource = sourceType === 'PDF' || (contract?.original_filename || '').toLowerCase().endsWith('.pdf');
+        const hasPdfPreview = Boolean(contract?.pdf_url || contract?.pdf_storage_path);
 
         // AI解析結果があればそれを使用、なければ静的コンテンツまたはデフォルト
         const hasComparableVersion = Array.isArray(contract.history) && contract.history.length > 0;
@@ -738,8 +741,8 @@ const Views = {
                             <button class="tab-item ${activeTab === 'diff' ? 'active' : ''}" onclick="window.app.setDetailTab('diff')">差分表示</button>
                             <button class="tab-item ${activeTab === 'original' ? 'active' : ''}" onclick="window.app.setDetailTab('original')">原本全文</button>
                         </div>
-                        <div class="pane-scroll-area ${activeTab === 'original' && contract.source_type === 'PDF' && (contract.pdf_url || contract.pdf_storage_path) ? '' : 'document-pane-bg is-frameless'}" style="padding:0; flex:1; display:flex; flex-direction:column; overflow-y:auto;">
-                                ${activeTab === 'original' && contract.source_type === 'PDF' && (contract.pdf_url || contract.pdf_storage_path)
+                        <div class="pane-scroll-area ${activeTab === 'original' && isPdfSource && hasPdfPreview ? '' : 'document-pane-bg is-frameless'}" style="padding:0; flex:1; display:flex; flex-direction:column; overflow-y:auto;">
+                                ${activeTab === 'original' && isPdfSource && hasPdfPreview
                 ? `<div style="width:100%; height:100%; display:flex; flex-direction:column;">
                         <iframe src="${contract.pdf_url || contract.pdf_storage_path}" style="width:100%; flex:1; border:none; background:#525659; min-height:600px;"></iframe>
                         <div style="padding:10px; text-align:center; background:#f9f9f9; border-top:1px solid #ddd; font-size:12px;">
@@ -753,31 +756,40 @@ const Views = {
                                         ${activeTab === 'diff'
                     ? (() => {
                         // 差分表示ロジック
+                        const renderAiChangeCards = () => {
+                            const aiOnlyHtml = (contract.ai_changes || []).map((c, idx) => {
+                                const escapedOld = String(c.old || '')
+                                    .replace(/&/g, "&amp;")
+                                    .replace(/</g, "&lt;")
+                                    .replace(/>/g, "&gt;");
+                                const escapedNew = String(c.new || '')
+                                    .replace(/&/g, "&amp;")
+                                    .replace(/</g, "&lt;")
+                                    .replace(/>/g, "&gt;");
+                                const typeLabel = c.type === 'ADD' ? '追加' : (c.type === 'DELETE' ? '削除' : '変更');
+                                return `
+                                    <div style="margin-bottom:18px; border:1px solid #e5e7eb; border-radius:8px; overflow:hidden; background:#fff;">
+                                        <div style="padding:10px 14px; background:#f8fafc; border-bottom:1px solid #e5e7eb; font-size:12px; font-weight:600;">
+                                            ${c.section || `変更 ${idx + 1}`} <span style="font-weight:normal; color:#667085; margin-left:8px;">(${typeLabel})</span>
+                                        </div>
+                                        <div class="diff-container" style="height:auto; min-height:90px;">
+                                            <div class="diff-pane diff-left"><span class="diff-del">${escapedOld || '（変更前なし）'}</span></div>
+                                            <div class="diff-pane diff-right"><span class="diff-add">${escapedNew || '（変更後なし）'}</span></div>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('');
+                            return `<div class="document-content-diff-wrap">${aiOnlyHtml}</div>`;
+                        };
+
+                        // PDFは全文diffCharsだと崩れやすいため、変更カードを優先表示
+                        if (isPdfSource && contract.ai_changes && contract.ai_changes.length > 0) {
+                            return renderAiChangeCards();
+                        }
+
                         if (!contract.history || contract.history.length === 0) {
                             if (contract.ai_changes && contract.ai_changes.length > 0) {
-                                const aiOnlyHtml = contract.ai_changes.map((c, idx) => {
-                                    const escapedOld = String(c.old || '')
-                                        .replace(/&/g, "&amp;")
-                                        .replace(/</g, "&lt;")
-                                        .replace(/>/g, "&gt;");
-                                    const escapedNew = String(c.new || '')
-                                        .replace(/&/g, "&amp;")
-                                        .replace(/</g, "&lt;")
-                                        .replace(/>/g, "&gt;");
-                                    const typeLabel = c.type === 'ADD' ? '追加' : (c.type === 'DELETE' ? '削除' : '変更');
-                                    return `
-                                        <div style="margin-bottom:18px; border:1px solid #e5e7eb; border-radius:8px; overflow:hidden; background:#fff;">
-                                            <div style="padding:10px 14px; background:#f8fafc; border-bottom:1px solid #e5e7eb; font-size:12px; font-weight:600;">
-                                                ${c.section || `変更 ${idx + 1}`} <span style="font-weight:normal; color:#667085; margin-left:8px;">(${typeLabel})</span>
-                                            </div>
-                                            <div class="diff-container" style="height:auto; min-height:90px;">
-                                                <div class="diff-pane diff-left"><span class="diff-del">${escapedOld || '（変更前なし）'}</span></div>
-                                                <div class="diff-pane diff-right"><span class="diff-add">${escapedNew || '（変更後なし）'}</span></div>
-                                            </div>
-                                        </div>
-                                    `;
-                                }).join('');
-                                return `<div class="document-content-diff-wrap">${aiOnlyHtml}</div>`;
+                                return renderAiChangeCards();
                             }
                             return `
                                 <div class="text-muted text-center" style="padding:20px 40px 10px;">比較対象となる旧バージョンがありません（初回登録）</div>
