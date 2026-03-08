@@ -17,6 +17,51 @@ function median(values) {
     return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
+function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+}
+
+function round1(value) {
+    return Math.round(Number(value || 0) * 10) / 10;
+}
+
+function isCjkChar(ch) {
+    return /[\u3040-\u30ff\u3400-\u9fff]/.test(ch || '');
+}
+
+function normalizeChunk(text) {
+    return String(text || '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function shouldInsertSpace(prevText, nextText, gap, fontSize) {
+    const prevLast = (prevText || '').slice(-1);
+    const nextFirst = (nextText || '').slice(0, 1);
+    if (!prevLast || !nextFirst) return false;
+    if (gap <= 0.2) return false;
+
+    // Japanese text should not be split by aggressive spaces.
+    if (isCjkChar(prevLast) && isCjkChar(nextFirst)) {
+        return gap > Math.max(3, fontSize * 1.1);
+    }
+
+    return gap > Math.max(1.2, fontSize * 0.45);
+}
+
+function normalizeLineText(text) {
+    let line = String(text || '');
+    line = line.replace(/\s{2,}/g, ' ').trim();
+    line = line.replace(/\s+([、。。，．,.;:!?])/g, '$1');
+    line = line.replace(/([（(「『【])\s+/g, '$1');
+    line = line.replace(/\s+([）」』】])/g, '$1');
+
+    // Recover article headers corrupted by extracted spacing.
+    line = line.replace(/^第\s*第?\s*([0-9０-９一二三四五六七八九十百千〇零]+)\s*条\s*条?/, '第$1条');
+    line = line.replace(/^第\s+([0-9０-９一二三四五六七八九十百千〇零]+)\s+条/, '第$1条');
+    return line.trim();
+}
+
 class PDFService {
     async extractText(base64Data) {
         try {
@@ -39,21 +84,28 @@ class PDFService {
                 const viewport = page.getViewport({ scale: 1.0 });
                 const textContent = await page.getTextContent();
 
+                const seen = new Set();
                 const items = (textContent.items || []).map((item) => {
                     const transform = item.transform || [1, 0, 0, 1, 0, 0];
                     const x = Number(transform[4] || 0);
                     const y = Number(transform[5] || 0);
                     const width = Number(item.width || 0);
                     const height = Math.abs(Number(transform[3] || item.height || 0));
+                    const text = normalizeChunk(item.str);
+                    const dedupeKey = `${round1(x)}|${round1(y)}|${round1(width)}|${text}`;
+                    if (!text || seen.has(dedupeKey)) {
+                        return null;
+                    }
+                    seen.add(dedupeKey);
                     return {
-                        text: String(item.str || ''),
+                        text,
                         x,
                         y,
                         width,
                         height: height || 10,
                         pageNum
                     };
-                }).filter((it) => it.text.trim().length > 0);
+                }).filter((it) => it && it.text.length > 0);
 
                 items.sort((a, b) => {
                     if (Math.abs(a.y - b.y) > 1) return b.y - a.y;
@@ -61,9 +113,18 @@ class PDFService {
                 });
 
                 const rows = [];
-                const sameLineY = 3;
+                const itemHeights = items.map((i) => i.height).filter((h) => h > 0);
+                const sameLineY = clamp((median(itemHeights) || 10) * 0.35, 1.5, 4);
                 for (const item of items) {
-                    const row = rows.find((r) => Math.abs(r.y - item.y) < sameLineY);
+                    let row = null;
+                    let nearestDelta = Infinity;
+                    for (const candidate of rows) {
+                        const delta = Math.abs(candidate.y - item.y);
+                        if (delta <= sameLineY && delta < nearestDelta) {
+                            nearestDelta = delta;
+                            row = candidate;
+                        }
+                    }
                     if (!row) {
                         rows.push({
                             y: item.y,
@@ -80,7 +141,28 @@ class PDFService {
                 rows.sort((a, b) => b.y - a.y);
                 for (const row of rows) {
                     row.items.sort((a, b) => a.x - b.x);
-                    const line = row.items.map((r) => r.text).join(' ').replace(/\s{2,}/g, ' ').trim();
+                    let line = '';
+                    let prevRight = null;
+                    let prevText = '';
+                    for (const token of row.items) {
+                        const chunk = token.text;
+                        if (!chunk) continue;
+                        if (!line) {
+                            line = chunk;
+                            prevRight = token.x + token.width;
+                            prevText = chunk;
+                            continue;
+                        }
+
+                        const gap = prevRight === null ? 0 : token.x - prevRight;
+                        if (shouldInsertSpace(prevText, chunk, gap, row.avgHeight || token.height || 10)) {
+                            line += ' ';
+                        }
+                        line += chunk;
+                        prevRight = Math.max(prevRight || 0, token.x + token.width);
+                        prevText = chunk;
+                    }
+                    line = normalizeLineText(line);
                     if (!line) continue;
                     const minX = row.items[0].x;
                     const maxX = row.items[row.items.length - 1].x + row.items[row.items.length - 1].width;

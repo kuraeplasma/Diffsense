@@ -40,7 +40,9 @@ function parseJapaneseNumber(value) {
 }
 
 function parseArticleHeader(text) {
-    const line = String(text || '').trim();
+    let line = String(text || '').trim();
+    line = line.replace(/^第\s*第?\s*([0-9０-９一二三四五六七八九十百千〇零]+)\s*条\s*条?/, '第$1条');
+    line = line.replace(/^第\s+([0-9０-９一二三四五六七八九十百千〇零]+)\s+条/, '第$1条');
     const match = line.match(ARTICLE_HEADER_REGEX);
     if (!match) return null;
 
