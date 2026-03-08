@@ -311,18 +311,29 @@ class DBService {
      * @param {string} plan - Plan ID (starter, business, pro)
      * @param {string|null} billingCycle - Billing cycle (monthly, annual)
      */
-    async setUserPlan(uid, plan, billingCycle = null) {
+    async setUserPlan(uid, plan, billingCycle = null, options = {}) {
         const normalizedBillingCycle = billingCycle ? normalizeBillingCycle(billingCycle) : null;
-        logger.info(`setUserPlan: uid=${uid}, plan=${plan}, billingCycle=${normalizedBillingCycle || 'keep'}`);
+        const forceTrialStart = options.forceTrialStart === true;
+        logger.info(`setUserPlan: uid=${uid}, plan=${plan}, billingCycle=${normalizedBillingCycle || 'keep'}, forceTrialStart=${forceTrialStart}`);
+
+        const existingProfile = await this.getUserProfile(uid);
+        const trialStartedAt = forceTrialStart
+            ? new Date().toISOString()
+            : (existingProfile?.trialStartedAt || new Date().toISOString());
+
+        const firestorePayload = normalizedBillingCycle
+            ? { uid, plan, billingCycle: normalizedBillingCycle, trialStartedAt }
+            : { uid, plan, trialStartedAt };
 
         // Always persist to Firestore first
-        await this._firestoreSetUser(uid, normalizedBillingCycle ? { uid, plan, billingCycle: normalizedBillingCycle } : { uid, plan });
+        await this._firestoreSetUser(uid, firestorePayload);
 
         const users = await this.readData('users');
         const index = users.findIndex(u => u.uid === uid);
 
         if (index > -1) {
             users[index].plan = plan;
+            users[index].trialStartedAt = trialStartedAt;
             if (normalizedBillingCycle) {
                 users[index].billingCycle = normalizedBillingCycle;
             } else {
@@ -336,7 +347,7 @@ class DBService {
                 uid: uid,
                 plan: plan,
                 billingCycle: normalizedBillingCycle || 'monthly',
-                trialStartedAt: new Date().toISOString(),
+                trialStartedAt,
                 hasPaymentMethod: false,
                 usageCount: 0,
                 lastResetDate: new Date().toISOString()

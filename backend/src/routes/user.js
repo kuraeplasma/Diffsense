@@ -51,7 +51,7 @@ router.get('/subscription', async (req, res) => {
 router.post('/select-plan', async (req, res) => {
     try {
         const uid = req.user.uid;
-        const { plan, billingCycle } = req.body;
+        const { plan, billingCycle, startTrial } = req.body;
 
         const validPlans = ['starter', 'business', 'pro'];
         if (!plan || !validPlans.includes(plan)) {
@@ -63,7 +63,7 @@ router.post('/select-plan', async (req, res) => {
             ? billingCycle
             : 'monthly';
 
-        await dbService.setUserPlan(uid, plan, selectedBillingCycle);
+        await dbService.setUserPlan(uid, plan, selectedBillingCycle, { forceTrialStart: startTrial === true });
         logger.info(`User ${uid} selected plan: ${plan}, billingCycle: ${selectedBillingCycle}`);
 
         res.json({ success: true, data: { plan, billingCycle: selectedBillingCycle } });

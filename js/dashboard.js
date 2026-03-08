@@ -1590,7 +1590,7 @@ class DashboardApp {
                 const signupFlowFlag = localStorage.getItem('diffsense_signup_flow') === '1';
                 if (selectedPlan && signupFlowFlag && !trialExpiredFlowFlag) {
                     // 無料登録導線は常にPro開始に統一
-                    await this.registerSelectedPlan(token, 'pro', selectedBillingCycle);
+                    await this.registerSelectedPlan(token, 'pro', selectedBillingCycle, { startTrial: true });
                     localStorage.removeItem('diffsense_selected_plan');
                     localStorage.removeItem('diffsense_selected_billing_cycle');
                     localStorage.removeItem('diffsense_signup_flow');
@@ -1688,8 +1688,9 @@ class DashboardApp {
         }
     }
 
-    async registerSelectedPlan(token, plan, billingCycle = 'monthly') {
+    async registerSelectedPlan(token, plan, billingCycle = 'monthly', options = {}) {
         const selectedBillingCycle = billingCycle === 'annual' ? 'annual' : 'monthly';
+        const startTrial = options.startTrial === true;
         try {
             const apiUrl = `${aiService.API_BASE}/user/select-plan`;
 
@@ -1699,7 +1700,7 @@ class DashboardApp {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ plan, billingCycle: selectedBillingCycle })
+                body: JSON.stringify({ plan, billingCycle: selectedBillingCycle, startTrial })
             });
             console.log('Selected plan registered:', plan, selectedBillingCycle);
         } catch (error) {
