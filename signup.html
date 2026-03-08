@@ -22,6 +22,8 @@
         localStorage.setItem('diffsense_selected_plan', 'pro');
         localStorage.setItem('diffsense_selected_billing_cycle', billing);
         localStorage.setItem('diffsense_signup_flow', '1');
+        localStorage.removeItem('diffsense_trial_expired_flow');
+        localStorage.removeItem('diffsense_trial_expired');
         window.location.replace("login.html?tab=signup");
     </script>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
