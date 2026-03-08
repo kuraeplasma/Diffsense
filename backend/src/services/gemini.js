@@ -19,16 +19,17 @@ class GeminiService {
             throw new Error('Gemini API key is not configured');
         }
 
-        const prompt = this.buildPrompt(contractText, previousVersion);
+        const currentText = typeof contractText === 'string'
+            ? contractText
+            : JSON.stringify(contractText || '');
+        const previousText = (previousVersion === null || previousVersion === undefined)
+            ? null
+            : (typeof previousVersion === 'string' ? previousVersion : JSON.stringify(previousVersion));
 
-        logger.info(`Analyzing contract text (length: ${contractText.length}): ${contractText.substring(0, 100)}...`);
-        if (previousVersion) {
-            logger.info(`Comparing with previous version (length: ${previousVersion.length}): ${previousVersion.substring(0, 100)}...`);
-        }
+        const prompt = this.buildPrompt(currentText, previousText);
+        logger.info('Starting Gemini analyzeContract request');
 
         try {
-            logger.info('Calling Gemini API for contract analysis');
-
             const response = await axios.post(
                 `${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`,
                 {
@@ -36,21 +37,13 @@ class GeminiService {
                         parts: [{ text: prompt }]
                     }],
                     generationConfig: {
-                        temperature: 0.2,
+                        temperature: 0.1,
                         maxOutputTokens: 2048,
-                        topP: 0.8,
-                        topK: 40,
                         responseMimeType: 'application/json'
-                    },
-                    safetySettings: [
-                        { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
-                        { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
-                        { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-                        { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' }
-                    ]
+                    }
                 },
                 {
-                    timeout: 120000, // Keep increased timeout (120s)
+                    timeout: 60000,
                     headers: {
                         'Content-Type': 'application/json',
                         'Referer': 'https://diffsense.spacegleam.co.jp'
@@ -58,56 +51,140 @@ class GeminiService {
                 }
             );
 
-            if (!response.data.candidates || response.data.candidates.length === 0) {
-                throw new Error('No response from Gemini API');
+            const aiText = response?.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (!aiText || typeof aiText !== 'string') {
+                throw new Error('Gemini response text is empty');
             }
 
-            const aiText = response.data.candidates[0].content.parts[0].text;
-            logger.debug('Gemini API response received');
+            const cleanText = aiText.replace(/```json/g, '').replace(/```/g, '');
+            const firstOpen = cleanText.indexOf('{');
+            const lastClose = cleanText.lastIndexOf('}');
+            if (firstOpen === -1 || lastClose === -1 || lastClose <= firstOpen) {
+                throw new Error('Gemini response is not valid JSON');
+            }
 
-            // Extract JSON from response
+            const parsed = JSON.parse(cleanText.substring(firstOpen, lastClose + 1));
+            const riskLevelNum = Number(parsed?.riskLevel);
+
+            return {
+                changes: Array.isArray(parsed?.changes) ? parsed.changes : [],
+                riskLevel: [1, 2, 3].includes(riskLevelNum) ? riskLevelNum : 1,
+                riskReason: typeof parsed?.riskReason === 'string' ? parsed.riskReason : '',
+                summary: typeof parsed?.summary === 'string' ? parsed.summary : '解析完了'
+            };
+        } catch (error) {
+            logger.error('Gemini analyzeContract failed:', error);
+            return {
+                changes: [],
+                riskLevel: 1,
+                riskReason: 'AIサービスとの通信に失敗しました',
+                summary: 'AI解析に失敗しました'
+            };
+        }
+    }
+
+    /**
+     * Analyze a structured set of changes (Article-based)
+     * @param {Array} changes - Array from DiffService.compare
+     */
+    async analyzeStructuredDiff(changes) {
+        if (!GEMINI_API_KEY) {
+            throw new Error('Gemini API key is not configured');
+        }
+
+        const modifiedChanges = changes.filter(c => c.type !== 'UNTOUCHED').slice(0, 15); // limit to prioritized changes
+        const prompt = this.buildStructuredDiffPrompt(modifiedChanges);
+
+        logger.info(`Analyzing structured diff with ${modifiedChanges.length} prioritized changes`);
+
+        try {
+            const response = await axios.post(
+                `${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`,
+                {
+                    contents: [{
+                        parts: [{ text: prompt }]
+                    }],
+                    generationConfig: {
+                        temperature: 0.1,
+                        maxOutputTokens: 2048,
+                        responseMimeType: 'application/json'
+                    }
+                },
+                {
+                    timeout: 60000,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Referer': 'https://diffsense.spacegleam.co.jp'
+                    }
+                }
+            );
+
+            const aiText = response.data.candidates[0].content.parts[0].text;
             let cleanText = aiText.replace(/```json/g, '').replace(/```/g, '');
             const firstOpen = cleanText.indexOf('{');
             const lastClose = cleanText.lastIndexOf('}');
-
-            if (firstOpen === -1 || lastClose === -1 || firstOpen >= lastClose) {
-                logger.error('Invalid AI response format:', aiText);
-                throw new Error('AI response does not contain valid JSON');
-            }
-
             const jsonStr = cleanText.substring(firstOpen, lastClose + 1);
-            let result;
-            try {
-                result = JSON.parse(jsonStr);
-            } catch (parseError) {
-                logger.error('JSON Parse Error:', parseError);
-                throw new Error('Failed to parse AI response as JSON');
+
+            const result = JSON.parse(jsonStr);
+
+            // Merge AI insights back into changes
+            const analyzerMap = {};
+            if (result.insights) {
+                result.insights.forEach(ins => {
+                    analyzerMap[ins.sectionId] = ins;
+                });
             }
 
-            // Validate result structure
-            if (typeof result.riskLevel !== 'number') result.riskLevel = 1;
-            if (!result.riskReason) result.riskReason = '解析結果が不完全です';
-            if (!result.summary) result.summary = '契約書の解析が完了しました';
-            if (!result.changes) result.changes = [];
-
-            logger.info('Gemini API analysis completed successfully');
-            return result;
-
-        } catch (error) {
-            if (error.response) {
-                logger.error(`Gemini API Error: status=${error.response.status} data=${JSON.stringify(error.response.data).substring(0, 500)}`);
-            } else {
-                logger.error(`Gemini Analysis Failed: ${error.message}`);
-            }
-
-            // Fallback: Return specific structure so frontend can still show text
             return {
-                summary: "AI解析に失敗しました（テキスト抽出のみ完了）",
+                summary: result.summary || '解析完了',
+                riskLevel: result.riskLevel || 1,
+                riskReason: result.riskReason || '',
+                insights: analyzerMap
+            };
+        } catch (error) {
+            logger.error('Structured AI analysis failed:', error);
+            return {
+                summary: 'AI分析に失敗しました',
                 riskLevel: 1,
-                riskReason: "AI解析サーバーからの応答がありませんでした。",
-                changes: []
+                riskReason: 'AIサービスとの通信に失敗しました',
+                insights: {}
             };
         }
+    }
+
+    buildStructuredDiffPrompt(changes) {
+        const changesText = changes.map((c, i) => {
+            return `---
+Change ID: CHG-${i}
+Section: ${c.section}
+Type: ${c.type}
+Old Content: ${c.old}
+New Content: ${c.new}
+---`;
+        }).join('\n');
+
+        return `あなたは契約書の専門家です。以下の契約書の変更リストを解析し、法的なリスクと要約を提示してください。
+
+${changesText}
+
+以下のJSON形式で回答してください:
+{
+  "summary": "契約全体の変更概要（3行以内）",
+  "riskLevel": 3,
+  "riskReason": "最も高いリスクの根拠",
+  "insights": [
+    {
+      "sectionId": "CHG-0",
+      "impact": "この変更の法的影響（50文字以内）",
+      "concern": "具体的な懸念点やリスク（ない場合は'特になし'）",
+      "recommendation": "推奨される対応"
+    }
+  ]
+}
+
+重要:
+- riskLevelは1-3。
+- 各変更点に対して、専門的な視点でimpactとconcernを詳しく説明してください。`;
     }
 
     buildPrompt(contractText, previousVersion) {
