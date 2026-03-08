@@ -30,13 +30,10 @@ function normalizeBillingCycle(value) {
 
 function persistPlanIntentFromUrl() {
     const params = new URLSearchParams(window.location.search);
-    const plan = params.get('plan');
     const billing = normalizeBillingCycle(params.get('billing'));
-    const validPlans = ['starter', 'business', 'pro'];
 
-    if (!plan || !validPlans.includes(plan)) return;
-
-    localStorage.setItem('diffsense_selected_plan', plan);
+    // 無料登録導線はすべてProトライアルへ統一
+    localStorage.setItem('diffsense_selected_plan', 'pro');
     localStorage.setItem('diffsense_selected_billing_cycle', billing);
 }
 
