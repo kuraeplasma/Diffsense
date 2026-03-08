@@ -758,16 +758,15 @@ const Views = {
                                         ${activeTab === 'diff'
                     ? (() => {
                         // 差分表示ロジック
+                        const escapeHtml = (value) => String(value || '')
+                            .replace(/&/g, "&amp;")
+                            .replace(/</g, "&lt;")
+                            .replace(/>/g, "&gt;");
+
                         const renderAiChangeCards = () => {
                             const aiOnlyHtml = (contract.ai_changes || []).map((c, idx) => {
-                                const escapedOld = String(c.old || '')
-                                    .replace(/&/g, "&amp;")
-                                    .replace(/</g, "&lt;")
-                                    .replace(/>/g, "&gt;");
-                                const escapedNew = String(c.new || '')
-                                    .replace(/&/g, "&amp;")
-                                    .replace(/</g, "&lt;")
-                                    .replace(/>/g, "&gt;");
+                                const escapedOld = escapeHtml(c.old || '');
+                                const escapedNew = escapeHtml(c.new || '');
                                 const typeLabel = c.type === 'ADD' ? '追加' : (c.type === 'DELETE' ? '削除' : '変更');
                                 return `
                                     <div style="margin-bottom:18px; border:1px solid #e5e7eb; border-radius:8px; overflow:hidden; background:#fff;">
@@ -783,11 +782,6 @@ const Views = {
                             }).join('');
                             return `<div class="document-content-diff-wrap">${aiOnlyHtml}</div>`;
                         };
-
-                        // PDFは全文diffCharsだと崩れやすいため、変更カードを優先表示
-                        if (isPdfSource && contract.ai_changes && contract.ai_changes.length > 0) {
-                            return renderAiChangeCards();
-                        }
 
                         if (!contract.history || contract.history.length === 0) {
                             if (contract.ai_changes && contract.ai_changes.length > 0) {
@@ -826,6 +820,60 @@ const Views = {
                         const previousVersionText = getPlainText(previousVersion);
                         const currentVersionText = getPlainText(currentVersion);
 
+                        const renderDualFullDiff = () => {
+                            if (!window.Diff || typeof window.Diff.diffWordsWithSpace !== 'function') {
+                                return `
+                                    <div class="document-content-diff-wrap">
+                                        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:12px;">
+                                            <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px;">
+                                                <div style="font-size:12px; font-weight:700; color:#b42318; margin-bottom:8px;">変更前（旧版全文）</div>
+                                                <div style="white-space:pre-wrap; line-height:1.9;">${escapeHtml(previousVersionText)}</div>
+                                            </div>
+                                            <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px;">
+                                                <div style="font-size:12px; font-weight:700; color:#027a48; margin-bottom:8px;">変更後（新版本文）</div>
+                                                <div style="white-space:pre-wrap; line-height:1.9;">${escapeHtml(currentVersionText)}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `;
+                            }
+
+                            const chunks = window.Diff.diffWordsWithSpace(previousVersionText, currentVersionText);
+                            let oldHtml = '';
+                            let newHtml = '';
+
+                            for (const chunk of chunks) {
+                                const safe = escapeHtml(chunk.value);
+                                if (chunk.added) {
+                                    newHtml += `<span class="diff-inline-add">${safe}</span>`;
+                                } else if (chunk.removed) {
+                                    oldHtml += `<span class="diff-inline-del">${safe}</span>`;
+                                } else {
+                                    oldHtml += safe;
+                                    newHtml += safe;
+                                }
+                            }
+
+                            return `
+                                <div class="document-content-diff-wrap">
+                                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:12px;">
+                                        <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px;">
+                                            <div style="font-size:12px; font-weight:700; color:#b42318; margin-bottom:8px;">変更前（旧版全文）</div>
+                                            <div style="white-space:pre-wrap; line-height:1.9;">${oldHtml}</div>
+                                        </div>
+                                        <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px;">
+                                            <div style="font-size:12px; font-weight:700; color:#027a48; margin-bottom:8px;">変更後（新版本文）</div>
+                                            <div style="white-space:pre-wrap; line-height:1.9;">${newHtml}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        };
+
+                        if (isPdfSource) {
+                            return renderDualFullDiff();
+                        }
+
                         const diff = (window.Diff && typeof window.Diff.diffChars === 'function')
                             ? window.Diff.diffChars(previousVersionText, currentVersionText)
                             : [{ value: currentVersionText }];
@@ -836,10 +884,7 @@ const Views = {
                                 part.removed ? 'diff-inline-del' : '';
 
                             // エスケープ処理（XSS対策）
-                            const escapedValue = part.value
-                                .replace(/&/g, "&amp;")
-                                .replace(/</g, "&lt;")
-                                .replace(/>/g, "&gt;");
+                            const escapedValue = escapeHtml(part.value);
 
                             return colorClass ? `<span class="${colorClass}">${escapedValue}</span>` : escapedValue;
                         }).join('');
