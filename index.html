@@ -613,8 +613,8 @@
                     <div class="step-number">01</div>
                     <div class="step-content">
                         <div class="step-icon-wrap"><i class="fa-solid fa-file-import"></i></div>
-                        <h3 class="step-title-single">PDF/URL登録</h3>
-                        <p>契約書PDFをアップロード、またはURLを登録するだけ。</p>
+                        <h3 class="step-title-single">書類登録</h3>
+                        <p>PDF・Wordをアップロード、またはURLを登録するだけ。</p>
                     </div>
                 </div>
                 <!-- Step 2 -->
@@ -666,10 +666,10 @@
             <article class="step-card">
                 <div class="step-badge">STEP 1</div>
                 <div class="step-image">
-                    <img src="images/step1-upload-dialog.png" alt="契約書をアップロード" class="step-img" loading="lazy">
+                    <img src="images/スクリーンショット 2026-03-09 001250.png" alt="契約書をアップロード" class="step-img" loading="lazy">
                 </div>
                 <h3 class="step-title">契約書をアップロード</h3>
-                <p class="step-desc">PDFまたはURLを登録。<br>契約書や利用規約をそのままアップロードできます。</p>
+                <p class="step-desc">PDF・WordまたはURLを登録。<br>契約書や利用規約をそのままアップロードできます。</p>
             </article>
 
             <div class="step-arrow desktop-only">
@@ -1146,38 +1146,64 @@
                     <span>導入までどのくらいの期間がかかりますか？</span>
                 </div>
                 <div class="faq-answer">
-                    <p>アカウント作成後、すぐにご利用いただけます。複雑な環境構築やインストールは不要で、ブラウザからお手持ちのPDFファイルをアップロード、あるいはURLを指定するだけで解析を開始できます。
+                    <p>アカウント作成後、すぐにご利用いただけます。複雑な環境構築やインストールは不要で、ブラウザからWord（.docx）またはPDFファイルをアップロード、またはWEBサイトのURLを登録するだけで解析を開始できます。
                     </p>
                 </div>
             </div>
             <div class="faq-item">
                 <div class="faq-question">
-                    <span>どのようなファイル形式に対応していますか？</span>
+                    <span>対応しているファイル形式は何ですか？</span>
                 </div>
                 <div class="faq-answer">
-                    <p>現在はPDFファイルのアップロードと、WEBサイトのURL指定による自動チェックに対応しています。今後、Word（.docx）形式などへの対応も順次進めてまいります。</p>
+                    <p>現在、PDFおよびWord（.docx）形式の契約書アップロードに対応しています。<br>また、WEBサイトのURLを登録することで、利用規約やポリシーの変更を自動検知することも可能です。</p>
                 </div>
-            </div>
-        </div>
-        <div class="faq-cta-wrap scroll-fade" data-delay="120">
-            <p class="faq-cta-copy">7日間無料トライアル実施中</p>
-            <div class="section-inline-cta section-inline-cta--faq">
-                <a href="#pricing" class="btn btn-primary full-width">7日間無料で試してみる</a>
             </div>
         </div>
     </div>
 </section>
 
+<!-- Final CTA -->
+<section class="final-cta">
+    <div class="container final-cta-inner">
+        <h2>まずは契約書チェックを体験してください</h2>
+        <p class="final-cta-sub">PDFまたはWord（.docx）をアップロードするだけで、契約書の差分とリスクをAIが分析します。</p>
+        <ul class="final-cta-trust">
+            <li>インストール不要</li>
+            <li>ブラウザですぐ利用可能</li>
+            <li>7日間無料</li>
+        </ul>
+        <a href="login.html?mode=signup" class="btn cta-button">7日間無料で試してみる</a>
+        <p class="final-cta-note">クレジットカード登録不要</p>
+    </div>
+</section>
+
 <!-- Footer -->
-<footer class="footer">
-    <div class="container text-center">
-        <div class="footer-links" style="margin-bottom: 1.5rem;">
-            <a href="company.html" style="font-size: 0.9rem; color: #888; margin: 0 1rem;">会社概要</a>
-            <a href="law.html" style="font-size: 0.9rem; color: #888; margin: 0 1rem;">特定商取引法に基づく表記</a>
-            <a href="terms.html" style="font-size: 0.9rem; color: #888; margin: 0 1rem;">利用規約</a>
-            <a href="privacy.html" style="font-size: 0.9rem; color: #888; margin: 0 1rem;">プライバシーポリシー</a>
+<footer class="site-footer">
+    <div class="container footer-container">
+        <div class="footer-column">
+            <h3>サービス</h3>
+            <a href="#features">機能</a>
+            <a href="#pricing">料金</a>
+            <a href="onboarding.html">導入支援</a>
         </div>
-        <p>&copy; 2026 SpaceGleam All Rights Reserved.</p>
+        <div class="footer-column">
+            <h3>サポート</h3>
+            <a href="#faq">よくある質問</a>
+            <a href="mailto:contact@spacegleam.co.jp">お問い合わせ</a>
+        </div>
+        <div class="footer-column">
+            <h3>会社情報</h3>
+            <a href="company.html">会社概要</a>
+            <a href="law.html">特定商取引法に基づく表記</a>
+            <a href="terms.html">利用規約</a>
+            <a href="privacy.html">プライバシーポリシー</a>
+            <a href="https://x.com/DIFFsense_jp" class="footer-x" target="_blank" rel="noopener" aria-label="DIFFsense公式X" title="DIFFsense公式X">
+                <span class="x-icon" aria-hidden="true">𝕏</span>
+            </a>
+        </div>
+    </div>
+    <div class="footer-copy">
+        © 2026 SpaceGleam Inc. All Rights Reserved.
     </div>
 </footer>
 

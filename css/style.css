@@ -300,20 +300,23 @@ ul {
 }
 
 .btn-login {
-    color: #ccc;
-    font-weight: 500;
-    transition: color 0.3s;
-    border: none;
-    background: transparent;
+    color: #e6dccb;
+    font-weight: 600;
+    transition: all 0.25s ease;
+    border: 1px solid rgba(197, 160, 89, 0.55);
+    background: rgba(197, 160, 89, 0.08);
     padding: 0.5rem 1.2rem;
     /* Match btn-sm padding */
     display: inline-flex;
     align-items: center;
     height: auto;
+    border-radius: 8px;
 }
 
 .btn-login:hover {
-    color: #fff;
+    color: #17120d;
+    background: #c5a059;
+    border-color: #c5a059;
 }
 
 /* Specific style for the outline CTA in header */
@@ -1524,16 +1527,129 @@ ul {
     border-radius: var(--radius-sm);
 }
 
-/* Footer (Dark) */
-.footer {
-    background-color: #1a1512;
-    padding: 3rem 0;
-    border-top: none;
-    color: #888;
+/* Final CTA + Footer */
+.final-cta {
+    text-align: center;
+    padding: 80px 20px;
+    background: #faf8f4;
+    border-top: 1px solid #ede8de;
 }
 
-.footer p {
-    font-size: 0.9rem;
+.final-cta-inner {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.final-cta h2 {
+    font-size: 28px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    color: #1f1b16;
+}
+
+.final-cta-sub {
+    color: #666;
+    margin: 0 auto 24px;
+    max-width: 760px;
+    line-height: 1.8;
+}
+
+.final-cta-trust {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin: 0 0 28px;
+    padding: 0;
+    list-style: none;
+    color: #5f5648;
+    font-size: 14px;
+}
+
+.cta-button {
+    background: #c7a15a;
+    color: #fff;
+    padding: 14px 32px;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    display: inline-block;
+    text-decoration: none;
+    transition: background-color 0.2s ease;
+}
+
+.cta-button:hover {
+    background: #b9934c;
+    color: #fff;
+}
+
+.final-cta-note {
+    margin-top: 12px;
+    font-size: 13px;
+    color: #7a6e5b;
+}
+
+.site-footer {
+    background: #1f1b16;
+    color: #ddd;
+    padding: 40px 0 22px;
+}
+
+.footer-container {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 40px;
+}
+
+.footer-column h3 {
+    margin: 0 0 14px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #f2e8d7;
+}
+
+.footer-column a {
+    display: block;
+    margin-bottom: 10px;
+    color: #ccc;
+    text-decoration: none;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.footer-column a:hover {
+    color: #fff;
+}
+
+.footer-x {
+    display: inline-block;
+    margin-top: 10px;
+    color: #bbb;
+    font-size: 18px;
+    line-height: 1;
+    text-decoration: none;
+    transition: opacity 0.2s ease, color 0.2s ease;
+}
+
+.footer-x:hover {
+    color: #fff;
+    opacity: 0.8;
+}
+
+.x-icon {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    text-align: center;
+}
+
+.footer-copy {
+    margin-top: 26px;
+    text-align: center;
+    color: #a99b85;
+    font-size: 13px;
 }
 
 /* Navigation Login Link */
@@ -4461,5 +4577,24 @@ ul {
 
     .onboarding-desc br {
         display: none;
+    }
+}
+
+@media (max-width: 768px) {
+    .final-cta {
+        padding: 56px 16px;
+    }
+
+    .final-cta h2 {
+        font-size: 22px;
+    }
+
+    .final-cta-sub {
+        font-size: 15px;
+    }
+
+    .footer-container {
+        grid-template-columns: 1fr;
+        gap: 28px;
     }
 }
