@@ -88,6 +88,7 @@
     border: 1px solid #e5e7eb;
     border-radius: 8px;
     overflow: hidden;
+    scroll-margin-top: 0;
 }
 
 .clause-header {
