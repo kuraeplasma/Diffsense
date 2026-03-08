@@ -114,7 +114,7 @@ const renderStructuredView = (content, idPrefix = 'clause') => {
                 <div class="clause-nav-title">条文目次</div>
                 <ul class="clause-nav-list">
                     ${clauses.map((c, i) => `
-                        <li class="clause-nav-item" onclick="document.getElementById('${idPrefix}-clause-${i}')?.scrollIntoView({behavior:'smooth', block:'start'})" title="${c.title}${c.header ? ' ' + c.header : ''}">
+                        <li class="clause-nav-item" onclick="window.app?.scrollToClause('${idPrefix}-clause-${i}')" title="${c.title}${c.header ? ' ' + c.header : ''}">
                             <span class="nav-clause-num">${c.title}</span>
                             <span class="nav-clause-header">${c.header}</span>
                         </li>
@@ -2362,6 +2362,7 @@ class DashboardApp {
                 if (viewId === 'diff') {
                     this.resetDetailPaneScroll();
                 }
+                this.enforceDetailScrollLayout();
                 if (viewId === 'dashboard' || viewId === 'history') {
                     this.cacheRecentHistorySnapshot();
                 }
@@ -2452,6 +2453,56 @@ class DashboardApp {
 
         // Reset scroll positions when switching tabs in detail view.
         this.resetDetailPaneScroll();
+    }
+
+    scrollToClause(clauseId) {
+        const target = document.getElementById(clauseId);
+        if (!target) return;
+
+        const paneScrollArea = target.closest('.pane-scroll-area');
+        if (paneScrollArea) {
+            const targetTop = target.getBoundingClientRect().top;
+            const containerTop = paneScrollArea.getBoundingClientRect().top;
+            const nextTop = paneScrollArea.scrollTop + (targetTop - containerTop) - 8;
+            paneScrollArea.scrollTo({ top: Math.max(0, nextTop), behavior: 'smooth' });
+            return;
+        }
+
+        const appHeader = document.getElementById('app-header');
+        const headerHeight = appHeader ? appHeader.offsetHeight : 0;
+        const yOffset = -(headerHeight + 8);
+        const y = target.getBoundingClientRect().top + window.pageYOffset + yOffset;
+        window.scrollTo({ top: y, behavior: 'smooth' });
+    }
+
+    enforceDetailScrollLayout() {
+        if (!this.mainContent) return;
+
+        if (this.currentView !== 'diff') {
+            this.mainContent.style.overflowY = '';
+            return;
+        }
+
+        this.mainContent.style.overflowY = 'hidden';
+
+        const detailBody = this.mainContent.querySelector('.detail-split-body');
+        if (detailBody) {
+            detailBody.style.minHeight = '0';
+        }
+
+        this.mainContent.querySelectorAll('.detail-split-body .pane').forEach((pane) => {
+            pane.style.minHeight = '0';
+        });
+
+        this.mainContent.querySelectorAll('.pane-scroll-area').forEach((area) => {
+            area.style.overflowY = 'auto';
+            area.style.overflowX = 'hidden';
+            area.style.scrollPaddingTop = '8px';
+        });
+
+        this.mainContent.querySelectorAll('.clause-card').forEach((card) => {
+            card.style.scrollMarginTop = '80px';
+        });
     }
 
     resetDetailPaneScroll() {
