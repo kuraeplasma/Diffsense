@@ -84,7 +84,15 @@ class DocxService {
         for (const element of body) {
             if (element['w:p']) {
                 // Paragraph
-                const text = this._extractTextFromParagraph(element['w:p']);
+                const paragraphNode = element['w:p'];
+                const text = this._extractTextFromParagraph(paragraphNode);
+                const paragraphStyle = this._extractParagraphStyle(paragraphNode);
+
+                // Skip Word TOC/control heading paragraphs to avoid misplaced
+                // "第n条 ..." lists at the beginning of extracted content.
+                if (this._isTocParagraph(paragraphStyle, text)) {
+                    continue;
+                }
                 // 空行も構造として保持（ただしトリミングが必要な場合もある）
                 if (text.trim() || text.includes('\n')) {
                     blocks.push(this._categorizeParagraph(text));
@@ -104,6 +112,42 @@ class DocxService {
         }
 
         return this._regroupByArticle(blocks);
+    }
+
+    _extractParagraphStyle(p) {
+        if (!Array.isArray(p)) return '';
+        for (const part of p) {
+            if (!part || !part['w:pPr'] || !Array.isArray(part['w:pPr'])) continue;
+            for (const prop of part['w:pPr']) {
+                if (!prop) continue;
+                const styleNode = prop['w:pStyle'] || prop['pStyle'] || null;
+                if (!styleNode) continue;
+                const styleArr = Array.isArray(styleNode) ? styleNode : [styleNode];
+                for (const styleItem of styleArr) {
+                    if (!styleItem || typeof styleItem !== 'object') continue;
+                    const val = styleItem['@_w:val'] || styleItem['@_val'] || styleItem['#text'] || '';
+                    if (val) return String(val).trim();
+                }
+            }
+        }
+        return '';
+    }
+
+    _isTocParagraph(style, text) {
+        const styleName = String(style || '').trim();
+        const line = String(text || '').trim();
+        if (!line) return false;
+
+        if (/^TOC\d*$/i.test(styleName) || /^ContentsHeading$/i.test(styleName)) {
+            return true;
+        }
+
+        // Fallback heuristic for explicit TOC heading line.
+        if (/^(目次|TABLE OF CONTENTS)$/i.test(line)) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -135,12 +179,34 @@ class DocxService {
                 } else if (el['w:ins']) {
                     // Tracked insertion: Keep content
                     traverse(el['w:ins']);
+                } else if (el['w:hyperlink']) {
+                    // TOC and normal hyperlink text are stored here.
+                    // Keep text unless the paragraph itself is filtered as TOC.
+                    traverse(el['w:hyperlink']);
                 }
             }
         };
 
         traverse(p);
-        return text;
+        return this._normalizeExtractedLine(text);
+    }
+
+    _normalizeExtractedLine(text) {
+        const normalized = String(text || '')
+            .replace(/\u00a0/g, ' ')
+            .replace(/[ \t]+\n/g, '\n')
+            .replace(/[ \t]{2,}/g, ' ')
+            .trim();
+
+        if (!normalized) return '';
+
+        // Collapse exact doubled lines such as "利用規約利用規約".
+        const exactDouble = normalized.match(/^(.{2,120}?)\1$/u);
+        if (exactDouble) {
+            return exactDouble[1].trim();
+        }
+
+        return normalized;
     }
 
     /**

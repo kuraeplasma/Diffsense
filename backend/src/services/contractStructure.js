@@ -154,6 +154,7 @@ function fromLegacyArticleArray(articles = [], meta = {}) {
     }
 
     let preamble = '';
+    let seenArticleOne = false;
     const normalizedArticles = [];
 
     for (const item of articles) {
@@ -169,6 +170,27 @@ function fromLegacyArticleArray(articles = [], meta = {}) {
                 preamble = preamble ? `${preamble}\n${preambleText}` : preambleText;
             }
             continue;
+        }
+
+        const parsed = parseArticleHeader(articleLabel);
+        const numeric = parsed?.articleNumeric || Number(item?.article_number) || 0;
+
+        if (numeric === 1) {
+            seenArticleOne = true;
+        }
+
+        // DOCX由来の先頭TOC混入対策:
+        // 第1条登場前に現れる空の「第n条 見出し」は本文ではない可能性が高いので除外する。
+        if (!seenArticleOne && numeric > 1) {
+            const joined = paragraphs.join('\n').trim();
+            const hasSubstance = joined.length >= 30;
+            const looksLikePreamble = /(前文|契約書|規約|改訂|ver\.?|version)/i.test(joined);
+            if (!hasSubstance || looksLikePreamble) {
+                if (looksLikePreamble && joined) {
+                    preamble = preamble ? `${preamble}\n${joined}` : joined;
+                }
+                continue;
+            }
         }
 
         normalizedArticles.push({
