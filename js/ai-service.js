@@ -33,7 +33,9 @@ export const aiService = {
             const apiBase = this.getApiBase();
             const token = await getIdToken();
             console.log("AI Service: Token retrieval status:", token ? "Success" : "Failed");
-            const normalizedPreviousVersion = this.normalizePreviousVersion(previousVersion);
+            const normalizedPreviousVersion = method === 'docx'
+                ? previousVersion
+                : this.normalizePreviousVersion(previousVersion);
             const body = {
                 contractId,
                 method,
