@@ -93,9 +93,7 @@ function buildStructuredContract(paragraphs = [], meta = {}) {
         }
 
         if (!currentArticle) {
-            // Skip duplicate title/version lines from preamble body.
-            if (title && line === title) continue;
-            if (version && line === version) continue;
+            // Keep all preamble lines to avoid losing leading text.
             preambleLines.push(line);
         } else {
             currentArticle.paragraphs.push(line);
