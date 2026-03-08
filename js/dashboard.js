@@ -559,6 +559,7 @@ const Views = {
         const sourceType = String(contract?.source_type || '').toUpperCase();
         const isPdfSource = sourceType === 'PDF' || (contract?.original_filename || '').toLowerCase().endsWith('.pdf');
         const hasPdfPreview = Boolean(contract?.pdf_url || contract?.pdf_storage_path || runtimePdfUrl);
+        const showPdfViewerInRightPane = isPdfSource && hasPdfPreview && (activeTab === 'original' || activeTab === 'diff');
 
         // AI解析結果があればそれを使用、なければ静的コンテンツまたはデフォルト
         const hasComparableVersion = Array.isArray(contract.history) && contract.history.length > 0;
@@ -742,8 +743,8 @@ const Views = {
                             <button class="tab-item ${activeTab === 'diff' ? 'active' : ''}" onclick="window.app.setDetailTab('diff')">差分表示</button>
                             <button class="tab-item ${activeTab === 'original' ? 'active' : ''}" onclick="window.app.setDetailTab('original')">原本全文</button>
                         </div>
-                        <div class="pane-scroll-area ${activeTab === 'original' && isPdfSource && hasPdfPreview ? '' : 'document-pane-bg is-frameless'}" style="padding:0; flex:1; display:flex; flex-direction:column; overflow-y:auto;">
-                                ${activeTab === 'original' && isPdfSource && hasPdfPreview
+                        <div class="pane-scroll-area ${showPdfViewerInRightPane ? '' : 'document-pane-bg is-frameless'}" style="padding:0; flex:1; display:flex; flex-direction:column; overflow-y:auto;">
+                                ${showPdfViewerInRightPane
                 ? `<div style="width:100%; height:100%; display:flex; flex-direction:column;">
                         <iframe src="${contract.pdf_url || runtimePdfUrl || contract.pdf_storage_path}" style="width:100%; flex:1; border:none; background:#525659; min-height:600px;"></iframe>
                         <div style="padding:10px; text-align:center; background:#f9f9f9; border-top:1px solid #ddd; font-size:12px;">
