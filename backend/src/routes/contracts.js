@@ -10,6 +10,7 @@ const diffService = require('../services/diffService');
 const dbService = require('../services/db');
 const { toLegacyArticleArray, fromLegacyArticleArray } = require('../services/contractStructure');
 const logger = require('../utils/logger');
+const crypto = require('crypto');
 
 function normalizeContentToText(content) {
     if (content === null || content === undefined) return '';
@@ -39,6 +40,11 @@ function normalizeContentToText(content) {
 function decodeBase64Payload(raw) {
     const base64Clean = String(raw || '').split(',').pop();
     return Buffer.from(base64Clean, 'base64');
+}
+
+function buildFirebaseDownloadUrl(bucketName, objectPath, token) {
+    const encodedPath = encodeURIComponent(objectPath).replace(/%2F/g, '%2F');
+    return `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodedPath}?alt=media&token=${token}`;
 }
 
 async function resolvePreviousDocxArticles(previousVersion) {
@@ -148,17 +154,32 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                 try {
                     pdfStoragePath = `contracts/${contractId}/${Date.now()}.pdf`;
                     const file = bucket.file(pdfStoragePath);
+                    const downloadToken = crypto.randomUUID();
 
                     await file.save(buffer, {
-                        metadata: { contentType: 'application/pdf' }
+                        metadata: {
+                            contentType: 'application/pdf',
+                            metadata: {
+                                firebaseStorageDownloadTokens: downloadToken
+                            }
+                        }
                     });
 
-                    const [signedUrl] = await file.getSignedUrl({
-                        action: 'read',
-                        expires: Date.now() + 31536000000
-                    });
-
-                    pdfUrl = signedUrl;
+                    try {
+                        const [signedUrl] = await file.getSignedUrl({
+                            action: 'read',
+                            expires: Date.now() + 31536000000
+                        });
+                        pdfUrl = signedUrl;
+                    } catch (signedUrlError) {
+                        // Fallback: tokenized download URL (does not rely on signBlob capability)
+                        const bucketName = bucket.name || process.env.FB_STORAGE_BUCKET || process.env.FIREBASE_STORAGE_BUCKET;
+                        if (!bucketName) {
+                            throw signedUrlError;
+                        }
+                        pdfUrl = buildFirebaseDownloadUrl(bucketName, pdfStoragePath, downloadToken);
+                        logger.warn('Signed URL generation failed. Falling back to token download URL:', signedUrlError.message);
+                    }
                     logger.info(`PDF uploaded to Firebase Storage: ${pdfStoragePath}`);
                 } catch (storageError) {
                     logger.warn('Firebase Storage upload failed (analysis will continue):', storageError.message);
