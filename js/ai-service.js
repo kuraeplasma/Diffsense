@@ -5,6 +5,11 @@ import { getIdToken } from './auth.js';
  * バックエンドAPIとの通信を担当
  */
 export const aiService = {
+    // Backward compatibility: existing code still references aiService.API_BASE.
+    get API_BASE() {
+        return this.getApiBase();
+    },
+
     // API Base URL (Local vs Cloud). localhostでも本番APIを明示指定できる。
     getApiBase() {
         const PROD_API = 'https://api-qf37m5ba2q-an.a.run.app';

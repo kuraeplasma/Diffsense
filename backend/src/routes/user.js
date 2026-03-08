@@ -12,7 +12,7 @@ router.get('/subscription', async (req, res) => {
         const uid = req.user.uid;
         const userProfile = await dbService.getUserProfile(uid);
 
-        const plan = userProfile.plan || 'starter';
+        const plan = userProfile.plan || 'pro';
         const billingCycle = userProfile.billingCycle || 'monthly';
         const limit = dbService.getUsageLimit(userProfile);
         const isInTrial = dbService.isTrialActive(userProfile);
