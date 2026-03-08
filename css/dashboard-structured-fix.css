@@ -8,10 +8,13 @@
 
 .contract-structured-container {
     display: flex;
-    align-items: flex-start;
+    align-items: stretch;
     gap: 24px;
     width: 100%;
     min-width: 0;
+    min-height: 0;
+    flex: 1 1 auto;
+    height: 100%;
 }
 
 .contract-structured-container > * {
@@ -27,7 +30,13 @@
     background: #fff;
     border: 1px solid #e5e7eb;
     border-radius: 8px;
+    position: sticky;
+    top: 8px;
+    align-self: flex-start;
+    height: 100%;
+    max-height: 100%;
     overflow: hidden;
+    z-index: 2;
 }
 
 .clause-nav-title {
@@ -43,6 +52,8 @@
     list-style: none;
     margin: 0;
     padding: 8px 0;
+    overflow: visible !important;
+    max-height: none !important;
 }
 
 .clause-nav-item {
@@ -54,6 +65,11 @@
 }
 
 .clause-nav-item:hover {
+    background: #f8fafc;
+    border-left-color: #c5a059;
+}
+
+.clause-nav-item.active {
     background: #f8fafc;
     border-left-color: #c5a059;
 }
@@ -78,9 +94,21 @@
 .clause-cards-container {
     flex: 1 1 auto;
     min-width: 0;
+    min-height: auto;
+    height: auto;
+    max-height: none;
+    overflow: visible;
     display: flex;
     flex-direction: column;
     gap: 16px;
+    padding-left: 4px;
+}
+
+.document-content {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .clause-card {
@@ -88,7 +116,7 @@
     border: 1px solid #e5e7eb;
     border-radius: 8px;
     overflow: hidden;
-    scroll-margin-top: 0;
+    scroll-margin-top: 100px;
 }
 
 .clause-header {
@@ -215,3 +243,121 @@
         padding: 16px 18px;
     }
 }
+
+/* Root fix: keep one reliable scroll container in detail view at browser zoom 100%. */
+#app-content.is-detail-view {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
+}
+
+#app-content.is-detail-view .detail-split-container {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+}
+
+#app-content.is-detail-view .detail-split-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+
+#app-content.is-detail-view .detail-split-body .pane {
+    min-height: 0;
+}
+
+#app-content.is-detail-view .detail-split-body .pane-scroll-area {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: auto;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+    scrollbar-gutter: stable;
+}
+
+#app-content.is-detail-view .is-structured {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+}
+
+#app-content.is-detail-view .is-structured > .contract-structured-container {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    margin-top: 6px;
+}
+
+/* Desktop 100% tuning: keep readability while matching the practical density seen at ~60% zoom. */
+@media (min-width: 1025px) {
+    #app-content.is-detail-view .detail-split-container {
+        font-size: 13px;
+    }
+
+    #app-content.is-detail-view .detail-split-body {
+        gap: 14px;
+    }
+
+    #app-content.is-detail-view .detail-split-body .pane-header {
+        min-height: 50px;
+        height: 50px !important;
+        padding: 9px 12px;
+    }
+
+    #app-content.is-detail-view .detail-split-body .pane-scroll-area {
+        padding: 12px;
+    }
+
+    #app-content.is-detail-view .document-content-full {
+        font-size: 14px;
+        line-height: 1.8;
+        padding: 0 6px 10px;
+    }
+
+    #app-content.is-detail-view .clause-nav {
+        width: 180px;
+        flex-basis: 180px;
+    }
+
+    #app-content.is-detail-view .clause-nav-title {
+        padding: 10px 12px;
+        font-size: 12px;
+    }
+
+    #app-content.is-detail-view .clause-nav-item {
+        padding: 8px 10px;
+    }
+
+    #app-content.is-detail-view .nav-clause-num {
+        font-size: 12px;
+    }
+
+    #app-content.is-detail-view .nav-clause-header {
+        font-size: 11px;
+    }
+
+    #app-content.is-detail-view .clause-header {
+        padding: 10px 14px;
+    }
+
+    #app-content.is-detail-view .clause-body {
+        padding: 14px 16px;
+    }
+
+    #app-content.is-detail-view .clause-p {
+        margin: 0 0 12px;
+        font-size: 14px;
+        line-height: 1.75;
+    }
+}
+
+

@@ -95,6 +95,8 @@ const isStructuredDocumentContent = (content) => {
     return typeof content === 'object' && Array.isArray(content.articles);
 };
 
+const isWordDocumentFilename = (value) => /\.(docx?|dotx?)$/i.test(String(value || '').trim());
+
 const clauseIdentityKey = (clause) => `${clause?.title || ''}__${clause?.header || ''}`;
 
 const clauseParagraphs = (clause) => Array.isArray(clause?.paragraphs)
@@ -349,7 +351,7 @@ const renderStructuredView = (content, idPrefix = 'clause') => {
                 <div class="clause-nav-title">条文目次</div>
                 <ul class="clause-nav-list">
                     ${clauses.map((c, i) => `
-                        <li class="clause-nav-item" onclick="window.app?.scrollToClause('${idPrefix}-clause-${i}')" title="${c.title}${c.header ? ' ' + c.header : ''}">
+                        <li class="clause-nav-item" data-clause-id="${idPrefix}-clause-${i}" onclick="window.app?.scrollToClause('${idPrefix}-clause-${i}')" title="${c.title}${c.header ? ' ' + c.header : ''}">
                             <span class="nav-clause-num">${c.title}</span>
                             <span class="nav-clause-header">${c.header}</span>
                         </li>
@@ -996,16 +998,6 @@ const Views = {
                             return `<div class="document-content-diff-wrap">${aiOnlyHtml}</div>`;
                         };
 
-                        if (!contract.history || contract.history.length === 0) {
-                            if (contract.ai_changes && contract.ai_changes.length > 0) {
-                                return renderAiChangeCards();
-                            }
-                            return `
-                                <div class="text-muted text-center" style="padding:20px 40px 10px;">比較対象となる旧バージョンがありません（初回登録）</div>
-                                <div class="is-structured">${renderStructuredView(contract.original_content, `diff-${id}`)}</div>
-                            `;
-                        }
-
                         // Extract text for diff if structured
                         const getPlainText = (content) => {
                             if (content && typeof content === 'object' && !Array.isArray(content) && Array.isArray(content.articles)) {
@@ -1027,15 +1019,42 @@ const Views = {
                             return content || '';
                         };
 
-                        const previousVersion = contract.history[contract.history.length - 1].content;
+                        const historyEntries = Array.isArray(contract.history) ? contract.history : [];
                         const currentVersion = contract.original_content || '';
+                        const isWordSource = isWordDocumentFilename(contract.original_filename);
+                        const currentVersionText = getPlainText(currentVersion);
 
-                        if (!isPdfSource && (isStructuredDocumentContent(previousVersion) || isStructuredDocumentContent(currentVersion))) {
-                            return renderStructuredDiffView(previousVersion, currentVersion, `diff-${id}`);
+                        const previousVersion = (() => {
+                            for (let i = historyEntries.length - 1; i >= 0; i -= 1) {
+                                const candidate = historyEntries[i]?.content;
+                                if (getPlainText(candidate) !== currentVersionText) {
+                                    return candidate;
+                                }
+                            }
+                            return historyEntries.length > 0 ? historyEntries[historyEntries.length - 1].content : null;
+                        })();
+
+                        if (!previousVersion) {
+                            if (contract.ai_changes && contract.ai_changes.length > 0) {
+                                return renderAiChangeCards();
+                            }
+                            return `
+                                <div class="document-content-diff-wrap" style="padding: 8px 0;">
+                                    <div style="white-space:pre-wrap; line-height:1.9;">${escapeHtmlText(currentVersionText)}</div>
+                                </div>
+                            `;
                         }
 
                         const previousVersionText = getPlainText(previousVersion);
-                        const currentVersionText = getPlainText(currentVersion);
+                        if (previousVersionText === currentVersionText) {
+                            return `
+                                <div class="text-muted text-center" style="padding:24px;">比較可能な差分がありません（旧版と同一内容です）</div>
+                            `;
+                        }
+
+                        if (!isPdfSource && !isWordSource && (isStructuredDocumentContent(previousVersion) || isStructuredDocumentContent(currentVersion))) {
+                            return renderStructuredDiffView(previousVersion, currentVersion, `diff-${id}`);
+                        }
 
                         const renderDualFullDiff = () => {
                             if (!window.Diff || typeof window.Diff.diffWordsWithSpace !== 'function') {
@@ -1087,7 +1106,7 @@ const Views = {
                             `;
                         };
 
-                        if (isPdfSource) {
+                        if (isPdfSource || isWordSource) {
                             return renderDualFullDiff();
                         }
 
@@ -1613,6 +1632,8 @@ class DashboardApp {
             sortBy: "date_desc"
         };
         this.searchTimeout = null;
+        this.detailClauseNavScrollCleanup = null;
+        this.detailClauseNavRaf = null;
 
         // Registration Flow
         this.registration = new RegistrationFlow(this);
@@ -2718,6 +2739,11 @@ class DashboardApp {
                     this.resetDetailPaneScroll();
                 }
                 this.enforceDetailScrollLayout();
+                if (viewId === 'diff') {
+                    this.setupClauseNavAutoSync();
+                } else {
+                    this.teardownClauseNavAutoSync();
+                }
                 if (viewId === 'dashboard' || viewId === 'history') {
                     this.cacheRecentHistorySnapshot();
                 }
@@ -2808,60 +2834,270 @@ class DashboardApp {
 
         // Reset scroll positions when switching tabs in detail view.
         this.resetDetailPaneScroll();
+        this.setupClauseNavAutoSync();
     }
 
-    scrollToClause(clauseId) {
+    getDetailHeaderOffset(scrollArea = null) {
+        const appHeader = document.getElementById('app-header');
+        const appHeaderHeight = appHeader ? appHeader.offsetHeight : 0;
+
+        if (!scrollArea) {
+            return appHeaderHeight + 10;
+        }
+
+        const pane = scrollArea.closest('.pane');
+        const paneHeader = pane ? pane.querySelector('.pane-header') : null;
+        const tabsRow = pane ? pane.querySelector('.tabs-row') : null;
+        const paneHeaderHeight = paneHeader ? paneHeader.offsetHeight : 0;
+        const tabsHeight = tabsRow ? tabsRow.offsetHeight : 0;
+
+        return paneHeaderHeight + tabsHeight + 10;
+    }
+
+    setActiveClauseNavItem(clauseId) {
+        const navItems = document.querySelectorAll('.detail-split-body .pane:nth-child(2) .clause-nav-item');
+        if (!navItems.length) return;
+        navItems.forEach((item) => {
+            const isActive = item.getAttribute('data-clause-id') === clauseId;
+            item.classList.toggle('active', isActive);
+        });
+    }
+
+    getDetailContentScrollContainer(rightPane) {
+        if (!rightPane) return null;
+        // Single scroll container for detail right pane.
+        return rightPane.querySelector('.pane-scroll-area');
+    }
+
+    updateClauseNavByScroll(scrollContainer) {
+        if (!scrollContainer) return;
+        if (this.clauseNavManualLockUntil && Date.now() < this.clauseNavManualLockUntil && this.clauseNavManualTargetId) {
+            this.setActiveClauseNavItem(this.clauseNavManualTargetId);
+            return;
+        }
+        const cards = Array.from(scrollContainer.querySelectorAll('.clause-card[id]'));
+        if (!cards.length) return;
+
+        const containerTop = scrollContainer.getBoundingClientRect().top;
+        const offset = scrollContainer.classList.contains('clause-cards-container')
+            ? 8
+            : this.getDetailHeaderOffset(scrollContainer);
+        const threshold = containerTop + offset;
+
+        let activeCard = cards[0];
+        for (const card of cards) {
+            const top = card.getBoundingClientRect().top;
+            if (top <= threshold) {
+                activeCard = card;
+            } else {
+                break;
+            }
+        }
+
+        this.setActiveClauseNavItem(activeCard.id);
+    }
+
+    setupClauseNavAutoSync() {
+        this.teardownClauseNavAutoSync();
+
+        if (this.currentView !== 'diff') return;
+        if (this.activeDetailTab !== 'original') return;
+
+        const rightPane = document.querySelector('.detail-split-body .pane:nth-child(2)');
+        if (!rightPane) return;
+        const scrollArea = this.getDetailContentScrollContainer(rightPane);
+        const navItems = Array.from(rightPane.querySelectorAll('.clause-nav-item[data-clause-id]'));
+        if (!scrollArea || !navItems.length) return;
+
+        // In original tab, keep TOC fixed and scroll only document cards area.
+        scrollArea.style.overflowY = 'auto';
+        scrollArea.style.overflowX = 'hidden';
+        scrollArea.style.pointerEvents = 'auto';
+        scrollArea.style.overscrollBehavior = 'contain';
+        scrollArea.style.webkitOverflowScrolling = 'touch';
+
+        const onScroll = () => {
+            if (this.detailClauseNavRaf) return;
+            this.detailClauseNavRaf = requestAnimationFrame(() => {
+                this.detailClauseNavRaf = null;
+                this.updateClauseNavByScroll(scrollArea);
+            });
+        };
+
+        scrollArea.addEventListener('scroll', onScroll, { passive: true });
+        const navBox = rightPane.querySelector('.clause-nav');
+        const navList = rightPane.querySelector('.clause-nav-list');
+        const onWheelForward = (event) => {
+            if (!event || !Number.isFinite(event.deltaY) || event.deltaY === 0) return;
+            scrollArea.scrollTop += event.deltaY;
+        };
+        // Keep native wheel behavior on cards container itself (main scroll target).
+        // Only forward wheel from TOC to the content scroll container.
+        if (navBox) {
+            navBox.addEventListener('wheel', onWheelForward, { passive: true });
+        }
+        if (navList) {
+            navList.addEventListener('wheel', onWheelForward, { passive: true });
+        }
+        let observer = null;
+        const cardsForObserver = Array.from(scrollArea.querySelectorAll('.clause-card[id]'));
+        if (cardsForObserver.length > 0 && typeof IntersectionObserver === 'function') {
+            observer = new IntersectionObserver((entries) => {
+                if (this.clauseNavManualLockUntil && Date.now() < this.clauseNavManualLockUntil && this.clauseNavManualTargetId) {
+                    this.setActiveClauseNavItem(this.clauseNavManualTargetId);
+                    return;
+                }
+                const visible = entries
+                    .filter((entry) => entry.isIntersecting)
+                    .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+                if (visible.length > 0) {
+                    const activeId = visible[0].target?.id;
+                    if (activeId) this.setActiveClauseNavItem(activeId);
+                }
+            }, {
+                root: scrollArea,
+                threshold: [0.35, 0.55, 0.75],
+                rootMargin: '-8px 0px -55% 0px'
+            });
+
+            cardsForObserver.forEach((card) => observer.observe(card));
+        }
+
+        this.detailClauseNavScrollCleanup = () => {
+            scrollArea.removeEventListener('scroll', onScroll);
+            if (navBox) {
+                navBox.removeEventListener('wheel', onWheelForward);
+            }
+            if (navList) {
+                navList.removeEventListener('wheel', onWheelForward);
+            }
+            if (this.detailClauseNavRaf) {
+                cancelAnimationFrame(this.detailClauseNavRaf);
+                this.detailClauseNavRaf = null;
+            }
+            if (observer) {
+                observer.disconnect();
+                observer = null;
+            }
+        };
+
+        this.updateClauseNavByScroll(scrollArea);
+    }
+
+    teardownClauseNavAutoSync() {
+        if (typeof this.detailClauseNavScrollCleanup === 'function') {
+            this.detailClauseNavScrollCleanup();
+        }
+        this.detailClauseNavScrollCleanup = null;
+        if (this.detailClauseNavRaf) {
+            cancelAnimationFrame(this.detailClauseNavRaf);
+            this.detailClauseNavRaf = null;
+        }
+    }
+
+    scrollToClause(clauseId, options = {}) {
+        const behavior = options.behavior || 'smooth';
         const target = document.getElementById(clauseId);
         if (!target) return;
+        // Cancel pending auto-reset timers once user explicitly navigates by clause.
+        this.detailResetToken = 0;
+        this.clauseNavManualTargetId = clauseId;
+        this.clauseNavManualLockUntil = Date.now() + 900;
 
         const paneScrollArea = target.closest('.pane-scroll-area');
         if (paneScrollArea) {
-            const targetTop = target.getBoundingClientRect().top;
-            const containerTop = paneScrollArea.getBoundingClientRect().top;
-            const nextTop = paneScrollArea.scrollTop + (targetTop - containerTop) - 8;
-            paneScrollArea.scrollTo({ top: Math.max(0, nextTop), behavior: 'smooth' });
+            const offset = this.getDetailHeaderOffset(paneScrollArea);
+            const cardsContainer = target.closest('.clause-cards-container');
+            const containerTop = cardsContainer ? (cardsContainer.offsetTop || 0) : 0;
+            const targetTop = target.offsetTop || 0;
+            const topWithinPane = containerTop + targetTop;
+            const nextTop = topWithinPane - offset;
+            paneScrollArea.scrollTo({ top: Math.max(0, Math.round(nextTop)), behavior });
+            this.setActiveClauseNavItem(clauseId);
             return;
         }
 
-        const appHeader = document.getElementById('app-header');
-        const headerHeight = appHeader ? appHeader.offsetHeight : 0;
-        const yOffset = -(headerHeight + 8);
-        const y = target.getBoundingClientRect().top + window.pageYOffset + yOffset;
-        window.scrollTo({ top: y, behavior: 'smooth' });
+        const offset = this.getDetailHeaderOffset(null);
+        const elementPosition = target.getBoundingClientRect().top + window.pageYOffset;
+        const offsetPosition = Math.max(0, elementPosition - offset);
+        window.scrollTo({ top: offsetPosition, behavior });
+        this.setActiveClauseNavItem(clauseId);
     }
 
     enforceDetailScrollLayout() {
         if (!this.mainContent) return;
 
         if (this.currentView !== 'diff') {
+            this.mainContent.style.display = '';
+            this.mainContent.style.flexDirection = '';
+            this.mainContent.style.minHeight = '';
+            this.mainContent.style.height = '';
             this.mainContent.style.overflowY = '';
+            this.mainContent.style.overflowX = '';
             return;
         }
 
+        // Single-scroll layout chain for detail view (stable at browser zoom 100%).
+        this.mainContent.style.display = 'flex';
+        this.mainContent.style.flexDirection = 'column';
+        this.mainContent.style.minHeight = '0';
+        this.mainContent.style.height = '100%';
         this.mainContent.style.overflowY = 'hidden';
+        this.mainContent.style.overflowX = 'hidden';
+
+        const detailContainer = this.mainContent.querySelector('.detail-split-container');
+        if (detailContainer) {
+            detailContainer.style.display = 'flex';
+            detailContainer.style.flexDirection = 'column';
+            detailContainer.style.flex = '1 1 auto';
+            detailContainer.style.minHeight = '0';
+            detailContainer.style.height = '100%';
+        }
 
         const detailBody = this.mainContent.querySelector('.detail-split-body');
         if (detailBody) {
+            detailBody.style.display = 'flex';
+            detailBody.style.flex = '1 1 auto';
             detailBody.style.minHeight = '0';
+            detailBody.style.height = 'auto';
+            detailBody.style.overflow = 'hidden';
         }
 
         this.mainContent.querySelectorAll('.detail-split-body .pane').forEach((pane) => {
+            pane.style.display = 'flex';
+            pane.style.flexDirection = 'column';
+            pane.style.flex = '1 1 0';
             pane.style.minHeight = '0';
+            pane.style.overflow = 'hidden';
         });
 
         this.mainContent.querySelectorAll('.pane-scroll-area').forEach((area) => {
+            area.style.display = 'block';
+            area.style.flex = '1 1 auto';
             area.style.overflowY = 'auto';
             area.style.overflowX = 'hidden';
+            area.style.minHeight = '0';
+            area.style.height = 'auto';
             area.style.scrollPaddingTop = '8px';
         });
 
         this.mainContent.querySelectorAll('.clause-card').forEach((card) => {
-            card.style.scrollMarginTop = '80px';
+            card.style.scrollMarginTop = '100px';
         });
     }
 
     resetDetailPaneScroll() {
+        const resetToken = Date.now();
+        this.detailResetToken = resetToken;
+        const resetScrollAreaToTop = (scrollArea) => {
+            if (!scrollArea) return;
+            scrollArea.scrollTop = 0;
+            scrollArea.scrollLeft = 0;
+            scrollArea.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+        };
+
         const runReset = () => {
+            if (this.detailResetToken !== resetToken) return;
             const rightPane = document.querySelectorAll('.detail-split-body .pane')[1];
             if (!rightPane) return;
 
@@ -2870,9 +3106,12 @@ class DashboardApp {
             const documentContent = rightPane.querySelector('.document-content-full');
             const structuredView = rightPane.querySelector('.contract-structured-container');
             const navBox = rightPane.querySelector('.clause-nav');
+            const navList = rightPane.querySelector('.clause-nav-list');
+            const clauseCards = rightPane.querySelector('.clause-cards-container');
+
             if (scrollArea) {
-                scrollArea.scrollTo({ top: 0, left: 0, behavior: 'auto' });
-                scrollArea.scrollTop = 0;
+                scrollArea.style.scrollBehavior = 'auto';
+                resetScrollAreaToTop(scrollArea);
             }
             if (detailBody) {
                 detailBody.scrollTop = 0;
@@ -2886,45 +3125,50 @@ class DashboardApp {
             if (navBox) {
                 navBox.scrollTop = 0;
             }
-
-            const navList = rightPane.querySelector('.clause-nav-list');
             if (navList) {
-                navList.scrollTo({ top: 0, left: 0, behavior: 'auto' });
                 navList.scrollTop = 0;
+                navList.scrollTo({ top: 0, left: 0, behavior: 'auto' });
             }
-
-            const clauseCards = rightPane.querySelector('.clause-cards-container');
             if (clauseCards) {
-                clauseCards.scrollTo({ top: 0, left: 0, behavior: 'auto' });
                 clauseCards.scrollTop = 0;
+                clauseCards.scrollTo({ top: 0, left: 0, behavior: 'auto' });
             }
 
-            // Original tab must always reopen from the first visible clause/header.
             if (this.activeDetailTab === 'original' && scrollArea) {
-                const firstClauseCard = rightPane.querySelector('.clause-card');
-                const firstNavItem = rightPane.querySelector('.clause-nav-item');
-                const topAnchor = rightPane.querySelector('.document-top-anchor');
-                if (firstNavItem && typeof firstNavItem.scrollIntoView === 'function') {
-                    firstNavItem.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'auto' });
-                }
-                if (firstClauseCard && typeof firstClauseCard.scrollIntoView === 'function') {
-                    firstClauseCard.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'auto' });
-                    scrollArea.scrollTop = 0;
-                } else if (topAnchor) {
-                    topAnchor.scrollIntoView({ block: 'start', behavior: 'auto' });
-                    scrollArea.scrollTop = 0;
+                const firstNavItem = rightPane.querySelector('.clause-nav-item[data-clause-id]');
+                const firstClauseId = firstNavItem ? firstNavItem.getAttribute('data-clause-id') : null;
+                if (firstClauseId) {
+                    this.setActiveClauseNavItem(firstClauseId);
                 }
             }
         };
 
         requestAnimationFrame(() => {
             runReset();
-            setTimeout(runReset, 50);
-            setTimeout(runReset, 180);
-            setTimeout(runReset, 420);
-            setTimeout(runReset, 800);
-            setTimeout(runReset, 1400);
-            setTimeout(runReset, 2200);
+
+            const rightPane = document.querySelectorAll('.detail-split-body .pane')[1];
+            const scrollArea = rightPane ? rightPane.querySelector('.pane-scroll-area') : null;
+            const delayedResets = [120, 420, 900];
+            delayedResets.forEach((delayMs) => {
+                setTimeout(() => {
+                    if (this.detailResetToken !== resetToken) return;
+                    runReset();
+                }, delayMs);
+            });
+
+            if (scrollArea) {
+                // Keep nav static (no independent scrolling) and always route wheel to content pane.
+                const navBox = rightPane ? rightPane.querySelector('.clause-nav') : null;
+                const navList = rightPane ? rightPane.querySelector('.clause-nav-list') : null;
+                if (navBox) {
+                    navBox.scrollTop = 0;
+                    navBox.style.overflow = 'hidden';
+                }
+                if (navList) {
+                    navList.scrollTop = 0;
+                    navList.style.overflowY = 'hidden';
+                }
+            }
         });
     }
 
@@ -4093,6 +4337,10 @@ class DashboardApp {
 // Global App Instance
 window.app = new DashboardApp();
 document.addEventListener('DOMContentLoaded', () => window.app.init());
+
+
+
+
 
 
 

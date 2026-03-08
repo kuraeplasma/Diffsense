@@ -136,7 +136,8 @@ ul {
     flex: 1;
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    min-height: 0;
+    height: auto;
     overflow: hidden;
 }
 
@@ -155,6 +156,10 @@ ul {
     flex: 1;
     overflow-y: auto;
     padding: var(--space-lg);
+}
+
+#app-content.is-detail-view {
+    overflow: hidden;
 }
 
 /* Sidebar Components */
@@ -330,6 +335,7 @@ ul {
     font-size: 24px;
     font-weight: 600;
     margin-bottom: var(--space-lg);
+    line-height: 1.2;
 }
 
 /* Plan Management */
@@ -1295,9 +1301,7 @@ ul {
         margin-top: 8px;
     }
 
-    .header-dropdown-menu.show {
-        display: block;
-    }
+    /* Header Dropdown Menu */
 
     .header-dropdown-item {
         padding: 10px 16px;
@@ -1492,7 +1496,8 @@ ul {
 
 /* Fluid layout container when in detail view */
 #app-content.is-detail-view {
-    height: 100%;
+    height: auto;
+    min-height: 0;
     overflow: hidden;
     padding: 20px;
     background: #f8f9fa;
@@ -1501,7 +1506,9 @@ ul {
 .detail-split-container {
     display: flex;
     flex-direction: column;
-    height: 100%;
+    flex: 1;
+    min-height: 0;
+    height: auto;
 }
 
 .detail-split-header {
@@ -1509,9 +1516,51 @@ ul {
     flex-shrink: 0;
 }
 
+.detail-header-main {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    min-width: 0;
+    flex: 1;
+}
+
+.detail-header-title-wrap {
+    min-width: 0;
+}
+
+.detail-header-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+}
+
+.detail-header-meta-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+.doc-source-name {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #64748b;
+    max-width: 300px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .detail-split-body {
     display: flex;
     flex: 1;
+    min-height: 0;
     gap: 20px;
     overflow: hidden;
     /* Prevent body scroll */
@@ -1520,6 +1569,7 @@ ul {
 /* Left/Right Panes */
 .pane {
     flex: 1;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     background: #fff;
@@ -1531,6 +1581,8 @@ ul {
 
 .pane-header {
     padding: 12px 16px;
+    min-height: 56px;
+    box-sizing: border-box;
     background: #fdfdfd;
     border-bottom: 1px solid var(--border-subtle);
     display: flex;
@@ -1541,9 +1593,18 @@ ul {
     color: var(--text-main);
 }
 
+/* Keep both split-pane headers the same height on desktop */
+#app-content.is-detail-view .detail-split-body .pane-header {
+    height: 56px;
+    box-sizing: border-box;
+}
+
 .pane-scroll-area {
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
+    overflow-x: hidden;
+    scroll-padding-top: 8px;
     padding: 20px;
 }
 
@@ -1585,7 +1646,12 @@ ul {
     width: 100%;
     margin: 0;
     font-size: 16px;
-    padding: 0 10px;
+    padding: 0 10px 12px;
+}
+
+.is-structured {
+    width: 100%;
+    min-height: 100%;
 }
 
 /* Analysis Pane components */
@@ -1686,6 +1752,18 @@ ul {
         height: auto;
         margin-bottom: 20px;
         width: 100% !important;
+    }
+
+    #app-content.is-detail-view .detail-split-body .pane-header {
+        height: auto;
+    }
+
+    .detail-header-main {
+        flex-wrap: wrap;
+    }
+
+    .doc-source-name {
+        max-width: 200px;
     }
 
     .document-paper {
@@ -2035,3 +2113,140 @@ ul {
 .btn-crawl-check i {
     font-size: 14px;
 }
+
+/* --- Contract Document Rendering (Structured) --- */
+.contract-structured-container {
+    display: flex;
+    gap: 24px;
+    min-height: 100%;
+    align-items: flex-start;
+    width: 100%;
+}
+
+.clause-nav {
+    width: 250px;
+    background: #fff;
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    height: fit-content;
+    max-height: 100%;
+    position: static;
+    overflow: hidden;
+}
+
+.clause-nav-title {
+    padding: 16px;
+    font-weight: 700;
+    color: var(--text-main);
+    border-bottom: 1px solid var(--border-subtle);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #fff;
+}
+
+.clause-nav-list {
+    overflow-y: auto;
+    padding: 8px 0;
+}
+
+.clause-nav-item {
+    padding: 10px 16px;
+    font-size: 13px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s;
+    border-left: 3px solid transparent;
+}
+
+.nav-clause-num {
+    display: block;
+    font-weight: 600;
+    color: var(--color-primary);
+}
+
+.nav-clause-header {
+    display: block;
+    margin-top: 2px;
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.clause-nav-item:hover {
+    background: #f8fafc;
+    color: var(--color-primary);
+    border-left-color: var(--color-primary);
+}
+
+.clause-cards-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding-top: 0;
+}
+
+.clause-card {
+    background: #fff;
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    overflow: hidden;
+    scroll-margin-top: 100px;
+}
+
+.clause-header {
+    background: #f8fafc;
+    padding: 12px 20px;
+    font-weight: 700;
+    color: var(--text-main);
+    font-size: 14px;
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.clause-title-text {
+    color: var(--text-main);
+}
+
+.clause-body {
+    padding: 24px 30px;
+    background: #fff;
+}
+
+.clause-body p {
+    font-size: 15px;
+    line-height: 1.9;
+    margin-bottom: 1.5em;
+    /* Traditional legal spacing */
+    color: #334155;
+}
+
+.clause-body p:last-child {
+    margin-bottom: 0;
+}
+
+/* For unstructured or plain text views strictly used for contracts */
+.document-content-diff-wrap {
+    font-size: 15px;
+    line-height: 1.9;
+    white-space: normal;
+    margin-top: 6px;
+    padding-top: 0;
+}
+
+.document-content-full.is-frameless {
+    font-size: 15px;
+    line-height: 1.9;
+    white-space: pre-wrap;
+    padding: 30px;
+    background: #fff;
+}
+
+
+
