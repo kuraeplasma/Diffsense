@@ -2751,8 +2751,8 @@ class DashboardApp {
                             originalFilename: file.name
                         });
 
-                        // 画面を再読み込み (差分表示を優先)
-                        this.activeDetailTab = 'diff';
+                        // PDF更新時は「取り込んだまま」の見た目を優先して原本タブ表示
+                        this.activeDetailTab = isPdf ? 'original' : 'diff';
                         this.navigate('diff', id);
 
                         // 部分的な失敗（AI解析のみ失敗）のチェック
@@ -2765,7 +2765,7 @@ class DashboardApp {
                                 this.showToast('⚠️ 解析は不完全ですが保存しました', 'warning', 5000);
                             }
                         } else {
-                            this.showToast('✅ 差分解析が完了しました', 'success', 5000);
+                            this.showToast(isPdf ? '✅ PDFの取り込みと解析が完了しました' : '✅ 差分解析が完了しました', 'success', 5000);
                         }
 
                     } else {

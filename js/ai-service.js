@@ -33,11 +33,12 @@ export const aiService = {
             const apiBase = this.getApiBase();
             const token = await getIdToken();
             console.log("AI Service: Token retrieval status:", token ? "Success" : "Failed");
+            const normalizedPreviousVersion = this.normalizePreviousVersion(previousVersion);
             const body = {
                 contractId,
                 method,
                 source,
-                previousVersion
+                previousVersion: normalizedPreviousVersion
             };
             if (options.skipAI) {
                 body.skipAI = true;
@@ -90,6 +91,36 @@ export const aiService = {
 
             throw error;
         }
+    },
+
+    normalizePreviousVersion(previousVersion) {
+        if (previousVersion === null || previousVersion === undefined || previousVersion === '') {
+            return null;
+        }
+        if (typeof previousVersion === 'string') {
+            return previousVersion;
+        }
+        if (Array.isArray(previousVersion)) {
+            return previousVersion.map((section) => {
+                if (!section || typeof section !== 'object') {
+                    return String(section || '');
+                }
+                const article = typeof section.article === 'string' ? section.article : '';
+                const title = typeof section.title === 'string' ? section.title : '';
+                const paragraphs = Array.isArray(section.paragraphs)
+                    ? section.paragraphs.map((p) => {
+                        if (typeof p === 'string') return p;
+                        if (p && typeof p === 'object') return p.content || p.body || JSON.stringify(p);
+                        return '';
+                    }).filter(Boolean).join('\n')
+                    : '';
+                return `${article} ${title}\n${paragraphs}`.trim();
+            }).filter(Boolean).join('\n\n');
+        }
+        if (typeof previousVersion === 'object') {
+            return JSON.stringify(previousVersion);
+        }
+        return String(previousVersion);
     },
 
     /**
