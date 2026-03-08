@@ -5,8 +5,68 @@ const { validateAnalyzeRequest } = require('../utils/validator');
 const geminiService = require('../services/gemini');
 const pdfService = require('../services/pdf');
 const urlService = require('../services/url');
+const docxService = require('../services/docxService');
+const diffService = require('../services/diffService');
 const dbService = require('../services/db');
+const { toLegacyArticleArray, fromLegacyArticleArray } = require('../services/contractStructure');
 const logger = require('../utils/logger');
+
+function normalizeContentToText(content) {
+    if (content === null || content === undefined) return '';
+    if (typeof content === 'string') return content;
+    if (Array.isArray(content)) {
+        return content.map((section) => {
+            if (!section || typeof section !== 'object') return String(section || '');
+            const article = typeof section.article === 'string' ? section.article : '';
+            const title = typeof section.title === 'string' ? section.title : '';
+            const paragraphs = Array.isArray(section.paragraphs)
+                ? section.paragraphs.map((p) => {
+                    if (typeof p === 'string') return p;
+                    if (p && typeof p === 'object') return p.content || p.body || JSON.stringify(p);
+                    return '';
+                }).filter(Boolean).join('\n')
+                : '';
+            return `${article} ${title}\n${paragraphs}`.trim();
+        }).filter(Boolean).join('\n\n');
+    }
+    if (typeof content === 'object' && Array.isArray(content.articles)) {
+        return toLegacyArticleArray(content).map((a) => `${a.article || ''} ${a.title || ''}\n${(a.paragraphs || []).join('\n')}`.trim()).join('\n\n');
+    }
+    if (typeof content === 'object') return JSON.stringify(content);
+    return String(content);
+}
+
+function decodeBase64Payload(raw) {
+    const base64Clean = String(raw || '').split(',').pop();
+    return Buffer.from(base64Clean, 'base64');
+}
+
+async function resolvePreviousDocxArticles(previousVersion) {
+    if (!previousVersion) return [];
+    if (Array.isArray(previousVersion)) return previousVersion;
+    if (typeof previousVersion === 'object' && Array.isArray(previousVersion.articles)) {
+        return toLegacyArticleArray(previousVersion);
+    }
+    if (typeof previousVersion !== 'string') return [];
+
+    const trimmed = previousVersion.trim();
+    if (!trimmed) return [];
+
+    const looksLikeRawText = /\n|第\s*[0-9０-９一二三四五六七八九十百千〇零]+\s*条/.test(trimmed);
+    if (looksLikeRawText) {
+        return docxService.parseTextToArticles(trimmed);
+    }
+
+    try {
+        const buffer = decodeBase64Payload(trimmed);
+        const isZip = buffer.length > 4 && buffer[0] === 0x50 && buffer[1] === 0x4B;
+        if (!isZip) return docxService.parseTextToArticles(trimmed);
+        return await docxService.parseDocx(buffer);
+    } catch (error) {
+        logger.warn('Failed to parse previousVersion as DOCX, fallback to text parser:', error.message);
+        return docxService.parseTextToArticles(trimmed);
+    }
+}
 
 /**
  * POST /api/contracts/analyze
@@ -81,8 +141,7 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
             const { bucket } = require('../firebase');
 
             // Remove data URL prefix
-            const base64Clean = source.replace(/^data:application\/pdf;base64,/, '');
-            const buffer = Buffer.from(base64Clean, 'base64');
+            const buffer = decodeBase64Payload(source);
 
             // Try to upload to Firebase Storage (optional - analysis continues even if this fails)
             if (bucket) {
@@ -138,6 +197,7 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
         }
 
         let extractedText = "";
+        let structuredContract = null;
         let aiResult = {
             changes: [],
             riskLevel: 1,
@@ -148,7 +208,17 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
         try {
             // 2. Extract text
             if (method === 'pdf') {
-                extractedText = await pdfService.extractText(source);
+                const pdfResult = await pdfService.extractText(source);
+                if (pdfResult && typeof pdfResult === 'object' && Array.isArray(pdfResult.articles)) {
+                    structuredContract = pdfResult.structuredContract || null;
+                    extractedText = pdfResult.articles;
+                } else {
+                    extractedText = pdfResult;
+                }
+            } else if (method === 'docx') {
+                const docxBuffer = decodeBase64Payload(source);
+                extractedText = await docxService.parseDocx(docxBuffer);
+                structuredContract = fromLegacyArticleArray(extractedText);
             } else if (method === 'url') {
                 extractedText = await urlService.extractText(source);
             } else if (method === 'text') {
@@ -159,10 +229,14 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
             if (skipAI) {
                 logger.info('skipAI=true: Skipping Gemini analysis, text extraction only');
                 aiResult.summary = 'テキスト抽出のみ完了（AI解析はスキップ）';
-            } else if (extractedText && extractedText.trim().length > 0) {
+            } else {
+                const textToAnalyze = normalizeContentToText(extractedText);
+                const previousVersionText = normalizeContentToText(previousVersion);
+
+                if (textToAnalyze.trim().length > 0) {
                 aiResult = await geminiService.analyzeContract(
-                    extractedText,
-                    previousVersion
+                    textToAnalyze,
+                    previousVersionText
                 );
 
                 // 3.1 Increment Usage Count ONLY on successful AI analysis
@@ -172,9 +246,10 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                 } else {
                     logger.info(`AI analysis failed for user ${uid} - usage count NOT incremented`);
                 }
-            } else {
-                logger.warn('No text extracted, skipping AI analysis');
-                aiResult.summary = 'テキストを抽出できませんでした（画像ベースの可能性があります）';
+                } else {
+                    logger.warn('No text extracted, skipping AI analysis');
+                    aiResult.summary = 'テキストを抽出できませんでした（画像ベースの可能性があります）';
+                }
             }
 
         } catch (error) {
@@ -185,8 +260,11 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
         }
 
         const crypto = require('crypto');
-        const extractedTextHash = crypto.createHash('sha256').update(extractedText || '').digest('hex');
-        const extractedTextLength = (extractedText || '').length;
+        const textForHash = Array.isArray(extractedText)
+            ? JSON.stringify(extractedText)
+            : String(extractedText || '');
+        const extractedTextHash = crypto.createHash('sha256').update(textForHash).digest('hex');
+        const extractedTextLength = textForHash.length;
 
         logger.info(`Response ready for contract ${contractId}`);
 
@@ -215,11 +293,107 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                 riskLevel: aiResult.riskLevel,
                 riskReason: aiResult.riskReason,
                 summary: aiResult.summary,
+                structuredContract,
                 aiFailed: aiFailed
             }
         });
     } catch (error) {
         logger.error('Analysis error:', error);
+        next(error);
+    }
+});
+
+/**
+ * POST /api/contracts/upload-docx
+ * Parse DOCX and compare by article blocks
+ */
+router.post('/upload-docx', rateLimit, async (req, res, next) => {
+    try {
+        const { contractId, source, previousVersion, skipAI } = req.body || {};
+        const uid = req.user.uid;
+
+        if (!Number.isInteger(contractId) || contractId <= 0) {
+            return res.status(400).json({ success: false, error: '"contractId" must be a positive integer' });
+        }
+        if (!source || typeof source !== 'string') {
+            return res.status(400).json({ success: false, error: '"source" is required' });
+        }
+
+        const userProfile = await dbService.getUserProfile(uid);
+        const limit = dbService.getUsageLimit(userProfile);
+        const isInTrial = dbService.isTrialActive(userProfile);
+
+        if (!skipAI && userProfile.usageCount >= limit) {
+            const limitMsg = isInTrial
+                ? `無料トライアルの解析上限（${limit}回）に達しました。継続して利用するにはプランの契約が必要です。`
+                : `プランの月間解析上限（${limit}回）に達しました。アップグレードをご検討ください。`;
+            return res.status(403).json({ success: false, error: limitMsg });
+        }
+
+        const currentBuffer = decodeBase64Payload(source);
+        const currentArticles = await docxService.parseDocx(currentBuffer);
+        const structuredContract = fromLegacyArticleArray(currentArticles);
+        const previousArticles = await resolvePreviousDocxArticles(previousVersion);
+
+        const diffChanges = previousArticles.length
+            ? diffService.compare(previousArticles, currentArticles)
+            : [];
+
+        let aiResult = {
+            changes: diffChanges.map((c) => ({
+                section: c.section,
+                old: c.old,
+                new: c.new,
+                impact: '',
+                concern: ''
+            })),
+            riskLevel: diffChanges.some((c) => c.type === 'DELETE') ? 2 : 1,
+            riskReason: diffChanges.length ? '条文単位の差分を検出しました' : '差分は検出されませんでした',
+            summary: diffChanges.length ? `${diffChanges.length}件の差分を検出しました` : '差分は検出されませんでした'
+        };
+
+        if (!skipAI) {
+            const currentText = normalizeContentToText(currentArticles);
+            const previousText = normalizeContentToText(previousArticles);
+
+            if (currentText.trim().length > 0) {
+                const geminiResult = await geminiService.analyzeContract(currentText, previousText);
+                const aiSucceeded = geminiResult && geminiResult.summary && !geminiResult.summary.includes('AI解析に失敗');
+                if (aiSucceeded) {
+                    await dbService.incrementUsage(uid);
+                }
+
+                aiResult = {
+                    changes: diffChanges.length ? aiResult.changes : (geminiResult.changes || []),
+                    riskLevel: geminiResult.riskLevel,
+                    riskReason: geminiResult.riskReason,
+                    summary: geminiResult.summary
+                };
+            }
+        }
+
+        const crypto = require('crypto');
+        const serialized = JSON.stringify(currentArticles);
+        const extractedTextHash = crypto.createHash('sha256').update(serialized).digest('hex');
+
+        res.json({
+            success: true,
+            data: {
+                sourceType: 'DOCX',
+                extractedText: currentArticles,
+                structuredContract,
+                previousArticles,
+                changes: aiResult.changes || [],
+                riskLevel: aiResult.riskLevel,
+                riskReason: aiResult.riskReason,
+                summary: aiResult.summary,
+                extractedTextHash,
+                extractedTextLength: serialized.length,
+                aiFailed: Boolean(aiResult.summary && aiResult.summary.includes('AI解析に失敗'))
+            }
+        });
+    } catch (error) {
+        logger.error('DOCX upload error:', error);
         next(error);
     }
 });

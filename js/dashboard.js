@@ -44,6 +44,26 @@ function loadExternalScriptOnce(src, globalGuard = null) {
 const parseContractIntoClauses = (content) => {
     if (!content) return [];
 
+    // structuredContract support: { title, version, preamble, articles[] }
+    if (typeof content === 'object' && !Array.isArray(content) && Array.isArray(content.articles)) {
+        const clauses = [];
+        if (content.preamble) {
+            clauses.push({
+                title: '前文',
+                header: content.title || '',
+                paragraphs: String(content.preamble).split(/\n+/).filter(Boolean)
+            });
+        }
+        content.articles.forEach((item, idx) => {
+            clauses.push({
+                title: item.articleNumber || `第${idx + 1}条`,
+                header: item.title || '',
+                paragraphs: String(item.content || '').split(/\n+/).filter(Boolean)
+            });
+        });
+        return clauses;
+    }
+
     // If content is already structured (Array from backend)
     if (Array.isArray(content)) {
         return content.map((item, idx) => {
@@ -767,6 +787,14 @@ const Views = {
 
                         // Extract text for diff if structured
                         const getPlainText = (content) => {
+                            if (content && typeof content === 'object' && !Array.isArray(content) && Array.isArray(content.articles)) {
+                                const preamble = content.preamble ? `${content.preamble}\n\n` : '';
+                                const articlesText = content.articles.map((a) => {
+                                    const head = `${a.articleNumber || ''}${a.title ? ` ${a.title}` : ''}`.trim();
+                                    return `${head}\n${a.content || ''}`.trim();
+                                }).join('\n\n');
+                                return `${preamble}${articlesText}`.trim();
+                            }
                             if (Array.isArray(content)) {
                                 return content.map(c => {
                                     const ps = Array.isArray(c.paragraphs)
@@ -1223,7 +1251,7 @@ class RegistrationFlow {
                 }
 
                 dbService.updateContractAnalysis(contractId, {
-                    extractedText: result.data.extractedText,
+                    extractedText: result.data.structuredContract || result.data.extractedText,
                     baselineContent: result.data.previousArticles || null,
                     sourceType: result.data.sourceType || 'DOCX',
                     changes: result.data.changes || [],
@@ -1250,7 +1278,7 @@ class RegistrationFlow {
             if (result.success) {
                 // 抽出されたテキストのみを保存（AI解析結果は保存しない）
                 dbService.updateContractText(contractId, {
-                    extractedText: result.data.extractedText,
+                    extractedText: result.data.structuredContract || result.data.extractedText,
                     extractedTextHash: result.data.extractedTextHash,
                     extractedTextLength: result.data.extractedTextLength,
                     sourceType: result.data.sourceType,
@@ -2737,7 +2765,7 @@ class DashboardApp {
                     if (result.success) {
                         // 解析結果をDBに保存
                         dbService.updateContractAnalysis(id, {
-                            extractedText: result.data.extractedText,
+                            extractedText: result.data.structuredContract || result.data.extractedText,
                             extractedTextHash: result.data.extractedTextHash,
                             extractedTextLength: result.data.extractedTextLength,
                             sourceType: result.data.sourceType,
@@ -2843,7 +2871,7 @@ class DashboardApp {
                 if (result.success) {
                     // 解析結果をDBに保存
                     dbService.updateContractAnalysis(id, {
-                        extractedText: result.data.extractedText,
+                        extractedText: result.data.structuredContract || result.data.extractedText,
                         sourceUrl: url,
                         sourceType: 'URL',
                         changes: result.data.changes,

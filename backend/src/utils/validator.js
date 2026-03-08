@@ -2,9 +2,13 @@ const Joi = require('joi');
 
 const analyzeRequestSchema = Joi.object({
     contractId: Joi.number().integer().required(),
-    method: Joi.string().valid('pdf', 'url', 'text').required(),
+    method: Joi.string().valid('pdf', 'url', 'text', 'docx').required(),
     source: Joi.string().required(),
-    previousVersion: Joi.string().optional().allow(null, ''),
+    previousVersion: Joi.alternatives().try(
+        Joi.string(),
+        Joi.array(),
+        Joi.object()
+    ).optional().allow(null, ''),
     skipAI: Joi.boolean().optional()
 });
 
