@@ -150,7 +150,7 @@
     font-family: "Noto Serif JP", serif;
     font-size: 15px;
     line-height: 1.95;
-    white-space: pre-wrap;
+    white-space: normal;
     word-break: break-word;
 }
 
@@ -162,8 +162,28 @@
 }
 
 .structured-diff-text {
-    white-space: pre-wrap;
+    white-space: normal;
     word-break: break-word;
+}
+
+.structured-diff-paragraph {
+    margin: 0 0 16px;
+}
+
+.structured-diff-paragraph:last-child {
+    margin-bottom: 0;
+}
+
+.structured-diff-removed {
+    background: rgba(255, 220, 224, 0.45);
+}
+
+.structured-diff-added {
+    background: rgba(205, 255, 216, 0.45);
+}
+
+.structured-diff-empty {
+    color: #94a3b8;
 }
 
 .structured-diff-plain .clause-body {

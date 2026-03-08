@@ -97,6 +97,10 @@ const isStructuredDocumentContent = (content) => {
 
 const clauseIdentityKey = (clause) => `${clause?.title || ''}__${clause?.header || ''}`;
 
+const clauseParagraphs = (clause) => Array.isArray(clause?.paragraphs)
+    ? clause.paragraphs.map((p) => String(p ?? ''))
+    : [];
+
 const clauseBodyText = (clause) => Array.isArray(clause?.paragraphs)
     ? clause.paragraphs.map((p) => String(p || '')).join('\n').trim()
     : '';
@@ -107,6 +111,61 @@ const renderClauseParagraphs = (text) => {
         return '<p class="text-muted">本文なし</p>';
     }
     return lines.map((line) => `<p class="clause-p">${escapeHtmlText(line)}</p>`).join('');
+};
+
+const renderStructuredDiffParagraphColumn = (paragraphs, counterpartParagraphs, tone) => {
+    const own = Array.isArray(paragraphs) ? paragraphs : [];
+    const other = Array.isArray(counterpartParagraphs) ? counterpartParagraphs : [];
+    const maxLength = Math.max(own.length, other.length, 1);
+    const html = [];
+
+    for (let i = 0; i < maxLength; i += 1) {
+        const current = String(own[i] ?? '');
+        const counterpart = String(other[i] ?? '');
+
+        if (!current && !counterpart) {
+            continue;
+        }
+
+        const paragraphClasses = ['clause-p', 'structured-diff-paragraph'];
+        let paragraphHtml = escapeHtmlText(current);
+
+        if (!current && counterpart) {
+            paragraphClasses.push(tone === 'old' ? 'structured-diff-empty' : 'structured-diff-added');
+            paragraphHtml = '（追加）';
+        } else if (current && !counterpart) {
+            paragraphClasses.push(tone === 'old' ? 'structured-diff-removed' : 'structured-diff-empty');
+            paragraphHtml = tone === 'old' ? escapeHtmlText(current) : '（削除）';
+        } else if (current === counterpart) {
+            paragraphHtml = escapeHtmlText(current);
+        } else if (window.Diff && typeof window.Diff.diffWordsWithSpace === 'function') {
+            const chunks = window.Diff.diffWordsWithSpace(counterpart, current);
+            const fragmentHtml = [];
+            for (const chunk of chunks) {
+                const safe = escapeHtmlText(chunk.value);
+                if (chunk.added) {
+                    if (tone === 'new') {
+                        fragmentHtml.push(`<span class="diff-add">${safe}</span>`);
+                    }
+                } else if (chunk.removed) {
+                    if (tone === 'old') {
+                        fragmentHtml.push(`<span class="diff-del">${safe}</span>`);
+                    }
+                } else {
+                    fragmentHtml.push(safe);
+                }
+            }
+            paragraphHtml = fragmentHtml.join('') || escapeHtmlText(current);
+            paragraphClasses.push(tone === 'old' ? 'structured-diff-removed' : 'structured-diff-added');
+        } else {
+            paragraphClasses.push(tone === 'old' ? 'structured-diff-removed' : 'structured-diff-added');
+            paragraphHtml = escapeHtmlText(current);
+        }
+
+        html.push(`<p class="${paragraphClasses.join(' ')}">${paragraphHtml || '　'}</p>`);
+    }
+
+    return html.join('') || '<p class="clause-p text-muted">本文なし</p>';
 };
 
 const renderStructuredDiffView = (previousContent, currentContent, idPrefix = 'structured-diff') => {
@@ -132,29 +191,11 @@ const renderStructuredDiffView = (previousContent, currentContent, idPrefix = 's
     const renderChangedClause = (key, currentClause, previousClause) => {
         const title = currentClause?.title || previousClause?.title || '条文';
         const header = currentClause?.header || previousClause?.header || '';
-        const previousText = clauseBodyText(previousClause);
-        const currentText = clauseBodyText(currentClause);
+        const previousParagraphs = clauseParagraphs(previousClause);
+        const currentParagraphs = clauseParagraphs(currentClause);
         const safeId = String(key).replace(/[^\w-]+/g, '-');
-        let previousHtml = escapeHtmlText(previousText || '（変更前なし）');
-        let currentHtml = escapeHtmlText(currentText || '（変更後なし）');
-
-        if (window.Diff && typeof window.Diff.diffWordsWithSpace === 'function') {
-            const chunks = window.Diff.diffWordsWithSpace(previousText, currentText);
-            previousHtml = '';
-            currentHtml = '';
-
-            for (const chunk of chunks) {
-                const safe = escapeHtmlText(chunk.value);
-                if (chunk.added) {
-                    currentHtml += `<span class="diff-add">${safe}</span>`;
-                } else if (chunk.removed) {
-                    previousHtml += `<span class="diff-del">${safe}</span>`;
-                } else {
-                    previousHtml += safe;
-                    currentHtml += safe;
-                }
-            }
-        }
+        const previousHtml = renderStructuredDiffParagraphColumn(previousParagraphs, currentParagraphs, 'old');
+        const currentHtml = renderStructuredDiffParagraphColumn(currentParagraphs, previousParagraphs, 'new');
 
         return `
             <article class="clause-card structured-diff-card" id="${idPrefix}-${safeId}">
@@ -165,11 +206,11 @@ const renderStructuredDiffView = (previousContent, currentContent, idPrefix = 's
                 <div class="diff-container structured-diff-grid" style="height:auto; min-height:140px;">
                     <div class="diff-pane diff-left structured-diff-pane">
                         <div class="structured-diff-label">変更前</div>
-                        <div class="structured-diff-text">${previousHtml || '（変更前なし）'}</div>
+                        <div class="structured-diff-text">${previousHtml}</div>
                     </div>
                     <div class="diff-pane diff-right structured-diff-pane">
                         <div class="structured-diff-label">変更後</div>
-                        <div class="structured-diff-text">${currentHtml || '（変更後なし）'}</div>
+                        <div class="structured-diff-text">${currentHtml}</div>
                     </div>
                 </div>
             </article>
