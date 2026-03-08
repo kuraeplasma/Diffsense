@@ -2095,19 +2095,38 @@ class DashboardApp {
 
     checkTrialExpired() {
         const sub = this.subscription;
-        const payment = this.paymentStatus;
         if (!sub) return;
         const urlParams = new URLSearchParams(window.location.search);
         const skipGateForPaymentFlow = urlParams.get('start_payment') === '1';
         if (skipGateForPaymentFlow) return;
 
         // トライアル切れ + 決済未登録なら即プラン選択へ遷移
-        const isTrialExpired = sub.trialStartedAt && !sub.isInTrial;
-        const hasNoPayment = !payment || !payment.hasPaymentMethod;
-        if (isTrialExpired && hasNoPayment) {
-            localStorage.setItem('diffsense_trial_expired', '1');
-            window.location.replace(`${window.location.origin}/select-plan-preview.html?reason=trial_expired`);
+        if (this.requiresPaymentRegistration()) {
+            this.redirectToPlanSelection('trial_expired');
         }
+    }
+
+    requiresPaymentRegistration() {
+        const sub = this.subscription;
+        if (!sub) return false;
+        const isTrialExpired = Boolean(sub.trialStartedAt) && !sub.isInTrial;
+        const hasNoPayment = !this.paymentStatus || !this.paymentStatus.hasPaymentMethod;
+        return isTrialExpired && hasNoPayment;
+    }
+
+    redirectToPlanSelection(reason = 'trial_expired') {
+        const billing = this.subscription?.billingCycle === 'annual' ? 'annual' : 'monthly';
+        localStorage.setItem('diffsense_trial_expired', '1');
+        window.location.replace(`${window.location.origin}/select-plan-preview.html?reason=${reason}&billing=${billing}`);
+    }
+
+    ensurePaymentAccess(featureLabel = '機能') {
+        if (!this.requiresPaymentRegistration()) {
+            return true;
+        }
+        Notify.warning(`${featureLabel}を利用するには、お支払い方法の登録が必要です。プラン選択画面へ移動します。`);
+        this.redirectToPlanSelection('trial_expired');
+        return false;
     }
 
     showCancelModal() {
@@ -2294,6 +2313,10 @@ class DashboardApp {
         // Auto-close sidebar on mobile
         document.getElementById('app-sidebar')?.classList.remove('active');
         document.getElementById('sidebar-overlay')?.classList.remove('active');
+
+        if (viewId === 'diff' && !this.ensurePaymentAccess('差分機能')) {
+            return;
+        }
 
         // RBAC: Protect team view - Allow if Business+ OR Trial
         if (viewId === 'team' && this.subscription?.plan === 'starter' && !this.subscription?.isInTrial) {
@@ -2598,6 +2621,9 @@ class DashboardApp {
             Notify.warning('閲覧のみの権限ではAI解析を実行できません');
             return;
         }
+        if (!this.ensurePaymentAccess('差分解析')) {
+            return;
+        }
         const contract = dbService.getContractById(id);
         if (!contract) {
             Notify.error('契約が見つかりません');
@@ -2673,6 +2699,9 @@ class DashboardApp {
     }
 
     uploadNewVersion(id) {
+        if (!this.ensurePaymentAccess('新しいバージョン解析')) {
+            return;
+        }
         const contract = dbService.getContractById(id);
         if (!contract) {
             Notify.error('契約が見つかりません');
@@ -2828,6 +2857,9 @@ class DashboardApp {
     async handleUrlVersionSubmit(id, url) {
         if (!this.can('operate_contract')) {
             Notify.warning('閲覧のみの権限ではバージョン更新を実行できません');
+            return;
+        }
+        if (!this.ensurePaymentAccess('URL差分解析')) {
             return;
         }
         const urlModal = document.getElementById('url-input-modal');
@@ -3307,6 +3339,9 @@ class DashboardApp {
      * AI解析を実行（共通ロジック）
      */
     async performAIAnalysis(id) {
+        if (!this.ensurePaymentAccess('差分解析')) {
+            return;
+        }
         const contract = dbService.getContractById(id);
         const fbModule = await import('./firebase-config.js');
         const user = fbModule.auth.currentUser;

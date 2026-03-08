@@ -1,5 +1,12 @@
 import { getIdToken } from './auth.js';
 
+function redirectToTrialExpiredPlanPage() {
+    const billingRaw = localStorage.getItem('diffsense_selected_billing_cycle');
+    const billing = billingRaw === 'annual' ? 'annual' : 'monthly';
+    localStorage.setItem('diffsense_trial_expired', '1');
+    window.location.replace(`${window.location.origin}/select-plan-preview.html?reason=trial_expired&billing=${billing}`);
+}
+
 /**
  * AI Service - Backend API Communication
  * バックエンドAPIとの通信を担当
@@ -66,6 +73,9 @@ export const aiService = {
                 const apiError = new Error(result.error || `HTTP error! status: ${response.status}`);
                 if (result.code) {
                     apiError.code = result.code;
+                }
+                if (apiError.code === 'TRIAL_EXPIRED') {
+                    redirectToTrialExpiredPlanPage();
                 }
                 throw apiError;
             }
