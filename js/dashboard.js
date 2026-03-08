@@ -34,6 +34,56 @@ function loadExternalScriptOnce(src, globalGuard = null) {
     return loader;
 }
 
+const parseArticleNumeric = (label) => {
+    if (!label) return 0;
+    const m = String(label).match(/第\s*([0-9０-９一二三四五六七八九十百千〇零]+)\s*条/);
+    if (!m) return 0;
+    const raw = m[1].replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xfee0));
+    if (/^\d+$/.test(raw)) return parseInt(raw, 10);
+    const map = { '零': 0, '〇': 0, '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9 };
+    if (map[raw] !== undefined) return map[raw];
+    return 0;
+};
+
+const normalizeStructuredDisplayContent = (content) => {
+    if (!content || typeof content !== 'object' || Array.isArray(content) || !Array.isArray(content.articles)) {
+        return content;
+    }
+
+    const clone = {
+        ...content,
+        preamble: String(content.preamble || '').trim(),
+        articles: content.articles.map((a) => ({ ...a }))
+    };
+
+    const firstArticleOneIdx = clone.articles.findIndex((a) => parseArticleNumeric(a.articleNumber || a.article || '') === 1);
+    if (firstArticleOneIdx > 0) {
+        const prefix = clone.articles.slice(0, firstArticleOneIdx);
+        const allLikelyNoise = prefix.every((a) => {
+            const body = String(a.content || '').trim();
+            if (!body) return true;
+            if (body.length < 30) return true;
+            return /(前文|契約書|規約|改訂|ver\.?|version)/i.test(body);
+        });
+
+        if (allLikelyNoise) {
+            const mergedPrefixText = prefix
+                .map((a) => String(a.content || '').trim())
+                .filter(Boolean)
+                .join('\n')
+                .trim();
+            if (mergedPrefixText) {
+                clone.preamble = clone.preamble
+                    ? `${clone.preamble}\n${mergedPrefixText}`.trim()
+                    : mergedPrefixText;
+            }
+            clone.articles = clone.articles.slice(firstArticleOneIdx);
+        }
+    }
+
+    return clone;
+};
+
 // --- Static Content ---
 
 // --- View Renderers Helpers ---
@@ -46,15 +96,16 @@ const parseContractIntoClauses = (content) => {
 
     // structuredContract support: { title, version, preamble, articles[] }
     if (typeof content === 'object' && !Array.isArray(content) && Array.isArray(content.articles)) {
+        const normalized = normalizeStructuredDisplayContent(content);
         const clauses = [];
-        if (content.preamble) {
+        if (normalized.preamble) {
             clauses.push({
                 title: '前文',
-                header: content.title || '',
-                paragraphs: String(content.preamble).split(/\n+/).filter(Boolean)
+                header: normalized.title || '',
+                paragraphs: String(normalized.preamble).split(/\n+/).filter(Boolean)
             });
         }
-        content.articles.forEach((item, idx) => {
+        normalized.articles.forEach((item, idx) => {
             clauses.push({
                 title: item.articleNumber || `第${idx + 1}条`,
                 header: item.title || '',
