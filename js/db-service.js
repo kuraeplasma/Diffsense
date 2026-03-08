@@ -382,6 +382,9 @@ export const dbService = {
                 contract.source_type = data.sourceType;
                 contract.pdf_storage_path = data.pdfStoragePath;
                 contract.pdf_url = data.pdfUrl;
+                if (data.rawExtractedText !== undefined) {
+                    contract.pdf_raw_text = data.rawExtractedText || '';
+                }
             }
 
             // ステータスを更新
@@ -418,6 +421,9 @@ export const dbService = {
             // 抽出されたテキストを保存
             if (analysisData.extractedText) {
                 contract.original_content = analysisData.extractedText;
+            }
+            if (analysisData.rawExtractedText !== undefined) {
+                contract.pdf_raw_text = analysisData.rawExtractedText || '';
             }
 
             // PDF情報も更新（新バージョン取り込み時）

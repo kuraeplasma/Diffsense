@@ -59,7 +59,98 @@ function normalizeLineText(text) {
     // Recover article headers corrupted by extracted spacing.
     line = line.replace(/^第\s*第?\s*([0-9０-９一二三四五六七八九十百千〇零]+)\s*条\s*条?/, '第$1条');
     line = line.replace(/^第\s+([0-9０-９一二三四五六七八九十百千〇零]+)\s+条/, '第$1条');
+
+    // Collapse exact doubled fragments caused by layered PDF text rendering.
+    // Examples:
+    // - "利用規約利用規約" -> "利用規約"
+    // - "定義定義" -> "定義"
+    const doubled = line.match(/^(.{2,64})\1$/);
+    if (doubled && /[\u3040-\u30ff\u3400-\u9fff]/.test(doubled[1])) {
+        line = doubled[1];
+    }
+
     return line.trim();
+}
+
+function shouldKeepSoftLineBreak(prevLine, nextLine) {
+    const prev = String(prevLine || '').trim();
+    const next = String(nextLine || '').trim();
+    if (!prev || !next) return true;
+    if (/^第\s*[0-9０-９一二三四五六七八九十百千〇零]+\s*条/.test(prev)) return true;
+    if (/^[\d０-９]+\s*[\.．\)]/.test(next)) return true;
+    if (/^[・●○■□\-]/.test(next)) return true;
+    if (/^[（(]/.test(next)) return true;
+    return false;
+}
+
+function areSameToken(a, b) {
+    if (!a || !b) return false;
+    if (a.text !== b.text) return false;
+    const yClose = Math.abs(a.y - b.y) <= 1.8;
+    const xClose = Math.abs(a.x - b.x) <= 1.8;
+    const widthClose = Math.abs((a.width || 0) - (b.width || 0)) <= 3.2;
+    return yClose && xClose && widthClose;
+}
+
+function dedupeRowItems(items) {
+    const deduped = [];
+    for (const token of items) {
+        // Remove same-token overlays emitted multiple times by some PDF generators.
+        const duplicate = deduped.some((kept) => {
+            if (areSameToken(kept, token)) return true;
+            if (kept.text !== token.text) return false;
+            if (Math.abs(kept.y - token.y) > 2.4) return false;
+            const keptStart = kept.x;
+            const keptEnd = kept.x + kept.width;
+            const tokStart = token.x;
+            const tokEnd = token.x + token.width;
+            const overlap = Math.max(0, Math.min(keptEnd, tokEnd) - Math.max(keptStart, tokStart));
+            const minWidth = Math.max(1, Math.min(kept.width || 0, token.width || 0));
+            // Treat strongly-overlapped identical text as duplicate even if x/y is slightly shifted.
+            return overlap / minWidth >= 0.55;
+        });
+        if (!duplicate) deduped.push(token);
+    }
+    return deduped;
+}
+
+function collapseLineDuplicates(text) {
+    let line = String(text || '');
+    // "利用規約利用規約" / "定義定義" を圧縮（同一語の連続）
+    line = line.replace(/([\u3040-\u30ff\u3400-\u9fffA-Za-z0-9]{2,24})\1+/g, '$1');
+    // "ユーザー ユーザー：" のような先頭重複を圧縮
+    line = line.replace(/^([\u3040-\u30ff\u3400-\u9fffA-Za-z0-9]{2,24})[\s　]+\1([：:])/g, '$1$2');
+    return line;
+}
+
+function normalizeParagraphBreaks(paragraphs) {
+    const out = [];
+    const articleHeaderPattern = /^第\s*[0-9０-９一二三四五六七八九十百千〇零]+\s*条(?:\s+.*)?$/;
+    const shortTailPattern = /^[\u3040-\u30ff\u3400-\u9fffA-Za-z0-9]{1,6}$/;
+
+    for (const raw of (paragraphs || [])) {
+        const line = String(raw || '').trim();
+        if (!line) continue;
+        if (!out.length) {
+            out.push(line);
+            continue;
+        }
+
+        const prev = out[out.length - 1];
+        const canMergeToHeader = articleHeaderPattern.test(prev) && shortTailPattern.test(line);
+        const isSoftWrapped =
+            !articleHeaderPattern.test(prev) &&
+            /[\u3040-\u30ff\u3400-\u9fffA-Za-z0-9）)】]$/.test(prev) &&
+            !/^([0-9０-９]+[\.．\)]|[・●○■□\-]|第\s*[0-9０-９一二三四五六七八九十百千〇零]+\s*条)/.test(line);
+
+        if (canMergeToHeader || isSoftWrapped) {
+            out[out.length - 1] = `${prev}${line}`;
+        } else {
+            out.push(line);
+        }
+    }
+
+    return out;
 }
 
 class PDFService {
@@ -114,7 +205,8 @@ class PDFService {
 
                 const rows = [];
                 const itemHeights = items.map((i) => i.height).filter((h) => h > 0);
-                const sameLineY = clamp((median(itemHeights) || 10) * 0.35, 1.5, 4);
+                // Slightly wider tolerance to prevent one logical line from being split.
+                const sameLineY = clamp((median(itemHeights) || 10) * 0.42, 2, 6);
                 for (const item of items) {
                     let row = null;
                     let nearestDelta = Infinity;
@@ -141,6 +233,7 @@ class PDFService {
                 rows.sort((a, b) => b.y - a.y);
                 for (const row of rows) {
                     row.items.sort((a, b) => a.x - b.x);
+                    row.items = dedupeRowItems(row.items);
                     let line = '';
                     let prevRight = null;
                     let prevText = '';
@@ -155,6 +248,11 @@ class PDFService {
                         }
 
                         const gap = prevRight === null ? 0 : token.x - prevRight;
+                        // Some PDFs emit duplicated adjacent tokens with tiny x-shift.
+                        if (prevText === chunk && gap <= Math.max(4, (row.avgHeight || token.height || 10) * 0.9)) {
+                            prevRight = Math.max(prevRight || 0, token.x + token.width);
+                            continue;
+                        }
                         if (shouldInsertSpace(prevText, chunk, gap, row.avgHeight || token.height || 10)) {
                             line += ' ';
                         }
@@ -162,7 +260,7 @@ class PDFService {
                         prevRight = Math.max(prevRight || 0, token.x + token.width);
                         prevText = chunk;
                     }
-                    line = normalizeLineText(line);
+                    line = normalizeLineText(collapseLineDuplicates(line));
                     if (!line) continue;
                     const minX = row.items[0].x;
                     const maxX = row.items[row.items.length - 1].x + row.items[row.items.length - 1].width;
@@ -189,7 +287,8 @@ class PDFService {
                         preamble: '（PDFからテキストを抽出できませんでした。画像ベースのPDFの可能性があります。）',
                         articles: []
                     },
-                    articles: []
+                    articles: [],
+                    rawText: ''
                 };
             }
 
@@ -197,6 +296,7 @@ class PDFService {
                 if (a.pageNum !== b.pageNum) return a.pageNum - b.pageNum;
                 return b.y - a.y;
             });
+            const rawText = allLines.map((l) => l.text).join('\n').trim();
 
             const heights = allLines.map((l) => l.height).filter((h) => h > 0);
             const medianHeight = median(heights) || 10;
@@ -221,20 +321,28 @@ class PDFService {
                     if (current.trim()) paragraphs.push(current.trim());
                     current = line.text;
                 } else {
-                    current += `\n${line.text}`;
+                    // Within a paragraph, avoid preserving visual line wraps from PDF layout.
+                    // Keep explicit soft line breaks only for list-like lines.
+                    const keepBreak = shouldKeepSoftLineBreak(prev.text, line.text);
+                    if (keepBreak) {
+                        current += `\n${line.text}`;
+                    } else {
+                        current += line.text;
+                    }
                 }
                 prev = line;
             }
             if (current.trim()) paragraphs.push(current.trim());
+            const normalizedParagraphs = normalizeParagraphBreaks(paragraphs);
 
-            const structuredContract = buildStructuredContract(paragraphs, {
+            const structuredContract = buildStructuredContract(normalizedParagraphs, {
                 title: titleLine ? titleLine.text : '',
                 version: versionLine ? versionLine.text : ''
             });
             const articles = toLegacyArticleArray(structuredContract);
 
-            logger.info(`Successfully extracted ${paragraphs.length} paragraphs from ${pdfDocument.numPages} pages`);
-            return { structuredContract, articles };
+            logger.info(`Successfully extracted ${normalizedParagraphs.length} paragraphs from ${pdfDocument.numPages} pages`);
+            return { structuredContract, articles, rawText };
 
         } catch (error) {
             logger.error('PDF extraction error:', error);

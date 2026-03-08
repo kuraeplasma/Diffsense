@@ -97,6 +97,23 @@ const isStructuredDocumentContent = (content) => {
 
 const isWordDocumentFilename = (value) => /\.(docx?|dotx?)$/i.test(String(value || '').trim());
 
+const isEmbeddablePdfUrl = (value) => {
+    const src = String(value || '').trim();
+    if (!src) return false;
+    if (src.startsWith('blob:')) return true;
+    if (/^https?:\/\//i.test(src)) return true;
+    if (src.startsWith('/uploads/')) return true;
+    return false;
+};
+
+const resolvePdfPreviewUrl = (contract, runtimePdfUrl = null) => {
+    const candidates = [contract?.pdf_url, runtimePdfUrl, contract?.pdf_storage_path];
+    for (const candidate of candidates) {
+        if (isEmbeddablePdfUrl(candidate)) return candidate;
+    }
+    return null;
+};
+
 const clauseIdentityKey = (clause) => `${clause?.title || ''}__${clause?.header || ''}`;
 
 const clauseParagraphs = (clause) => Array.isArray(clause?.paragraphs)
@@ -773,9 +790,10 @@ const Views = {
         const contract = dbService.getContractById(id);
         const activeTab = window.app ? window.app.activeDetailTab : 'diff';
         const runtimePdfUrl = window.app?.getRuntimePdfPreviewUrl(id) || null;
+        const resolvedPdfPreviewUrl = resolvePdfPreviewUrl(contract, runtimePdfUrl);
         const sourceType = String(contract?.source_type || '').toUpperCase();
         const isPdfSource = sourceType === 'PDF' || (contract?.original_filename || '').toLowerCase().endsWith('.pdf');
-        const hasPdfPreview = Boolean(contract?.pdf_url || contract?.pdf_storage_path || runtimePdfUrl);
+        const hasPdfPreview = Boolean(resolvedPdfPreviewUrl);
         const showPdfViewerInRightPane = isPdfSource && hasPdfPreview && activeTab === 'original';
 
         // AI解析結果があればそれを使用、なければ静的コンテンツまたはデフォルト
@@ -966,9 +984,9 @@ const Views = {
                         <div class="pane-scroll-area ${showPdfViewerInRightPane ? '' : 'document-pane-bg is-frameless'}" style="padding:0; flex:1; display:flex; flex-direction:column; overflow-y:auto;">
                                 ${showPdfViewerInRightPane
                 ? `<div style="width:100%; height:100%; display:flex; flex-direction:column;">
-                        <iframe src="${contract.pdf_url || runtimePdfUrl || contract.pdf_storage_path}" style="width:100%; flex:1; border:none; background:#525659; min-height:600px;"></iframe>
+                        <iframe src="${resolvedPdfPreviewUrl}" style="width:100%; flex:1; border:none; background:#525659; min-height:600px;"></iframe>
                         <div style="padding:10px; text-align:center; background:#f9f9f9; border-top:1px solid #ddd; font-size:12px;">
-                            <a href="${contract.pdf_url || runtimePdfUrl || contract.pdf_storage_path}" target="_blank" class="text-primary"><i class="fa-solid fa-external-link-alt"></i> PDFを別ウィンドウで開く</a>
+                            <a href="${resolvedPdfPreviewUrl}" target="_blank" class="text-primary"><i class="fa-solid fa-external-link-alt"></i> PDFを別ウィンドウで開く</a>
                              <span style="margin-left:10px; color:#999;">(Shift+Clickでダウンロード)</span>
                         </div>
                    </div>`
@@ -1019,6 +1037,44 @@ const Views = {
                             return content || '';
                         };
 
+                        const normalizePdfDisplayText = (text) => {
+                            const src = String(text || '');
+                            if (!src) return '';
+                            const lines = src.split(/\r?\n/);
+                            const out = [];
+                            const articleHeaderPattern = /^第\s*[0-9０-９一二三四五六七八九十百千〇零]+\s*条(?:\s+.*)?$/;
+                            const listLinePattern = /^([0-9０-９]+[\.．\)]|[・●○■□\-]|第\s*[0-9０-９一二三四五六七八九十百千〇零]+\s*条)/;
+                            const shortTailPattern = /^[\u3040-\u30ff\u3400-\u9fffA-Za-z0-9]{1,6}$/;
+
+                            for (let i = 0; i < lines.length; i += 1) {
+                                const line = String(lines[i] || '').trim();
+                                if (!line) {
+                                    if (out.length > 0 && out[out.length - 1] !== '') out.push('');
+                                    continue;
+                                }
+
+                                const prev = out.length > 0 ? out[out.length - 1] : '';
+                                const prevTrim = String(prev || '').trim();
+                                const isList = listLinePattern.test(line);
+                                const isLikelyHeaderTail = shortTailPattern.test(line) && articleHeaderPattern.test(prevTrim);
+                                const isLikelyWrappedContinuation =
+                                    !isList &&
+                                    prevTrim &&
+                                    prevTrim !== '' &&
+                                    /[\u3040-\u30ff\u3400-\u9fffA-Za-z0-9）)】]$/.test(prevTrim);
+
+                                if (out.length === 0 || prevTrim === '' || isList) {
+                                    out.push(line);
+                                } else if (isLikelyHeaderTail || isLikelyWrappedContinuation) {
+                                    out[out.length - 1] = `${prevTrim}${line}`;
+                                } else {
+                                    out.push(line);
+                                }
+                            }
+
+                            return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+                        };
+
                         const historyEntries = Array.isArray(contract.history) ? contract.history : [];
                         const currentVersion = contract.original_content || '';
                         const isWordSource = isWordDocumentFilename(contract.original_filename);
@@ -1038,9 +1094,12 @@ const Views = {
                             if (contract.ai_changes && contract.ai_changes.length > 0) {
                                 return renderAiChangeCards();
                             }
+                            const initialDisplayText = (isPdfSource && typeof contract.pdf_raw_text === 'string' && contract.pdf_raw_text.trim())
+                                ? contract.pdf_raw_text
+                                : (isPdfSource ? normalizePdfDisplayText(currentVersionText) : currentVersionText);
                             return `
                                 <div class="document-content-diff-wrap" style="padding: 8px 0;">
-                                    <div style="white-space:pre-wrap; line-height:1.9;">${escapeHtmlText(currentVersionText)}</div>
+                                    <div style="white-space:pre-wrap; line-height:1.9;">${escapeHtmlText(initialDisplayText)}</div>
                                 </div>
                             `;
                         }
@@ -1057,24 +1116,26 @@ const Views = {
                         }
 
                         const renderDualFullDiff = () => {
+                            const lhsText = isPdfSource ? normalizePdfDisplayText(previousVersionText) : previousVersionText;
+                            const rhsText = isPdfSource ? normalizePdfDisplayText(currentVersionText) : currentVersionText;
                             if (!window.Diff || typeof window.Diff.diffWordsWithSpace !== 'function') {
                                 return `
                                     <div class="document-content-diff-wrap">
                                         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:12px;">
                                             <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px;">
                                                 <div style="font-size:12px; font-weight:700; color:#b42318; margin-bottom:8px;">変更前（旧版全文）</div>
-                                                <div style="white-space:pre-wrap; line-height:1.9;">${escapeHtmlText(previousVersionText)}</div>
+                                                <div style="white-space:pre-wrap; line-height:1.9;">${escapeHtmlText(lhsText)}</div>
                                             </div>
                                             <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px;">
                                                 <div style="font-size:12px; font-weight:700; color:#027a48; margin-bottom:8px;">変更後（新版本文）</div>
-                                                <div style="white-space:pre-wrap; line-height:1.9;">${escapeHtmlText(currentVersionText)}</div>
+                                                <div style="white-space:pre-wrap; line-height:1.9;">${escapeHtmlText(rhsText)}</div>
                                             </div>
                                         </div>
                                     </div>
                                 `;
                             }
 
-                            const chunks = window.Diff.diffWordsWithSpace(previousVersionText, currentVersionText);
+                            const chunks = window.Diff.diffWordsWithSpace(lhsText, rhsText);
                             let oldHtml = '';
                             let newHtml = '';
 
@@ -1577,6 +1638,7 @@ class RegistrationFlow {
                 // 抽出されたテキストのみを保存（AI解析結果は保存しない）
                 dbService.updateContractText(contractId, {
                     extractedText: result.data.structuredContract || result.data.extractedText,
+                    rawExtractedText: result.data.rawExtractedText,
                     extractedTextHash: result.data.extractedTextHash,
                     extractedTextLength: result.data.extractedTextLength,
                     sourceType: result.data.sourceType,
@@ -3371,6 +3433,7 @@ class DashboardApp {
                         // 解析結果をDBに保存
                         dbService.updateContractAnalysis(id, {
                             extractedText: result.data.structuredContract || result.data.extractedText,
+                            rawExtractedText: result.data.rawExtractedText,
                             extractedTextHash: result.data.extractedTextHash,
                             extractedTextLength: result.data.extractedTextLength,
                             sourceType: result.data.sourceType,

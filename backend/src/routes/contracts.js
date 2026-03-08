@@ -219,6 +219,7 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
 
         let extractedText = "";
         let structuredContract = null;
+        let rawExtractedText = '';
         let aiResult = {
             changes: [],
             riskLevel: 1,
@@ -233,6 +234,7 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                 if (pdfResult && typeof pdfResult === 'object' && Array.isArray(pdfResult.articles)) {
                     structuredContract = pdfResult.structuredContract || null;
                     extractedText = pdfResult.articles;
+                    rawExtractedText = String(pdfResult.rawText || '');
                 } else {
                     extractedText = pdfResult;
                 }
@@ -315,6 +317,7 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                 riskReason: aiResult.riskReason,
                 summary: aiResult.summary,
                 structuredContract,
+                rawExtractedText,
                 aiFailed: aiFailed
             }
         });
