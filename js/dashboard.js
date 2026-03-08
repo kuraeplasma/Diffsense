@@ -559,7 +559,7 @@ const Views = {
         const sourceType = String(contract?.source_type || '').toUpperCase();
         const isPdfSource = sourceType === 'PDF' || (contract?.original_filename || '').toLowerCase().endsWith('.pdf');
         const hasPdfPreview = Boolean(contract?.pdf_url || contract?.pdf_storage_path || runtimePdfUrl);
-        const showPdfViewerInRightPane = isPdfSource && hasPdfPreview && (activeTab === 'original' || activeTab === 'diff');
+        const showPdfViewerInRightPane = isPdfSource && hasPdfPreview && activeTab === 'original';
 
         // AI解析結果があればそれを使用、なければ静的コンテンツまたはデフォルト
         const hasComparableVersion = Array.isArray(contract.history) && contract.history.length > 0;
