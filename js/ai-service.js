@@ -5,10 +5,15 @@ import { getIdToken } from './auth.js';
  * バックエンドAPIとの通信を担当
  */
 export const aiService = {
-    // API Base URL (Local vs Cloud)
-    API_BASE: (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-        ? 'http://localhost:3001'
-        : 'https://api-qf37m5ba2q-an.a.run.app',
+    // API Base URL (Local vs Cloud). localhostでも本番APIを明示指定できる。
+    getApiBase() {
+        const PROD_API = 'https://api-qf37m5ba2q-an.a.run.app';
+        const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const params = new URLSearchParams(window.location.search);
+        const forceProd = params.get('api') === 'prod' || localStorage.getItem('diffsense_api_mode') === 'prod';
+        if (forceProd) return PROD_API;
+        return isLocalHost ? 'http://localhost:3001' : PROD_API;
+    },
 
     /**
      * 契約書を解析
@@ -20,6 +25,7 @@ export const aiService = {
      */
     async analyzeContract(contractId, method, source, previousVersion = null, options = {}) {
         try {
+            const apiBase = this.getApiBase();
             const token = await getIdToken();
             console.log("AI Service: Token retrieval status:", token ? "Success" : "Failed");
             const body = {
@@ -31,7 +37,13 @@ export const aiService = {
             if (options.skipAI) {
                 body.skipAI = true;
             }
-            const response = await fetch(`${this.API_BASE}/contracts/analyze`, {
+            // Word解析は常に専用エンドポイントを使用
+            // 一部環境の /contracts/analyze バリデーションでは docx が未許可のため
+            const endpoint = (method === 'docx')
+                ? `${apiBase}/contracts/upload-docx`
+                : `${apiBase}/contracts/analyze`;
+
+            const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -48,6 +60,17 @@ export const aiService = {
                     apiError.code = result.code;
                 }
                 throw apiError;
+            }
+
+            // Normalize DOCX full-analysis response shape.
+            // /contracts/upload-docx returns `articles`, while the app expects `extractedText`.
+            if (method === 'docx' && result?.success && result?.data) {
+                if (result.data.extractedText === undefined && Array.isArray(result.data.articles)) {
+                    result.data.extractedText = result.data.articles;
+                }
+                if (!result.data.sourceType) {
+                    result.data.sourceType = 'DOCX';
+                }
             }
 
             return result;
@@ -73,8 +96,9 @@ export const aiService = {
      */
     async sendInvite(email, name, role) {
         try {
+            const apiBase = this.getApiBase();
             const token = await getIdToken();
-            const response = await fetch(`${this.API_BASE}/invite`, {
+            const response = await fetch(`${apiBase}/invite`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -106,7 +130,8 @@ export const aiService = {
      */
     async healthCheck() {
         try {
-            const response = await fetch(`${this.API_BASE}/health`);
+            const apiBase = this.getApiBase();
+            const response = await fetch(`${apiBase}/health`);
             return await response.json();
         } catch (error) {
             console.error('Health check failed:', error);
@@ -123,8 +148,16 @@ export const aiService = {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = () => {
-                // data:application/pdf;base64, の部分を除去
-                const base64 = reader.result.split(',')[1];
+                let result = reader.result;
+                const fileName = file.name.toLowerCase();
+
+                // .docx ファイルが application/octet-stream として認識される場合の補正
+                if (fileName.endsWith('.docx') && result.startsWith('data:application/octet-stream;')) {
+                    result = result.replace('data:application/octet-stream;', 'data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;');
+                }
+
+                // Base64の部分のみ抽出して返す
+                const base64 = result.split(',')[1];
                 resolve(base64);
             };
             reader.onerror = reject;
