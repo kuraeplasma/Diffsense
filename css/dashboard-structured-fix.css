@@ -1,3 +1,11 @@
+.detail-split-body .pane-scroll-area,
+.contract-structured-container,
+.clause-nav,
+.clause-nav-list,
+.clause-cards-container {
+    overflow-anchor: none;
+}
+
 .contract-structured-container {
     display: flex;
     align-items: flex-start;

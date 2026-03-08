@@ -2822,28 +2822,43 @@ class DashboardApp {
             if (!rightPane) return;
 
             const scrollArea = rightPane.querySelector('.pane-scroll-area');
+            const documentContent = rightPane.querySelector('.document-content-full');
+            const navBox = rightPane.querySelector('.clause-nav');
             if (scrollArea) {
                 scrollArea.scrollTo({ top: 0, left: 0, behavior: 'auto' });
                 scrollArea.scrollTop = 0;
             }
+            if (documentContent) {
+                documentContent.scrollTop = 0;
+            }
+            if (navBox) {
+                navBox.scrollTop = 0;
+            }
 
             const navList = rightPane.querySelector('.clause-nav-list');
             if (navList) {
+                navList.scrollTo({ top: 0, left: 0, behavior: 'auto' });
                 navList.scrollTop = 0;
             }
 
             const clauseCards = rightPane.querySelector('.clause-cards-container');
             if (clauseCards) {
+                clauseCards.scrollTo({ top: 0, left: 0, behavior: 'auto' });
                 clauseCards.scrollTop = 0;
             }
 
-            // In both tabs, pin to explicit top anchor to avoid mid-document reopen.
-            if (scrollArea) {
+            // Original tab must always reopen from the first visible clause/header.
+            if (this.activeDetailTab === 'original' && scrollArea) {
+                const firstClauseCard = rightPane.querySelector('.clause-card');
                 const topAnchor = rightPane.querySelector('.document-top-anchor');
-                if (topAnchor) {
+                if (firstClauseCard) {
+                    const nextTop = Math.max(0, firstClauseCard.offsetTop - 8);
+                    scrollArea.scrollTo({ top: nextTop, left: 0, behavior: 'auto' });
+                    scrollArea.scrollTop = nextTop;
+                } else if (topAnchor) {
                     topAnchor.scrollIntoView({ block: 'start', behavior: 'auto' });
+                    scrollArea.scrollTop = 0;
                 }
-                scrollArea.scrollTop = 0;
             }
         };
 
@@ -2853,6 +2868,7 @@ class DashboardApp {
             setTimeout(runReset, 180);
             setTimeout(runReset, 420);
             setTimeout(runReset, 800);
+            setTimeout(runReset, 1400);
         });
     }
 
