@@ -626,7 +626,7 @@ const Views = {
                 <div class="detail-split-body">
                     <!-- Left Pane: Analysis & Diffs -->
                     <div class="pane">
-                        <div class="pane-header">
+                        <div class="pane-header" style="min-height:56px; box-sizing:border-box;">
                             <span><i class="fa-solid fa-magnifying-glass-chart"></i> AI解析・差分判定</span>
                             <span class="text-muted" style="font-weight:normal; font-size:11px;">最終解析: ${contract.last_analyzed_at || '-'}</span>
                         </div>
@@ -687,7 +687,7 @@ const Views = {
 
                     <!-- Right Pane: Original Document -->
                     <div class="pane">
-                        <div class="pane-header" style="display:flex; justify-content:space-between; align-items:center;">
+                        <div class="pane-header" style="display:flex; justify-content:space-between; align-items:center; min-height:56px; box-sizing:border-box;">
                             <div style="display:flex; align-items:center; gap:8px;">
                                 <span><i class="fa-solid fa-file-contract"></i> ドキュメント表示</span>
                                 <!-- History Dropdown -->
