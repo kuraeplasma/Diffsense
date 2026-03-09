@@ -1366,18 +1366,11 @@ const Views = {
         const effectiveSelectedDiffData = (!hasExplicitNoDiffResult && selectedDiffPayload)
             ? selectedDiffPayload
             : (hasAnalysisRecord(storedContractAnalysis) ? storedContractAnalysis : null);
-        const shouldAutoAnalyzePair = Boolean(
+        const shouldShowStructuredFallbackPanel = Boolean(
             !comparisonContext
-            && selectedSourceDoc
-            && selectedTargetDoc
             && hasStructuredDifferences
-            && (!selectedDiffPayload || hasExplicitNoDiffResult || selectedDiffPayload.isFallback === true)
+            && (!effectiveSelectedDiffData || hasExplicitNoDiffResult)
         );
-        const autoPairAnalysisQueued = shouldAutoAnalyzePair
-            ? window.app?.scheduleAutoPairAnalysis(id, selectedSourceDoc.id, selectedTargetDoc.id, {
-                force: Boolean(selectedDiffPayload && (hasExplicitNoDiffResult || selectedDiffPayload.isFallback === true))
-            }) === true
-            : false;
         const activeTab = window.app ? window.app.activeDetailTab : 'diff';
         const runtimePdfUrl = window.app?.getRuntimePdfPreviewUrl(id) || null;
         const resolvedPdfPreviewUrl = resolvePdfPreviewUrl(contract, runtimePdfUrl);
@@ -1411,6 +1404,15 @@ const Views = {
                 changes: cached.changes || [],
                 isFallback: cached.isFallback === true
             };
+        } else if (shouldShowStructuredFallbackPanel && structuredFallbackAnalysis) {
+            diffData = {
+                title: `${contract.name} - 文書比較`,
+                summary: structuredFallbackAnalysis.summary || '文書差分から変更点を表示しています。',
+                riskLevel: structuredFallbackAnalysis.riskLevel ?? 1,
+                riskReason: '文書差分から変更点を表示しています',
+                changes: Array.isArray(structuredFallbackAnalysis.changes) ? structuredFallbackAnalysis.changes : [],
+                isFallback: false
+            };
         } else if (hasFallbackNoDiffResult) {
             diffData = {
                 title: `${contract.name} - 文書比較`,
@@ -1419,15 +1421,6 @@ const Views = {
                 riskReason: 'AI差分要約未取得',
                 changes: [],
                 isFallback: true
-            };
-        } else if (autoPairAnalysisQueued) {
-            diffData = {
-                title: `${contract.name} - 文書比較`,
-                summary: 'AI差分解析を開始しています。数秒後に要約と変更点を表示します。',
-                riskLevel: 1,
-                riskReason: 'AI差分解析中',
-                changes: [],
-                isFallback: false
             };
         } else if (selectedSourceDoc && selectedTargetDoc) {
             diffData = {
