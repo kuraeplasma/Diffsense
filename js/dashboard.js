@@ -166,6 +166,14 @@ const isMeaningfulAnalysisPayload = (payload) => {
     return true;
 };
 
+const hasAnalysisRecord = (payload) => {
+    if (!payload || typeof payload !== 'object') return false;
+    const summary = String(payload.summary || '').trim();
+    const riskReason = String(payload.riskReason || '').trim();
+    const changes = Array.isArray(payload.changes) ? payload.changes.filter(Boolean) : [];
+    return Boolean(summary || riskReason || changes.length > 0 || payload.isFallback === true || payload.aiFailed === true);
+};
+
 const sanitizeAnalysisPayload = (payload) => {
     const base = (payload && typeof payload === 'object') ? payload : {};
     const changes = Array.isArray(base.changes) ? base.changes.filter(Boolean) : [];
@@ -1341,6 +1349,9 @@ const Views = {
         const selectedDiffResult = selectedSourceDoc && selectedTargetDoc
             ? dbService.getDiffResult(selectedSourceDoc.id, selectedTargetDoc.id)
             : null;
+        const selectedDiffPayload = hasAnalysisRecord(selectedDiffResult?.diff_data)
+            ? selectedDiffResult.diff_data
+            : null;
         const structuredFallbackAnalysis = selectedSourceDoc && selectedTargetDoc
             ? buildStructuredFallbackAnalysis(selectedSourceDoc.content, selectedTargetDoc.content)
             : null;
@@ -1348,11 +1359,23 @@ const Views = {
         const latestCurrentPair = isCurrentVsLatestHistoryPair(documentOptions, selectedSourceDoc, selectedTargetDoc);
         const storedContractAnalysis = latestCurrentPair ? buildStoredContractAnalysis(contract) : null;
         const hasFallbackNoDiffResult = hasStructuredDifferences
-            && selectedDiffResult?.diff_data?.isFallback === true
-            && isExplicitNoDiffAnalysis(selectedDiffResult?.diff_data);
-        const effectiveSelectedDiffData = (!hasFallbackNoDiffResult && isMeaningfulAnalysisPayload(selectedDiffResult?.diff_data))
-            ? selectedDiffResult.diff_data
-            : ((storedContractAnalysis && storedContractAnalysis.isFallback !== true && !isExplicitNoDiffAnalysis(storedContractAnalysis)) ? storedContractAnalysis : null);
+            && selectedDiffPayload?.isFallback === true
+            && isExplicitNoDiffAnalysis(selectedDiffPayload);
+        const effectiveSelectedDiffData = (!hasFallbackNoDiffResult && selectedDiffPayload)
+            ? selectedDiffPayload
+            : (hasAnalysisRecord(storedContractAnalysis) ? storedContractAnalysis : null);
+        const shouldAutoAnalyzePair = Boolean(
+            !comparisonContext
+            && selectedSourceDoc
+            && selectedTargetDoc
+            && hasStructuredDifferences
+            && (!selectedDiffPayload || selectedDiffPayload.isFallback === true)
+        );
+        const autoPairAnalysisQueued = shouldAutoAnalyzePair
+            ? window.app?.scheduleAutoPairAnalysis(id, selectedSourceDoc.id, selectedTargetDoc.id, {
+                force: selectedDiffPayload?.isFallback === true
+            }) === true
+            : false;
         const activeTab = window.app ? window.app.activeDetailTab : 'diff';
         const runtimePdfUrl = window.app?.getRuntimePdfPreviewUrl(id) || null;
         const resolvedPdfPreviewUrl = resolvePdfPreviewUrl(contract, runtimePdfUrl);
@@ -1369,7 +1392,15 @@ const Views = {
 
         let diffData;
         if (effectiveSelectedDiffData) {
-            const cached = sanitizeAnalysisPayload(effectiveSelectedDiffData);
+            const cached = effectiveSelectedDiffData?.isFallback === true
+                ? {
+                    summary: String(effectiveSelectedDiffData.summary || 'AI差分要約を取得できませんでした。再解析を実行してください。').trim() || 'AI差分要約を取得できませんでした。再解析を実行してください。',
+                    riskLevel: effectiveSelectedDiffData.riskLevel ?? 1,
+                    riskReason: String(effectiveSelectedDiffData.riskReason || 'AI差分要約未取得').trim() || 'AI差分要約未取得',
+                    changes: Array.isArray(effectiveSelectedDiffData.changes) ? effectiveSelectedDiffData.changes.filter(Boolean) : [],
+                    isFallback: true
+                }
+                : sanitizeAnalysisPayload(effectiveSelectedDiffData);
             diffData = {
                 title: `${contract.name} - 文書比較`,
                 summary: cached.summary || '選択した2文書の差分結果を表示しています。',
@@ -1386,6 +1417,15 @@ const Views = {
                 riskReason: 'AI差分要約未取得',
                 changes: [],
                 isFallback: true
+            };
+        } else if (autoPairAnalysisQueued) {
+            diffData = {
+                title: `${contract.name} - 文書比較`,
+                summary: 'AI差分解析を開始しています。数秒後に要約と変更点を表示します。',
+                riskLevel: 1,
+                riskReason: 'AI差分解析中',
+                changes: [],
+                isFallback: false
             };
         } else if (selectedSourceDoc && selectedTargetDoc) {
             diffData = {
@@ -2389,6 +2429,8 @@ class DashboardApp {
         this.subscription = { plan: 'pro', billingCycle: 'monthly', usageCount: 0, usageLimit: 400, daysRemaining: null, isInTrial: false, planLimit: 400 };
         this.userPlan = 'pro';
         this.memoryCache = new Map();
+        this.pendingPairAnalysisKeys = new Set();
+        this.attemptedAutoPairAnalysisKeys = new Set();
         this.bootstrapCompleted = false;
         this.hydrateCachedState();
     }
@@ -2462,6 +2504,51 @@ class DashboardApp {
             return;
         }
         this.documentCompareState = null;
+    }
+
+    buildPairAnalysisKey(contractId, docAId, docBId) {
+        if (!contractId || !docAId || !docBId) return '';
+        return `${contractId}:${docAId}->${docBId}`;
+    }
+
+    isPairAnalysisPending(contractId, docAId, docBId) {
+        const key = this.buildPairAnalysisKey(contractId, docAId, docBId);
+        return key ? this.pendingPairAnalysisKeys.has(key) : false;
+    }
+
+    scheduleAutoPairAnalysis(contractId, docAId, docBId, options = {}) {
+        if (!this.can('operate_contract')) return false;
+
+        const key = this.buildPairAnalysisKey(contractId, docAId, docBId);
+        if (!key) return false;
+        if (this.pendingPairAnalysisKeys.has(key)) return true;
+        if (this.attemptedAutoPairAnalysisKeys.has(key)) return false;
+
+        const force = options.force === true;
+        this.pendingPairAnalysisKeys.add(key);
+        this.attemptedAutoPairAnalysisKeys.add(key);
+
+        setTimeout(async () => {
+            try {
+                if (this.currentView !== 'diff' || Number(this.currentViewParams) !== Number(contractId)) return;
+
+                const docs = dbService.getDocumentsByContractId(contractId);
+                const sourceDoc = docs.find((doc) => doc.id === docAId);
+                const targetDoc = docs.find((doc) => doc.id === docBId);
+                if (!sourceDoc || !targetDoc || sourceDoc.id === targetDoc.id) return;
+
+                const cached = dbService.getDiffResult(docAId, docBId);
+                if (!force && hasAnalysisRecord(cached?.diff_data)) return;
+
+                await this.analyzeDocumentPair(contractId, sourceDoc, targetDoc, { force, silent: true, auto: true });
+            } catch (error) {
+                console.error('Auto pair analysis error:', error);
+            } finally {
+                this.pendingPairAnalysisKeys.delete(key);
+            }
+        }, 0);
+
+        return true;
     }
 
     getCachedItem(key, maxAgeMs = 5 * 60 * 1000) {
