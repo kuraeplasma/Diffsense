@@ -285,6 +285,124 @@ const normalizeChangesForDisplay = (changes) => {
     return normalized;
 };
 
+const isExplicitNoDiffAnalysis = (payload) => {
+    const normalized = sanitizeAnalysisPayload(payload);
+    const summary = String(normalized.summary || '').trim();
+    const riskReason = String(normalized.riskReason || '').trim();
+    const changes = Array.isArray(normalized.changes) ? normalized.changes.filter(Boolean) : [];
+    if (changes.length > 0) return false;
+    return /差分は検出されませんでした|変更点は検出されませんでした/.test(`${summary} ${riskReason}`);
+};
+
+const buildStructuredFallbackAnalysis = (previousContent, currentContent) => {
+    if (!isStructuredDocumentContent(previousContent) && !isStructuredDocumentContent(currentContent)) {
+        return null;
+    }
+
+    const previousClauses = parseContractIntoClauses(previousContent);
+    const currentClauses = parseContractIntoClauses(currentContent);
+    if (previousClauses.length === 0 && currentClauses.length === 0) {
+        return null;
+    }
+
+    const previousMap = new Map(previousClauses.map((clause) => [clauseIdentityKey(clause), clause]));
+    const currentMap = new Map(currentClauses.map((clause) => [clauseIdentityKey(clause), clause]));
+    const orderedKeys = [];
+
+    currentClauses.forEach((clause) => {
+        const key = clauseIdentityKey(clause);
+        if (!orderedKeys.includes(key)) orderedKeys.push(key);
+    });
+    previousClauses.forEach((clause) => {
+        const key = clauseIdentityKey(clause);
+        if (!orderedKeys.includes(key)) orderedKeys.push(key);
+    });
+
+    const changes = orderedKeys.map((key) => {
+        const previousClause = previousMap.get(key) || null;
+        const currentClause = currentMap.get(key) || null;
+        const previousText = clauseBodyText(previousClause);
+        const currentText = clauseBodyText(currentClause);
+        const section = composeClauseHeading(
+            currentClause?.title || previousClause?.title || '条文',
+            currentClause?.header || previousClause?.header || ''
+        );
+
+        if (!previousClause && currentClause) {
+            return {
+                section,
+                type: 'ADD',
+                old: '',
+                new: currentText,
+                impact: '',
+                concern: ''
+            };
+        }
+
+        if (previousClause && !currentClause) {
+            return {
+                section,
+                type: 'DELETE',
+                old: previousText,
+                new: '',
+                impact: '',
+                concern: ''
+            };
+        }
+
+        if (previousText !== currentText) {
+            return {
+                section,
+                type: 'MODIFY',
+                old: previousText,
+                new: currentText,
+                impact: '',
+                concern: ''
+            };
+        }
+
+        return null;
+    }).filter(Boolean);
+
+    if (changes.length === 0) {
+        return {
+            summary: '差分は検出されませんでした',
+            riskLevel: 1,
+            riskReason: '差分は検出されませんでした',
+            changes: [],
+            isFallback: true
+        };
+    }
+
+    const previewSections = changes.slice(0, 3).map((item) => item.section).filter(Boolean);
+    const previewSuffix = previewSections.length > 0
+        ? `（${previewSections.join('、')}${changes.length > 3 ? ' ほか' : ''}）`
+        : '';
+    const hasDelete = changes.some((item) => item.type === 'DELETE');
+    const hasAdd = changes.some((item) => item.type === 'ADD');
+    const hasModify = changes.some((item) => item.type === 'MODIFY');
+    let riskReason = '条文差分を検出しました';
+    if (hasDelete && (hasAdd || hasModify)) {
+        riskReason = '追加・削除・変更を検出しました';
+    } else if (hasDelete) {
+        riskReason = '削除を検出しました';
+    } else if (hasAdd && hasModify) {
+        riskReason = '追加・変更を検出しました';
+    } else if (hasAdd) {
+        riskReason = '追加を検出しました';
+    } else if (hasModify) {
+        riskReason = '変更を検出しました';
+    }
+
+    return {
+        summary: `${changes.length}件の変更点を検出しました${previewSuffix}。`,
+        riskLevel: hasDelete ? 2 : 1,
+        riskReason,
+        changes,
+        isFallback: true
+    };
+};
+
 const isCurrentVsLatestHistoryPair = (documentOptions, sourceDoc, targetDoc) => {
     if (!Array.isArray(documentOptions) || !sourceDoc || !targetDoc?.is_current) return false;
     const historicalDocs = documentOptions.filter((doc) => !doc.is_current);
@@ -1123,11 +1241,20 @@ const Views = {
         const selectedDiffResult = selectedSourceDoc && selectedTargetDoc
             ? dbService.getDiffResult(selectedSourceDoc.id, selectedTargetDoc.id)
             : null;
+        const structuredFallbackAnalysis = selectedSourceDoc && selectedTargetDoc
+            ? buildStructuredFallbackAnalysis(selectedSourceDoc.content, selectedTargetDoc.content)
+            : null;
         const latestCurrentPair = isCurrentVsLatestHistoryPair(documentOptions, selectedSourceDoc, selectedTargetDoc);
         const storedContractAnalysis = latestCurrentPair ? buildStoredContractAnalysis(contract) : null;
-        const effectiveSelectedDiffData = isMeaningfulAnalysisPayload(selectedDiffResult?.diff_data)
-            ? selectedDiffResult.diff_data
-            : ((storedContractAnalysis && storedContractAnalysis.isFallback !== true) ? storedContractAnalysis : null);
+        const shouldPreferStructuredFallback = structuredFallbackAnalysis
+            && Array.isArray(structuredFallbackAnalysis.changes)
+            && structuredFallbackAnalysis.changes.length > 0
+            && (!isReusableAnalysisPayload(selectedDiffResult?.diff_data) || isExplicitNoDiffAnalysis(selectedDiffResult?.diff_data));
+        const effectiveSelectedDiffData = shouldPreferStructuredFallback
+            ? structuredFallbackAnalysis
+            : (isMeaningfulAnalysisPayload(selectedDiffResult?.diff_data)
+                ? selectedDiffResult.diff_data
+                : ((storedContractAnalysis && storedContractAnalysis.isFallback !== true) ? storedContractAnalysis : null));
         const activeTab = window.app ? window.app.activeDetailTab : 'diff';
         const runtimePdfUrl = window.app?.getRuntimePdfPreviewUrl(id) || null;
         const resolvedPdfPreviewUrl = resolvePdfPreviewUrl(contract, runtimePdfUrl);
@@ -4736,6 +4863,7 @@ class DashboardApp {
         const force = options.force === true;
         const docs = dbService.getDocumentsByContractId(contractId);
         const storedContractAnalysis = buildStoredContractAnalysis(contract);
+        const structuredFallbackAnalysis = buildStructuredFallbackAnalysis(sourceDoc.content, targetDoc.content);
         const canReuseStoredAnalysis = !force
             && isCurrentVsLatestHistoryPair(docs, sourceDoc, targetDoc)
             && isMeaningfulAnalysisPayload(storedContractAnalysis)
@@ -4776,10 +4904,16 @@ class DashboardApp {
                     Object.assign(diffPayload, result.data || {});
                 }
             } else {
-                const currentText = contentToComparableText(targetDoc.content);
-                const result = await aiService.analyzeContract(contractId, 'text', currentText, sourceDoc.content);
+                const currentPayload = isStructuredDocumentContent(targetDoc.content)
+                    ? targetDoc.content
+                    : contentToComparableText(targetDoc.content);
+                const result = await aiService.analyzeContract(contractId, 'text', currentPayload, sourceDoc.content);
                 if (!result.success) throw new Error(result.error || '差分解析に失敗しました');
                 Object.assign(diffPayload, result.data || {});
+            }
+
+            if (structuredFallbackAnalysis?.changes?.length > 0 && (!isMeaningfulAnalysisPayload(diffPayload) || isExplicitNoDiffAnalysis(diffPayload))) {
+                Object.assign(diffPayload, structuredFallbackAnalysis);
             }
 
             if (!isMeaningfulAnalysisPayload(diffPayload) && canReuseStoredAnalysis) {

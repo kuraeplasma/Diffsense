@@ -360,7 +360,7 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
         }
 
         const crypto = require('crypto');
-        const textForHash = Array.isArray(extractedText)
+        const textForHash = (extractedText && typeof extractedText === 'object')
             ? JSON.stringify(extractedText)
             : String(extractedText || '');
         const extractedTextHash = crypto.createHash('sha256').update(textForHash).digest('hex');
