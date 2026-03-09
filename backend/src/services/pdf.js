@@ -136,6 +136,7 @@ function collapseLineDuplicates(text) {
 function normalizeParagraphBreaks(paragraphs) {
     const out = [];
     const articleHeaderPattern = /^第\s*[0-9０-９一二三四五六七八九十百千〇零]+\s*条(?:\s+.*)?$/;
+    const articleHeaderLikePattern = /^第\s*[0-9０-９一二三四五六七八九十百千〇零]+\s*条(?:[\s　]*[（(【]?[^。．！？!?、,:：]{0,24}[）)】]?)?$/;
     const shortTailPattern = /^[\u3040-\u30ff\u3400-\u9fffA-Za-z0-9]{1,6}$/;
     const definitionLinePattern = /^[^\s　]{1,20}[：:]/;
 
@@ -150,7 +151,7 @@ function normalizeParagraphBreaks(paragraphs) {
         const prev = out[out.length - 1];
         const canMergeToHeader = articleHeaderPattern.test(prev) && shortTailPattern.test(line);
         const isSoftWrapped =
-            !articleHeaderPattern.test(prev) &&
+            !articleHeaderLikePattern.test(prev) &&
             !/[。．！？!?]$/.test(prev) &&
             !definitionLinePattern.test(line) &&
             /[\u3040-\u30ff\u3400-\u9fffA-Za-z0-9）)】]$/.test(prev) &&
