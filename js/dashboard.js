@@ -963,9 +963,15 @@ const Views = {
         const fallbackTargetDoc = documentOptions.length >= 1 ? documentOptions[documentOptions.length - 1] : null;
         const selectedSourceDoc = documentOptions.find((doc) => doc.id === storedCompareState?.docAId) || fallbackSourceDoc;
         const selectedTargetDoc = documentOptions.find((doc) => doc.id === storedCompareState?.docBId) || fallbackTargetDoc;
-        const displayPair = resolveDisplayDocumentPair(documentOptions, selectedSourceDoc, selectedTargetDoc);
-        const displaySourceDoc = displayPair.previousDoc || selectedSourceDoc;
-        const displayTargetDoc = displayPair.currentDoc || selectedTargetDoc;
+        let displaySourceDoc = selectedSourceDoc;
+        let displayTargetDoc = selectedTargetDoc;
+        try {
+            const displayPair = resolveDisplayDocumentPair(documentOptions, selectedSourceDoc, selectedTargetDoc);
+            displaySourceDoc = displayPair.previousDoc || selectedSourceDoc;
+            displayTargetDoc = displayPair.currentDoc || selectedTargetDoc;
+        } catch (pairResolveError) {
+            console.error('Failed to resolve display document pair:', pairResolveError);
+        }
         const selectedDiffResult = selectedSourceDoc && selectedTargetDoc
             ? dbService.getDiffResult(selectedSourceDoc.id, selectedTargetDoc.id)
             : null;
@@ -1228,6 +1234,7 @@ const Views = {
                          <div class="document-top-anchor" aria-hidden="true"></div>
                                         ${activeTab === 'diff'
                     ? (() => {
+                        try {
                         // 差分表示ロジック
                         const renderAiChangeCards = () => {
                             const aiOnlyHtml = (contract.ai_changes || []).map((c, idx) => {
@@ -1410,6 +1417,35 @@ const Views = {
                         }).join('');
 
                         return `<div class="document-content-diff-wrap">${diffHtml}</div>`;
+                        } catch (documentRenderError) {
+                            console.error('Document comparison render error:', documentRenderError);
+                            const fallbackPreviousText = contentToComparableText(
+                                displaySourceDoc?.content || selectedSourceDoc?.content || comparisonContext?.historyItem?.content || ''
+                            );
+                            const fallbackCurrentText = contentToComparableText(
+                                displayTargetDoc?.content || selectedTargetDoc?.content || contract.original_content || ''
+                            );
+                            const fallbackPreviousLabel = displaySourceDoc
+                                ? buildComparisonLabel(displaySourceDoc.document_name, displaySourceDoc.uploaded_at, '比較元資料')
+                                : (comparisonContext?.previousLabel || '比較元資料');
+                            const fallbackCurrentLabel = displayTargetDoc
+                                ? buildComparisonLabel(displayTargetDoc.document_name, displayTargetDoc.uploaded_at, '比較先資料')
+                                : (comparisonContext?.currentLabel || '比較先資料');
+                            return `
+                                <div class="document-content-diff-wrap">
+                                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:12px;">
+                                        <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px;">
+                                            <div style="font-size:12px; font-weight:700; color:#667085; margin-bottom:8px;">${escapeHtmlText(fallbackPreviousLabel)}</div>
+                                            <div style="white-space:pre-wrap; line-height:1.9;">${escapeHtmlText(fallbackPreviousText || '比較元データなし')}</div>
+                                        </div>
+                                        <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px;">
+                                            <div style="font-size:12px; font-weight:700; color:#667085; margin-bottom:8px;">${escapeHtmlText(fallbackCurrentLabel)}</div>
+                                            <div style="white-space:pre-wrap; line-height:1.9;">${escapeHtmlText(fallbackCurrentText || '比較先データなし')}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        }
                     })()
                     : (contract.original_content
                         ? `<div class="is-structured">${renderStructuredView(contract.original_content, `orig-${id}`)}</div>`
