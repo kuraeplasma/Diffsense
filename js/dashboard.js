@@ -703,18 +703,18 @@ const renderStructuredDiffView = (previousContent, currentContent, options = {})
             <div class="clause-nav-title">条文目次</div>
             <ul class="clause-nav-list">
                 ${orderedKeys.map((key, index) => {
-                    const previousClause = previousMap.get(key) || null;
-                    const currentClause = currentMap.get(key) || null;
-                    const title = currentClause?.title || previousClause?.title || '条文';
-                    const header = currentClause?.header || previousClause?.header || '';
-                    const fullClauseTitle = composeClauseHeading(title, header);
-                    const clauseId = `${idPrefix}-clause-${index}`;
-                    return `
+        const previousClause = previousMap.get(key) || null;
+        const currentClause = currentMap.get(key) || null;
+        const title = currentClause?.title || previousClause?.title || '条文';
+        const header = currentClause?.header || previousClause?.header || '';
+        const fullClauseTitle = composeClauseHeading(title, header);
+        const clauseId = `${idPrefix}-clause-${index}`;
+        return `
                         <li class="clause-nav-item" data-clause-id="${clauseId}" onclick="window.app?.scrollToClause('${clauseId}')" title="${escapeHtmlText(fullClauseTitle)}">
                             <span class="nav-clause-num">${escapeHtmlText(fullClauseTitle)}</span>
                         </li>
                     `;
-                }).join('')}
+    }).join('')}
             </ul>
         </div>
     `;
@@ -1513,8 +1513,8 @@ const Views = {
                 </div>
                 <div class="document-compare-status">
                     ${selectedSourceDoc && selectedTargetDoc
-                        ? `比較中: <strong>${escapeHtmlText(trimDocumentLabel(selectedSourceDoc.document_name, '比較元資料'))}</strong> → <strong>${escapeHtmlText(trimDocumentLabel(selectedTargetDoc.document_name, '比較先資料'))}</strong>`
-                        : '比較元と比較先を選択してください'}
+                ? `比較中: <strong>${escapeHtmlText(trimDocumentLabel(selectedSourceDoc.document_name, '比較元資料'))}</strong> → <strong>${escapeHtmlText(trimDocumentLabel(selectedTargetDoc.document_name, '比較先資料'))}</strong>`
+                : '比較元と比較先を選択してください'}
                 </div>
             </div>
         ` : '';
@@ -1524,11 +1524,11 @@ const Views = {
             <div style="margin-bottom: 24px; border:1px solid #eee; border-radius:4px; overflow:hidden;">
                 <div style="background:#f0f0f0; padding:8px 12px; font-weight:600; font-size:12px; border-bottom:1px solid #eee;">
                     ${c.section} <span style="font-weight:normal; color:#666; margin-left:8px;">(${(() => {
-                        const t = String(c.type || '').toUpperCase();
-                        if (t === 'ADD') return '追加';
-                        if (t === 'DELETE') return '削除';
-                        return '変更';
-                    })()})</span>
+                const t = String(c.type || '').toUpperCase();
+                if (t === 'ADD') return '追加';
+                if (t === 'DELETE') return '削除';
+                return '変更';
+            })()})</span>
                 </div>
                 <div class="diff-container" style="height:auto; min-height:100px;">
                     <div class="diff-pane diff-left"><span class="diff-del">${typeof c.old === 'string' ? c.old : JSON.stringify(c.old)}</span></div>
@@ -1603,7 +1603,7 @@ const Views = {
                                 <i class="fa-solid fa-circle-exclamation text-warning"></i> 検知された重要な変更点
                             </div>
                             <div style="margin-bottom:32px;">
-                                ${changesHtml || `<div style="padding:20px; text-align:center; color:#999; font-size:13px;">${hasComparableVersion ? '変更点は検知されませんでした' : '比較対象の旧バージョンがありません（差分判定には2つ以上のバージョンが必要です）'}</div>`}
+                                ${changesHtml || `<div style="padding:20px; text-align:center; color:#999; font-size:13px;">${hasComparableVersion ? (isStructuredDocumentContent(previousVersion) || isStructuredDocumentContent(currentVersion) ? 'AIによる抽出変更点はありません。<br><small>右側の詳細比較にて全条文の差異を確認できます。</small>' : '変更点は検知されませんでした') : '比較対象の旧バージョンがありません'}</div>`}
                             </div>
                         </div>
                         
@@ -1666,19 +1666,19 @@ const Views = {
                              <span style="margin-left:10px; color:#999;">(Shift+Clickでダウンロード)</span>
                         </div>
                    </div>`
-                 : `${compareBannerHtml}<div class="document-paper-container is-frameless">
+                : `${compareBannerHtml}<div class="document-paper-container is-frameless">
                       <div class="document-content-full">
                          <div class="document-top-anchor" aria-hidden="true"></div>
                                         ${activeTab === 'diff'
                     ? (() => {
                         try {
-                        // 差分表示ロジック
-                        const renderAiChangeCards = () => {
-                            const aiOnlyHtml = normalizeChangesForDisplay(contract.ai_changes || []).map((c, idx) => {
-                                const escapedOld = escapeHtmlText(c.old || '');
-                                const escapedNew = escapeHtmlText(c.new || '');
-                                const typeLabel = c.type === 'ADD' ? '追加' : (c.type === 'DELETE' ? '削除' : '変更');
-                                return `
+                            // 差分表示ロジック
+                            const renderAiChangeCards = () => {
+                                const aiOnlyHtml = normalizeChangesForDisplay(contract.ai_changes || []).map((c, idx) => {
+                                    const escapedOld = escapeHtmlText(c.old || '');
+                                    const escapedNew = escapeHtmlText(c.new || '');
+                                    const typeLabel = c.type === 'ADD' ? '追加' : (c.type === 'DELETE' ? '削除' : '変更');
+                                    return `
                                     <div style="margin-bottom:18px; border:1px solid #e5e7eb; border-radius:8px; overflow:hidden; background:#fff;">
                                         <div style="padding:10px 14px; background:#f8fafc; border-bottom:1px solid #e5e7eb; font-size:12px; font-weight:600;">
                                             ${c.section || `変更 ${idx + 1}`} <span style="font-weight:normal; color:#667085; margin-left:8px;">(${typeLabel})</span>
@@ -1689,104 +1689,104 @@ const Views = {
                                         </div>
                                     </div>
                                 `;
-                            }).join('');
-                            return `<div class="document-content-diff-wrap">${aiOnlyHtml}</div>`;
-                        };
+                                }).join('');
+                                return `<div class="document-content-diff-wrap">${aiOnlyHtml}</div>`;
+                            };
 
-                        // Extract text for diff if structured
-                        const normalizePdfDisplayText = (text) => {
-                            const src = String(text || '');
-                            if (!src) return '';
-                            const lines = src.split(/\r?\n/);
-                            const out = [];
-                            const articleHeaderPattern = /^第\s*[0-9０-９一二三四五六七八九十百千〇零]+\s*条(?:\s+.*)?$/;
-                            const listLinePattern = /^([0-9０-９]+[\.．\)]|[・●○■□\-]|第\s*[0-9０-９一二三四五六七八九十百千〇零]+\s*条)/;
-                            const shortTailPattern = /^[\u3040-\u30ff\u3400-\u9fffA-Za-z0-9]{1,6}$/;
+                            // Extract text for diff if structured
+                            const normalizePdfDisplayText = (text) => {
+                                const src = String(text || '');
+                                if (!src) return '';
+                                const lines = src.split(/\r?\n/);
+                                const out = [];
+                                const articleHeaderPattern = /^第\s*[0-9０-９一二三四五六七八九十百千〇零]+\s*条(?:\s+.*)?$/;
+                                const listLinePattern = /^([0-9０-９]+[\.．\)]|[・●○■□\-]|第\s*[0-9０-９一二三四五六七八九十百千〇零]+\s*条)/;
+                                const shortTailPattern = /^[\u3040-\u30ff\u3400-\u9fffA-Za-z0-9]{1,6}$/;
 
-                            for (let i = 0; i < lines.length; i += 1) {
-                                const line = String(lines[i] || '').trim();
-                                if (!line) {
-                                    if (out.length > 0 && out[out.length - 1] !== '') out.push('');
-                                    continue;
+                                for (let i = 0; i < lines.length; i += 1) {
+                                    const line = String(lines[i] || '').trim();
+                                    if (!line) {
+                                        if (out.length > 0 && out[out.length - 1] !== '') out.push('');
+                                        continue;
+                                    }
+
+                                    const prev = out.length > 0 ? out[out.length - 1] : '';
+                                    const prevTrim = String(prev || '').trim();
+                                    const isList = listLinePattern.test(line);
+                                    const isLikelyHeaderTail = shortTailPattern.test(line) && articleHeaderPattern.test(prevTrim);
+                                    const isLikelyWrappedContinuation =
+                                        !isList &&
+                                        prevTrim &&
+                                        prevTrim !== '' &&
+                                        /[\u3040-\u30ff\u3400-\u9fffA-Za-z0-9）)】]$/.test(prevTrim);
+
+                                    if (out.length === 0 || prevTrim === '' || isList) {
+                                        out.push(line);
+                                    } else if (isLikelyHeaderTail || isLikelyWrappedContinuation) {
+                                        out[out.length - 1] = `${prevTrim}${line}`;
+                                    } else {
+                                        out.push(line);
+                                    }
                                 }
 
-                                const prev = out.length > 0 ? out[out.length - 1] : '';
-                                const prevTrim = String(prev || '').trim();
-                                const isList = listLinePattern.test(line);
-                                const isLikelyHeaderTail = shortTailPattern.test(line) && articleHeaderPattern.test(prevTrim);
-                                const isLikelyWrappedContinuation =
-                                    !isList &&
-                                    prevTrim &&
-                                    prevTrim !== '' &&
-                                    /[\u3040-\u30ff\u3400-\u9fffA-Za-z0-9）)】]$/.test(prevTrim);
+                                return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+                            };
 
-                                if (out.length === 0 || prevTrim === '' || isList) {
-                                    out.push(line);
-                                } else if (isLikelyHeaderTail || isLikelyWrappedContinuation) {
-                                    out[out.length - 1] = `${prevTrim}${line}`;
-                                } else {
-                                    out.push(line);
+                            const historyEntries = Array.isArray(contract.history) ? contract.history : [];
+                            const currentVersion = displayTargetDoc?.content || selectedTargetDoc?.content || contract.original_content || '';
+                            const isWordSource = isWordDocumentFilename(contract.original_filename);
+                            const currentVersionText = contentToComparableText(currentVersion);
+
+                            const previousVersion = displaySourceDoc?.content || selectedSourceDoc?.content || comparisonContext?.historyItem?.content || (() => {
+                                for (let i = historyEntries.length - 1; i >= 0; i -= 1) {
+                                    const candidate = historyEntries[i];
+                                    if (contentToComparableText(candidate?.content) !== currentVersionText) {
+                                        return candidate?.content || null;
+                                    }
                                 }
-                            }
+                                return historyEntries.length > 0 ? historyEntries[historyEntries.length - 1].content : null;
+                            })();
 
-                            return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
-                        };
-
-                        const historyEntries = Array.isArray(contract.history) ? contract.history : [];
-                        const currentVersion = displayTargetDoc?.content || selectedTargetDoc?.content || contract.original_content || '';
-                        const isWordSource = isWordDocumentFilename(contract.original_filename);
-                        const currentVersionText = contentToComparableText(currentVersion);
-
-                        const previousVersion = displaySourceDoc?.content || selectedSourceDoc?.content || comparisonContext?.historyItem?.content || (() => {
-                            for (let i = historyEntries.length - 1; i >= 0; i -= 1) {
-                                const candidate = historyEntries[i];
-                                if (contentToComparableText(candidate?.content) !== currentVersionText) {
-                                    return candidate?.content || null;
+                            if (!previousVersion) {
+                                if (contract.ai_changes && contract.ai_changes.length > 0) {
+                                    return renderAiChangeCards();
                                 }
-                            }
-                            return historyEntries.length > 0 ? historyEntries[historyEntries.length - 1].content : null;
-                        })();
-
-                        if (!previousVersion) {
-                            if (contract.ai_changes && contract.ai_changes.length > 0) {
-                                return renderAiChangeCards();
-                            }
-                            const initialDisplayText = (isPdfSource && typeof contract.pdf_raw_text === 'string' && contract.pdf_raw_text.trim())
-                                ? contract.pdf_raw_text
-                                : (isPdfSource ? normalizePdfDisplayText(currentVersionText) : currentVersionText);
-                            return `
+                                const initialDisplayText = (isPdfSource && typeof contract.pdf_raw_text === 'string' && contract.pdf_raw_text.trim())
+                                    ? contract.pdf_raw_text
+                                    : (isPdfSource ? normalizePdfDisplayText(currentVersionText) : currentVersionText);
+                                return `
                                 <div class="document-content-diff-wrap" style="padding: 8px 0;">
                                     <div style="white-space:pre-wrap; line-height:1.9;">${escapeHtmlText(initialDisplayText)}</div>
                                 </div>
                             `;
-                        }
+                            }
 
-                        const previousVersionText = contentToComparableText(previousVersion);
-                        if (previousVersionText === currentVersionText) {
-                            return `
+                            const previousVersionText = contentToComparableText(previousVersion);
+                            if (previousVersionText === currentVersionText) {
+                                return `
                                 <div class="text-muted text-center" style="padding:24px;">比較可能な差分がありません（旧版と同一内容です）</div>
                             `;
-                        }
+                            }
 
-                        if (isStructuredDocumentContent(previousVersion) || isStructuredDocumentContent(currentVersion)) {
-                            const previousLabel = displaySourceDoc
-                                ? buildComparisonLabel(displaySourceDoc.document_name, displaySourceDoc.uploaded_at, '比較元資料')
-                                : (comparisonContext?.previousLabel || buildComparisonLabel(contract.original_filename || contract.name, contract.last_updated_at, '比較元資料'));
-                            const currentLabel = displayTargetDoc
-                                ? buildComparisonLabel(displayTargetDoc.document_name, displayTargetDoc.uploaded_at, '比較先資料')
-                                : (comparisonContext?.currentLabel || buildComparisonLabel(contract.original_filename || contract.name, contract.last_analyzed_at || contract.last_updated_at, '比較先資料'));
-                            return renderStructuredDiffView(previousVersion, currentVersion, {
-                                idPrefix: `diff-${id}`,
-                                previousLabel,
-                                currentLabel
-                            });
-                        }
+                            if (isStructuredDocumentContent(previousVersion) || isStructuredDocumentContent(currentVersion)) {
+                                const previousLabel = displaySourceDoc
+                                    ? buildComparisonLabel(displaySourceDoc.document_name, displaySourceDoc.uploaded_at, '比較元資料')
+                                    : (comparisonContext?.previousLabel || buildComparisonLabel(contract.original_filename || contract.name, contract.last_updated_at, '比較元資料'));
+                                const currentLabel = displayTargetDoc
+                                    ? buildComparisonLabel(displayTargetDoc.document_name, displayTargetDoc.uploaded_at, '比較先資料')
+                                    : (comparisonContext?.currentLabel || buildComparisonLabel(contract.original_filename || contract.name, contract.last_analyzed_at || contract.last_updated_at, '比較先資料'));
+                                return renderStructuredDiffView(previousVersion, currentVersion, {
+                                    idPrefix: `diff-${id}`,
+                                    previousLabel,
+                                    currentLabel
+                                });
+                            }
 
-                        const renderDualFullDiff = () => {
-                            const lhsText = isPdfSource ? normalizePdfDisplayText(previousVersionText) : previousVersionText;
-                            const rhsText = isPdfSource ? normalizePdfDisplayText(currentVersionText) : currentVersionText;
-                            if (!window.Diff || typeof window.Diff.diffWordsWithSpace !== 'function') {
-                                return `
+                            const renderDualFullDiff = () => {
+                                const lhsText = isPdfSource ? normalizePdfDisplayText(previousVersionText) : previousVersionText;
+                                const rhsText = isPdfSource ? normalizePdfDisplayText(currentVersionText) : currentVersionText;
+                                if (!window.Diff || typeof window.Diff.diffWordsWithSpace !== 'function') {
+                                    return `
                                     <div class="document-content-diff-wrap">
                                         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:12px;">
                                             <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px;">
@@ -1800,25 +1800,25 @@ const Views = {
                                         </div>
                                     </div>
                                 `;
-                            }
-
-                            const chunks = window.Diff.diffWordsWithSpace(lhsText, rhsText);
-                            let oldHtml = '';
-                            let newHtml = '';
-
-                            for (const chunk of chunks) {
-                                const safe = escapeHtmlText(chunk.value);
-                                if (chunk.added) {
-                                    newHtml += `<span class="diff-inline-add">${safe}</span>`;
-                                } else if (chunk.removed) {
-                                    oldHtml += `<span class="diff-inline-del">${safe}</span>`;
-                                } else {
-                                    oldHtml += safe;
-                                    newHtml += safe;
                                 }
-                            }
 
-                            return `
+                                const chunks = window.Diff.diffWordsWithSpace(lhsText, rhsText);
+                                let oldHtml = '';
+                                let newHtml = '';
+
+                                for (const chunk of chunks) {
+                                    const safe = escapeHtmlText(chunk.value);
+                                    if (chunk.added) {
+                                        newHtml += `<span class="diff-inline-add">${safe}</span>`;
+                                    } else if (chunk.removed) {
+                                        oldHtml += `<span class="diff-inline-del">${safe}</span>`;
+                                    } else {
+                                        oldHtml += safe;
+                                        newHtml += safe;
+                                    }
+                                }
+
+                                return `
                                 <div class="document-content-diff-wrap">
                                     <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:12px;">
                                         <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px;">
@@ -1832,28 +1832,28 @@ const Views = {
                                     </div>
                                 </div>
                             `;
-                        };
+                            };
 
-                        if (isPdfSource || isWordSource) {
-                            return renderDualFullDiff();
-                        }
+                            if (isPdfSource || isWordSource) {
+                                return renderDualFullDiff();
+                            }
 
-                        const diff = (window.Diff && typeof window.Diff.diffChars === 'function')
-                            ? window.Diff.diffChars(previousVersionText, currentVersionText)
-                            : [{ value: currentVersionText }];
+                            const diff = (window.Diff && typeof window.Diff.diffChars === 'function')
+                                ? window.Diff.diffChars(previousVersionText, currentVersionText)
+                                : [{ value: currentVersionText }];
 
-                        // HTML生成
-                        let diffHtml = diff.map(part => {
-                            const colorClass = part.added ? 'diff-inline-add' :
-                                part.removed ? 'diff-inline-del' : '';
+                            // HTML生成
+                            let diffHtml = diff.map(part => {
+                                const colorClass = part.added ? 'diff-inline-add' :
+                                    part.removed ? 'diff-inline-del' : '';
 
-                            // エスケープ処理（XSS対策）
-                            const escapedValue = escapeHtmlText(part.value);
+                                // エスケープ処理（XSS対策）
+                                const escapedValue = escapeHtmlText(part.value);
 
-                            return colorClass ? `<span class="${colorClass}">${escapedValue}</span>` : escapedValue;
-                        }).join('');
+                                return colorClass ? `<span class="${colorClass}">${escapedValue}</span>` : escapedValue;
+                            }).join('');
 
-                        return `<div class="document-content-diff-wrap">${diffHtml}</div>`;
+                            return `<div class="document-content-diff-wrap">${diffHtml}</div>`;
                         } catch (documentRenderError) {
                             console.error('Document comparison render error:', documentRenderError);
                             const fallbackPreviousText = contentToComparableText(
