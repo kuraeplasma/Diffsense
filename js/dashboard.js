@@ -302,11 +302,11 @@ const renderStructuredDiffParagraphColumn = (paragraphs, counterpartParagraphs, 
         let paragraphHtml = escapeHtmlText(current);
 
         if (!current && counterpart) {
-            paragraphClasses.push(tone === 'old' ? 'structured-diff-empty' : 'structured-diff-added');
-            paragraphHtml = '（追加）';
+            paragraphClasses.push('structured-diff-empty');
+            paragraphHtml = '';
         } else if (current && !counterpart) {
-            paragraphClasses.push(tone === 'old' ? 'structured-diff-removed' : 'structured-diff-empty');
-            paragraphHtml = tone === 'old' ? escapeHtmlText(current) : '（削除）';
+            paragraphClasses.push(tone === 'old' ? 'structured-diff-removed' : 'structured-diff-added');
+            paragraphHtml = escapeHtmlText(current);
         } else if (current === counterpart) {
             paragraphHtml = escapeHtmlText(current);
         } else if (window.Diff && typeof window.Diff.diffWordsWithSpace === 'function') {
