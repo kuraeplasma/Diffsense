@@ -11,7 +11,9 @@ export const dbService = {
         CONTRACTS: 'contracts',
         ACTIVITY_LOGS: 'logs',
         USERS: 'users',
-        INITIALIZED: 'initialized'
+        INITIALIZED: 'initialized',
+        DIFF_RESULTS: 'diff_results',
+        RECENT_DIFF: 'recent_diff'
     },
 
     // Dynamic KEYS getter (with UID prefix)
@@ -21,7 +23,9 @@ export const dbService = {
             CONTRACTS: `${prefix}contracts`,
             ACTIVITY_LOGS: `${prefix}logs`,
             USERS: `${prefix}users`,
-            INITIALIZED: `${prefix}initialized`
+            INITIALIZED: `${prefix}initialized`,
+            DIFF_RESULTS: `${prefix}diff_results`,
+            RECENT_DIFF: `${prefix}recent_diff`
         };
     },
 
@@ -92,6 +96,8 @@ export const dbService = {
         localStorage.setItem(this.KEYS.CONTRACTS, JSON.stringify([]));
         localStorage.setItem(this.KEYS.USERS, JSON.stringify([]));
         localStorage.setItem(this.KEYS.ACTIVITY_LOGS, JSON.stringify([]));
+        localStorage.setItem(this.KEYS.DIFF_RESULTS, JSON.stringify([]));
+        localStorage.setItem(this.KEYS.RECENT_DIFF, JSON.stringify([]));
     },
 
     /**
@@ -163,6 +169,88 @@ export const dbService = {
     getContractById(id) {
         const contracts = this.getContracts();
         return contracts.find(c => c.id === parseInt(id));
+    },
+
+    getDocumentsByContractId(id) {
+        const contract = this.getContractById(id);
+        if (!contract) return [];
+
+        const docs = [];
+        const baseName = contract.name || '契約書';
+        const fileType = (contract.original_filename || '').split('.').pop() || contract.source_type || 'document';
+        const history = Array.isArray(contract.history) ? contract.history : [];
+
+        history.forEach((entry, index) => {
+            docs.push({
+                id: `contract-${contract.id}-hist-${entry.version ?? index + 1}`,
+                contract_id: contract.id,
+                document_name: entry.original_filename || `${baseName}_ver${entry.version ?? index + 1}`,
+                file_type: fileType,
+                uploaded_at: entry.date || contract.last_updated_at || '',
+                user_id: this._uid || null,
+                content: entry.content,
+                version_label: `ver${entry.version ?? index + 1}`,
+                sort_order: index + 1,
+                is_current: false
+            });
+        });
+
+        docs.push({
+            id: `contract-${contract.id}-current`,
+            contract_id: contract.id,
+            document_name: contract.original_filename || baseName,
+            file_type: fileType,
+            uploaded_at: contract.last_analyzed_at || contract.last_updated_at || '',
+            user_id: this._uid || null,
+            content: contract.original_content,
+            version_label: `ver${history.length + 1}`,
+            sort_order: history.length + 1,
+            is_current: true
+        });
+
+        return docs.filter((doc) => doc.content).sort((a, b) => a.sort_order - b.sort_order);
+    },
+
+    getDiffResults() {
+        return JSON.parse(localStorage.getItem(this.KEYS.DIFF_RESULTS) || '[]');
+    },
+
+    getDiffResult(docAId, docBId) {
+        const results = this.getDiffResults();
+        return results.find((item) => item.docA_id === docAId && item.docB_id === docBId) || null;
+    },
+
+    saveDiffResult(payload) {
+        const results = this.getDiffResults();
+        const existingIndex = results.findIndex((item) => item.docA_id === payload.docA_id && item.docB_id === payload.docB_id);
+        const nextValue = {
+            docA_id: payload.docA_id,
+            docB_id: payload.docB_id,
+            diff_data: payload.diff_data || {},
+            created_at: payload.created_at || new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        };
+        if (existingIndex >= 0) {
+            results[existingIndex] = { ...results[existingIndex], ...nextValue };
+        } else {
+            results.unshift(nextValue);
+        }
+        localStorage.setItem(this.KEYS.DIFF_RESULTS, JSON.stringify(results));
+        return nextValue;
+    },
+
+    getRecentDiffs() {
+        return JSON.parse(localStorage.getItem(this.KEYS.RECENT_DIFF) || '[]');
+    },
+
+    touchRecentDiff(docAId, docBId) {
+        const items = this.getRecentDiffs().filter((item) => !(item.docA === docAId && item.docB === docBId));
+        items.unshift({
+            docA: docAId,
+            docB: docBId,
+            last_viewed: new Date().toISOString()
+        });
+        localStorage.setItem(this.KEYS.RECENT_DIFF, JSON.stringify(items.slice(0, 20)));
     },
 
     updateContractStatus(id, status) {
@@ -413,6 +501,7 @@ export const dbService = {
                     version: contract.history.length + 1,
                     date: contract.last_analyzed_at || contract.last_updated_at || new Date().toISOString().split('T')[0],
                     content: contract.original_content,
+                    original_filename: contract.original_filename || contract.name || '',
                     pdf_storage_path: contract.pdf_storage_path, // PDFパスも一応残すが、実体は削除される前提
                     pdf_url: null // 古いPDFは見れない
                 });

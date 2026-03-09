@@ -164,11 +164,11 @@ const renderStructuredDiffParagraphColumn = (paragraphs, counterpartParagraphs, 
                 const safe = escapeHtmlText(chunk.value);
                 if (chunk.added) {
                     if (tone === 'new') {
-                        fragmentHtml.push(`<span class="diff-add">${safe}</span>`);
+                        fragmentHtml.push(`<ins>${safe}</ins>`);
                     }
                 } else if (chunk.removed) {
                     if (tone === 'old') {
-                        fragmentHtml.push(`<span class="diff-del">${safe}</span>`);
+                        fragmentHtml.push(`<del>${safe}</del>`);
                     }
                 } else {
                     fragmentHtml.push(safe);
@@ -187,7 +187,12 @@ const renderStructuredDiffParagraphColumn = (paragraphs, counterpartParagraphs, 
     return html.join('') || '<p class="clause-p text-muted">本文なし</p>';
 };
 
-const renderStructuredDiffView = (previousContent, currentContent, idPrefix = 'structured-diff') => {
+const renderStructuredDiffView = (previousContent, currentContent, options = {}) => {
+    const {
+        idPrefix = 'structured-diff',
+        previousLabel = 'Version 1',
+        currentLabel = 'Version 2'
+    } = options;
     const previousClauses = parseContractIntoClauses(previousContent);
     const currentClauses = parseContractIntoClauses(currentContent);
 
@@ -196,6 +201,7 @@ const renderStructuredDiffView = (previousContent, currentContent, idPrefix = 's
     }
 
     const previousMap = new Map(previousClauses.map((clause) => [clauseIdentityKey(clause), clause]));
+    const currentMap = new Map(currentClauses.map((clause) => [clauseIdentityKey(clause), clause]));
     const orderedKeys = [];
 
     currentClauses.forEach((clause) => {
@@ -207,64 +213,71 @@ const renderStructuredDiffView = (previousContent, currentContent, idPrefix = 's
         if (!orderedKeys.includes(key)) orderedKeys.push(key);
     });
 
-    const renderChangedClause = (key, currentClause, previousClause) => {
+    const renderClauseCard = (key, currentClause, previousClause, index) => {
         const title = currentClause?.title || previousClause?.title || '条文';
         const header = currentClause?.header || previousClause?.header || '';
         const previousParagraphs = clauseParagraphs(previousClause);
         const currentParagraphs = clauseParagraphs(currentClause);
-        const safeId = String(key).replace(/[^\w-]+/g, '-');
         const previousHtml = renderStructuredDiffParagraphColumn(previousParagraphs, currentParagraphs, 'old');
         const currentHtml = renderStructuredDiffParagraphColumn(currentParagraphs, previousParagraphs, 'new');
+        const fullClauseTitle = composeClauseHeading(title, header);
+        const clauseId = `${idPrefix}-clause-${index}`;
 
         return `
-            <article class="clause-card structured-diff-card" id="${idPrefix}-${safeId}">
-                <div class="clause-header">
-                    <span class="clause-num">${escapeHtmlText(title)}</span>
-                    ${header ? `<span class="clause-title-text">${escapeHtmlText(header)}</span>` : ''}
+            <article class="clause-card diff-card structured-diff-card" id="${clauseId}">
+                <div class="clause-header diff-header">
+                    <span class="clause-num">${escapeHtmlText(fullClauseTitle)}</span>
                 </div>
-                <div class="diff-container structured-diff-grid" style="height:auto; min-height:140px;">
-                    <div class="diff-pane diff-left structured-diff-pane">
-                        <div class="structured-diff-label">変更前</div>
-                        <div class="structured-diff-text">${previousHtml}</div>
+                <div class="diff-compare structured-diff-grid">
+                    <div class="diff-old structured-diff-pane">
+                        <div class="version-label">${escapeHtmlText(previousLabel)}</div>
+                        <div class="diff-text structured-diff-text">${previousHtml}</div>
                     </div>
-                    <div class="diff-pane diff-right structured-diff-pane">
-                        <div class="structured-diff-label">変更後</div>
-                        <div class="structured-diff-text">${currentHtml}</div>
+                    <div class="diff-new structured-diff-pane">
+                        <div class="version-label">${escapeHtmlText(currentLabel)}</div>
+                        <div class="diff-text structured-diff-text">${currentHtml}</div>
                     </div>
                 </div>
             </article>
         `;
     };
 
-    const renderUnchangedClause = (currentClause, previousClause) => {
-        const title = currentClause?.title || previousClause?.title || '条文';
-        const header = currentClause?.header || previousClause?.header || '';
-        const text = clauseBodyText(currentClause || previousClause);
-        return `
-            <article class="clause-card structured-diff-card structured-diff-plain">
-                <div class="clause-header">
-                    <span class="clause-num">${escapeHtmlText(title)}</span>
-                    ${header ? `<span class="clause-title-text">${escapeHtmlText(header)}</span>` : ''}
-                </div>
-                <div class="clause-body">
-                    ${renderClauseParagraphs(text)}
-                </div>
-            </article>
-        `;
-    };
-
-    const cards = orderedKeys.map((key) => {
+    const cards = orderedKeys.map((key, index) => {
         const previousClause = previousMap.get(key) || null;
-        const currentClause = currentClauses.find((clause) => clauseIdentityKey(clause) === key) || null;
-        const previousText = clauseBodyText(previousClause);
-        const currentText = clauseBodyText(currentClause);
-        const changed = previousText !== currentText || (previousClause?.header || '') !== (currentClause?.header || '');
-        return changed
-            ? renderChangedClause(key, currentClause, previousClause)
-            : renderUnchangedClause(currentClause, previousClause);
+        const currentClause = currentMap.get(key) || null;
+        return renderClauseCard(key, currentClause, previousClause, index);
     }).join('');
 
-    return `<div class="structured-diff-stack">${cards}</div>`;
+    const navHtml = `
+        <div class="clause-nav">
+            <div class="clause-nav-title">条文目次</div>
+            <ul class="clause-nav-list">
+                ${orderedKeys.map((key, index) => {
+                    const previousClause = previousMap.get(key) || null;
+                    const currentClause = currentMap.get(key) || null;
+                    const title = currentClause?.title || previousClause?.title || '条文';
+                    const header = currentClause?.header || previousClause?.header || '';
+                    const fullClauseTitle = composeClauseHeading(title, header);
+                    const clauseId = `${idPrefix}-clause-${index}`;
+                    return `
+                        <li class="clause-nav-item" data-clause-id="${clauseId}" onclick="window.app?.scrollToClause('${clauseId}')" title="${escapeHtmlText(fullClauseTitle)}">
+                            <span class="nav-clause-num">${escapeHtmlText(fullClauseTitle)}</span>
+                        </li>
+                    `;
+                }).join('')}
+            </ul>
+        </div>
+    `;
+
+    return `
+        <div class="contract-structured-container structured-diff-shell">
+            ${navHtml}
+            <div class="clause-cards-container structured-diff-stack">
+                ${cards}
+                <div style="height: 40px; flex-shrink: 0;"></div>
+            </div>
+        </div>
+    `;
 };
 
 // --- Static Content ---
@@ -406,6 +419,40 @@ const composeClauseHeading = (title, header) => {
     if (!h) return t;
     if (/^[（(【]/.test(h)) return `${t}${h}`;
     return `${t} ${h}`.trim();
+};
+
+const formatDisplayTimestamp = (value) => {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    const normalized = /^\d{4}-\d{2}-\d{2}$/.test(raw) ? `${raw}T00:00:00` : raw.replace(' ', 'T');
+    const parsed = new Date(normalized);
+    if (Number.isNaN(parsed.getTime())) return raw;
+    return parsed.toLocaleString('ja-JP', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+};
+
+const trimDocumentLabel = (value, fallback = '資料') => {
+    const raw = String(value || '').trim();
+    if (!raw) return fallback;
+    return raw.length > 42 ? `${raw.slice(0, 42)}...` : raw;
+};
+
+const buildComparisonLabel = (name, timestamp, fallbackName = '資料') => {
+    const label = trimDocumentLabel(name, fallbackName);
+    const stamp = formatDisplayTimestamp(timestamp);
+    return stamp ? `${label} / ${stamp}` : label;
+};
+
+const buildDocumentOptionLabel = (doc) => {
+    if (!doc) return '';
+    const primary = trimDocumentLabel(doc.document_name || '資料', 64);
+    const stamp = formatDisplayTimestamp(doc.uploaded_at);
+    return stamp ? `${primary} | ${stamp}` : primary;
 };
 
 const renderStructuredView = (content, idPrefix = 'clause') => {
@@ -840,6 +887,16 @@ const Views = {
     // 3. Diff Details
     diff: (id) => {
         const contract = dbService.getContractById(id);
+        const comparisonContext = window.app?.getHistoryComparisonContext(id) || null;
+        const documentOptions = dbService.getDocumentsByContractId(id);
+        const storedCompareState = window.app?.getDocumentCompareState(id) || null;
+        const fallbackSourceDoc = documentOptions.length >= 2 ? documentOptions[documentOptions.length - 2] : null;
+        const fallbackTargetDoc = documentOptions.length >= 1 ? documentOptions[documentOptions.length - 1] : null;
+        const selectedSourceDoc = documentOptions.find((doc) => doc.id === storedCompareState?.docAId) || fallbackSourceDoc;
+        const selectedTargetDoc = documentOptions.find((doc) => doc.id === storedCompareState?.docBId) || fallbackTargetDoc;
+        const selectedDiffResult = selectedSourceDoc && selectedTargetDoc
+            ? dbService.getDiffResult(selectedSourceDoc.id, selectedTargetDoc.id)
+            : null;
         const activeTab = window.app ? window.app.activeDetailTab : 'diff';
         const runtimePdfUrl = window.app?.getRuntimePdfPreviewUrl(id) || null;
         const resolvedPdfPreviewUrl = resolvePdfPreviewUrl(contract, runtimePdfUrl);
@@ -850,11 +907,44 @@ const Views = {
         const showPdfViewerInRightPane = false;
 
         // AI解析結果があればそれを使用、なければ静的コンテンツまたはデフォルト
-        const hasComparableVersion = Array.isArray(contract.history) && contract.history.length > 0;
+        const hasComparableVersion = documentOptions.length >= 2;
         const hasAIResults = Boolean(contract.ai_summary || (Array.isArray(contract.ai_changes) && contract.ai_changes.length > 0));
 
         let diffData;
-        if (hasAIResults) {
+        if (selectedDiffResult?.diff_data) {
+            const cached = selectedDiffResult.diff_data;
+            diffData = {
+                title: `${contract.name} - 文書比較`,
+                summary: cached.summary || '選択した2文書の差分結果を表示しています。',
+                riskLevel: cached.riskLevel ?? 1,
+                riskReason: cached.riskReason || '保存済みの差分結果を表示しています。',
+                changes: cached.changes || []
+            };
+        } else if (selectedSourceDoc && selectedTargetDoc) {
+            diffData = {
+                title: `${contract.name} - 文書比較`,
+                summary: '選択した2文書の差分はまだ解析されていません。比較先を選択すると、保存済み結果を検索します。',
+                riskLevel: 1,
+                riskReason: '未解析',
+                changes: []
+            };
+        } else if (comparisonContext?.analysis) {
+            diffData = {
+                title: `${contract.name} - 比較解析`,
+                summary: comparisonContext.analysis.summary || '選択した履歴との差分比較を表示しています。',
+                riskLevel: comparisonContext.analysis.riskLevel ?? 1,
+                riskReason: comparisonContext.analysis.riskReason || '選択した履歴との差分を解析しました。',
+                changes: comparisonContext.analysis.changes || []
+            };
+        } else if (comparisonContext?.analysisNotice) {
+            diffData = {
+                title: `${contract.name} - 比較表示`,
+                summary: comparisonContext.analysisNotice,
+                riskLevel: 1,
+                riskReason: '比較表示のみ',
+                changes: []
+            };
+        } else if (hasAIResults) {
             // AI解析結果を使用
             diffData = {
                 title: `${contract.name} - AI解析結果`,
@@ -884,6 +974,36 @@ const Views = {
 
         // デバッグ情報（開発時のみ表示）
         const debugInfoHtml = '';
+
+        const compareBannerHtml = activeTab === 'diff' ? `
+            <div class="document-compare-toolbar">
+                <div class="document-compare-grid">
+                    <label class="document-compare-field">
+                        <span class="document-compare-label">比較元</span>
+                        <select class="document-compare-select" onchange="window.app.handleDocumentCompareChange(${id}, 'docA', this.value)">
+                            <option value="">文書を選択</option>
+                            ${documentOptions.map((doc) => `
+                                <option value="${doc.id}" ${selectedSourceDoc?.id === doc.id ? 'selected' : ''}>${escapeHtmlText(buildDocumentOptionLabel(doc))}</option>
+                            `).join('')}
+                        </select>
+                    </label>
+                    <label class="document-compare-field">
+                        <span class="document-compare-label">比較先</span>
+                        <select class="document-compare-select" onchange="window.app.handleDocumentCompareChange(${id}, 'docB', this.value)">
+                            <option value="">文書を選択</option>
+                            ${documentOptions.map((doc) => `
+                                <option value="${doc.id}" ${selectedTargetDoc?.id === doc.id ? 'selected' : ''}>${escapeHtmlText(buildDocumentOptionLabel(doc))}</option>
+                            `).join('')}
+                        </select>
+                    </label>
+                </div>
+                <div class="document-compare-status">
+                    ${selectedSourceDoc && selectedTargetDoc
+                        ? `比較中: <strong>${escapeHtmlText(trimDocumentLabel(selectedSourceDoc.document_name, '比較元資料'))}</strong> → <strong>${escapeHtmlText(trimDocumentLabel(selectedTargetDoc.document_name, '比較先資料'))}</strong>`
+                        : '比較元と比較先を選択してください'}
+                </div>
+            </div>
+        ` : '';
 
         const changesHtml = (diffData.changes.length > 0 ? diffData.changes : []).map(c => `
             <div style="margin-bottom: 24px; border:1px solid #eee; border-radius:4px; overflow:hidden;">
@@ -1006,23 +1126,6 @@ const Views = {
                             <div style="display:flex; align-items:center; gap:8px; min-width:0;">
                                 <span><i class="fa-solid fa-file-contract"></i> ドキュメント表示</span>
                                 ${contract.original_filename ? `<span class="doc-source-name" title="${contract.original_filename}"><i class="fa-solid fa-file-lines"></i> ${contract.original_filename}</span>` : ''}
-                                <!-- History Dropdown -->
-                                <div class="header-dropdown-container">
-                                    <button class="btn-dashboard" style="display:flex; align-items:center; gap:6px; padding:4px 10px; font-size:12px;" onclick="event.stopPropagation(); document.getElementById('history-menu-${id}').classList.toggle('show');" title="バージョン履歴">
-                                        <i class="fa-solid fa-clock-rotate-left"></i> バージョン履歴
-                                    </button>
-                                    <div id="history-menu-${id}" class="header-dropdown-menu" style="left:0; right:auto; min-width:180px;" onclick="event.stopPropagation();">
-                                        ${contract.history && contract.history.length > 0
-                ? contract.history.slice().reverse().map(h => `
-                                                <div class="header-dropdown-item" onclick="window.app.viewHistory(${id}, ${h.version}); document.getElementById('history-menu-${id}').classList.remove('show');" style="padding:10px 16px; border-bottom:1px solid #f5f5f5; display:flex; justify-content:space-between; align-items:center;">
-                                                    <span style="display:flex; align-items:center;"><i class="fa-solid fa-clock-rotate-left" style="color:#ccc; margin-right:8px;"></i> Version ${h.version}</span>
-                                                    <span style="font-size:11px; color:#999;">${h.date}</span>
-                                                </div>
-                                            `).join('')
-                : '<div style="padding:10px 16px; font-size:12px; color:#999;">履歴はありません</div>'
-            }
-                                    </div>
-                                </div>
                             </div>
                             
                             ${window.app.can('operate_contract') ? `
@@ -1043,9 +1146,9 @@ const Views = {
                              <span style="margin-left:10px; color:#999;">(Shift+Clickでダウンロード)</span>
                         </div>
                    </div>`
-                 : `<div class="document-paper-container is-frameless">
-                     <div class="document-content-full">
-                        <div class="document-top-anchor" aria-hidden="true"></div>
+                 : `${compareBannerHtml}<div class="document-paper-container is-frameless">
+                      <div class="document-content-full">
+                         <div class="document-top-anchor" aria-hidden="true"></div>
                                         ${activeTab === 'diff'
                     ? (() => {
                         // 差分表示ロジック
@@ -1129,15 +1232,15 @@ const Views = {
                         };
 
                         const historyEntries = Array.isArray(contract.history) ? contract.history : [];
-                        const currentVersion = contract.original_content || '';
+                        const currentVersion = selectedTargetDoc?.content || contract.original_content || '';
                         const isWordSource = isWordDocumentFilename(contract.original_filename);
                         const currentVersionText = getPlainText(currentVersion);
 
-                        const previousVersion = (() => {
+                        const previousVersion = selectedSourceDoc?.content || comparisonContext?.historyItem?.content || (() => {
                             for (let i = historyEntries.length - 1; i >= 0; i -= 1) {
-                                const candidate = historyEntries[i]?.content;
-                                if (getPlainText(candidate) !== currentVersionText) {
-                                    return candidate;
+                                const candidate = historyEntries[i];
+                                if (getPlainText(candidate?.content) !== currentVersionText) {
+                                    return candidate?.content || null;
                                 }
                             }
                             return historyEntries.length > 0 ? historyEntries[historyEntries.length - 1].content : null;
@@ -1164,8 +1267,18 @@ const Views = {
                             `;
                         }
 
-                        if (!isPdfSource && !isWordSource && (isStructuredDocumentContent(previousVersion) || isStructuredDocumentContent(currentVersion))) {
-                            return renderStructuredDiffView(previousVersion, currentVersion, `diff-${id}`);
+                        if (isStructuredDocumentContent(previousVersion) || isStructuredDocumentContent(currentVersion)) {
+                            const previousLabel = selectedSourceDoc
+                                ? buildComparisonLabel(selectedSourceDoc.document_name, selectedSourceDoc.uploaded_at, '比較元資料')
+                                : (comparisonContext?.previousLabel || buildComparisonLabel(contract.original_filename || contract.name, contract.last_updated_at, '比較元資料'));
+                            const currentLabel = selectedTargetDoc
+                                ? buildComparisonLabel(selectedTargetDoc.document_name, selectedTargetDoc.uploaded_at, '比較先資料')
+                                : (comparisonContext?.currentLabel || buildComparisonLabel(contract.original_filename || contract.name, contract.last_analyzed_at || contract.last_updated_at, '比較先資料'));
+                            return renderStructuredDiffView(previousVersion, currentVersion, {
+                                idPrefix: `diff-${id}`,
+                                previousLabel,
+                                currentLabel
+                            });
                         }
 
                         const renderDualFullDiff = () => {
@@ -1743,6 +1856,8 @@ class DashboardApp {
         this.searchQuery = "";
         this.currentPage = 1;
         this.runtimePdfPreviewUrls = new Map();
+        this.historyComparisonContext = null;
+        this.documentCompareState = null;
         this.dashboardFilter = "pending";
         this.activeDetailTab = 'diff';
         this.filters = {
@@ -1787,6 +1902,48 @@ class DashboardApp {
     getRuntimePdfPreviewUrl(contractId) {
         if (!contractId) return null;
         return this.runtimePdfPreviewUrls.get(String(contractId)) || null;
+    }
+
+    setHistoryComparisonContext(context = null) {
+        this.historyComparisonContext = context && typeof context === 'object'
+            ? { ...context }
+            : null;
+    }
+
+    getHistoryComparisonContext(contractId) {
+        if (!this.historyComparisonContext) return null;
+        if (contractId !== undefined && contractId !== null && Number(this.historyComparisonContext.contractId) !== Number(contractId)) {
+            return null;
+        }
+        return this.historyComparisonContext;
+    }
+
+    clearHistoryComparisonContext(contractId = null) {
+        if (!this.historyComparisonContext) return;
+        if (contractId !== null && contractId !== undefined && Number(this.historyComparisonContext.contractId) !== Number(contractId)) {
+            return;
+        }
+        this.historyComparisonContext = null;
+    }
+
+    getDocumentCompareState(contractId = null) {
+        if (!this.documentCompareState) return null;
+        if (contractId !== null && contractId !== undefined && Number(this.documentCompareState.contractId) !== Number(contractId)) {
+            return null;
+        }
+        return this.documentCompareState;
+    }
+
+    setDocumentCompareState(state = null) {
+        this.documentCompareState = state && typeof state === 'object' ? { ...state } : null;
+    }
+
+    clearDocumentCompareState(contractId = null) {
+        if (!this.documentCompareState) return;
+        if (contractId !== null && contractId !== undefined && Number(this.documentCompareState.contractId) !== Number(contractId)) {
+            return;
+        }
+        this.documentCompareState = null;
     }
 
     getCachedItem(key, maxAgeMs = 5 * 60 * 1000) {
@@ -2750,6 +2907,11 @@ class DashboardApp {
 
     async navigate(viewId, params = null) {
         console.log(`Navigating to ${viewId}`, params);
+
+        if (viewId !== 'diff') {
+            this.clearHistoryComparisonContext();
+            this.clearDocumentCompareState();
+        }
 
         // Auto-close sidebar on mobile
         document.getElementById('app-sidebar')?.classList.remove('active');
@@ -4089,74 +4251,272 @@ class DashboardApp {
 
 
 
+    async compareHistoryWithBase(contractId, version) {
+        const contract = dbService.getContractById(contractId);
+        if (!contract || !Array.isArray(contract.history)) return;
+
+        const historyItem = contract.history.find((h) => h.version === version);
+        if (!historyItem) return;
+
+        const previousLabel = buildComparisonLabel(
+            historyItem.original_filename || contract.original_filename || contract.name,
+            historyItem.date,
+            '比較元資料'
+        );
+        const currentLabel = buildComparisonLabel(
+            contract.original_filename || contract.name,
+            contract.last_analyzed_at || contract.last_updated_at,
+            'BASE資料'
+        );
+
+        const confirmed = await Notify.confirm(
+            `BASE資料との比較解析を実行しますか？<br><br><strong>比較元:</strong> ${escapeHtmlText(previousLabel)}<br><strong>比較先:</strong> ${escapeHtmlText(currentLabel)}<br><br>解析後はこの比較専用の差分画面を表示します。`,
+            { title: '比較解析の確認', type: 'info', okText: '解析する', cancelText: 'キャンセル' }
+        );
+        if (!confirmed) return;
+
+        const comparisonContext = {
+            contractId,
+            historyVersion: version,
+            historyItem,
+            previousLabel,
+            currentLabel
+        };
+
+        const sourceType = String(contract?.source_type || '').toUpperCase();
+        const isPdfSource = sourceType === 'PDF' || (contract?.original_filename || '').toLowerCase().endsWith('.pdf');
+        const isWordSource = isWordDocumentFilename(contract?.original_filename || '');
+
+        try {
+            Notify.info('比較解析を実行中...');
+
+            if (contract.source_url) {
+                const result = await aiService.analyzeContract(contractId, 'url', contract.source_url, historyItem.content);
+                if (!result.success) throw new Error(result.error || '比較解析に失敗しました');
+                comparisonContext.analysis = result.data;
+            } else if (isPdfSource) {
+                const pdfUrl = this.getRuntimePdfPreviewUrl(contractId) || contract.pdf_url;
+                if (!pdfUrl) {
+                    comparisonContext.analysisNotice = 'PDF原本が保持されていないため、AI再解析は行わず比較表示のみ行います。';
+                } else {
+                    const response = await fetch(pdfUrl);
+                    if (!response.ok) throw new Error('PDF原本の取得に失敗しました');
+                    const blob = await response.blob();
+                    const file = new File([blob], contract.original_filename || 'contract.pdf', { type: blob.type || 'application/pdf' });
+                    const base64 = await aiService.convertFileToBase64(file);
+                    const result = await aiService.analyzeContract(contractId, 'pdf', base64, historyItem.content);
+                    if (!result.success) throw new Error(result.error || '比較解析に失敗しました');
+                    comparisonContext.analysis = result.data;
+                }
+            } else if (isWordSource) {
+                comparisonContext.analysisNotice = 'Word原本は再取得できないため、AI再解析は行わず比較表示のみ行います。';
+            } else {
+                comparisonContext.analysisNotice = 'この資料形式では再解析できないため、比較表示のみ行います。';
+            }
+
+            this.setHistoryComparisonContext(comparisonContext);
+            this.activeDetailTab = 'diff';
+            await this.navigate('diff', contractId);
+        } catch (error) {
+            console.error('History comparison error:', error);
+            Notify.error(`比較解析に失敗しました: ${error.message}`);
+        }
+    }
+
+    async handleDocumentCompareChange(contractId, field, value) {
+        const docs = dbService.getDocumentsByContractId(contractId);
+        const currentState = this.getDocumentCompareState(contractId) || {};
+        const nextState = {
+            contractId,
+            docAId: field === 'docA' ? value : (currentState.docAId || ''),
+            docBId: field === 'docB' ? value : (currentState.docBId || '')
+        };
+
+        if (nextState.docAId && nextState.docAId === nextState.docBId) {
+            Notify.warning('比較元と比較先には別の文書を選択してください。');
+            return;
+        }
+
+        this.clearHistoryComparisonContext(contractId);
+        this.setDocumentCompareState(nextState);
+
+        if (!nextState.docAId || !nextState.docBId) {
+            this.navigate('diff', contractId);
+            return;
+        }
+
+        const sourceDoc = docs.find((doc) => doc.id === nextState.docAId);
+        const targetDoc = docs.find((doc) => doc.id === nextState.docBId);
+        if (!sourceDoc || !targetDoc) {
+            Notify.error('選択した文書が見つかりません。');
+            return;
+        }
+
+        const cached = dbService.getDiffResult(sourceDoc.id, targetDoc.id);
+        if (cached) {
+            dbService.touchRecentDiff(sourceDoc.id, targetDoc.id);
+            this.navigate('diff', contractId);
+            return;
+        }
+
+        const confirmed = await Notify.confirm(
+            `この2つの文書の差分はまだ解析されていません。<br><br><strong>比較元:</strong> ${escapeHtmlText(buildDocumentOptionLabel(sourceDoc))}<br><strong>比較先:</strong> ${escapeHtmlText(buildDocumentOptionLabel(targetDoc))}<br><br>AI差分解析を実行しますか？`,
+            { title: '未解析の文書ペア', type: 'info', okText: 'AI差分解析を実行', cancelText: 'キャンセル' }
+        );
+
+        if (!confirmed) {
+            this.navigate('diff', contractId);
+            return;
+        }
+
+        await this.analyzeDocumentPair(contractId, sourceDoc, targetDoc);
+    }
+
+    async analyzeDocumentPair(contractId, sourceDoc, targetDoc) {
+        const contract = dbService.getContractById(contractId);
+        if (!contract || !sourceDoc || !targetDoc) return;
+
+        const diffPayload = {
+            summary: '選択した2文書の差分結果です。',
+            riskLevel: 1,
+            riskReason: '差分抽出済み',
+            changes: []
+        };
+
+        try {
+            Notify.info('AI差分解析を実行中...');
+
+            const sourceType = String(contract?.source_type || '').toUpperCase();
+            const isPdfSource = sourceType === 'PDF' || (contract?.original_filename || '').toLowerCase().endsWith('.pdf');
+
+            if (targetDoc.is_current && contract.source_url) {
+                const result = await aiService.analyzeContract(contractId, 'url', contract.source_url, sourceDoc.content);
+                if (!result.success) throw new Error(result.error || '差分解析に失敗しました');
+                Object.assign(diffPayload, result.data || {});
+            } else if (targetDoc.is_current && isPdfSource) {
+                const pdfUrl = this.getRuntimePdfPreviewUrl(contractId) || contract.pdf_url;
+                if (!pdfUrl) {
+                    diffPayload.summary = 'PDF原本が保持されていないため、AI差分解析は実行せず構造化比較のみ表示します。';
+                    diffPayload.riskReason = '原本未保持';
+                } else {
+                    const response = await fetch(pdfUrl);
+                    if (!response.ok) throw new Error('PDF原本の取得に失敗しました');
+                    const blob = await response.blob();
+                    const file = new File([blob], targetDoc.document_name || contract.original_filename || 'contract.pdf', { type: blob.type || 'application/pdf' });
+                    const base64 = await aiService.convertFileToBase64(file);
+                    const result = await aiService.analyzeContract(contractId, 'pdf', base64, sourceDoc.content);
+                    if (!result.success) throw new Error(result.error || '差分解析に失敗しました');
+                    Object.assign(diffPayload, result.data || {});
+                }
+            } else {
+                diffPayload.summary = 'この文書ペアはAI再解析対象ではないため、保存済みテキストを用いた差分表示のみ作成しました。';
+                diffPayload.riskReason = '表示用キャッシュ';
+            }
+
+            dbService.saveDiffResult({
+                docA_id: sourceDoc.id,
+                docB_id: targetDoc.id,
+                diff_data: diffPayload,
+                created_at: new Date().toISOString()
+            });
+            dbService.touchRecentDiff(sourceDoc.id, targetDoc.id);
+            this.setDocumentCompareState({
+                contractId,
+                docAId: sourceDoc.id,
+                docBId: targetDoc.id
+            });
+            this.navigate('diff', contractId);
+        } catch (error) {
+            console.error('analyzeDocumentPair error:', error);
+            Notify.error(`AI差分解析に失敗しました: ${error.message}`);
+        }
+    }
+
     viewHistory(contractId, version) {
         const contract = dbService.getContractById(contractId);
-        if (!contract || !contract.history) return;
+        if (!contract || !Array.isArray(contract.history)) return;
 
         const historyItem = contract.history.find(h => h.version === version);
         if (!historyItem) return;
 
-        // 【修正】モーダルは使用せず、右側のペインに直接表示する（インライン表示）
-        // 既存のモーダルがあれば削除（念のため）
         document.querySelectorAll('.modal').forEach(m => m.remove());
 
-        // 右側のペインを取得 (Diffビューの構成に依存: .pane の2つ目)
         const panes = document.querySelectorAll('.pane');
         if (panes.length < 2) {
-            // もしDiffビューでない場合、一旦移動してからリトライ
             this.navigate('diff', contractId);
             setTimeout(() => this.viewHistory(contractId, version), 300);
             return;
         }
 
         const rightPane = panes[1];
-
-        // ヘッダーを一時的に書き換え（ハイライト）
-        rightPane.querySelector('.pane-header').style.background = '#fff8e1';
-        rightPane.querySelector('.pane-header').style.borderBottom = '1px solid #ffe0b2';
-
-        // ヘッダー内容を書き換え
-        rightPane.querySelector('.pane-header').innerHTML = `
-                            <div style="display:flex; justify-content:center; align-items:center; width:100%; position:relative;">
-                                <span style="position:absolute; left:0; font-weight:bold; color:#d4a017; display:flex; align-items:center; font-size:12px;">
-                                    <i class="fa-solid fa-clock-rotate-left" style="margin-right:6px;"></i> Version ${version}
-                                </span>
-                                <button class="btn-dashboard" onclick="window.app.navigate('diff', ${contractId})" style="background:#fff; border:1px solid #c5a059; font-weight:600; font-size:13px; padding:6px 20px; color:#c5a059; border-radius:20px; transition:all 0.2s;">
-                                    <i class="fa-solid fa-rotate-left"></i> 最新版(原本)に戻す
-                                </button>
-                            </div>
-                            `;
-
-        // タブとサブ情報を非表示にする
-        const tabsRow = rightPane.querySelector('.tabs-row');
-        if (tabsRow) tabsRow.style.display = 'none';
-
-        // コンテンツエリアを書き換え（現行DOM: .pane-scroll-area > .document-paper-container > .document-content-full）
-        const scrollArea = rightPane.querySelector('.pane-scroll-area');
-        if (scrollArea) {
-            scrollArea.scrollTop = 0;
-            scrollArea.style.background = '#fafffd'; // 少し背景色を変える
-
-            const escapeHtml = (value) => String(value || '')
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;');
-
-            const historyContentHtml = Array.isArray(historyItem.content)
-                ? `<div class="is-structured">${renderStructuredView(historyItem.content, `hist-${contractId}-${version}`)}</div>`
-                : `<div class="document-content-full is-frameless">${escapeHtml(historyItem.content).replace(/\r?\n/g, '<br>')}</div>`;
-
-            scrollArea.innerHTML = `
-                <div class="document-paper-container is-frameless">
-                    <div class="document-content-full">
-                        <div class="document-top-anchor" aria-hidden="true"></div>
-                        ${historyContentHtml || '<div class="text-center text-muted" style="padding:40px;">履歴データがありません</div>'}
+        const rightHeader = rightPane.querySelector('.pane-header');
+        if (rightHeader) {
+            rightHeader.classList.add('history-preview-header');
+            rightHeader.style.background = '#f7f2e4';
+            rightHeader.style.borderBottom = '1px solid #eadfbe';
+            rightHeader.innerHTML = `
+                <div class="history-preview-bar">
+                    <div class="history-preview-copy">
+                        <div class="history-preview-eyebrow">
+                            <i class="fa-solid fa-clock-rotate-left"></i>
+                            履歴プレビュー
+                        </div>
+                        <div class="history-preview-name" title="${escapeHtmlText(historyItem.original_filename || contract.original_filename || contract.name || '履歴資料')}">
+                            ${escapeHtmlText(historyItem.original_filename || contract.original_filename || contract.name || '履歴資料')}
+                        </div>
+                        <div class="history-preview-meta">
+                            取込日時: ${escapeHtmlText(formatDisplayTimestamp(historyItem.date) || '-')}
+                        </div>
+                    </div>
+                    <div class="history-preview-actions">
+                        <button class="btn-dashboard history-preview-primary" onclick="window.app.compareHistoryWithBase(${contractId}, ${version})">
+                            <i class="fa-solid fa-code-compare"></i> BASE資料と比較
+                        </button>
+                        <button class="btn-dashboard history-preview-secondary" onclick="window.app.clearHistoryComparisonContext(${contractId}); window.app.navigate('diff', ${contractId})">
+                            <i class="fa-solid fa-rotate-left"></i> 最新版に戻す
+                        </button>
                     </div>
                 </div>
             `;
         }
 
-        // this.showToast(`Version ${version} をプレビュー中`, 'info'); // ポップアップ非表示
+        const tabsRow = rightPane.querySelector('.tabs-row');
+        if (tabsRow) tabsRow.style.display = 'none';
+
+        const scrollArea = rightPane.querySelector('.pane-scroll-area');
+        if (scrollArea) {
+            scrollArea.scrollTop = 0;
+            scrollArea.style.background = '#f6f7f9';
+
+            const historyContentHtml = isStructuredDocumentContent(historyItem.content)
+                ? `<div class="is-structured">${renderStructuredView(historyItem.content, `hist-${contractId}-${version}`)}</div>`
+                : `<div class="document-content-full is-frameless">${escapeHtmlText(historyItem.content).replace(/\r?\n/g, '<br>')}</div>`;
+
+            scrollArea.innerHTML = `
+                <div style="padding:18px;">
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px; margin-bottom:16px;">
+                        <div style="background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:14px;">
+                            <div style="font-size:11px; color:#7b8794; margin-bottom:6px;">履歴資料</div>
+                            <div style="font-size:14px; font-weight:700; color:#1f2937; word-break:break-word;">${escapeHtmlText(historyItem.original_filename || contract.original_filename || contract.name || '-')}</div>
+                        </div>
+                        <div style="background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:14px;">
+                            <div style="font-size:11px; color:#7b8794; margin-bottom:6px;">取込日時</div>
+                            <div style="font-size:14px; font-weight:700; color:#1f2937;">${escapeHtmlText(formatDisplayTimestamp(historyItem.date) || '-')}</div>
+                        </div>
+                        <div style="background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:14px;">
+                            <div style="font-size:11px; color:#7b8794; margin-bottom:6px;">比較先(BASE)</div>
+                            <div style="font-size:14px; font-weight:700; color:#1f2937; word-break:break-word;">${escapeHtmlText(contract.original_filename || contract.name || '-')}</div>
+                        </div>
+                    </div>
+                    <div class="document-paper-container is-frameless">
+                        <div class="document-content-full">
+                            <div class="document-top-anchor" aria-hidden="true"></div>
+                            ${historyContentHtml || '<div class="text-center text-muted" style="padding:40px;">履歴データがありません</div>'}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
     }
 
 
