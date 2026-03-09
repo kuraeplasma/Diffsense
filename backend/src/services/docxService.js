@@ -279,6 +279,26 @@ class DocxService {
         };
     }
 
+    _isShortTitleCandidate(text) {
+        const line = String(text || '').trim();
+        if (!line) return false;
+        if (line.length > 20) return false;
+        if (line.includes('。')) return false;
+        return true;
+    }
+
+    _extractBracketedTitlePrefix(text) {
+        const line = String(text || '').trim();
+        const match = line.match(/^([（(【][^）)】]{1,20}[）)】])\s*(.*)$/);
+        if (!match) return null;
+        const title = String(match[1] || '').trim();
+        if (!this._isShortTitleCandidate(title)) return null;
+        return {
+            title,
+            rest: String(match[2] || '').trim()
+        };
+    }
+
     _parseJapaneseNumber(str) {
         if (!str) return 0;
         // Simple conversion for common cases
@@ -311,6 +331,27 @@ class DocxService {
                 startNewArticle(block);
             } else {
                 if (!currentArticle) startNewArticle();
+
+                const blockText = String(block.body || block.full_text || '').trim();
+                if (currentArticle.clause_number && !currentArticle.title && currentArticle.paragraphs.length === 0) {
+                    const bracketedTitle = this._extractBracketedTitlePrefix(blockText);
+                    if (bracketedTitle) {
+                        currentArticle.title = bracketedTitle.title;
+                        if (bracketedTitle.rest) {
+                            currentArticle.paragraphs.push(bracketedTitle.rest);
+                        }
+                        currentArticle.blocks.push(block);
+                        currentArticle.full_text = (currentArticle.full_text || '') + '\n' + (block.full_text || '');
+                        continue;
+                    }
+
+                    if (this._isShortTitleCandidate(blockText)) {
+                        currentArticle.title = blockText;
+                        currentArticle.blocks.push(block);
+                        currentArticle.full_text = (currentArticle.full_text || '') + '\n' + (block.full_text || '');
+                        continue;
+                    }
+                }
 
                 if (block.type === 'blank_line') {
                     currentArticle.paragraphs.push('');

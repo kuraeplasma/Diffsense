@@ -277,6 +277,31 @@ const renderStructuredDiffView = (previousContent, currentContent, idPrefix = 's
 const parseContractIntoClauses = (content) => {
     if (!content) return [];
 
+    const applyHeadingPromotion = (title, header, paragraphs) => {
+        let nextHeader = String(header || '').trim();
+        let nextParagraphs = Array.isArray(paragraphs) ? [...paragraphs] : [];
+        if (!nextHeader && title !== '前文' && nextParagraphs.length > 0) {
+            const firstRaw = String(nextParagraphs[0] || '').trim();
+            const bracketed = firstRaw.match(/^([（(【][^）)】]{1,20}[）)】])\s*(.*)$/);
+            if (bracketed && !String(bracketed[1]).includes('。')) {
+                nextHeader = String(bracketed[1] || '').trim();
+                const rest = String(bracketed[2] || '').trim();
+                if (rest) {
+                    nextParagraphs[0] = rest;
+                } else {
+                    nextParagraphs = nextParagraphs.slice(1);
+                }
+            } else {
+                const looksLikeHeading = firstRaw.length > 0 && firstRaw.length <= 20 && !firstRaw.includes('。');
+                if (looksLikeHeading) {
+                    nextHeader = firstRaw;
+                    nextParagraphs = nextParagraphs.slice(1);
+                }
+            }
+        }
+        return { header: nextHeader, paragraphs: nextParagraphs };
+    };
+
     // structuredContract support: { title, version, preamble, articles[] }
     if (typeof content === 'object' && !Array.isArray(content) && Array.isArray(content.articles)) {
         const normalized = normalizeStructuredDisplayContent(content);
@@ -289,10 +314,15 @@ const parseContractIntoClauses = (content) => {
             });
         }
         normalized.articles.forEach((item, idx) => {
+            const promoted = applyHeadingPromotion(
+                item.articleNumber || `第${idx + 1}条`,
+                item.title || '',
+                String(item.content || '').split(/\n+/).filter(Boolean)
+            );
             clauses.push({
                 title: item.articleNumber || `第${idx + 1}条`,
-                header: item.title || '',
-                paragraphs: String(item.content || '').split(/\n+/).filter(Boolean)
+                header: promoted.header,
+                paragraphs: promoted.paragraphs
             });
         });
         return clauses;
@@ -305,7 +335,13 @@ const parseContractIntoClauses = (content) => {
             // 「前文/ヘッダー」などの冗長な表記を正規化
             if (title === '前文/ヘッダー') title = '前文';
 
-            let header = item.title || '';
+            const promoted = applyHeadingPromotion(
+                title,
+                item.title || '',
+                Array.isArray(item.paragraphs) ? item.paragraphs : (item.body ? item.body.split(/\n+/) : [])
+            );
+            let header = promoted.header;
+            let paragraphs = promoted.paragraphs;
             // 「前文/ヘッダー」がタイトルと重複する場合は非表示にする
             if (idx === 0 && (header === '前文/ヘッダー' || header === '前文' || header === title)) {
                 header = '';
@@ -313,7 +349,7 @@ const parseContractIntoClauses = (content) => {
             return {
                 title: title,
                 header: header,
-                paragraphs: Array.isArray(item.paragraphs) ? item.paragraphs : (item.body ? item.body.split(/\n+/) : [])
+                paragraphs
             };
         });
     }
@@ -323,7 +359,7 @@ const parseContractIntoClauses = (content) => {
     const clauses = [];
     let currentClause = { title: '前文', header: '', body: [] };
 
-    const clauseRegex = /^(?:第\s*[\d０-９一二三四五六七八九十百]+\s*条|【\s*第\s*[\d０-９一二三四五六七八九十百]+\s*条\s*】)/;
+    const clauseRegex = /^(?:第\s*[\d０-９]+\s*条|【\s*第\s*[\d０-９]+\s*条\s*】)/;
 
     lines.forEach(line => {
         const trimmedLine = line.trim();
@@ -336,9 +372,15 @@ const parseContractIntoClauses = (content) => {
                 });
             }
             // Split title into "Clause Number" and "Header" if possible
-            const match = trimmedLine.match(/^(第\s*[\d０-９一二三四五六七八九十百]+\s*条|【\s*第\s*[\d０-９一二三四五六七八九十百]+\s*条\s*】)(.*)/);
+            const match = trimmedLine.match(/^(第\s*[\d０-９]+\s*条|【\s*第\s*[\d０-９]+\s*条\s*】)(.*)/);
             if (match) {
-                currentClause = { title: match[1], header: match[2].trim().replace(/^[\(（【]|[）\)】]$/g, ''), body: [] };
+                const rawHeader = match[2].trim().replace(/^[\(（【]|[）\)】]$/g, '');
+                const normalizedHeader = String(rawHeader || '');
+                const isValidTitle = normalizedHeader.length > 0 && normalizedHeader.length <= 20 && !normalizedHeader.includes('。');
+                currentClause = { title: match[1].replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0)), header: isValidTitle ? normalizedHeader : '', body: [] };
+                if (!isValidTitle && normalizedHeader) {
+                    currentClause.body.push(normalizedHeader);
+                }
             } else {
                 currentClause = { title: trimmedLine, header: '', body: [] };
             }
@@ -358,6 +400,14 @@ const parseContractIntoClauses = (content) => {
     return clauses;
 };
 
+const composeClauseHeading = (title, header) => {
+    const t = String(title || '').trim();
+    const h = String(header || '').trim();
+    if (!h) return t;
+    if (/^[（(【]/.test(h)) return `${t}${h}`;
+    return `${t} ${h}`.trim();
+};
+
 const renderStructuredView = (content, idPrefix = 'clause') => {
     try {
         const clauses = parseContractIntoClauses(content);
@@ -367,12 +417,14 @@ const renderStructuredView = (content, idPrefix = 'clause') => {
             <div class="clause-nav">
                 <div class="clause-nav-title">条文目次</div>
                 <ul class="clause-nav-list">
-                    ${clauses.map((c, i) => `
-                        <li class="clause-nav-item" data-clause-id="${idPrefix}-clause-${i}" onclick="window.app?.scrollToClause('${idPrefix}-clause-${i}')" title="${c.title}${c.header ? ' ' + c.header : ''}">
-                            <span class="nav-clause-num">${c.title}</span>
-                            <span class="nav-clause-header">${c.header}</span>
+                    ${clauses.map((c, i) => {
+            const fullClauseTitle = composeClauseHeading(c.title, c.header);
+            return `
+                        <li class="clause-nav-item" data-clause-id="${idPrefix}-clause-${i}" onclick="window.app?.scrollToClause('${idPrefix}-clause-${i}')" title="${fullClauseTitle}">
+                            <span class="nav-clause-num">${fullClauseTitle}</span>
                         </li>
-                    `).join('')}
+                    `;
+        }).join('')}
                 </ul>
             </div>
         `;
@@ -387,11 +439,11 @@ const renderStructuredView = (content, idPrefix = 'clause') => {
                 }).join('')
                 : `<p class="text-muted">本文なし</p>`;
 
+            const fullClauseTitle = composeClauseHeading(c.title, c.header);
             return `
                         <article class="clause-card" id="${idPrefix}-clause-${i}">
                             <div class="clause-header">
-                                <span class="clause-num">${c.title}</span>
-                                ${c.header ? `<span class="clause-title-text">${c.header}</span>` : ''}
+                                <span class="clause-num">${fullClauseTitle}</span>
                             </div>
                             <div class="clause-body">${pTags}</div>
                         </article>
@@ -794,7 +846,8 @@ const Views = {
         const sourceType = String(contract?.source_type || '').toUpperCase();
         const isPdfSource = sourceType === 'PDF' || (contract?.original_filename || '').toLowerCase().endsWith('.pdf');
         const hasPdfPreview = Boolean(resolvedPdfPreviewUrl);
-        const showPdfViewerInRightPane = isPdfSource && hasPdfPreview && activeTab === 'original';
+        // Align with production expectation: keep "原本全文" as structured text view even for PDF.
+        const showPdfViewerInRightPane = false;
 
         // AI解析結果があればそれを使用、なければ静的コンテンツまたはデフォルト
         const hasComparableVersion = Array.isArray(contract.history) && contract.history.length > 0;

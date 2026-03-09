@@ -1,5 +1,6 @@
 const logger = require('../utils/logger');
-const { buildStructuredContract, toLegacyArticleArray } = require('./contractStructure');
+const docxService = require('./docxService');
+const { buildStructuredContract, toLegacyArticleArray, fromLegacyArticleArray } = require('./contractStructure');
 
 let pdfjsModulePromise = null;
 
@@ -77,9 +78,18 @@ function shouldKeepSoftLineBreak(prevLine, nextLine) {
     const next = String(nextLine || '').trim();
     if (!prev || !next) return true;
     if (/^第\s*[0-9０-９一二三四五六七八九十百千〇零]+\s*条/.test(prev)) return true;
+    if (/[。．！？!?]$/.test(prev)) return true;
+    // Preserve line break for likely standalone heading lines such as "総則", "定義", "利用料金".
+    if (
+        prev.length <= 24 &&
+        !/[。．、，:：]/.test(prev) &&
+        /^[\u3040-\u30ff\u3400-\u9fffA-Za-z0-9\s　（）()【】\-]+$/.test(prev) &&
+        !/^[\d０-９]+\s*[\.．\)]/.test(prev)
+    ) return true;
     if (/^[\d０-９]+\s*[\.．\)]/.test(next)) return true;
     if (/^[・●○■□\-]/.test(next)) return true;
     if (/^[（(]/.test(next)) return true;
+    if (/^[^\s　]{1,20}[：:]/.test(next)) return true;
     return false;
 }
 
@@ -127,6 +137,7 @@ function normalizeParagraphBreaks(paragraphs) {
     const out = [];
     const articleHeaderPattern = /^第\s*[0-9０-９一二三四五六七八九十百千〇零]+\s*条(?:\s+.*)?$/;
     const shortTailPattern = /^[\u3040-\u30ff\u3400-\u9fffA-Za-z0-9]{1,6}$/;
+    const definitionLinePattern = /^[^\s　]{1,20}[：:]/;
 
     for (const raw of (paragraphs || [])) {
         const line = String(raw || '').trim();
@@ -140,6 +151,8 @@ function normalizeParagraphBreaks(paragraphs) {
         const canMergeToHeader = articleHeaderPattern.test(prev) && shortTailPattern.test(line);
         const isSoftWrapped =
             !articleHeaderPattern.test(prev) &&
+            !/[。．！？!?]$/.test(prev) &&
+            !definitionLinePattern.test(line) &&
             /[\u3040-\u30ff\u3400-\u9fffA-Za-z0-9）)】]$/.test(prev) &&
             !/^([0-9０-９]+[\.．\)]|[・●○■□\-]|第\s*[0-9０-９一二三四五六七八九十百千〇零]+\s*条)/.test(line);
 
@@ -335,10 +348,22 @@ class PDFService {
             if (current.trim()) paragraphs.push(current.trim());
             const normalizedParagraphs = normalizeParagraphBreaks(paragraphs);
 
-            const structuredContract = buildStructuredContract(normalizedParagraphs, {
+            // Reuse the same article parser as DOCX flow so PDF and Word behave consistently.
+            const normalizedText = normalizedParagraphs.join('\n');
+            const docxStyleArticles = docxService.parseTextToArticles(normalizedText);
+            let structuredContract = fromLegacyArticleArray(docxStyleArticles, {
                 title: titleLine ? titleLine.text : '',
                 version: versionLine ? versionLine.text : ''
             });
+
+            // Fallback to existing PDF-first builder when DOCX-style parsing cannot build articles.
+            if (!structuredContract || !Array.isArray(structuredContract.articles) || structuredContract.articles.length === 0) {
+                structuredContract = buildStructuredContract(normalizedParagraphs, {
+                    title: titleLine ? titleLine.text : '',
+                    version: versionLine ? versionLine.text : ''
+                });
+            }
+
             const articles = toLegacyArticleArray(structuredContract);
 
             logger.info(`Successfully extracted ${normalizedParagraphs.length} paragraphs from ${pdfDocument.numPages} pages`);

@@ -1,4 +1,4 @@
-const ARTICLE_HEADER_REGEX = /^第\s*([0-9０-９一二三四五六七八九十百千〇零]+)\s*条(?:\s*[（(]?\s*([^）)]+?)\s*[）)]?)?\s*(.*)$/;
+const ARTICLE_HEADER_REGEX = /^第\s*([0-9０-９]+)\s*条\s*(.*)$/;
 const VERSION_REGEX = /(?:ver(?:sion)?\.?\s*)?v?\d+(?:\.\d+)+/i;
 
 function normalizeDigits(value) {
@@ -46,9 +46,24 @@ function parseArticleHeader(text) {
     const match = line.match(ARTICLE_HEADER_REGEX);
     if (!match) return null;
 
-    const numRaw = match[1];
-    const titleRaw = (match[2] || '').trim();
-    const remainder = (match[3] || '').trim();
+    const numRaw = normalizeDigits(match[1]);
+    const tail = String(match[2] || '').trim();
+    let titleRaw = '';
+    let remainder = '';
+
+    // Pattern 1: 第○条（タイトル）
+    // Prefer bracketed title extraction even when the rest of line is long.
+    const bracketed = tail.match(/^([（(【][^）)】]{1,20}[）)】])\s*(.*)$/);
+    if (bracketed && !String(bracketed[1]).includes('。')) {
+        titleRaw = String(bracketed[1] || '').trim();
+        remainder = String(bracketed[2] || '').trim();
+    } else if (tail && tail.length <= 20 && !tail.includes('。')) {
+        // Pattern 2: 第○条 タイトル
+        titleRaw = tail;
+    } else {
+        remainder = tail;
+    }
+
     const articleNumber = `第${numRaw}条`;
 
     return {
@@ -59,10 +74,65 @@ function parseArticleHeader(text) {
     };
 }
 
+function isValidArticleTitleCandidate(text) {
+    const s = String(text || '').trim();
+    if (!s) return false;
+    if (s.length > 20) return false;
+    if (s.includes('。')) return false;
+    return true;
+}
+
+function extractInlineTitleFromFullText(fullText) {
+    const src = String(fullText || '').trim();
+    if (!src) return '';
+    const m = src.match(/^第\s*[0-9０-９]+\s*条\s*(.*)$/);
+    if (!m) return '';
+    const tail = String(m[1] || '').trim();
+    if (!tail) return '';
+
+    const bracketed = tail.match(/^([（(【][^）)】]{1,20}[）)】])/);
+    if (bracketed && !String(bracketed[1]).includes('。')) {
+        return String(bracketed[1]).trim();
+    }
+    if (tail.length <= 20 && !tail.includes('。')) {
+        return tail;
+    }
+    return '';
+}
+
+function extractBracketedHeadingPrefix(text) {
+    const s = String(text || '').trim();
+    if (!s) return null;
+    const m = s.match(/^([（(【][^）)】]{1,20}[）)】])\s*(.*)$/);
+    if (!m) return null;
+    const heading = String(m[1] || '').trim();
+    if (!heading || heading.includes('。')) return null;
+    return {
+        heading,
+        rest: String(m[2] || '').trim()
+    };
+}
+
+function looksLikeStandaloneHeading(line) {
+    const text = String(line || '').trim();
+    if (!text) return false;
+    if (text.length > 24) return false;
+    if (/[。．、，:：]/.test(text)) return false;
+    if (/^[\d０-９]+\s*[\.．\)]/.test(text)) return false;
+    if (/^[・●○■□\-]/.test(text)) return false;
+    // Keep short Japanese/ASCII heading-like labels (e.g. 総則, 定義, 利用料金, Account).
+    return /^[\u3040-\u30ff\u3400-\u9fffA-Za-z0-9\s　（）()【】\-]+$/.test(text);
+}
+
 function buildStructuredContract(paragraphs = [], meta = {}) {
-    const cleaned = paragraphs
-        .map((p) => String(p || '').replace(/\r/g, '').trim())
-        .filter(Boolean);
+    const cleaned = [];
+    for (const p of (paragraphs || [])) {
+        const raw = String(p || '').replace(/\r/g, '');
+        const lines = raw.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+        if (lines.length) {
+            cleaned.push(...lines);
+        }
+    }
 
     const title = (meta.title || cleaned[0] || '').trim();
     const version = (meta.version || (cleaned.find((line) => VERSION_REGEX.test(line)) || '')).trim();
@@ -96,7 +166,13 @@ function buildStructuredContract(paragraphs = [], meta = {}) {
             // Keep all preamble lines to avoid losing leading text.
             preambleLines.push(line);
         } else {
-            currentArticle.paragraphs.push(line);
+            // If title is missing and the first body line looks like a standalone heading,
+            // promote it to article title to stabilize PDF extraction output.
+            if (!currentArticle.title && currentArticle.paragraphs.length === 0 && looksLikeStandaloneHeading(line)) {
+                currentArticle.title = line;
+            } else {
+                currentArticle.paragraphs.push(line);
+            }
         }
     }
 
@@ -159,8 +235,8 @@ function fromLegacyArticleArray(articles = [], meta = {}) {
 
     for (const item of articles) {
         const articleLabel = String(item?.article || '').trim();
-        const title = String(item?.title || '').trim();
-        const paragraphs = Array.isArray(item?.paragraphs)
+        let title = String(item?.title || '').trim();
+        let paragraphs = Array.isArray(item?.paragraphs)
             ? item.paragraphs.map((p) => String(p || '')).filter((p) => p.length > 0)
             : (typeof item?.full_text === 'string' ? item.full_text.split(/\n+/).filter(Boolean) : []);
 
@@ -174,6 +250,34 @@ function fromLegacyArticleArray(articles = [], meta = {}) {
 
         const parsed = parseArticleHeader(articleLabel);
         const numeric = parsed?.articleNumeric || Number(item?.article_number) || 0;
+
+        // Pattern 1 recovery for legacy/docx-like blocks:
+        // full_text may preserve "第1条（定義）" even if title was normalized to "定義".
+        const inlineTitle = extractInlineTitleFromFullText(item?.full_text);
+        if (inlineTitle) {
+            title = inlineTitle;
+        }
+
+        // Pattern 3 variant:
+        // first paragraph starts with a bracketed heading, e.g. "（定義） 1 ...".
+        if (!title && paragraphs.length > 0) {
+            const pref = extractBracketedHeadingPrefix(paragraphs[0]);
+            if (pref) {
+                title = pref.heading;
+                if (pref.rest) {
+                    paragraphs[0] = pref.rest;
+                } else {
+                    paragraphs = paragraphs.slice(1);
+                }
+            }
+        }
+
+        // Align PDF behavior with DOCX:
+        // When title is missing, treat the first short line as article title.
+        if (!title && paragraphs.length > 0 && isValidArticleTitleCandidate(paragraphs[0])) {
+            title = paragraphs[0].trim();
+            paragraphs = paragraphs.slice(1);
+        }
 
         if (numeric === 1) {
             seenArticleOne = true;
