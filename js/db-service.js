@@ -28,6 +28,17 @@ export const dbService = {
         }
     },
 
+    contentSignature(value) {
+        if (value === null || value === undefined) return '';
+        if (typeof value === 'string') return value.trim();
+        if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+        try {
+            return JSON.stringify(value);
+        } catch {
+            return String(value);
+        }
+    },
+
     // Dynamic KEYS getter (with UID prefix)
     get KEYS() {
         const prefix = this._uid ? `diffsense_${this._uid}_` : 'diffsense_';
@@ -506,8 +517,14 @@ export const dbService = {
         const contracts = this.getContracts();
         const contract = contracts.find(c => c.id === parseInt(id));
         if (contract) {
-            // バージョン保存 (履歴に追加)
-            if (contract.original_content) {
+            const incomingContent = this.cloneContent(analysisData.extractedText);
+            const hasIncomingContent = incomingContent !== undefined && incomingContent !== null && this.contentSignature(incomingContent).length > 0;
+            const currentSignature = this.contentSignature(contract.original_content);
+            const incomingSignature = hasIncomingContent ? this.contentSignature(incomingContent) : '';
+            const shouldBumpVersion = Boolean(hasIncomingContent && currentSignature && incomingSignature && incomingSignature !== currentSignature);
+
+            // バージョン保存 (新しい本文がある場合のみ履歴に追加)
+            if (shouldBumpVersion) {
                 if (!contract.history) contract.history = [];
                 contract.history.push({
                     version: contract.history.length + 1,
@@ -520,8 +537,8 @@ export const dbService = {
             }
 
             // 抽出されたテキストを保存
-            if (analysisData.extractedText) {
-                contract.original_content = this.cloneContent(analysisData.extractedText);
+            if (hasIncomingContent) {
+                contract.original_content = incomingContent;
             }
             if (analysisData.rawExtractedText !== undefined) {
                 contract.pdf_raw_text = analysisData.rawExtractedText || '';

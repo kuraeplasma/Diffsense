@@ -67,7 +67,12 @@ export const aiService = {
                 body: JSON.stringify(body)
             });
 
-            const result = await response.json();
+            let result = null;
+            try {
+                result = await response.json();
+            } catch {
+                throw new Error(`APIレスポンスの解析に失敗しました (HTTP ${response.status})`);
+            }
 
             if (!response.ok) {
                 const apiError = new Error(result.error || `HTTP error! status: ${response.status}`);
@@ -82,10 +87,15 @@ export const aiService = {
 
             // Normalize DOCX full-analysis response shape.
             // /contracts/upload-docx returns `articles`, while the app expects `extractedText`.
-            if (method === 'docx' && result?.success && result?.data) {
+            if (result?.success && result?.data) {
                 if (result.data.extractedText === undefined && Array.isArray(result.data.articles)) {
                     result.data.extractedText = result.data.articles;
                 }
+                if (result.data.extractedText === undefined && result.data.structuredContract !== undefined) {
+                    result.data.extractedText = result.data.structuredContract;
+                }
+            }
+            if (method === 'docx' && result?.success && result?.data) {
                 if (!result.data.sourceType) {
                     result.data.sourceType = 'DOCX';
                 }

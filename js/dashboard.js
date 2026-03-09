@@ -1,5 +1,5 @@
 import { dbService } from './db-service.js?v=20260309h1';
-import { aiService } from './ai-service.js';
+import { aiService } from './ai-service.js?v=20260309h2';
 const DASHBOARD_CACHE_KEYS = {
     USER_META: 'diffsense_cache_user_meta',
     SUBSCRIPTION: 'diffsense_cache_subscription',
@@ -18,15 +18,35 @@ function loadExternalScriptOnce(src, globalGuard = null) {
     const loader = new Promise((resolve, reject) => {
         const existing = document.querySelector(`script[data-src="${src}"]`);
         if (existing) {
+            if (globalGuard && globalGuard()) {
+                resolve();
+                return;
+            }
+            if (existing.dataset.loaded === '1' || existing.readyState === 'complete') {
+                resolve();
+                return;
+            }
+            const timeoutId = setTimeout(() => {
+                reject(new Error(`Timed out while loading ${src}`));
+            }, 10000);
             existing.addEventListener('load', () => resolve(), { once: true });
             existing.addEventListener('error', () => reject(new Error(`Failed to load ${src}`)), { once: true });
+            existing.addEventListener('load', () => clearTimeout(timeoutId), { once: true });
+            existing.addEventListener('error', () => clearTimeout(timeoutId), { once: true });
             return;
         }
         const script = document.createElement('script');
         script.src = src;
         script.async = true;
         script.dataset.src = src;
-        script.onload = () => resolve();
+        const timeoutId = setTimeout(() => {
+            reject(new Error(`Timed out while loading ${src}`));
+        }, 10000);
+        script.onload = () => {
+            script.dataset.loaded = '1';
+            clearTimeout(timeoutId);
+            resolve();
+        };
         script.onerror = () => reject(new Error(`Failed to load ${src}`));
         document.head.appendChild(script);
     });
@@ -199,6 +219,60 @@ const resolveDisplayDocumentPair = (documentOptions, sourceDoc, targetDoc) => {
     }
 
     return resolved;
+};
+
+const contentToComparableText = (content) => {
+    if (content === null || content === undefined) return '';
+    if (typeof content === 'string') return content.trim();
+    if (typeof content === 'number' || typeof content === 'boolean') return String(content);
+
+    if (Array.isArray(content)) {
+        return content.map((item, idx) => {
+            if (typeof item === 'string') return item;
+            if (!item || typeof item !== 'object') return String(item || '');
+            const article = String(item.article || item.articleNumber || `第${idx + 1}条`).trim();
+            const title = String(item.title || '').trim();
+            const header = title ? `${article} ${title}`.trim() : article;
+            const paragraphs = Array.isArray(item.paragraphs)
+                ? item.paragraphs.map((p) => {
+                    if (typeof p === 'string') return p;
+                    if (p && typeof p === 'object') return String(p.content || p.body || '');
+                    return '';
+                }).filter(Boolean).join('\n')
+                : String(item.body || item.content || '');
+            return `${header}\n${paragraphs}`.trim();
+        }).filter(Boolean).join('\n\n').trim();
+    }
+
+    if (typeof content === 'object' && Array.isArray(content.articles)) {
+        const preamble = String(content.preamble || '').trim();
+        const articleText = contentToComparableText(content.articles);
+        return [preamble, articleText].filter(Boolean).join('\n\n').trim();
+    }
+
+    try {
+        return JSON.stringify(content);
+    } catch {
+        return String(content);
+    }
+};
+
+const resolveExtractedContentPayload = (data) => {
+    if (!data || typeof data !== 'object') return null;
+    const candidates = [
+        data.structuredContract,
+        data.extractedText,
+        data.structured_contract,
+        data.extracted_text,
+        data.contractText,
+        data.text
+    ];
+    for (const candidate of candidates) {
+        if (candidate === null || candidate === undefined) continue;
+        if (typeof candidate === 'string' && candidate.trim().length === 0) continue;
+        return candidate;
+    }
+    return null;
 };
 
 const normalizeDiffContractId = (value) => {
@@ -1881,9 +1955,13 @@ class RegistrationFlow {
                 if (!result.success) {
                     throw new Error(result.error || 'Word差分解析に失敗しました');
                 }
+                const extractedContent = resolveExtractedContentPayload(result.data);
+                if (!extractedContent) {
+                    throw new Error('Word解析結果に本文データが含まれていません');
+                }
 
                 dbService.updateContractAnalysis(contractId, {
-                    extractedText: result.data.structuredContract || result.data.extractedText,
+                    extractedText: extractedContent,
                     baselineContent: result.data.previousArticles || null,
                     sourceType: result.data.sourceType || 'DOCX',
                     changes: result.data.changes || [],
@@ -1908,9 +1986,13 @@ class RegistrationFlow {
             );
 
             if (result.success) {
+                const extractedContent = resolveExtractedContentPayload(result.data);
+                if (!extractedContent) {
+                    throw new Error('抽出結果に本文データが含まれていません');
+                }
                 // 抽出されたテキストのみを保存（AI解析結果は保存しない）
                 dbService.updateContractText(contractId, {
-                    extractedText: result.data.structuredContract || result.data.extractedText,
+                    extractedText: extractedContent,
                     rawExtractedText: result.data.rawExtractedText,
                     extractedTextHash: result.data.extractedTextHash,
                     extractedTextLength: result.data.extractedTextLength,
@@ -3791,9 +3873,13 @@ class DashboardApp {
                     if (document.getElementById('analysis-overlay')) document.getElementById('analysis-overlay').remove();
 
                     if (result.success) {
+                        const extractedContent = resolveExtractedContentPayload(result.data);
+                        if (!extractedContent) {
+                            throw new Error('解析結果に本文データが含まれていません');
+                        }
                         // 解析結果をDBに保存
                         dbService.updateContractAnalysis(id, {
-                            extractedText: result.data.structuredContract || result.data.extractedText,
+                            extractedText: extractedContent,
                             rawExtractedText: result.data.rawExtractedText,
                             extractedTextHash: result.data.extractedTextHash,
                             extractedTextLength: result.data.extractedTextLength,
@@ -3901,9 +3987,13 @@ class DashboardApp {
                 if (document.getElementById('analysis-overlay')) document.getElementById('analysis-overlay').remove();
 
                 if (result.success) {
+                    const extractedContent = resolveExtractedContentPayload(result.data);
+                    if (!extractedContent) {
+                        throw new Error('解析結果に本文データが含まれていません');
+                    }
                     // 解析結果をDBに保存
                     dbService.updateContractAnalysis(id, {
-                        extractedText: result.data.structuredContract || result.data.extractedText,
+                        extractedText: extractedContent,
                         sourceUrl: url,
                         sourceType: 'URL',
                         changes: result.data.changes,
