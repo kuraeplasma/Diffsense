@@ -69,6 +69,21 @@ function defaultStructuredConcern(change) {
     return '変更前後で条件や責任範囲が変わっていないか確認してください';
 }
 
+function normalizeStructuredChangeType(value, fallbackType = 'MODIFY') {
+    const raw = String(value || '').trim().toUpperCase();
+    if (raw === 'ADD' || raw === '追加') return 'ADD';
+    if (raw === 'DELETE' || raw === '削除') return 'DELETE';
+    if (raw === 'MODIFY' || raw === 'CHANGE' || raw === '修正' || raw === '変更') return 'MODIFY';
+    return normalizeStructuredChangeType(fallbackType || 'MODIFY', 'MODIFY');
+}
+
+function deriveStructuredRiskLevel(changes, fallbackLevel = 1) {
+    const numeric = Number(fallbackLevel || 0);
+    if ([1, 2, 3].includes(numeric)) return numeric;
+    const hasDelete = changes.some((item) => String(item?.type || '').toUpperCase() === 'DELETE');
+    return hasDelete ? 2 : 1;
+}
+
 async function buildStructuredPairAnalysis(oldArticles, newArticles) {
     if (!Array.isArray(oldArticles) || !Array.isArray(newArticles)) return null;
     if (oldArticles.length === 0 || newArticles.length === 0) return null;
@@ -85,22 +100,49 @@ async function buildStructuredPairAnalysis(oldArticles, newArticles) {
     }
 
     const analysis = await geminiService.analyzeStructuredDiff(diffChanges);
-    const insights = analysis && typeof analysis.insights === 'object' ? analysis.insights : {};
+    if (analysis?.isFallback === true) {
+        return {
+            changes: [],
+            riskLevel: 1,
+            riskReason: String(analysis?.riskReason || 'AI差分要約未取得').trim() || 'AI差分要約未取得',
+            summary: String(analysis?.summary || 'AI差分要約を取得できませんでした。再解析を実行してください。').trim() || 'AI差分要約を取得できませんでした。再解析を実行してください。',
+            isFallback: true
+        };
+    }
+
+    const resultMap = new Map(
+        (Array.isArray(analysis?.results) ? analysis.results : [])
+            .filter((item) => item && item.sectionId)
+            .map((item) => [String(item.sectionId), item])
+    );
     const mappedChanges = diffChanges.map((change, index) => {
-        const insight = insights[`CHG-${index}`] || {};
+        const evaluated = resultMap.get(`CHG-${index}`);
+        if (!evaluated || evaluated.change !== true) {
+            return null;
+        }
         return {
             section: change.section,
-            type: change.type,
+            type: normalizeStructuredChangeType(evaluated.changeType, change.type),
             old: change.old,
             new: change.new,
-            impact: insight.impact || defaultStructuredImpact(change),
-            concern: insight.concern || defaultStructuredConcern(change)
+            impact: evaluated.summary || defaultStructuredImpact(change),
+            concern: evaluated.reason || defaultStructuredConcern(change)
         };
-    });
+    }).filter(Boolean);
+
+    if (mappedChanges.length === 0) {
+        return {
+            changes: [],
+            riskLevel: 1,
+            riskReason: String(analysis?.riskReason || '契約上の意味変更はありません。').trim() || '契約上の意味変更はありません。',
+            summary: String(analysis?.summary || '実質的な契約変更は検出されませんでした。').trim() || '実質的な契約変更は検出されませんでした。',
+            isFallback: false
+        };
+    }
 
     return {
         changes: mappedChanges,
-        riskLevel: Number(analysis?.riskLevel || 0) || (diffChanges.some((c) => String(c.type || '').toUpperCase() === 'DELETE') ? 2 : 1),
+        riskLevel: deriveStructuredRiskLevel(mappedChanges, analysis?.riskLevel),
         riskReason: String(analysis?.riskReason || '').trim() || '変更点を確認してください',
         summary: String(analysis?.summary || '').trim() || `${mappedChanges.length}件の変更を検出しました`,
         isFallback: analysis?.isFallback === true
@@ -378,7 +420,7 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
             }));
         }
 
-        const aiFailed = !aiResult.summary || isAiFailureSummary(aiResult.summary);
+        const aiFailed = !aiResult.summary || isAiFailureSummary(aiResult.summary) || aiResult.isFallback === true;
 
         res.json({
             success: true,
@@ -503,7 +545,7 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
                 summary: aiResult.summary,
                 extractedTextHash,
                 extractedTextLength: serialized.length,
-                aiFailed: Boolean(aiResult.summary && isAiFailureSummary(aiResult.summary)),
+                aiFailed: Boolean(aiResult.isFallback === true || (aiResult.summary && isAiFailureSummary(aiResult.summary))),
                 isFallback: aiResult.isFallback === true
             }
         });

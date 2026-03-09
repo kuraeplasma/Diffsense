@@ -135,21 +135,50 @@ function buildHeuristicFallbackAnalysis(currentText, previousText = null) {
     };
 }
 
+function normalizeRiskLevelValue(value) {
+    const numeric = Number(value);
+    if ([1, 2, 3].includes(numeric)) return numeric;
+    const label = String(value || '').trim().toUpperCase();
+    if (label === 'HIGH') return 3;
+    if (label === 'MEDIUM') return 2;
+    if (label === 'LOW') return 1;
+    return 1;
+}
+
+function normalizeStructuredChangeType(value, fallbackType = 'MODIFY') {
+    const raw = String(value || '').trim().toUpperCase();
+    if (raw === 'ADD' || raw === '追加') return 'ADD';
+    if (raw === 'DELETE' || raw === '削除') return 'DELETE';
+    if (raw === 'MODIFY' || raw === 'CHANGE' || raw === '修正' || raw === '変更') return 'MODIFY';
+    return normalizeStructuredChangeType(fallbackType || 'MODIFY', 'MODIFY');
+}
+
+function truncateStructuredClauseText(text, maxLength = 2200) {
+    const normalized = String(text || '').trim();
+    if (normalized.length <= maxLength) return normalized;
+    return `${normalized.slice(0, maxLength)}\n...[省略]`;
+}
+
 function normalizeStructuredDiffResult(parsed) {
-    const riskLevelNum = Number(parsed?.riskLevel);
-    const insightsArray = Array.isArray(parsed?.insights) ? parsed.insights : [];
-    const insightsMap = {};
-    insightsArray.forEach((item) => {
-        const sectionId = String(item?.sectionId || '').trim();
-        if (!sectionId) return;
-        insightsMap[sectionId] = item;
-    });
+    const rawResults = Array.isArray(parsed?.results)
+        ? parsed.results
+        : (Array.isArray(parsed?.changes) ? parsed.changes : []);
+    const results = rawResults.map((item, index) => ({
+        sectionId: String(item?.sectionId || item?.id || `CHG-${index}`).trim(),
+        change: item?.change === true || String(item?.change || '').trim().toLowerCase() === 'true',
+        summary: typeof item?.summary === 'string' ? item.summary.trim() : '',
+        changeType: normalizeStructuredChangeType(item?.change_type || item?.changeType || item?.type),
+        riskLevel: normalizeRiskLevelValue(item?.risk_level || item?.riskLevel),
+        reason: typeof item?.reason === 'string' ? item.reason.trim() : ''
+    })).filter((item) => item.sectionId);
 
     return {
         summary: typeof parsed?.summary === 'string' ? parsed.summary : '解析完了',
-        riskLevel: [1, 2, 3].includes(riskLevelNum) ? riskLevelNum : 1,
-        riskReason: typeof parsed?.riskReason === 'string' ? parsed.riskReason : '',
-        insights: insightsMap
+        riskLevel: normalizeRiskLevelValue(parsed?.riskLevel || parsed?.risk_level),
+        riskReason: typeof parsed?.riskReason === 'string'
+            ? parsed.riskReason
+            : (typeof parsed?.reason === 'string' ? parsed.reason : ''),
+        results
     };
 }
 
@@ -271,19 +300,11 @@ class GeminiService {
      */
     async analyzeStructuredDiff(changes) {
         if (shouldUseLocalAiFallback() && (!GEMINI_API_KEY || process.env.LOCAL_AI_ONLY === 'true')) {
-            const first = changes.find(c => c.type !== 'UNTOUCHED') || changes[0] || {};
             return {
-                summary: '条文差分を検出しました。変更内容を確認してください。',
+                summary: 'AI差分要約を取得できませんでした。再解析を実行してください。',
                 riskLevel: 1,
-                riskReason: 'AI評価を取得できなかったため補完解析を表示しています',
-                insights: first.section ? {
-                    'CHG-0': {
-                        sectionId: 'CHG-0',
-                        impact: '差分を検出した条文です',
-                        concern: '要点の最終確認を推奨します',
-                        recommendation: '関連条文を確認してレビューしてください'
-                    }
-                } : {},
+                riskReason: 'AI差分要約未取得',
+                results: [],
                 isFallback: true
             };
         }
@@ -304,7 +325,7 @@ class GeminiService {
                 summary: result.summary || '解析完了',
                 riskLevel: result.riskLevel || 1,
                 riskReason: result.riskReason || '',
-                insights: result.insights,
+                results: result.results,
                 isFallback: false
             };
         } catch (error) {
@@ -316,7 +337,7 @@ class GeminiService {
                     summary: result.summary || '解析完了',
                     riskLevel: result.riskLevel || 1,
                     riskReason: result.riskReason || '',
-                    insights: result.insights,
+                    results: result.results,
                     isFallback: false
                 };
             } catch (retryError) {
@@ -324,18 +345,18 @@ class GeminiService {
             }
             if (shouldUseLocalAiFallback()) {
                 return {
-                    summary: '条文差分を検出しました。変更内容を確認してください。',
+                    summary: 'AI差分要約を取得できませんでした。再解析を実行してください。',
                     riskLevel: 1,
-                    riskReason: 'AI評価を取得できなかったため補完解析を表示しています',
-                    insights: {},
+                    riskReason: 'AI差分要約未取得',
+                    results: [],
                     isFallback: true
                 };
             }
             return {
-                summary: '変更点を検出しました。内容を確認してください。',
+                summary: 'AI差分要約を取得できませんでした。再解析を実行してください。',
                 riskLevel: 1,
-                riskReason: 'AI評価を一部補完表示しています',
-                insights: {},
+                riskReason: 'AI差分要約未取得',
+                results: [],
                 isFallback: true
             };
         }
@@ -345,35 +366,60 @@ class GeminiService {
         const changesText = changes.map((c, i) => {
             return `---
 Change ID: CHG-${i}
-Section: ${c.section}
-Type: ${c.type}
-Old Content: ${c.old}
-New Content: ${c.new}
+条文名: ${c.section}
+旧条文:
+${truncateStructuredClauseText(c.old)}
+
+新条文:
+${truncateStructuredClauseText(c.new)}
 ---`;
         }).join('\n');
 
-        return `あなたは契約書の専門家です。以下の契約書の変更リストを解析し、法的なリスクと要約を提示してください。
+        return `あなたは契約書レビュー専門AIです。
+
+以下の旧契約条文と新契約条文のペアごとに、契約内容に実質的な変更があるかを評価してください。
+
+重要
+- 文字差分ではなく「契約上の意味差分」を評価してください。
+- 旧条文と新条文の意味が同じ場合、差分が存在しても "change": false と判定してください。
+- 誤字修正、表記揺れ、日付変更のみ、バージョン番号変更、改行、スペース、句読点変更、同義語変更、条文番号変更のみ、タイトル変更のみは変更として扱わないでください。
+- 権利義務の変更、金額変更、支払条件変更、責任範囲変更、契約解除条件変更、再委託条件変更、知的財産権変更、競業避止変更、保証範囲変更、損害賠償条件変更、納期変更、数量変更は変更として扱ってください。
+
+各条文について次の手順で評価してください。
+1. 旧条文の意味を要約
+2. 新条文の意味を要約
+3. 両者の意味を比較
+4. 契約上の法的効果が変わるか判断
 
 ${changesText}
 
-以下のJSON形式で回答してください:
+以下のJSON形式で回答してください。JSON以外は出力しないでください。
 {
-  "summary": "契約全体の変更概要（3行以内）",
-  "riskLevel": 3,
-  "riskReason": "最も高いリスクの根拠",
-  "insights": [
+  "summary": "契約全体で実質的に変わった内容を2-3文で要約。実質変更がない場合は『実質的な契約変更は検出されませんでした。』",
+  "riskLevel": 1,
+  "riskReason": "契約全体への影響を簡潔に記載。実質変更がない場合は『契約上の意味変更はありません。』",
+  "results": [
     {
       "sectionId": "CHG-0",
-      "impact": "この変更の法的影響（50文字以内）",
-      "concern": "具体的な懸念点やリスク（ない場合は'特になし'）",
-      "recommendation": "推奨される対応"
+      "change": true,
+      "summary": "変更内容の要約",
+      "change_type": "追加",
+      "risk_level": "HIGH",
+      "reason": "契約上の影響"
+    },
+    {
+      "sectionId": "CHG-1",
+      "change": false
     }
   ]
 }
 
 重要:
-- riskLevelは1-3。
-- 各変更点に対して、専門的な視点でimpactとconcernを詳しく説明してください。`;
+- riskLevel は 1-3 で返してください。
+- change_type は 追加 / 削除 / 修正 のいずれかにしてください。
+- risk_level は HIGH / MEDIUM / LOW のいずれかにしてください。
+- 実質変更がない条文は "change": false のみ返してください。
+- Markdownコードブロック、説明文、前置きは禁止です。`;
     }
 
     buildPrompt(contractText, previousVersion) {

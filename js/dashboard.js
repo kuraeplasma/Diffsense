@@ -1347,8 +1347,10 @@ const Views = {
         const hasStructuredDifferences = Boolean(structuredFallbackAnalysis?.changes?.length);
         const latestCurrentPair = isCurrentVsLatestHistoryPair(documentOptions, selectedSourceDoc, selectedTargetDoc);
         const storedContractAnalysis = latestCurrentPair ? buildStoredContractAnalysis(contract) : null;
-        const hasMismatchedNoDiffResult = hasStructuredDifferences && isExplicitNoDiffAnalysis(selectedDiffResult?.diff_data);
-        const effectiveSelectedDiffData = (!hasMismatchedNoDiffResult && isMeaningfulAnalysisPayload(selectedDiffResult?.diff_data))
+        const hasFallbackNoDiffResult = hasStructuredDifferences
+            && selectedDiffResult?.diff_data?.isFallback === true
+            && isExplicitNoDiffAnalysis(selectedDiffResult?.diff_data);
+        const effectiveSelectedDiffData = (!hasFallbackNoDiffResult && isMeaningfulAnalysisPayload(selectedDiffResult?.diff_data))
             ? selectedDiffResult.diff_data
             : ((storedContractAnalysis && storedContractAnalysis.isFallback !== true && !isExplicitNoDiffAnalysis(storedContractAnalysis)) ? storedContractAnalysis : null);
         const activeTab = window.app ? window.app.activeDetailTab : 'diff';
@@ -4926,12 +4928,14 @@ class DashboardApp {
         const cached = dbService.getDiffResult(sourceDoc.id, targetDoc.id);
         const structuredFallbackAnalysis = buildStructuredFallbackAnalysis(sourceDoc.content, targetDoc.content);
         const hasStructuredDifferences = Boolean(structuredFallbackAnalysis?.changes?.length);
-        const hasMismatchedNoDiffCache = hasStructuredDifferences && isExplicitNoDiffAnalysis(cached?.diff_data);
+        const hasFallbackNoDiffCache = hasStructuredDifferences
+            && cached?.diff_data?.isFallback === true
+            && isExplicitNoDiffAnalysis(cached?.diff_data);
         const storedAnalysis = buildStoredContractAnalysis(dbService.getContractById(contractId));
         const canHydrateFromStoredAnalysis = isCurrentVsLatestHistoryPair(docs, sourceDoc, targetDoc)
             && isMeaningfulAnalysisPayload(storedAnalysis)
             && storedAnalysis?.isFallback !== true;
-        if (cached && isReusableAnalysisPayload(cached.diff_data) && !hasMismatchedNoDiffCache) {
+        if (cached && isReusableAnalysisPayload(cached.diff_data) && !hasFallbackNoDiffCache) {
             dbService.touchRecentDiff(sourceDoc.id, targetDoc.id);
             this.navigate('diff', contractId);
             return;
