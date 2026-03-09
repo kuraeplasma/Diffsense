@@ -84,6 +84,13 @@ function deriveStructuredRiskLevel(changes, fallbackLevel = 1) {
     return hasDelete ? 2 : 1;
 }
 
+function structuredRiskConcern(evaluated, change) {
+    const level = Number(evaluated?.riskLevel || 0);
+    if (level >= 3) return '高リスクの変更として確認してください';
+    if (level === 2) return '契約条件への影響を確認してください';
+    return defaultStructuredConcern(change);
+}
+
 async function buildStructuredPairAnalysis(oldArticles, newArticles) {
     if (!Array.isArray(oldArticles) || !Array.isArray(newArticles)) return null;
     if (oldArticles.length === 0 || newArticles.length === 0) return null;
@@ -122,11 +129,11 @@ async function buildStructuredPairAnalysis(oldArticles, newArticles) {
         }
         return {
             section: change.section,
-            type: normalizeStructuredChangeType(evaluated.changeType, change.type),
+            type: normalizeStructuredChangeType(change.type, change.type),
             old: change.old,
             new: change.new,
             impact: evaluated.summary || defaultStructuredImpact(change),
-            concern: evaluated.reason || defaultStructuredConcern(change)
+            concern: structuredRiskConcern(evaluated, change)
         };
     }).filter(Boolean);
 

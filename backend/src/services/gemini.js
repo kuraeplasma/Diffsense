@@ -159,27 +159,118 @@ function truncateStructuredClauseText(text, maxLength = 2200) {
     return `${normalized.slice(0, maxLength)}\n...[省略]`;
 }
 
-function normalizeStructuredDiffResult(parsed) {
-    const rawResults = Array.isArray(parsed?.results)
-        ? parsed.results
-        : (Array.isArray(parsed?.changes) ? parsed.changes : []);
-    const results = rawResults.map((item, index) => ({
-        sectionId: String(item?.sectionId || item?.id || `CHG-${index}`).trim(),
-        change: item?.change === true || String(item?.change || '').trim().toLowerCase() === 'true',
-        summary: typeof item?.summary === 'string' ? item.summary.trim() : '',
-        changeType: normalizeStructuredChangeType(item?.change_type || item?.changeType || item?.type),
-        riskLevel: normalizeRiskLevelValue(item?.risk_level || item?.riskLevel),
-        reason: typeof item?.reason === 'string' ? item.reason.trim() : ''
-    })).filter((item) => item.sectionId);
+function riskLevelToLabel(value) {
+    const level = normalizeRiskLevelValue(value);
+    if (level >= 3) return 'HIGH';
+    if (level === 2) return 'MEDIUM';
+    return 'LOW';
+}
 
+function buildSemanticDiffCandidate(oldText, newText, maxLength = 1600) {
+    const lhs = String(oldText || '').trim();
+    const rhs = String(newText || '').trim();
+    if (!lhs && !rhs) return '差分候補なし';
+
+    const chunks = Diff.diffWordsWithSpace(lhs, rhs);
+    const parts = chunks.map((chunk) => {
+        const text = String(chunk.value || '').replace(/\s+/g, ' ').trim();
+        if (!text) return '';
+        if (chunk.removed) return `[-${text}-]`;
+        if (chunk.added) return `{+${text}+}`;
+        return text.length > 40 ? `${text.slice(0, 40)}...` : text;
+    }).filter(Boolean);
+
+    const candidate = parts.join(' ').replace(/\s+/g, ' ').trim();
+    if (!candidate) return '差分候補なし';
+    return candidate.length > maxLength
+        ? `${candidate.slice(0, maxLength)} ...[省略]`
+        : candidate;
+}
+
+function normalizeStructuredClauseResult(parsed, index) {
+    const change = parsed?.change === true || String(parsed?.change || '').trim().toLowerCase() === 'true';
+    const sectionId = `CHG-${index}`;
+    if (!change) {
+        return {
+            sectionId,
+            change: false,
+            summary: '',
+            riskLevel: 1,
+            risk: 'LOW'
+        };
+    }
+
+    const riskLevel = normalizeRiskLevelValue(parsed?.risk || parsed?.risk_level || parsed?.riskLevel);
     return {
-        summary: typeof parsed?.summary === 'string' ? parsed.summary : '解析完了',
-        riskLevel: normalizeRiskLevelValue(parsed?.riskLevel || parsed?.risk_level),
-        riskReason: typeof parsed?.riskReason === 'string'
-            ? parsed.riskReason
-            : (typeof parsed?.reason === 'string' ? parsed.reason : ''),
-        results
+        sectionId,
+        change: true,
+        summary: typeof parsed?.summary === 'string' && parsed.summary.trim()
+            ? parsed.summary.trim()
+            : '変更内容を確認してください。',
+        riskLevel,
+        risk: riskLevelToLabel(riskLevel)
     };
+}
+
+function buildStructuredResultsSummary(results, changes) {
+    const changedResults = results.filter((item) => item?.change === true);
+    if (changedResults.length === 0) {
+        return '実質的な契約変更は検出されませんでした。';
+    }
+
+    const snippets = changedResults
+        .slice(0, 3)
+        .map((item) => item.summary)
+        .filter(Boolean);
+    if (snippets.length > 0) {
+        const suffix = changedResults.length > snippets.length
+            ? ` ほか${changedResults.length - snippets.length}件の変更があります。`
+            : '';
+        return `${snippets.join(' ')}${suffix}`.trim();
+    }
+
+    const labels = changedResults
+        .slice(0, 3)
+        .map((item) => {
+            const index = Number(String(item.sectionId || '').replace('CHG-', ''));
+            return changes[index]?.section || '';
+        })
+        .filter(Boolean);
+    const suffix = changedResults.length > labels.length
+        ? ` ほか${changedResults.length - labels.length}件。`
+        : '';
+    return labels.length > 0
+        ? `${labels.join('、')} に契約上の変更があります。${suffix}`.trim()
+        : '契約上の変更を検出しました。';
+}
+
+function buildStructuredResultsRiskReason(results) {
+    const changedResults = results.filter((item) => item?.change === true);
+    if (changedResults.length === 0) {
+        return '契約上の意味変更はありません。';
+    }
+
+    const highestRisk = Math.max(...changedResults.map((item) => normalizeRiskLevelValue(item.riskLevel)));
+    if (highestRisk >= 3) return '高リスクの契約変更を検出しました。条件変更の影響を確認してください。';
+    if (highestRisk === 2) return '契約条件に影響する変更を検出しました。主要条文を確認してください。';
+    return '軽微な契約変更を検出しました。変更内容を確認してください。';
+}
+
+async function mapWithConcurrency(items, limit, mapper) {
+    const results = new Array(items.length);
+    let cursor = 0;
+
+    async function worker() {
+        while (cursor < items.length) {
+            const index = cursor;
+            cursor += 1;
+            results[index] = await mapper(items[index], index);
+        }
+    }
+
+    const workers = Array.from({ length: Math.min(limit, items.length) }, () => worker());
+    await Promise.all(workers);
+    return results;
 }
 
 function shouldRetryGeminiRequest(error) {
@@ -313,45 +404,28 @@ class GeminiService {
         }
 
         const modifiedChanges = changes.filter(c => c.type !== 'UNTOUCHED').slice(0, 15); // limit to prioritized changes
-        const prompt = this.buildStructuredDiffPrompt(modifiedChanges);
-
         logger.info(`Analyzing structured diff with ${modifiedChanges.length} prioritized changes`);
 
-        try {
-            const primary = await this.requestGeminiJson(prompt, true);
-            const result = normalizeStructuredDiffResult(primary);
-
-            return {
-                summary: result.summary || '解析完了',
-                riskLevel: result.riskLevel || 1,
-                riskReason: result.riskReason || '',
-                results: result.results,
-                isFallback: false
-            };
-        } catch (error) {
-            logger.warn('Structured AI analysis primary request failed, retrying without JSON mime type:', error.message);
+        const clauseResults = await mapWithConcurrency(modifiedChanges, 3, async (change, index) => {
+            const prompt = this.buildStructuredClausePrompt(change);
             try {
-                const fallback = await this.requestGeminiJson(prompt, false);
-                const result = normalizeStructuredDiffResult(fallback);
-                return {
-                    summary: result.summary || '解析完了',
-                    riskLevel: result.riskLevel || 1,
-                    riskReason: result.riskReason || '',
-                    results: result.results,
-                    isFallback: false
-                };
-            } catch (retryError) {
-                logger.error('Structured AI analysis failed:', retryError);
+                const primary = await this.requestGeminiJson(prompt, true);
+                return normalizeStructuredClauseResult(primary, index);
+            } catch (error) {
+                logger.warn(`Structured clause analysis primary request failed for CHG-${index}, retrying without JSON mime type: ${error.message}`);
+                try {
+                    const fallback = await this.requestGeminiJson(prompt, false);
+                    return normalizeStructuredClauseResult(fallback, index);
+                } catch (retryError) {
+                    logger.error(`Structured clause analysis failed for CHG-${index}:`, retryError);
+                    return null;
+                }
             }
-            if (shouldUseLocalAiFallback()) {
-                return {
-                    summary: 'AI差分要約を取得できませんでした。再解析を実行してください。',
-                    riskLevel: 1,
-                    riskReason: 'AI差分要約未取得',
-                    results: [],
-                    isFallback: true
-                };
-            }
+        });
+
+        const successfulResults = clauseResults.filter(Boolean);
+        const changedResults = successfulResults.filter((item) => item.change === true);
+        if (successfulResults.length === 0 || (successfulResults.length < modifiedChanges.length && changedResults.length === 0)) {
             return {
                 summary: 'AI差分要約を取得できませんでした。再解析を実行してください。',
                 riskLevel: 1,
@@ -360,66 +434,93 @@ class GeminiService {
                 isFallback: true
             };
         }
+
+        return {
+            summary: buildStructuredResultsSummary(successfulResults, modifiedChanges),
+            riskLevel: changedResults.length > 0
+                ? Math.max(...changedResults.map((item) => normalizeRiskLevelValue(item.riskLevel)))
+                : 1,
+            riskReason: buildStructuredResultsRiskReason(successfulResults),
+            results: successfulResults,
+            isFallback: false
+        };
     }
 
-    buildStructuredDiffPrompt(changes) {
-        const changesText = changes.map((c, i) => {
-            return `---
-Change ID: CHG-${i}
-条文名: ${c.section}
-旧条文:
-${truncateStructuredClauseText(c.old)}
-
-新条文:
-${truncateStructuredClauseText(c.new)}
----`;
-        }).join('\n');
-
+    buildStructuredClausePrompt(change) {
         return `あなたは契約書レビュー専門AIです。
 
-以下の旧契約条文と新契約条文のペアごとに、契約内容に実質的な変更があるかを評価してください。
+旧条文と新条文を比較し、
+契約内容に変更があるかを評価してください。
 
 重要
-- 文字差分ではなく「契約上の意味差分」を評価してください。
-- 旧条文と新条文の意味が同じ場合、差分が存在しても "change": false と判定してください。
-- 誤字修正、表記揺れ、日付変更のみ、バージョン番号変更、改行、スペース、句読点変更、同義語変更、条文番号変更のみ、タイトル変更のみは変更として扱わないでください。
-- 権利義務の変更、金額変更、支払条件変更、責任範囲変更、契約解除条件変更、再委託条件変更、知的財産権変更、競業避止変更、保証範囲変更、損害賠償条件変更、納期変更、数量変更は変更として扱ってください。
+文字差分ではなく契約の意味差分を評価してください。
 
-各条文について次の手順で評価してください。
+--------------------------------
+
+入力
+
+旧条文
+${truncateStructuredClauseText(change?.old || '')}
+
+新条文
+${truncateStructuredClauseText(change?.new || '')}
+
+差分候補
+${buildSemanticDiffCandidate(change?.old || '', change?.new || '')}
+
+--------------------------------
+
+手順
+
 1. 旧条文の意味を要約
 2. 新条文の意味を要約
-3. 両者の意味を比較
-4. 契約上の法的効果が変わるか判断
+3. 契約上の効果が変わるか判断
 
-${changesText}
+--------------------------------
 
-以下のJSON形式で回答してください。JSON以外は出力しないでください。
+重要
+
+意味が同じ場合は
+
+変更なし
+
+と判定してください。
+
+--------------------------------
+
+変更として扱うもの
+
+・金額変更
+・数量変更
+・支払条件変更
+・期限変更
+・責任範囲変更
+・権利義務変更
+・契約解除条件変更
+・知的財産条件変更
+・再委託条件変更
+・保証範囲変更
+
+--------------------------------
+
+出力
+
 {
-  "summary": "契約全体で実質的に変わった内容を2-3文で要約。実質変更がない場合は『実質的な契約変更は検出されませんでした。』",
-  "riskLevel": 1,
-  "riskReason": "契約全体への影響を簡潔に記載。実質変更がない場合は『契約上の意味変更はありません。』",
-  "results": [
-    {
-      "sectionId": "CHG-0",
-      "change": true,
-      "summary": "変更内容の要約",
-      "change_type": "追加",
-      "risk_level": "HIGH",
-      "reason": "契約上の影響"
-    },
-    {
-      "sectionId": "CHG-1",
-      "change": false
-    }
-  ]
+ "change": true,
+ "summary": "変更内容",
+ "risk": "HIGH | MEDIUM | LOW"
+}
+
+変更がない場合
+
+{
+ "change": false
 }
 
 重要:
-- riskLevel は 1-3 で返してください。
-- change_type は 追加 / 削除 / 修正 のいずれかにしてください。
-- risk_level は HIGH / MEDIUM / LOW のいずれかにしてください。
-- 実質変更がない条文は "change": false のみ返してください。
-- Markdownコードブロック、説明文、前置きは禁止です。`;
+- JSONのみを返してください。
+- 説明文やコードブロックは不要です。
+- "change": false の場合は summary や risk を含めないでください。`;
     }
 
     buildPrompt(contractText, previousVersion) {
