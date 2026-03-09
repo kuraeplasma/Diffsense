@@ -3133,7 +3133,29 @@ class DashboardApp {
                 }
             } catch (error) {
                 console.error(`View Render Error (${viewId}):`, error);
-                this.mainContent.innerHTML = '<div class="p-md text-danger">画面の表示中にエラーが発生しました。</div>';
+                if (viewId === 'diff') {
+                    const contractId = typeof renderParams === 'object' ? renderParams?.id : renderParams;
+                    const contract = dbService.getContractById(contractId);
+                    const safeTitle = escapeHtmlText(contract?.name || '解析詳細');
+                    const safeFile = escapeHtmlText(contract?.original_filename || '');
+                    const safeBody = escapeHtmlText(contentToComparableText(contract?.original_content || '') || '原本データがありません');
+                    this.mainContent.innerHTML = `
+                        <div class="detail-split-container">
+                            <div class="detail-split-header flex justify-between items-center">
+                                <div class="detail-header-main">
+                                    <h2 style="font-size:18px; font-weight:700; color:var(--text-main); margin:0;">${safeTitle}</h2>
+                                    ${safeFile ? `<div class="detail-header-meta" style="font-size:12px; color:#666; margin-top:4px;"><span class="detail-header-meta-item"><i class="fa-solid fa-file-lines"></i> Original File: ${safeFile}</span></div>` : ''}
+                                </div>
+                            </div>
+                            <div style="padding:24px;">
+                                <div style="margin-bottom:16px; color:#b42318; font-size:13px;">比較画面の描画でエラーが発生したため、安全表示に切り替えました。</div>
+                                <div style="background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:20px; white-space:pre-wrap; line-height:1.9;">${safeBody}</div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    this.mainContent.innerHTML = '<div class="p-md text-danger">画面の表示中にエラーが発生しました。</div>';
+                }
             }
         }
     }
