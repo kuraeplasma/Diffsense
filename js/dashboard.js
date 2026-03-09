@@ -170,6 +170,37 @@ const isCurrentVsLatestHistoryPair = (documentOptions, sourceDoc, targetDoc) => 
     return Boolean(latestHistoricalDoc && latestHistoricalDoc.id === sourceDoc.id);
 };
 
+const resolveDisplayDocumentPair = (documentOptions, sourceDoc, targetDoc) => {
+    const resolved = {
+        previousDoc: sourceDoc || null,
+        currentDoc: targetDoc || null
+    };
+
+    if (!resolved.previousDoc || !resolved.currentDoc) {
+        return resolved;
+    }
+
+    const previousText = contentToComparableText(resolved.previousDoc.content);
+    const currentText = contentToComparableText(resolved.currentDoc.content);
+
+    if (!previousText || !currentText || previousText !== currentText) {
+        return resolved;
+    }
+
+    const sourceOrder = Number(resolved.previousDoc.sort_order || 0);
+    const targetOrder = Number(resolved.currentDoc.sort_order || 0);
+    const candidates = (Array.isArray(documentOptions) ? documentOptions : [])
+        .filter((doc) => doc && doc.id !== resolved.currentDoc.id && Number(doc.sort_order || 0) <= Math.max(sourceOrder, targetOrder))
+        .sort((a, b) => Number(b.sort_order || 0) - Number(a.sort_order || 0));
+
+    const distinctCandidate = candidates.find((doc) => contentToComparableText(doc.content) !== currentText);
+    if (distinctCandidate) {
+        resolved.previousDoc = distinctCandidate;
+    }
+
+    return resolved;
+};
+
 const renderStructuredDiffParagraphColumn = (paragraphs, counterpartParagraphs, tone) => {
     const own = Array.isArray(paragraphs) ? paragraphs : [];
     const other = Array.isArray(counterpartParagraphs) ? counterpartParagraphs : [];
@@ -932,6 +963,9 @@ const Views = {
         const fallbackTargetDoc = documentOptions.length >= 1 ? documentOptions[documentOptions.length - 1] : null;
         const selectedSourceDoc = documentOptions.find((doc) => doc.id === storedCompareState?.docAId) || fallbackSourceDoc;
         const selectedTargetDoc = documentOptions.find((doc) => doc.id === storedCompareState?.docBId) || fallbackTargetDoc;
+        const displayPair = resolveDisplayDocumentPair(documentOptions, selectedSourceDoc, selectedTargetDoc);
+        const displaySourceDoc = displayPair.previousDoc || selectedSourceDoc;
+        const displayTargetDoc = displayPair.currentDoc || selectedTargetDoc;
         const selectedDiffResult = selectedSourceDoc && selectedTargetDoc
             ? dbService.getDiffResult(selectedSourceDoc.id, selectedTargetDoc.id)
             : null;
@@ -1216,26 +1250,6 @@ const Views = {
                         };
 
                         // Extract text for diff if structured
-                        const getPlainText = (content) => {
-                            if (content && typeof content === 'object' && !Array.isArray(content) && Array.isArray(content.articles)) {
-                                const preamble = content.preamble ? `${content.preamble}\n\n` : '';
-                                const articlesText = content.articles.map((a) => {
-                                    const head = `${a.articleNumber || ''}${a.title ? ` ${a.title}` : ''}`.trim();
-                                    return `${head}\n${a.content || ''}`.trim();
-                                }).join('\n\n');
-                                return `${preamble}${articlesText}`.trim();
-                            }
-                            if (Array.isArray(content)) {
-                                return content.map(c => {
-                                    const ps = Array.isArray(c.paragraphs)
-                                        ? c.paragraphs.map(p => typeof p === 'string' ? p : (p.content || p.body || JSON.stringify(p))).join('\n')
-                                        : '';
-                                    return `${c.article || ''} ${c.title || ''}\n${ps}`;
-                                }).join('\n\n');
-                            }
-                            return content || '';
-                        };
-
                         const normalizePdfDisplayText = (text) => {
                             const src = String(text || '');
                             if (!src) return '';
@@ -1275,14 +1289,14 @@ const Views = {
                         };
 
                         const historyEntries = Array.isArray(contract.history) ? contract.history : [];
-                        const currentVersion = selectedTargetDoc?.content || contract.original_content || '';
+                        const currentVersion = displayTargetDoc?.content || selectedTargetDoc?.content || contract.original_content || '';
                         const isWordSource = isWordDocumentFilename(contract.original_filename);
-                        const currentVersionText = getPlainText(currentVersion);
+                        const currentVersionText = contentToComparableText(currentVersion);
 
-                        const previousVersion = selectedSourceDoc?.content || comparisonContext?.historyItem?.content || (() => {
+                        const previousVersion = displaySourceDoc?.content || selectedSourceDoc?.content || comparisonContext?.historyItem?.content || (() => {
                             for (let i = historyEntries.length - 1; i >= 0; i -= 1) {
                                 const candidate = historyEntries[i];
-                                if (getPlainText(candidate?.content) !== currentVersionText) {
+                                if (contentToComparableText(candidate?.content) !== currentVersionText) {
                                     return candidate?.content || null;
                                 }
                             }
@@ -1303,7 +1317,7 @@ const Views = {
                             `;
                         }
 
-                        const previousVersionText = getPlainText(previousVersion);
+                        const previousVersionText = contentToComparableText(previousVersion);
                         if (previousVersionText === currentVersionText) {
                             return `
                                 <div class="text-muted text-center" style="padding:24px;">比較可能な差分がありません（旧版と同一内容です）</div>
@@ -1311,11 +1325,11 @@ const Views = {
                         }
 
                         if (isStructuredDocumentContent(previousVersion) || isStructuredDocumentContent(currentVersion)) {
-                            const previousLabel = selectedSourceDoc
-                                ? buildComparisonLabel(selectedSourceDoc.document_name, selectedSourceDoc.uploaded_at, '比較元資料')
+                            const previousLabel = displaySourceDoc
+                                ? buildComparisonLabel(displaySourceDoc.document_name, displaySourceDoc.uploaded_at, '比較元資料')
                                 : (comparisonContext?.previousLabel || buildComparisonLabel(contract.original_filename || contract.name, contract.last_updated_at, '比較元資料'));
-                            const currentLabel = selectedTargetDoc
-                                ? buildComparisonLabel(selectedTargetDoc.document_name, selectedTargetDoc.uploaded_at, '比較先資料')
+                            const currentLabel = displayTargetDoc
+                                ? buildComparisonLabel(displayTargetDoc.document_name, displayTargetDoc.uploaded_at, '比較先資料')
                                 : (comparisonContext?.currentLabel || buildComparisonLabel(contract.original_filename || contract.name, contract.last_analyzed_at || contract.last_updated_at, '比較先資料'));
                             return renderStructuredDiffView(previousVersion, currentVersion, {
                                 idPrefix: `diff-${id}`,
