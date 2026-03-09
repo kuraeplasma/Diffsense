@@ -310,7 +310,9 @@ const renderStructuredDiffParagraphColumn = (paragraphs, counterpartParagraphs, 
         } else if (current === counterpart) {
             paragraphHtml = escapeHtmlText(current);
         } else if (window.Diff && typeof window.Diff.diffWordsWithSpace === 'function') {
-            const chunks = window.Diff.diffWordsWithSpace(counterpart, current);
+            const oldText = tone === 'old' ? current : counterpart;
+            const newText = tone === 'old' ? counterpart : current;
+            const chunks = window.Diff.diffWordsWithSpace(oldText, newText);
             const fragmentHtml = [];
             for (const chunk of chunks) {
                 const safe = escapeHtmlText(chunk.value);
