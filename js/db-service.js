@@ -571,6 +571,7 @@ export const dbService = {
             contract.ai_summary = analysisData.summary || '';
             contract.ai_risk_reason = analysisData.riskReason || '';
             contract.ai_changes = analysisData.changes || [];
+            contract.ai_is_fallback = analysisData.isFallback === true;
             contract.last_analyzed_at = new Date().toISOString().split('T')[0];
 
             localStorage.setItem(this.KEYS.CONTRACTS, JSON.stringify(contracts));

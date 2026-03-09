@@ -55,7 +55,8 @@ function normalizeAnalyzeResult(parsed) {
         changes: Array.isArray(parsed?.changes) ? parsed.changes : [],
         riskLevel: [1, 2, 3].includes(riskLevelNum) ? riskLevelNum : 1,
         riskReason: typeof parsed?.riskReason === 'string' ? parsed.riskReason : '',
-        summary: typeof parsed?.summary === 'string' ? parsed.summary : '解析完了'
+        summary: typeof parsed?.summary === 'string' ? parsed.summary : '解析完了',
+        isFallback: parsed?.isFallback === true
     };
 }
 
@@ -88,7 +89,8 @@ function buildLocalSingleAnalysis(contractText) {
         })),
         riskLevel: 1,
         riskReason: 'AI評価を取得できなかったため補完要約を表示しています',
-        summary: preview ? `補完要約: ${preview}` : '補完要約を表示しています'
+        summary: preview ? `補完要約: ${preview}` : '補完要約を表示しています',
+        isFallback: true
     };
 }
 
@@ -114,7 +116,8 @@ function buildLocalDiffAnalysis(currentText, previousText) {
         }],
         riskLevel: 1,
         riskReason: 'AI評価を取得できなかったため補完差分を表示しています',
-        summary
+        summary,
+        isFallback: true
     };
 }
 
@@ -124,10 +127,29 @@ function buildHeuristicFallbackAnalysis(currentText, previousText = null) {
         : buildLocalSingleAnalysis(currentText);
     return {
         ...base,
-        riskReason: 'Gemini応答不安定のため補完解析を返しました',
+        riskReason: 'AI評価を一部補完表示しています',
         summary: String(base.summary || '補完解析を返しました')
             .replace(/^ローカル差分要約:/, '補完差分要約:')
-            .replace(/^ローカル要約:/, '補完要約:')
+            .replace(/^ローカル要約:/, '補完要約:'),
+        isFallback: true
+    };
+}
+
+function normalizeStructuredDiffResult(parsed) {
+    const riskLevelNum = Number(parsed?.riskLevel);
+    const insightsArray = Array.isArray(parsed?.insights) ? parsed.insights : [];
+    const insightsMap = {};
+    insightsArray.forEach((item) => {
+        const sectionId = String(item?.sectionId || '').trim();
+        if (!sectionId) return;
+        insightsMap[sectionId] = item;
+    });
+
+    return {
+        summary: typeof parsed?.summary === 'string' ? parsed.summary : '解析完了',
+        riskLevel: [1, 2, 3].includes(riskLevelNum) ? riskLevelNum : 1,
+        riskReason: typeof parsed?.riskReason === 'string' ? parsed.riskReason : '',
+        insights: insightsMap
     };
 }
 
@@ -170,12 +192,18 @@ class GeminiService {
 
         try {
             const primary = await this.requestGeminiJson(prompt, true);
-            return normalizeAnalyzeResult(primary);
+            return {
+                ...normalizeAnalyzeResult(primary),
+                isFallback: false
+            };
         } catch (error) {
             logger.warn('Gemini analyzeContract primary request failed, retrying without JSON mime type:', error.message);
             try {
                 const fallback = await this.requestGeminiJson(prompt, false);
-                return normalizeAnalyzeResult(fallback);
+                return {
+                    ...normalizeAnalyzeResult(fallback),
+                    isFallback: false
+                };
             } catch (retryError) {
                 logger.error('Gemini analyzeContract failed:', retryError);
             }
@@ -249,12 +277,14 @@ class GeminiService {
                 riskLevel: 1,
                 riskReason: 'AI評価を取得できなかったため補完解析を表示しています',
                 insights: first.section ? {
-                    [first.section]: {
+                    'CHG-0': {
+                        sectionId: 'CHG-0',
                         impact: '差分を検出した条文です',
                         concern: '要点の最終確認を推奨します',
                         recommendation: '関連条文を確認してレビューしてください'
                     }
-                } : {}
+                } : {},
+                isFallback: true
             };
         }
         if (!GEMINI_API_KEY) {
@@ -267,64 +297,46 @@ class GeminiService {
         logger.info(`Analyzing structured diff with ${modifiedChanges.length} prioritized changes`);
 
         try {
-            const response = await axios.post(
-                `${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`,
-                {
-                    contents: [{
-                        parts: [{ text: prompt }]
-                    }],
-                    generationConfig: {
-                        temperature: 0.1,
-                        maxOutputTokens: 2048,
-                        responseMimeType: 'application/json'
-                    }
-                },
-                {
-                    timeout: 60000,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Referer': 'https://diffsense.spacegleam.co.jp'
-                    }
-                }
-            );
-
-            const aiText = response.data.candidates[0].content.parts[0].text;
-            let cleanText = aiText.replace(/```json/g, '').replace(/```/g, '');
-            const firstOpen = cleanText.indexOf('{');
-            const lastClose = cleanText.lastIndexOf('}');
-            const jsonStr = cleanText.substring(firstOpen, lastClose + 1);
-
-            const result = JSON.parse(jsonStr);
-
-            // Merge AI insights back into changes
-            const analyzerMap = {};
-            if (result.insights) {
-                result.insights.forEach(ins => {
-                    analyzerMap[ins.sectionId] = ins;
-                });
-            }
+            const primary = await this.requestGeminiJson(prompt, true);
+            const result = normalizeStructuredDiffResult(primary);
 
             return {
                 summary: result.summary || '解析完了',
                 riskLevel: result.riskLevel || 1,
                 riskReason: result.riskReason || '',
-                insights: analyzerMap
+                insights: result.insights,
+                isFallback: false
             };
         } catch (error) {
-            logger.error('Structured AI analysis failed:', error);
+            logger.warn('Structured AI analysis primary request failed, retrying without JSON mime type:', error.message);
+            try {
+                const fallback = await this.requestGeminiJson(prompt, false);
+                const result = normalizeStructuredDiffResult(fallback);
+                return {
+                    summary: result.summary || '解析完了',
+                    riskLevel: result.riskLevel || 1,
+                    riskReason: result.riskReason || '',
+                    insights: result.insights,
+                    isFallback: false
+                };
+            } catch (retryError) {
+                logger.error('Structured AI analysis failed:', retryError);
+            }
             if (shouldUseLocalAiFallback()) {
                 return {
                     summary: '条文差分を検出しました。変更内容を確認してください。',
                     riskLevel: 1,
                     riskReason: 'AI評価を取得できなかったため補完解析を表示しています',
-                    insights: {}
+                    insights: {},
+                    isFallback: true
                 };
             }
             return {
-                summary: '補完解析を返しました',
+                summary: '変更点を検出しました。内容を確認してください。',
                 riskLevel: 1,
-                riskReason: 'Gemini応答不安定のため補完解析を返しました',
-                insights: {}
+                riskReason: 'AI評価を一部補完表示しています',
+                insights: {},
+                isFallback: true
             };
         }
     }

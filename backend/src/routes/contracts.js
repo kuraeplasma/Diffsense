@@ -41,6 +41,72 @@ function normalizeContentToText(content) {
     return String(content);
 }
 
+function normalizeContentToLegacyArticles(content) {
+    if (content === null || content === undefined) return [];
+    if (Array.isArray(content)) return content;
+    if (typeof content === 'object' && Array.isArray(content.articles)) {
+        return toLegacyArticleArray(content);
+    }
+    if (typeof content === 'string') {
+        const trimmed = content.trim();
+        if (!trimmed) return [];
+        return docxService.parseTextToArticles(trimmed);
+    }
+    return [];
+}
+
+function defaultStructuredImpact(change) {
+    const type = String(change?.type || '').toUpperCase();
+    if (type === 'ADD') return '新規条項または文言追加が含まれます';
+    if (type === 'DELETE') return '既存条項または文言の削除が含まれます';
+    return '既存条項の文言変更が含まれます';
+}
+
+function defaultStructuredConcern(change) {
+    const type = String(change?.type || '').toUpperCase();
+    if (type === 'ADD') return '追加内容の法的効果を確認してください';
+    if (type === 'DELETE') return '削除による権利義務の変化を確認してください';
+    return '変更前後で条件や責任範囲が変わっていないか確認してください';
+}
+
+async function buildStructuredPairAnalysis(oldArticles, newArticles) {
+    if (!Array.isArray(oldArticles) || !Array.isArray(newArticles)) return null;
+    if (oldArticles.length === 0 || newArticles.length === 0) return null;
+
+    const diffChanges = diffService.compare(oldArticles, newArticles);
+    if (diffChanges.length === 0) {
+        return {
+            changes: [],
+            riskLevel: 1,
+            riskReason: '差分は検出されませんでした',
+            summary: '差分は検出されませんでした',
+            isFallback: false
+        };
+    }
+
+    const analysis = await geminiService.analyzeStructuredDiff(diffChanges);
+    const insights = analysis && typeof analysis.insights === 'object' ? analysis.insights : {};
+    const mappedChanges = diffChanges.map((change, index) => {
+        const insight = insights[`CHG-${index}`] || {};
+        return {
+            section: change.section,
+            type: change.type,
+            old: change.old,
+            new: change.new,
+            impact: insight.impact || defaultStructuredImpact(change),
+            concern: insight.concern || defaultStructuredConcern(change)
+        };
+    });
+
+    return {
+        changes: mappedChanges,
+        riskLevel: Number(analysis?.riskLevel || 0) || (diffChanges.some((c) => String(c.type || '').toUpperCase() === 'DELETE') ? 2 : 1),
+        riskReason: String(analysis?.riskReason || '').trim() || '変更点を確認してください',
+        summary: String(analysis?.summary || '').trim() || `${mappedChanges.length}件の変更を検出しました`,
+        isFallback: analysis?.isFallback === true
+    };
+}
+
 function decodeBase64Payload(raw) {
     const base64Clean = String(raw || '').split(',').pop();
     return Buffer.from(base64Clean, 'base64');
@@ -261,18 +327,25 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                 const previousVersionText = normalizeContentToText(previousVersion);
 
                 if (textToAnalyze.trim().length > 0) {
-                aiResult = await geminiService.analyzeContract(
-                    textToAnalyze,
-                    previousVersionText
-                );
+                    const structuredPairAnalysis = previousVersionText
+                        ? await buildStructuredPairAnalysis(
+                            normalizeContentToLegacyArticles(previousVersion),
+                            normalizeContentToLegacyArticles(extractedText)
+                        )
+                        : null;
 
-                // 3.1 Increment Usage Count ONLY on successful AI analysis
-                const aiSucceeded = aiResult && aiResult.summary && !isAiFailureSummary(aiResult.summary);
-                if (aiSucceeded) {
-                    await dbService.incrementUsage(uid);
-                } else {
-                    logger.info(`AI analysis failed for user ${uid} - usage count NOT incremented`);
-                }
+                    aiResult = structuredPairAnalysis || await geminiService.analyzeContract(
+                        textToAnalyze,
+                        previousVersionText
+                    );
+
+                    // 3.1 Increment Usage Count ONLY on successful AI analysis
+                    const aiSucceeded = aiResult && aiResult.summary && !isAiFailureSummary(aiResult.summary) && aiResult.isFallback !== true;
+                    if (aiSucceeded) {
+                        await dbService.incrementUsage(uid);
+                    } else {
+                        logger.info(`AI analysis failed for user ${uid} - usage count NOT incremented`);
+                    }
                 } else {
                     logger.warn('No text extracted, skipping AI analysis');
                     aiResult.summary = 'テキストを抽出できませんでした（画像ベースの可能性があります）';
@@ -322,7 +395,8 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                 summary: aiResult.summary,
                 structuredContract,
                 rawExtractedText,
-                aiFailed: aiFailed
+                aiFailed: aiFailed,
+                isFallback: aiResult.isFallback === true
             }
         });
     } catch (error) {
@@ -370,6 +444,7 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
         let aiResult = {
             changes: diffChanges.map((c) => ({
                 section: c.section,
+                type: c.type,
                 old: c.old,
                 new: c.new,
                 impact: '',
@@ -377,16 +452,26 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
             })),
             riskLevel: diffChanges.some((c) => c.type === 'DELETE') ? 2 : 1,
             riskReason: diffChanges.length ? '条文単位の差分を検出しました' : '差分は検出されませんでした',
-            summary: diffChanges.length ? `${diffChanges.length}件の差分を検出しました` : '差分は検出されませんでした'
+            summary: diffChanges.length ? `${diffChanges.length}件の差分を検出しました` : '差分は検出されませんでした',
+            isFallback: false
         };
 
         if (!skipAI) {
+            const structuredPairAnalysis = previousArticles.length
+                ? await buildStructuredPairAnalysis(previousArticles, currentArticles)
+                : null;
             const currentText = normalizeContentToText(currentArticles);
             const previousText = normalizeContentToText(previousArticles);
 
-            if (currentText.trim().length > 0) {
+            if (structuredPairAnalysis) {
+                const aiSucceeded = structuredPairAnalysis.summary && !isAiFailureSummary(structuredPairAnalysis.summary) && structuredPairAnalysis.isFallback !== true;
+                if (aiSucceeded) {
+                    await dbService.incrementUsage(uid);
+                }
+                aiResult = structuredPairAnalysis;
+            } else if (currentText.trim().length > 0) {
                 const geminiResult = await geminiService.analyzeContract(currentText, previousText);
-                const aiSucceeded = geminiResult && geminiResult.summary && !isAiFailureSummary(geminiResult.summary);
+                const aiSucceeded = geminiResult && geminiResult.summary && !isAiFailureSummary(geminiResult.summary) && geminiResult.isFallback !== true;
                 if (aiSucceeded) {
                     await dbService.incrementUsage(uid);
                 }
@@ -395,7 +480,8 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
                     changes: diffChanges.length ? aiResult.changes : (geminiResult.changes || []),
                     riskLevel: geminiResult.riskLevel,
                     riskReason: geminiResult.riskReason,
-                    summary: geminiResult.summary
+                    summary: geminiResult.summary,
+                    isFallback: geminiResult.isFallback === true
                 };
             }
         }
@@ -417,7 +503,8 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
                 summary: aiResult.summary,
                 extractedTextHash,
                 extractedTextLength: serialized.length,
-                aiFailed: Boolean(aiResult.summary && isAiFailureSummary(aiResult.summary))
+                aiFailed: Boolean(aiResult.summary && isAiFailureSummary(aiResult.summary)),
+                isFallback: aiResult.isFallback === true
             }
         });
     } catch (error) {

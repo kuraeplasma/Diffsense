@@ -1,4 +1,4 @@
-import { dbService } from './db-service.js?v=20260309h1';
+import { dbService } from './db-service.js?v=20260309h2';
 import { aiService } from './ai-service.js?v=20260309h2';
 const DASHBOARD_CACHE_KEYS = {
     USER_META: 'diffsense_cache_user_meta',
@@ -160,9 +160,9 @@ const isMeaningfulAnalysisPayload = (payload) => {
 
     if (changes.length > 0) return true;
     if (!summary) return false;
-    if (/まだ解析されていません|比較先を選択すると|AI解析がありません|解析データなし|ローカルテストモード|ローカル差分要約|ローカル要約/.test(summary)) return false;
+    if (/まだ解析されていません|比較先を選択すると|AI解析がありません|解析データなし|ローカルテストモード|ローカル差分要約|ローカル要約|補完解析を返しました|補完要約|補完差分要約/.test(summary)) return false;
     if (/^(未解析|差分抽出済み|表示用キャッシュ|比較表示のみ)$/.test(riskReason)) return false;
-    if (/ローカルテストモード|本番AI解析ではありません/.test(riskReason)) return false;
+    if (/ローカルテストモード|本番AI解析ではありません|Gemini応答不安定|AI評価を一部補完表示しています|AI評価を取得できなかったため補完解析を表示しています|AI評価を取得できなかったため補完差分を表示しています|AI評価を取得できなかったため補完要約を表示しています/.test(riskReason)) return false;
     return true;
 };
 
@@ -171,12 +171,14 @@ const sanitizeAnalysisPayload = (payload) => {
     const changes = Array.isArray(base.changes) ? base.changes.filter(Boolean) : [];
     const summaryRaw = String(base.summary || '').trim();
     const reasonRaw = String(base.riskReason || '').trim();
-    const hasLocalPhrase = /ローカルテストモード|ローカル差分要約|ローカル要約|本番AI解析ではありません/.test(`${summaryRaw} ${reasonRaw}`);
+    const hasFallbackPhrase = /ローカルテストモード|ローカル差分要約|ローカル要約|本番AI解析ではありません|Gemini応答不安定|補完解析を返しました|補完要約|補完差分要約|AI評価を一部補完表示しています|AI評価を取得できなかったため補完解析を表示しています|AI評価を取得できなかったため補完差分を表示しています|AI評価を取得できなかったため補完要約を表示しています/.test(`${summaryRaw} ${reasonRaw}`);
+    const isFallback = base.isFallback === true || hasFallbackPhrase;
 
-    if (!hasLocalPhrase) {
+    if (!isFallback) {
         return {
             ...base,
-            changes
+            changes,
+            isFallback
         };
     }
 
@@ -193,8 +195,14 @@ const sanitizeAnalysisPayload = (payload) => {
         ...base,
         summary,
         riskReason: '変更点を要確認',
-        changes
+        changes,
+        isFallback
     };
+};
+
+const isReusableAnalysisPayload = (payload) => {
+    const normalized = sanitizeAnalysisPayload(payload);
+    return isMeaningfulAnalysisPayload(normalized) && normalized.isFallback !== true;
 };
 
 const buildStoredContractAnalysis = (contract) => {
@@ -207,7 +215,8 @@ const buildStoredContractAnalysis = (contract) => {
         summary: summary || 'AI解析が完了しました',
         riskLevel: contract.risk_level === 'High' ? 3 : (contract.risk_level === 'Medium' ? 2 : 1),
         riskReason: riskReason || 'リスク判定が完了しました',
-        changes
+        changes,
+        isFallback: contract.ai_is_fallback === true
     };
 };
 
@@ -1053,7 +1062,7 @@ const Views = {
         const storedContractAnalysis = latestCurrentPair ? buildStoredContractAnalysis(contract) : null;
         const effectiveSelectedDiffData = isMeaningfulAnalysisPayload(selectedDiffResult?.diff_data)
             ? selectedDiffResult.diff_data
-            : (storedContractAnalysis || null);
+            : ((storedContractAnalysis && storedContractAnalysis.isFallback !== true) ? storedContractAnalysis : null);
         const activeTab = window.app ? window.app.activeDetailTab : 'diff';
         const runtimePdfUrl = window.app?.getRuntimePdfPreviewUrl(id) || null;
         const resolvedPdfPreviewUrl = resolvePdfPreviewUrl(contract, runtimePdfUrl);
@@ -1066,6 +1075,7 @@ const Views = {
         // AI解析結果があればそれを使用、なければ静的コンテンツまたはデフォルト
         const hasComparableVersion = documentOptions.length >= 2;
         const hasAIResults = Boolean(contract.ai_summary || (Array.isArray(contract.ai_changes) && contract.ai_changes.length > 0));
+        const canTriggerPairAnalysis = Boolean(selectedSourceDoc && selectedTargetDoc && window.app?.can('operate_contract'));
 
         let diffData;
         if (effectiveSelectedDiffData) {
@@ -1075,7 +1085,8 @@ const Views = {
                 summary: cached.summary || '選択した2文書の差分結果を表示しています。',
                 riskLevel: cached.riskLevel ?? 1,
                 riskReason: cached.riskReason || '保存済みの差分結果を表示しています。',
-                changes: cached.changes || []
+                changes: cached.changes || [],
+                isFallback: cached.isFallback === true
             };
         } else if (selectedSourceDoc && selectedTargetDoc) {
             diffData = {
@@ -1083,7 +1094,8 @@ const Views = {
                 summary: 'この文書ペアのAI差分要約はまだ保存されていません。必要に応じてAI差分解析を実行してください。',
                 riskLevel: 1,
                 riskReason: 'AI差分未保存',
-                changes: []
+                changes: [],
+                isFallback: false
             };
         } else if (comparisonContext?.analysis) {
             diffData = {
@@ -1091,7 +1103,8 @@ const Views = {
                 summary: comparisonContext.analysis.summary || '選択した履歴との差分比較を表示しています。',
                 riskLevel: comparisonContext.analysis.riskLevel ?? 1,
                 riskReason: comparisonContext.analysis.riskReason || '選択した履歴との差分を解析しました。',
-                changes: comparisonContext.analysis.changes || []
+                changes: comparisonContext.analysis.changes || [],
+                isFallback: comparisonContext.analysis.isFallback === true
             };
         } else if (comparisonContext?.analysisNotice) {
             diffData = {
@@ -1099,14 +1112,16 @@ const Views = {
                 summary: comparisonContext.analysisNotice,
                 riskLevel: 1,
                 riskReason: '比較表示のみ',
-                changes: []
+                changes: [],
+                isFallback: false
             };
         } else if (hasAIResults) {
             const normalizedStored = sanitizeAnalysisPayload({
                 summary: contract.ai_summary || '',
                 riskLevel: contract.risk_level === 'High' ? 3 : (contract.risk_level === 'Medium' ? 2 : 1),
                 riskReason: contract.ai_risk_reason || '',
-                changes: contract.ai_changes || []
+                changes: contract.ai_changes || [],
+                isFallback: contract.ai_is_fallback === true
             });
             // AI解析結果を使用
             diffData = {
@@ -1114,7 +1129,8 @@ const Views = {
                 summary: normalizedStored.summary || 'AI解析が完了しました',
                 riskLevel: normalizedStored.riskLevel ?? 1,
                 riskReason: normalizedStored.riskReason || 'リスク判定が完了しました',
-                changes: normalizedStored.changes || []
+                changes: normalizedStored.changes || [],
+                isFallback: normalizedStored.isFallback === true
             };
         } else {
             // デフォルトデータ
@@ -1131,7 +1147,8 @@ const Views = {
                     : (!hasComparableVersion
                         ? '旧バージョンが未登録のため差分判定は未実行です'
                         : '特定の変更箇所において、リスク要因が検知されました。詳細を確認してください。'),
-                changes: []
+                changes: [],
+                isFallback: false
             };
         }
 
@@ -1229,8 +1246,13 @@ const Views = {
                             <span class="text-muted" style="font-weight:normal; font-size:11px;">最終解析: ${contract.last_analyzed_at || '-'}</span>
                         </div>
                         <div class="pane-scroll-area">
-                            <div class="analysis-section-title">
-                                <i class="fa-solid fa-robot text-primary"></i> AIリスク要約
+                            <div class="analysis-section-title" style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
+                                <span><i class="fa-solid fa-robot text-primary"></i> AIリスク要約</span>
+                                ${canTriggerPairAnalysis ? `
+                                    <button class="btn-dashboard" style="padding:6px 12px; font-size:12px;" onclick="window.app.runSelectedPairAnalysis(${id})">
+                                        <i class="fa-solid fa-play"></i> ${diffData.isFallback === true || diffData.riskReason === 'AI差分未保存' ? '解析開始' : '再解析'}
+                                    </button>
+                                ` : ''}
                             </div>
                             <div style="margin-bottom:24px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:16px;">
                                 <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
@@ -4581,9 +4603,11 @@ class DashboardApp {
         }
 
         const cached = dbService.getDiffResult(sourceDoc.id, targetDoc.id);
+        const storedAnalysis = buildStoredContractAnalysis(dbService.getContractById(contractId));
         const canHydrateFromStoredAnalysis = isCurrentVsLatestHistoryPair(docs, sourceDoc, targetDoc)
-            && isMeaningfulAnalysisPayload(buildStoredContractAnalysis(dbService.getContractById(contractId)));
-        if (cached && isMeaningfulAnalysisPayload(cached.diff_data)) {
+            && isMeaningfulAnalysisPayload(storedAnalysis)
+            && storedAnalysis?.isFallback !== true;
+        if (cached && isReusableAnalysisPayload(cached.diff_data)) {
             dbService.touchRecentDiff(sourceDoc.id, targetDoc.id);
             this.navigate('diff', contractId);
             return;
@@ -4614,13 +4638,42 @@ class DashboardApp {
         await this.analyzeDocumentPair(contractId, sourceDoc, targetDoc);
     }
 
-    async analyzeDocumentPair(contractId, sourceDoc, targetDoc) {
+    async runSelectedPairAnalysis(contractId) {
+        if (!this.can('operate_contract')) {
+            Notify.warning('閲覧のみの権限では解析を実行できません');
+            return;
+        }
+        const docs = dbService.getDocumentsByContractId(contractId);
+        const compareState = this.getDocumentCompareState(contractId) || {};
+        const fallbackSourceDoc = docs.length >= 2 ? docs[docs.length - 2] : null;
+        const fallbackTargetDoc = docs.length >= 1 ? docs[docs.length - 1] : null;
+        const sourceDoc = docs.find((doc) => doc.id === compareState.docAId) || fallbackSourceDoc;
+        const targetDoc = docs.find((doc) => doc.id === compareState.docBId) || fallbackTargetDoc;
+
+        if (!sourceDoc || !targetDoc || sourceDoc.id === targetDoc.id) {
+            Notify.warning('比較元と比較先を選択してください。');
+            return;
+        }
+
+        const confirmed = await Notify.confirm(
+            `選択中の2文書に対してAI差分解析を実行しますか？<br><br><strong>比較元:</strong> ${escapeHtmlText(buildDocumentOptionLabel(sourceDoc))}<br><strong>比較先:</strong> ${escapeHtmlText(buildDocumentOptionLabel(targetDoc))}`,
+            { title: '解析開始', type: 'info', okText: '解析開始', cancelText: 'キャンセル' }
+        );
+        if (!confirmed) return;
+
+        await this.analyzeDocumentPair(contractId, sourceDoc, targetDoc, { force: true });
+    }
+
+    async analyzeDocumentPair(contractId, sourceDoc, targetDoc, options = {}) {
         const contract = dbService.getContractById(contractId);
         if (!contract || !sourceDoc || !targetDoc) return;
+        const force = options.force === true;
         const docs = dbService.getDocumentsByContractId(contractId);
         const storedContractAnalysis = buildStoredContractAnalysis(contract);
-        const canReuseStoredAnalysis = isCurrentVsLatestHistoryPair(docs, sourceDoc, targetDoc)
-            && isMeaningfulAnalysisPayload(storedContractAnalysis);
+        const canReuseStoredAnalysis = !force
+            && isCurrentVsLatestHistoryPair(docs, sourceDoc, targetDoc)
+            && isMeaningfulAnalysisPayload(storedContractAnalysis)
+            && storedContractAnalysis?.isFallback !== true;
 
         const diffPayload = {
             summary: '選択した2文書の差分結果です。',
@@ -4657,8 +4710,10 @@ class DashboardApp {
                     Object.assign(diffPayload, result.data || {});
                 }
             } else {
-                diffPayload.summary = 'この文書ペアのAI差分要約は未保存です。比較表示のみを作成しました。';
-                diffPayload.riskReason = 'AI差分未保存';
+                const currentText = contentToComparableText(targetDoc.content);
+                const result = await aiService.analyzeContract(contractId, 'text', currentText, sourceDoc.content);
+                if (!result.success) throw new Error(result.error || '差分解析に失敗しました');
+                Object.assign(diffPayload, result.data || {});
             }
 
             if (!isMeaningfulAnalysisPayload(diffPayload) && canReuseStoredAnalysis) {
