@@ -1358,10 +1358,12 @@ const Views = {
         const hasStructuredDifferences = Boolean(structuredFallbackAnalysis?.changes?.length);
         const latestCurrentPair = isCurrentVsLatestHistoryPair(documentOptions, selectedSourceDoc, selectedTargetDoc);
         const storedContractAnalysis = latestCurrentPair ? buildStoredContractAnalysis(contract) : null;
-        const hasFallbackNoDiffResult = hasStructuredDifferences
-            && selectedDiffPayload?.isFallback === true
+        const hasExplicitNoDiffResult = hasStructuredDifferences
+            && Boolean(selectedDiffPayload)
             && isExplicitNoDiffAnalysis(selectedDiffPayload);
-        const effectiveSelectedDiffData = (!hasFallbackNoDiffResult && selectedDiffPayload)
+        const hasFallbackNoDiffResult = hasExplicitNoDiffResult
+            && selectedDiffPayload?.isFallback === true;
+        const effectiveSelectedDiffData = (!hasExplicitNoDiffResult && selectedDiffPayload)
             ? selectedDiffPayload
             : (hasAnalysisRecord(storedContractAnalysis) ? storedContractAnalysis : null);
         const shouldAutoAnalyzePair = Boolean(
@@ -1369,11 +1371,11 @@ const Views = {
             && selectedSourceDoc
             && selectedTargetDoc
             && hasStructuredDifferences
-            && (!selectedDiffPayload || selectedDiffPayload.isFallback === true)
+            && (!selectedDiffPayload || hasExplicitNoDiffResult || selectedDiffPayload.isFallback === true)
         );
         const autoPairAnalysisQueued = shouldAutoAnalyzePair
             ? window.app?.scheduleAutoPairAnalysis(id, selectedSourceDoc.id, selectedTargetDoc.id, {
-                force: selectedDiffPayload?.isFallback === true
+                force: Boolean(selectedDiffPayload && (hasExplicitNoDiffResult || selectedDiffPayload.isFallback === true))
             }) === true
             : false;
         const activeTab = window.app ? window.app.activeDetailTab : 'diff';
