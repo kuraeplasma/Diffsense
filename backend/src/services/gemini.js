@@ -1,5 +1,6 @@
 const axios = require('axios');
 const logger = require('../utils/logger');
+const Diff = require('diff');
 
 // Gemini API Configuration
 // NOTE: We use gemini-2.0-flash on the v1beta endpoint as gemini-1.5-flash is retired for this key.
@@ -34,12 +35,18 @@ function extractJsonText(rawText) {
         .replace(/```json/gi, '```')
         .replace(/```/g, '')
         .trim();
-    const firstOpen = cleanText.indexOf('{');
-    const lastClose = cleanText.lastIndexOf('}');
-    if (firstOpen === -1 || lastClose === -1 || lastClose <= firstOpen) {
-        throw new Error('Gemini response is not valid JSON');
+    const candidates = [
+        [cleanText.indexOf('{'), cleanText.lastIndexOf('}')],
+        [cleanText.indexOf('['), cleanText.lastIndexOf(']')]
+    ];
+
+    for (const [start, end] of candidates) {
+        if (start !== -1 && end !== -1 && end > start) {
+            return cleanText.substring(start, end + 1);
+        }
     }
-    return cleanText.substring(firstOpen, lastClose + 1);
+
+    throw new Error('Gemini response is not valid JSON');
 }
 
 function normalizeAnalyzeResult(parsed) {
@@ -52,6 +59,86 @@ function normalizeAnalyzeResult(parsed) {
     };
 }
 
+function shouldUseLocalAiFallback() {
+    if (process.env.LOCAL_FAKE_AI === 'false') return false;
+    if (process.env.LOCAL_FAKE_AI === 'true') return true;
+    return process.env.NODE_ENV === 'development';
+}
+
+function extractSectionLabel(text) {
+    const src = String(text || '').trim();
+    if (!src) return '本文';
+    const article = src.match(/^第\s*[0-9０-９一二三四五六七八九十百]+\s*条(?:\s*[（(【][^）)】]+[）)】]|\s+\S+)?/m);
+    if (article) return article[0].trim();
+    const firstLine = src.split(/\r?\n/).map((line) => line.trim()).find(Boolean);
+    return firstLine ? firstLine.slice(0, 40) : '本文';
+}
+
+function buildLocalSingleAnalysis(contractText) {
+    const text = String(contractText || '').trim();
+    const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    const sections = lines.filter((line) => /^第\s*[0-9０-９一二三四五六七八九十百]+\s*条/.test(line));
+    const preview = lines.slice(0, 3).join(' / ').slice(0, 160);
+    return {
+        changes: sections.slice(0, 5).map((section) => ({
+            section,
+            type: 'risk',
+            old: section,
+            new: 'ローカルテストモードのため自動要約のみを生成しました。',
+            impact: 'ローカル検証用の簡易結果',
+            concern: '本番AI解析ではありません'
+        })),
+        riskLevel: 1,
+        riskReason: 'ローカルテストモードで簡易解析を実行しました',
+        summary: preview ? `ローカル要約: ${preview}` : 'ローカルテストモードで簡易解析を実行しました'
+    };
+}
+
+function buildLocalDiffAnalysis(currentText, previousText) {
+    const lhs = String(previousText || '').trim();
+    const rhs = String(currentText || '').trim();
+    const section = extractSectionLabel(rhs || lhs);
+    const chunks = Diff.diffWordsWithSpace(lhs, rhs);
+    const added = chunks.filter((part) => part.added).map((part) => part.value).join('').trim();
+    const removed = chunks.filter((part) => part.removed).map((part) => part.value).join('').trim();
+    const summary = added || removed
+        ? `ローカル差分要約: ${section} に変更があります。`
+        : 'ローカル差分要約: 目立つ変更は検出されませんでした。';
+
+    return {
+        changes: [{
+            section,
+            type: 'modification',
+            old: removed || lhs.slice(0, 240),
+            new: added || rhs.slice(0, 240),
+            impact: 'ローカル検証用の簡易差分',
+            concern: '本番AI解析ではありません'
+        }],
+        riskLevel: 1,
+        riskReason: 'ローカルテストモードで簡易差分解析を実行しました',
+        summary
+    };
+}
+
+function buildHeuristicFallbackAnalysis(currentText, previousText = null) {
+    const base = previousText
+        ? buildLocalDiffAnalysis(currentText, previousText)
+        : buildLocalSingleAnalysis(currentText);
+    return {
+        ...base,
+        riskReason: 'Gemini応答不安定のため補完解析を返しました',
+        summary: String(base.summary || '補完解析を返しました')
+            .replace(/^ローカル差分要約:/, '補完差分要約:')
+            .replace(/^ローカル要約:/, '補完要約:')
+    };
+}
+
+function shouldRetryGeminiRequest(error) {
+    const status = Number(error?.response?.status || 0);
+    if ([408, 429, 500, 502, 503, 504].includes(status)) return true;
+    const message = String(error?.message || '');
+    return /timeout|ECONNRESET|ETIMEDOUT|socket hang up|network/i.test(message);
+}
 class GeminiService {
     constructor() {
         if (!GEMINI_API_KEY) {
@@ -60,16 +147,25 @@ class GeminiService {
     }
 
     async analyzeContract(contractText, previousVersion = null) {
-        if (!GEMINI_API_KEY) {
-            throw new Error('Gemini API key is not configured');
-        }
-
         const currentText = typeof contractText === 'string'
             ? contractText
             : JSON.stringify(contractText || '');
         const previousText = (previousVersion === null || previousVersion === undefined)
             ? null
             : (typeof previousVersion === 'string' ? previousVersion : JSON.stringify(previousVersion));
+
+        if (shouldUseLocalAiFallback()) {
+            if (!GEMINI_API_KEY || process.env.LOCAL_AI_ONLY === 'true') {
+                logger.info('Using local AI fallback analysis');
+                return previousText
+                    ? buildLocalDiffAnalysis(currentText, previousText)
+                    : buildLocalSingleAnalysis(currentText);
+            }
+        }
+
+        if (!GEMINI_API_KEY) {
+            throw new Error('Gemini API key is not configured');
+        }
 
         const prompt = this.buildPrompt(currentText, previousText);
         logger.info('Starting Gemini analyzeContract request');
@@ -85,12 +181,14 @@ class GeminiService {
             } catch (retryError) {
                 logger.error('Gemini analyzeContract failed:', retryError);
             }
-            return {
-                changes: [],
-                riskLevel: 1,
-                riskReason: 'AIサービスとの通信に失敗しました',
-                summary: 'AI解析に失敗しました'
-            };
+            if (shouldUseLocalAiFallback()) {
+                logger.warn('Falling back to local AI analysis');
+                return previousText
+                    ? buildLocalDiffAnalysis(currentText, previousText)
+                    : buildLocalSingleAnalysis(currentText);
+            }
+            logger.warn('Returning heuristic fallback analysis instead of AI failure');
+            return buildHeuristicFallbackAnalysis(currentText, previousText);
         }
     }
 
@@ -109,21 +207,36 @@ class GeminiService {
             body.generationConfig.responseMimeType = 'application/json';
         }
 
-        const response = await axios.post(
-            `${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`,
-            body,
-            {
-                timeout: 90000,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Referer': 'https://diffsense.spacegleam.co.jp'
-                }
-            }
-        );
+        let lastError = null;
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+            try {
+                const response = await axios.post(
+                    `${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`,
+                    body,
+                    {
+                        timeout: 90000,
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Referer': 'https://diffsense.spacegleam.co.jp'
+                        }
+                    }
+                );
 
-        const aiText = extractCandidateText(response?.data);
-        const jsonText = extractJsonText(aiText);
-        return JSON.parse(jsonText);
+                const aiText = extractCandidateText(response?.data);
+                const jsonText = extractJsonText(aiText);
+                return JSON.parse(jsonText);
+            } catch (error) {
+                lastError = error;
+                if (attempt >= 2 || !shouldRetryGeminiRequest(error)) {
+                    break;
+                }
+                const waitMs = 1200 * (attempt + 1);
+                logger.warn(`Gemini request retry ${attempt + 1}/2 after ${waitMs}ms: ${error.message}`);
+                await new Promise((resolve) => setTimeout(resolve, waitMs));
+            }
+        }
+
+        throw lastError || new Error('Gemini request failed');
     }
 
     /**
@@ -131,6 +244,21 @@ class GeminiService {
      * @param {Array} changes - Array from DiffService.compare
      */
     async analyzeStructuredDiff(changes) {
+        if (shouldUseLocalAiFallback() && (!GEMINI_API_KEY || process.env.LOCAL_AI_ONLY === 'true')) {
+            const first = changes.find(c => c.type !== 'UNTOUCHED') || changes[0] || {};
+            return {
+                summary: 'ローカルテストモードで簡易構造化差分解析を実行しました',
+                riskLevel: 1,
+                riskReason: '本番AI解析ではありません',
+                insights: first.section ? {
+                    [first.section]: {
+                        impact: 'ローカル検証用の簡易結果',
+                        concern: '本番AI解析ではありません',
+                        recommendation: '本番環境で最終確認してください'
+                    }
+                } : {}
+            };
+        }
         if (!GEMINI_API_KEY) {
             throw new Error('Gemini API key is not configured');
         }
@@ -186,10 +314,18 @@ class GeminiService {
             };
         } catch (error) {
             logger.error('Structured AI analysis failed:', error);
+            if (shouldUseLocalAiFallback()) {
+                return {
+                    summary: 'ローカルテストモードで簡易構造化差分解析を実行しました',
+                    riskLevel: 1,
+                    riskReason: '本番AI解析ではありません',
+                    insights: {}
+                };
+            }
             return {
-                summary: 'AI分析に失敗しました',
+                summary: '補完解析を返しました',
                 riskLevel: 1,
-                riskReason: 'AIサービスとの通信に失敗しました',
+                riskReason: 'Gemini応答不安定のため補完解析を返しました',
                 insights: {}
             };
         }
