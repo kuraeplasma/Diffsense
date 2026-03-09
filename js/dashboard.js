@@ -3056,11 +3056,22 @@ class DashboardApp {
         }
         if (viewId === 'diff' && this.activeDetailTab === 'diff') {
             this.renderInitialSkeleton('diff');
-            try {
-                await this.ensureDiffLibrary();
-            } catch (error) {
-                console.warn('Diff library lazy load failed:', error);
-            }
+            this.ensureDiffLibrary()
+                .then(() => {
+                    if (this.currentView === 'diff' && this.activeDetailTab === 'diff') {
+                        try {
+                            this.mainContent.innerHTML = Views.diff(this.currentViewParams);
+                            this.resetDetailPaneScroll();
+                            this.enforceDetailScrollLayout();
+                            this.setupClauseNavAutoSync();
+                        } catch (error) {
+                            console.warn('Deferred diff rerender failed:', error);
+                        }
+                    }
+                })
+                .catch((error) => {
+                    console.warn('Diff library lazy load failed:', error);
+                });
         }
         if (viewId === 'plan') {
             if (!this.planViewBillingCycle) {
