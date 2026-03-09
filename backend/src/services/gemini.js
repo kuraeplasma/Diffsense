@@ -7,6 +7,51 @@ const logger = require('../utils/logger');
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
+function extractCandidateText(payload) {
+    const candidate = payload?.candidates?.[0];
+    const parts = candidate?.content?.parts;
+    if (Array.isArray(parts)) {
+        const text = parts
+            .map((part) => (typeof part?.text === 'string' ? part.text : ''))
+            .filter(Boolean)
+            .join('\n')
+            .trim();
+        if (text) return text;
+    }
+
+    const promptFeedback = payload?.promptFeedback?.blockReason;
+    const finishReason = candidate?.finishReason;
+    if (promptFeedback || finishReason) {
+        throw new Error(`Gemini returned no text (${promptFeedback || finishReason})`);
+    }
+
+    throw new Error('Gemini response text is empty');
+}
+
+function extractJsonText(rawText) {
+    const cleanText = String(rawText || '')
+        .replace(/^\uFEFF/, '')
+        .replace(/```json/gi, '```')
+        .replace(/```/g, '')
+        .trim();
+    const firstOpen = cleanText.indexOf('{');
+    const lastClose = cleanText.lastIndexOf('}');
+    if (firstOpen === -1 || lastClose === -1 || lastClose <= firstOpen) {
+        throw new Error('Gemini response is not valid JSON');
+    }
+    return cleanText.substring(firstOpen, lastClose + 1);
+}
+
+function normalizeAnalyzeResult(parsed) {
+    const riskLevelNum = Number(parsed?.riskLevel);
+    return {
+        changes: Array.isArray(parsed?.changes) ? parsed.changes : [],
+        riskLevel: [1, 2, 3].includes(riskLevelNum) ? riskLevelNum : 1,
+        riskReason: typeof parsed?.riskReason === 'string' ? parsed.riskReason : '',
+        summary: typeof parsed?.summary === 'string' ? parsed.summary : '解析完了'
+    };
+}
+
 class GeminiService {
     constructor() {
         if (!GEMINI_API_KEY) {
@@ -30,50 +75,16 @@ class GeminiService {
         logger.info('Starting Gemini analyzeContract request');
 
         try {
-            const response = await axios.post(
-                `${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`,
-                {
-                    contents: [{
-                        parts: [{ text: prompt }]
-                    }],
-                    generationConfig: {
-                        temperature: 0.1,
-                        maxOutputTokens: 2048,
-                        responseMimeType: 'application/json'
-                    }
-                },
-                {
-                    timeout: 60000,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Referer': 'https://diffsense.spacegleam.co.jp'
-                    }
-                }
-            );
-
-            const aiText = response?.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (!aiText || typeof aiText !== 'string') {
-                throw new Error('Gemini response text is empty');
-            }
-
-            const cleanText = aiText.replace(/```json/g, '').replace(/```/g, '');
-            const firstOpen = cleanText.indexOf('{');
-            const lastClose = cleanText.lastIndexOf('}');
-            if (firstOpen === -1 || lastClose === -1 || lastClose <= firstOpen) {
-                throw new Error('Gemini response is not valid JSON');
-            }
-
-            const parsed = JSON.parse(cleanText.substring(firstOpen, lastClose + 1));
-            const riskLevelNum = Number(parsed?.riskLevel);
-
-            return {
-                changes: Array.isArray(parsed?.changes) ? parsed.changes : [],
-                riskLevel: [1, 2, 3].includes(riskLevelNum) ? riskLevelNum : 1,
-                riskReason: typeof parsed?.riskReason === 'string' ? parsed.riskReason : '',
-                summary: typeof parsed?.summary === 'string' ? parsed.summary : '解析完了'
-            };
+            const primary = await this.requestGeminiJson(prompt, true);
+            return normalizeAnalyzeResult(primary);
         } catch (error) {
-            logger.error('Gemini analyzeContract failed:', error);
+            logger.warn('Gemini analyzeContract primary request failed, retrying without JSON mime type:', error.message);
+            try {
+                const fallback = await this.requestGeminiJson(prompt, false);
+                return normalizeAnalyzeResult(fallback);
+            } catch (retryError) {
+                logger.error('Gemini analyzeContract failed:', retryError);
+            }
             return {
                 changes: [],
                 riskLevel: 1,
@@ -81,6 +92,38 @@ class GeminiService {
                 summary: 'AI解析に失敗しました'
             };
         }
+    }
+
+    async requestGeminiJson(prompt, enforceJsonMime = true) {
+        const body = {
+            contents: [{
+                parts: [{ text: prompt }]
+            }],
+            generationConfig: {
+                temperature: 0.1,
+                maxOutputTokens: 2048
+            }
+        };
+
+        if (enforceJsonMime) {
+            body.generationConfig.responseMimeType = 'application/json';
+        }
+
+        const response = await axios.post(
+            `${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`,
+            body,
+            {
+                timeout: 90000,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Referer': 'https://diffsense.spacegleam.co.jp'
+                }
+            }
+        );
+
+        const aiText = extractCandidateText(response?.data);
+        const jsonText = extractJsonText(aiText);
+        return JSON.parse(jsonText);
     }
 
     /**

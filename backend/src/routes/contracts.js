@@ -12,6 +12,10 @@ const { toLegacyArticleArray, fromLegacyArticleArray } = require('../services/co
 const logger = require('../utils/logger');
 const crypto = require('crypto');
 
+function isAiFailureSummary(summary) {
+    return /AI解析に失敗|AI分析に失敗|エラーが発生/.test(String(summary || ''));
+}
+
 function normalizeContentToText(content) {
     if (content === null || content === undefined) return '';
     if (typeof content === 'string') return content;
@@ -263,7 +267,7 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                 );
 
                 // 3.1 Increment Usage Count ONLY on successful AI analysis
-                const aiSucceeded = aiResult && aiResult.summary && !aiResult.summary.includes('AI解析に失敗');
+                const aiSucceeded = aiResult && aiResult.summary && !isAiFailureSummary(aiResult.summary);
                 if (aiSucceeded) {
                     await dbService.incrementUsage(uid);
                 } else {
@@ -301,7 +305,7 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
             }));
         }
 
-        const aiFailed = !aiResult.summary || aiResult.summary.includes('AI解析に失敗') || aiResult.summary.includes('エラーが発生');
+        const aiFailed = !aiResult.summary || isAiFailureSummary(aiResult.summary);
 
         res.json({
             success: true,
@@ -382,7 +386,7 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
 
             if (currentText.trim().length > 0) {
                 const geminiResult = await geminiService.analyzeContract(currentText, previousText);
-                const aiSucceeded = geminiResult && geminiResult.summary && !geminiResult.summary.includes('AI解析に失敗');
+                const aiSucceeded = geminiResult && geminiResult.summary && !isAiFailureSummary(geminiResult.summary);
                 if (aiSucceeded) {
                     await dbService.incrementUsage(uid);
                 }
@@ -413,7 +417,7 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
                 summary: aiResult.summary,
                 extractedTextHash,
                 extractedTextLength: serialized.length,
-                aiFailed: Boolean(aiResult.summary && aiResult.summary.includes('AI解析に失敗'))
+                aiFailed: Boolean(aiResult.summary && isAiFailureSummary(aiResult.summary))
             }
         });
     } catch (error) {
