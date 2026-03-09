@@ -60,9 +60,7 @@ function normalizeAnalyzeResult(parsed) {
 }
 
 function shouldUseLocalAiFallback() {
-    if (process.env.LOCAL_FAKE_AI === 'false') return false;
-    if (process.env.LOCAL_FAKE_AI === 'true') return true;
-    return process.env.NODE_ENV === 'development';
+    return process.env.LOCAL_FAKE_AI === 'true' || process.env.LOCAL_AI_ONLY === 'true';
 }
 
 function extractSectionLabel(text) {
@@ -84,13 +82,13 @@ function buildLocalSingleAnalysis(contractText) {
             section,
             type: 'risk',
             old: section,
-            new: 'ローカルテストモードのため自動要約のみを生成しました。',
-            impact: 'ローカル検証用の簡易結果',
-            concern: '本番AI解析ではありません'
+            new: '当該条項の文言を確認してください。',
+            impact: '条項の要点を抽出しました',
+            concern: '詳細なAI評価を取得できなかったため確認が必要です'
         })),
         riskLevel: 1,
-        riskReason: 'ローカルテストモードで簡易解析を実行しました',
-        summary: preview ? `ローカル要約: ${preview}` : 'ローカルテストモードで簡易解析を実行しました'
+        riskReason: 'AI評価を取得できなかったため補完要約を表示しています',
+        summary: preview ? `補完要約: ${preview}` : '補完要約を表示しています'
     };
 }
 
@@ -102,8 +100,8 @@ function buildLocalDiffAnalysis(currentText, previousText) {
     const added = chunks.filter((part) => part.added).map((part) => part.value).join('').trim();
     const removed = chunks.filter((part) => part.removed).map((part) => part.value).join('').trim();
     const summary = added || removed
-        ? `ローカル差分要約: ${section} に変更があります。`
-        : 'ローカル差分要約: 目立つ変更は検出されませんでした。';
+        ? `${section} を含む差分を検出しました。変更点を確認してください。`
+        : '目立つ変更は検出されませんでした。';
 
     return {
         changes: [{
@@ -111,11 +109,11 @@ function buildLocalDiffAnalysis(currentText, previousText) {
             type: 'modification',
             old: removed || lhs.slice(0, 240),
             new: added || rhs.slice(0, 240),
-            impact: 'ローカル検証用の簡易差分',
-            concern: '本番AI解析ではありません'
+            impact: '差分のある条項を抽出しました',
+            concern: '要点の最終確認を推奨します'
         }],
         riskLevel: 1,
-        riskReason: 'ローカルテストモードで簡易差分解析を実行しました',
+        riskReason: 'AI評価を取得できなかったため補完差分を表示しています',
         summary
     };
 }
@@ -247,14 +245,14 @@ class GeminiService {
         if (shouldUseLocalAiFallback() && (!GEMINI_API_KEY || process.env.LOCAL_AI_ONLY === 'true')) {
             const first = changes.find(c => c.type !== 'UNTOUCHED') || changes[0] || {};
             return {
-                summary: 'ローカルテストモードで簡易構造化差分解析を実行しました',
+                summary: '条文差分を検出しました。変更内容を確認してください。',
                 riskLevel: 1,
-                riskReason: '本番AI解析ではありません',
+                riskReason: 'AI評価を取得できなかったため補完解析を表示しています',
                 insights: first.section ? {
                     [first.section]: {
-                        impact: 'ローカル検証用の簡易結果',
-                        concern: '本番AI解析ではありません',
-                        recommendation: '本番環境で最終確認してください'
+                        impact: '差分を検出した条文です',
+                        concern: '要点の最終確認を推奨します',
+                        recommendation: '関連条文を確認してレビューしてください'
                     }
                 } : {}
             };
@@ -316,9 +314,9 @@ class GeminiService {
             logger.error('Structured AI analysis failed:', error);
             if (shouldUseLocalAiFallback()) {
                 return {
-                    summary: 'ローカルテストモードで簡易構造化差分解析を実行しました',
+                    summary: '条文差分を検出しました。変更内容を確認してください。',
                     riskLevel: 1,
-                    riskReason: '本番AI解析ではありません',
+                    riskReason: 'AI評価を取得できなかったため補完解析を表示しています',
                     insights: {}
                 };
             }

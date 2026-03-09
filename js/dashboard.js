@@ -160,9 +160,41 @@ const isMeaningfulAnalysisPayload = (payload) => {
 
     if (changes.length > 0) return true;
     if (!summary) return false;
-    if (/まだ解析されていません|比較先を選択すると|AI解析がありません|解析データなし/.test(summary)) return false;
+    if (/まだ解析されていません|比較先を選択すると|AI解析がありません|解析データなし|ローカルテストモード|ローカル差分要約|ローカル要約/.test(summary)) return false;
     if (/^(未解析|差分抽出済み|表示用キャッシュ|比較表示のみ)$/.test(riskReason)) return false;
+    if (/ローカルテストモード|本番AI解析ではありません/.test(riskReason)) return false;
     return true;
+};
+
+const sanitizeAnalysisPayload = (payload) => {
+    const base = (payload && typeof payload === 'object') ? payload : {};
+    const changes = Array.isArray(base.changes) ? base.changes.filter(Boolean) : [];
+    const summaryRaw = String(base.summary || '').trim();
+    const reasonRaw = String(base.riskReason || '').trim();
+    const hasLocalPhrase = /ローカルテストモード|ローカル差分要約|ローカル要約|本番AI解析ではありません/.test(`${summaryRaw} ${reasonRaw}`);
+
+    if (!hasLocalPhrase) {
+        return {
+            ...base,
+            changes
+        };
+    }
+
+    const sectionLabels = changes
+        .map((c) => String(c.section || '').trim())
+        .filter(Boolean)
+        .slice(0, 3);
+    const sectionHint = sectionLabels.length > 0 ? `（${sectionLabels.join('、')}）` : '';
+    const summary = changes.length > 0
+        ? `${changes.length}件の変更点を検出しました${sectionHint}。`
+        : '変更点を確認してください。';
+
+    return {
+        ...base,
+        summary,
+        riskReason: '変更点を要確認',
+        changes
+    };
 };
 
 const buildStoredContractAnalysis = (contract) => {
@@ -188,37 +220,6 @@ const isCurrentVsLatestHistoryPair = (documentOptions, sourceDoc, targetDoc) => 
         return (Number(doc.sort_order || 0) > Number(latest.sort_order || 0)) ? doc : latest;
     }, null);
     return Boolean(latestHistoricalDoc && latestHistoricalDoc.id === sourceDoc.id);
-};
-
-const resolveDisplayDocumentPair = (documentOptions, sourceDoc, targetDoc) => {
-    const resolved = {
-        previousDoc: sourceDoc || null,
-        currentDoc: targetDoc || null
-    };
-
-    if (!resolved.previousDoc || !resolved.currentDoc) {
-        return resolved;
-    }
-
-    const previousText = contentToComparableText(resolved.previousDoc.content);
-    const currentText = contentToComparableText(resolved.currentDoc.content);
-
-    if (!previousText || !currentText || previousText !== currentText) {
-        return resolved;
-    }
-
-    const sourceOrder = Number(resolved.previousDoc.sort_order || 0);
-    const targetOrder = Number(resolved.currentDoc.sort_order || 0);
-    const candidates = (Array.isArray(documentOptions) ? documentOptions : [])
-        .filter((doc) => doc && doc.id !== resolved.currentDoc.id && Number(doc.sort_order || 0) <= Math.max(sourceOrder, targetOrder))
-        .sort((a, b) => Number(b.sort_order || 0) - Number(a.sort_order || 0));
-
-    const distinctCandidate = candidates.find((doc) => contentToComparableText(doc.content) !== currentText);
-    if (distinctCandidate) {
-        resolved.previousDoc = distinctCandidate;
-    }
-
-    return resolved;
 };
 
 const contentToComparableText = (content) => {
@@ -1045,15 +1046,8 @@ const Views = {
         const fallbackTargetDoc = documentOptions.length >= 1 ? documentOptions[documentOptions.length - 1] : null;
         const selectedSourceDoc = documentOptions.find((doc) => doc.id === storedCompareState?.docAId) || fallbackSourceDoc;
         const selectedTargetDoc = documentOptions.find((doc) => doc.id === storedCompareState?.docBId) || fallbackTargetDoc;
-        let displaySourceDoc = selectedSourceDoc;
-        let displayTargetDoc = selectedTargetDoc;
-        try {
-            const displayPair = resolveDisplayDocumentPair(documentOptions, selectedSourceDoc, selectedTargetDoc);
-            displaySourceDoc = displayPair.previousDoc || selectedSourceDoc;
-            displayTargetDoc = displayPair.currentDoc || selectedTargetDoc;
-        } catch (pairResolveError) {
-            console.error('Failed to resolve display document pair:', pairResolveError);
-        }
+        const displaySourceDoc = selectedSourceDoc;
+        const displayTargetDoc = selectedTargetDoc;
         const selectedDiffResult = selectedSourceDoc && selectedTargetDoc
             ? dbService.getDiffResult(selectedSourceDoc.id, selectedTargetDoc.id)
             : null;
@@ -1077,7 +1071,7 @@ const Views = {
 
         let diffData;
         if (effectiveSelectedDiffData) {
-            const cached = effectiveSelectedDiffData;
+            const cached = sanitizeAnalysisPayload(effectiveSelectedDiffData);
             diffData = {
                 title: `${contract.name} - 文書比較`,
                 summary: cached.summary || '選択した2文書の差分結果を表示しています。',
@@ -1110,13 +1104,19 @@ const Views = {
                 changes: []
             };
         } else if (hasAIResults) {
+            const normalizedStored = sanitizeAnalysisPayload({
+                summary: contract.ai_summary || '',
+                riskLevel: contract.risk_level === 'High' ? 3 : (contract.risk_level === 'Medium' ? 2 : 1),
+                riskReason: contract.ai_risk_reason || '',
+                changes: contract.ai_changes || []
+            });
             // AI解析結果を使用
             diffData = {
                 title: `${contract.name} - AI解析結果`,
-                summary: contract.ai_summary || 'AI解析が完了しました',
-                riskLevel: contract.risk_level === 'High' ? 3 : (contract.risk_level === 'Medium' ? 2 : 1),
-                riskReason: contract.ai_risk_reason || 'リスク判定が完了しました',
-                changes: contract.ai_changes || []
+                summary: normalizedStored.summary || 'AI解析が完了しました',
+                riskLevel: normalizedStored.riskLevel ?? 1,
+                riskReason: normalizedStored.riskReason || 'リスク判定が完了しました',
+                changes: normalizedStored.changes || []
             };
         } else {
             // デフォルトデータ
