@@ -2286,6 +2286,8 @@ class RegistrationFlow {
                     riskLevel: result.data.riskLevel,
                     riskReason: result.data.riskReason,
                     summary: result.data.summary,
+                    isFallback: result.data.isFallback === true,
+                    aiFailed: result.data.aiFailed === true,
                     status: '未確認',
                     originalFilename: this.tempData.fileData?.name || ''
                 });
@@ -2437,6 +2439,19 @@ class DashboardApp {
 
     setDocumentCompareState(state = null) {
         this.documentCompareState = state && typeof state === 'object' ? { ...state } : null;
+    }
+
+    syncLatestDocumentCompareState(contractId) {
+        const docs = dbService.getDocumentsByContractId(contractId);
+        const currentDoc = docs.find((doc) => doc.is_current) || null;
+        const historicalDocs = docs.filter((doc) => !doc.is_current);
+        const latestHistoryDoc = historicalDocs.length > 0 ? historicalDocs[historicalDocs.length - 1] : null;
+        if (!currentDoc || !latestHistoryDoc) return;
+        this.setDocumentCompareState({
+            contractId,
+            docAId: latestHistoryDoc.id,
+            docBId: currentDoc.id
+        });
     }
 
     clearDocumentCompareState(contractId = null) {
@@ -4065,6 +4080,8 @@ class DashboardApp {
                     riskLevel: result.data.riskLevel,
                     riskReason: result.data.riskReason,
                     summary: result.data.summary,
+                    isFallback: result.data.isFallback === true,
+                    aiFailed: result.data.aiFailed === true,
                     status: '未確認'  // 解析完了、確認待ち
                 });
 
@@ -4208,12 +4225,15 @@ class DashboardApp {
                             riskLevel: result.data.riskLevel,
                             riskReason: result.data.riskReason,
                             summary: result.data.summary,
+                            isFallback: result.data.isFallback === true,
+                            aiFailed: result.data.aiFailed === true,
                             status: '未確認',
                             originalFilename: file.name
                         });
 
                         // PDF更新時は「取り込んだまま」の見た目を優先して原本タブ表示
                         this.activeDetailTab = isPdf ? 'original' : 'diff';
+                        this.syncLatestDocumentCompareState(id);
                         this.navigate('diff', id);
 
                         // 部分的な失敗（AI解析のみ失敗）のチェック
@@ -4318,6 +4338,8 @@ class DashboardApp {
                         riskLevel: result.data.riskLevel,
                         riskReason: result.data.riskReason,
                         summary: result.data.summary,
+                        isFallback: result.data.isFallback === true,
+                        aiFailed: result.data.aiFailed === true,
                         status: '未確認'
                     });
 
@@ -4330,6 +4352,7 @@ class DashboardApp {
 
                     // 画面を再読み込み (差分表示を優先)
                     this.activeDetailTab = 'diff';
+                    this.syncLatestDocumentCompareState(id);
                     this.navigate('diff', id);
 
                     if (result.data.aiFailed) {

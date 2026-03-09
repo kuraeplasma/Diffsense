@@ -575,6 +575,29 @@ export const dbService = {
             contract.last_analyzed_at = new Date().toISOString().split('T')[0];
 
             localStorage.setItem(this.KEYS.CONTRACTS, JSON.stringify(contracts));
+
+            if (shouldBumpVersion) {
+                const latestHistory = Array.isArray(contract.history) && contract.history.length > 0
+                    ? contract.history[contract.history.length - 1]
+                    : null;
+                const historyVersion = latestHistory?.version ?? contract.history?.length;
+                if (latestHistory && historyVersion) {
+                    this.saveDiffResult({
+                        docA_id: `contract-${contract.id}-hist-${historyVersion}`,
+                        docB_id: `contract-${contract.id}-current`,
+                        diff_data: {
+                            summary: analysisData.summary || '',
+                            riskLevel: analysisData.riskLevel,
+                            riskReason: analysisData.riskReason || '',
+                            changes: Array.isArray(analysisData.changes) ? analysisData.changes : [],
+                            isFallback: analysisData.isFallback === true,
+                            aiFailed: analysisData.aiFailed === true
+                        },
+                        created_at: new Date().toISOString()
+                    });
+                }
+            }
+
             this.addActivityLog('AI解析完了', contract.name, 'system', '成功');
             return true;
         }
