@@ -91,6 +91,106 @@ function structuredRiskConcern(evaluated, change) {
     return defaultStructuredConcern(change);
 }
 
+function normalizeSignalText(value) {
+    return String(value || '')
+        .replace(/\s+/g, ' ')
+        .replace(/[（）()【】「」『』\[\]{}]/g, '')
+        .trim();
+}
+
+function extractMaterialValueTokens(text) {
+    return normalizeSignalText(text)
+        .match(/\d[\d,]*(?:\.\d+)?(?:円|万円|千円|百万円|億円|%|％|日|営業日|か月|ヶ月|ヵ月|月|年|件|個|株|条|項|回)/g) || [];
+}
+
+function hasKeywordDelta(oldText, newText) {
+    const keywords = [
+        '支払', '金額', '対価', '譲渡価格', '料金', '報酬', '期限', '期間', '営業日',
+        '責任', '義務', '権利', '解除', '解約', '再委託', '知的財産', '秘密保持',
+        '補償', '損害賠償', '保証', '表明保証', '競業避止', '納期', '数量', '株式',
+        '新株予約権', '費用', '条件', 'クロージング'
+    ];
+    const oldNorm = normalizeSignalText(oldText);
+    const newNorm = normalizeSignalText(newText);
+    return keywords.some((keyword) => oldNorm.includes(keyword) !== newNorm.includes(keyword));
+}
+
+function isLikelyMaterialStructuredChange(change) {
+    const type = String(change?.type || '').toUpperCase();
+    const oldText = String(change?.old || '').trim();
+    const newText = String(change?.new || '').trim();
+
+    if (!oldText && !newText) return false;
+    if (type === 'ADD' || type === 'DELETE') return true;
+
+    const oldTokens = extractMaterialValueTokens(oldText);
+    const newTokens = extractMaterialValueTokens(newText);
+    if (oldTokens.join('|') !== newTokens.join('|') && (oldTokens.length > 0 || newTokens.length > 0)) {
+        return true;
+    }
+
+    if (hasKeywordDelta(oldText, newText)) {
+        return true;
+    }
+
+    const similarity = Number(change?.similarity || 0);
+    const combined = `${oldText}\n${newText}`;
+    if (similarity > 0 && similarity < 0.88 && /(支払|譲渡|解除|責任|義務|保証|補償|対価|料金|費用|株式|新株予約権|期限|期間)/.test(combined)) {
+        return true;
+    }
+
+    return false;
+}
+
+function buildGuardrailStructuredChange(change) {
+    const type = normalizeStructuredChangeType(change?.type, change?.type);
+    const section = String(change?.section || '').trim() || '条文';
+    let impact = defaultStructuredImpact(change);
+    if (type === 'ADD') {
+        impact = `${section} に新しい契約条件が追加されています`;
+    } else if (type === 'DELETE') {
+        impact = `${section} の契約条件が削除されています`;
+    } else if (extractMaterialValueTokens(change?.old).join('|') !== extractMaterialValueTokens(change?.new).join('|')) {
+        impact = `${section} の数値条件または金額条件が変更されています`;
+    } else {
+        impact = `${section} の契約条件が変更されています`;
+    }
+
+    return {
+        section,
+        type,
+        old: change?.old || '',
+        new: change?.new || '',
+        impact,
+        concern: defaultStructuredConcern(change)
+    };
+}
+
+function buildGuardrailSummary(changes) {
+    const labels = changes
+        .slice(0, 3)
+        .map((item) => String(item.section || '').trim())
+        .filter(Boolean);
+    const suffix = changes.length > labels.length ? ` ほか${changes.length - labels.length}件の変更があります。` : '';
+    if (labels.length > 0) {
+        return `${labels.join('、')} に契約上の変更があります。${suffix}`.trim();
+    }
+    return `${changes.length}件の契約変更を検出しました。`;
+}
+
+function buildGuardrailRiskReason(changes) {
+    const hasDelete = changes.some((item) => String(item.type || '').toUpperCase() === 'DELETE');
+    const hasNumeric = changes.some((item) => {
+        const oldTokens = extractMaterialValueTokens(item.old);
+        const newTokens = extractMaterialValueTokens(item.new);
+        return oldTokens.join('|') !== newTokens.join('|') && (oldTokens.length > 0 || newTokens.length > 0);
+    });
+    if (hasDelete && hasNumeric) return '契約条件の削除と数値条件の変更を検出しました。';
+    if (hasDelete) return '契約条件の削除を検出しました。';
+    if (hasNumeric) return '金額・数量・期限などの条件変更を検出しました。';
+    return '契約条件の変更を検出しました。';
+}
+
 async function buildStructuredPairAnalysis(oldArticles, newArticles) {
     if (!Array.isArray(oldArticles) || !Array.isArray(newArticles)) return null;
     if (oldArticles.length === 0 || newArticles.length === 0) return null;
@@ -108,6 +208,20 @@ async function buildStructuredPairAnalysis(oldArticles, newArticles) {
 
     const analysis = await geminiService.analyzeStructuredDiff(diffChanges);
     if (analysis?.isFallback === true) {
+        const guardrailChanges = diffChanges.filter(isLikelyMaterialStructuredChange).map(buildGuardrailStructuredChange);
+        logger.warn('Structured pair analysis fell back', {
+            diffChanges: diffChanges.length,
+            guardrailChanges: guardrailChanges.length
+        });
+        if (guardrailChanges.length > 0) {
+            return {
+                changes: guardrailChanges,
+                riskLevel: guardrailChanges.some((item) => String(item.type || '').toUpperCase() === 'DELETE') ? 2 : 1,
+                riskReason: buildGuardrailRiskReason(guardrailChanges),
+                summary: buildGuardrailSummary(guardrailChanges),
+                isFallback: false
+            };
+        }
         return {
             changes: [],
             riskLevel: 1,
@@ -138,6 +252,20 @@ async function buildStructuredPairAnalysis(oldArticles, newArticles) {
     }).filter(Boolean);
 
     if (mappedChanges.length === 0) {
+        const guardrailChanges = diffChanges.filter(isLikelyMaterialStructuredChange).map(buildGuardrailStructuredChange);
+        logger.info('Structured pair analysis produced no AI changes', {
+            diffChanges: diffChanges.length,
+            guardrailChanges: guardrailChanges.length
+        });
+        if (guardrailChanges.length > 0) {
+            return {
+                changes: guardrailChanges,
+                riskLevel: guardrailChanges.some((item) => String(item.type || '').toUpperCase() === 'DELETE') ? 2 : 1,
+                riskReason: buildGuardrailRiskReason(guardrailChanges),
+                summary: buildGuardrailSummary(guardrailChanges),
+                isFallback: false
+            };
+        }
         return {
             changes: [],
             riskLevel: 1,
