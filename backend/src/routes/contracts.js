@@ -12,14 +12,6 @@ const { toLegacyArticleArray, fromLegacyArticleArray } = require('../services/co
 const logger = require('../utils/logger');
 const crypto = require('crypto');
 
-function shouldBypassLocalUsageLimits(req) {
-    if (process.env.LOCAL_UNLIMITED_ANALYSIS === 'true') return true;
-    const host = String(req.get('x-forwarded-host') || req.get('host') || '').toLowerCase();
-    const isLocalHost = host.includes('localhost') || host.includes('127.0.0.1');
-    const authHeader = String(req.headers.authorization || '');
-    const isDevBypassUser = String(req.user?.uid || '') === 'dev-user-001';
-    return isLocalHost && (authHeader === 'Bearer dev-bypass-token' || isDevBypassUser);
-}
 function isAiFailureSummary(summary) {
     return /AI解析に失敗|AI分析に失敗|エラーが発生/.test(String(summary || ''));
 }
@@ -355,20 +347,18 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
         const userProfile = await dbService.getUserProfile(uid);
         const limit = dbService.getUsageLimit(userProfile);
         const isInTrial = dbService.isTrialActive(userProfile);
-        const bypassLocalLimits = shouldBypassLocalUsageLimits(req);
 
         logger.info(`Usage check for ${uid}:`, {
             plan: userProfile.plan,
             usageCount: userProfile.usageCount,
             limit: limit,
             isInTrial: isInTrial,
-            bypassLocalLimits,
             skipAI: skipAI,
             trialStartedAt: userProfile.trialStartedAt,
             hasPaymentMethod: userProfile.hasPaymentMethod
         });
 
-        if (!skipAI && !bypassLocalLimits) {
+        if (!skipAI) {
             // Trial Expiration Check - Only if trial was ever started
             if (userProfile.trialStartedAt && isInTrial === false) {
                 // Check if user has registered a payment method for auto-transition
@@ -611,9 +601,8 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
         const userProfile = await dbService.getUserProfile(uid);
         const limit = dbService.getUsageLimit(userProfile);
         const isInTrial = dbService.isTrialActive(userProfile);
-        const bypassLocalLimits = shouldBypassLocalUsageLimits(req);
 
-        if (!skipAI && !bypassLocalLimits && userProfile.usageCount >= limit) {
+        if (!skipAI && userProfile.usageCount >= limit) {
             const limitMsg = isInTrial
                 ? `無料トライアルの解析上限（${limit}回）に達しました。継続して利用するにはプランの契約が必要です。`
                 : `プランの月間解析上限（${limit}回）に達しました。アップグレードをご検討ください。`;
@@ -664,17 +653,11 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
                     await dbService.incrementUsage(uid);
                 }
 
-                // AIが「差分なし」と言っていても、構造化差分がある場合はその事実を優先する
-                let finalSummary = geminiResult.summary;
-                if (diffChanges.length > 0 && (finalSummary === '差分は検出されませんでした' || !finalSummary)) {
-                    finalSummary = `${diffChanges.length}件の条文変更が検出されました。AIによる詳細解析が完了しました。`;
-                }
-
                 aiResult = {
-                    changes: (geminiResult.changes && geminiResult.changes.length > 0) ? geminiResult.changes : aiResult.changes,
-                    riskLevel: geminiResult.riskLevel || aiResult.riskLevel,
-                    riskReason: geminiResult.riskReason || aiResult.riskReason,
-                    summary: finalSummary || aiResult.summary,
+                    changes: diffChanges.length ? aiResult.changes : (geminiResult.changes || []),
+                    riskLevel: geminiResult.riskLevel,
+                    riskReason: geminiResult.riskReason,
+                    summary: geminiResult.summary,
                     isFallback: geminiResult.isFallback === true
                 };
             }

@@ -97,12 +97,7 @@ class DiffService {
             }
         }
 
-        let actualSimilarity = 0;
-        if (bestIndex !== -1) {
-            actualSimilarity = stringSimilarity.compareTwoStrings(oldArt.full_text || '', newArticles[bestIndex].full_text || '');
-        }
-
-        return { index: bestIndex, similarity: actualSimilarity };
+        return { index: bestIndex, similarity: Math.min(1.0, bestScore) };
     }
 
     /**
