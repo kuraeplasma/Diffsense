@@ -1378,7 +1378,7 @@ const Views = {
                 changes: cached.changes || [],
                 isFallback: cached.isFallback === true
             };
-        } else if (hasMismatchedNoDiffResult) {
+        } else if (hasFallbackNoDiffResult) {
             diffData = {
                 title: `${contract.name} - 文書比較`,
                 summary: 'AI差分要約を取得できませんでした。再解析を実行してください。',
