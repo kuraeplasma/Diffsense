@@ -1,4 +1,4 @@
-import { dbService } from './db-service.js';
+import { dbService } from './db-service.js?v=20260309h1';
 import { aiService } from './ai-service.js';
 const DASHBOARD_CACHE_KEYS = {
     USER_META: 'diffsense_cache_user_meta',
@@ -199,6 +199,14 @@ const resolveDisplayDocumentPair = (documentOptions, sourceDoc, targetDoc) => {
     }
 
     return resolved;
+};
+
+const normalizeDiffContractId = (value) => {
+    if (value && typeof value === 'object') {
+        return normalizeDiffContractId(value.id ?? value.contractId ?? value.contract_id ?? null);
+    }
+    const num = Number(value);
+    return Number.isFinite(num) && num > 0 ? num : null;
 };
 
 const renderStructuredDiffParagraphColumn = (paragraphs, counterpartParagraphs, tone) => {
@@ -3052,7 +3060,13 @@ class DashboardApp {
             };
         }
         if (viewId === 'diff') {
-            this.currentViewParams = params;
+            const normalizedDiffId = normalizeDiffContractId(params);
+            if (!normalizedDiffId) {
+                Notify.error('対象の契約IDを取得できませんでした。一覧から再度開いてください。');
+                return;
+            }
+            renderParams = normalizedDiffId;
+            this.currentViewParams = normalizedDiffId;
         }
         if (viewId === 'diff' && this.activeDetailTab === 'diff') {
             this.renderInitialSkeleton('diff');
@@ -4309,7 +4323,7 @@ class DashboardApp {
                     }
                 } else {
                     Notify.info('更新はありませんでした。');
-                    this.navigate('diff', { id });
+                    this.navigate('diff', id);
                 }
             } else {
                 throw new Error(result.error || 'クローリングに失敗しました');

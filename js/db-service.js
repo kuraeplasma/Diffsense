@@ -16,6 +16,18 @@ export const dbService = {
         RECENT_DIFF: 'recent_diff'
     },
 
+    cloneContent(value) {
+        if (value === null || value === undefined) return value;
+        if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+            return value;
+        }
+        try {
+            return JSON.parse(JSON.stringify(value));
+        } catch {
+            return value;
+        }
+    },
+
     // Dynamic KEYS getter (with UID prefix)
     get KEYS() {
         const prefix = this._uid ? `diffsense_${this._uid}_` : 'diffsense_';
@@ -188,7 +200,7 @@ export const dbService = {
                 file_type: fileType,
                 uploaded_at: entry.date || contract.last_updated_at || '',
                 user_id: this._uid || null,
-                content: entry.content,
+                content: this.cloneContent(entry.content),
                 version_label: `ver${entry.version ?? index + 1}`,
                 sort_order: index + 1,
                 is_current: false
@@ -202,7 +214,7 @@ export const dbService = {
             file_type: fileType,
             uploaded_at: contract.last_analyzed_at || contract.last_updated_at || '',
             user_id: this._uid || null,
-            content: contract.original_content,
+            content: this.cloneContent(contract.original_content),
             version_label: `ver${history.length + 1}`,
             sort_order: history.length + 1,
             is_current: true
@@ -464,7 +476,7 @@ export const dbService = {
         if (contract) {
             // 抽出されたテキストを保存
             if (data.extractedText !== undefined) {
-                contract.original_content = data.extractedText || "（テキストデータを抽出できませんでした）";
+                contract.original_content = this.cloneContent(data.extractedText) || "（テキストデータを抽出できませんでした）";
                 contract.extracted_text_hash = data.extractedTextHash;
                 contract.extracted_text_length = data.extractedTextLength;
                 contract.source_type = data.sourceType;
@@ -500,7 +512,7 @@ export const dbService = {
                 contract.history.push({
                     version: contract.history.length + 1,
                     date: contract.last_analyzed_at || contract.last_updated_at || new Date().toISOString().split('T')[0],
-                    content: contract.original_content,
+                    content: this.cloneContent(contract.original_content),
                     original_filename: contract.original_filename || contract.name || '',
                     pdf_storage_path: contract.pdf_storage_path, // PDFパスも一応残すが、実体は削除される前提
                     pdf_url: null // 古いPDFは見れない
@@ -509,7 +521,7 @@ export const dbService = {
 
             // 抽出されたテキストを保存
             if (analysisData.extractedText) {
-                contract.original_content = analysisData.extractedText;
+                contract.original_content = this.cloneContent(analysisData.extractedText);
             }
             if (analysisData.rawExtractedText !== undefined) {
                 contract.pdf_raw_text = analysisData.rawExtractedText || '';
