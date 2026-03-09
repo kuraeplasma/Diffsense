@@ -220,6 +220,71 @@ const buildStoredContractAnalysis = (contract) => {
     };
 };
 
+const extractChangeDisplayKey = (change) => {
+    const section = String(change?.section || '').trim();
+    const explicitNumber = Number(change?.articleNumber || change?.oldArticleNumber || 0);
+    if (explicitNumber > 0) return `article:${explicitNumber}`;
+    const articleMatch = section.match(/^第\s*[0-9０-９一二三四五六七八九十百千〇零]+\s*条/);
+    if (articleMatch) {
+        return `section:${articleMatch[0].replace(/\s+/g, '')}`;
+    }
+    return section ? `section:${section}` : '';
+};
+
+const resolveDisplayChangeType = (change) => {
+    const oldText = String(change?.old || '').trim();
+    const newText = String(change?.new || '').trim();
+    if (oldText && newText) return 'MODIFY';
+    if (newText) return 'ADD';
+    if (oldText) return 'DELETE';
+    const rawType = String(change?.type || '').toUpperCase();
+    return ['ADD', 'DELETE', 'MODIFY'].includes(rawType) ? rawType : 'MODIFY';
+};
+
+const normalizeChangesForDisplay = (changes) => {
+    const items = Array.isArray(changes) ? changes.filter(Boolean) : [];
+    const used = new Set();
+    const normalized = [];
+
+    for (let index = 0; index < items.length; index += 1) {
+        if (used.has(index)) continue;
+        const current = items[index];
+        const currentType = resolveDisplayChangeType(current);
+        const currentKey = extractChangeDisplayKey(current);
+
+        if ((currentType === 'ADD' || currentType === 'DELETE') && currentKey) {
+            const oppositeType = currentType === 'ADD' ? 'DELETE' : 'ADD';
+            const matchIndex = items.findIndex((candidate, candidateIndex) => {
+                if (candidateIndex <= index || used.has(candidateIndex)) return false;
+                if (resolveDisplayChangeType(candidate) !== oppositeType) return false;
+                return extractChangeDisplayKey(candidate) === currentKey;
+            });
+
+            if (matchIndex >= 0) {
+                const matched = items[matchIndex];
+                used.add(matchIndex);
+                normalized.push({
+                    ...current,
+                    section: String(current.section || matched.section || '').trim(),
+                    type: 'MODIFY',
+                    old: currentType === 'DELETE' ? current.old : matched.old,
+                    new: currentType === 'ADD' ? current.new : matched.new,
+                    impact: current.impact || matched.impact || '',
+                    concern: current.concern || matched.concern || ''
+                });
+                continue;
+            }
+        }
+
+        normalized.push({
+            ...current,
+            type: currentType
+        });
+    }
+
+    return normalized;
+};
+
 const isCurrentVsLatestHistoryPair = (documentOptions, sourceDoc, targetDoc) => {
     if (!Array.isArray(documentOptions) || !sourceDoc || !targetDoc?.is_current) return false;
     const historicalDocs = documentOptions.filter((doc) => !doc.is_current);
@@ -1185,7 +1250,8 @@ const Views = {
             </div>
         ` : '';
 
-        const changesHtml = (diffData.changes.length > 0 ? diffData.changes : []).map(c => `
+        const displayChanges = normalizeChangesForDisplay(diffData.changes);
+        const changesHtml = (displayChanges.length > 0 ? displayChanges : []).map(c => `
             <div style="margin-bottom: 24px; border:1px solid #eee; border-radius:4px; overflow:hidden;">
                 <div style="background:#f0f0f0; padding:8px 12px; font-weight:600; font-size:12px; border-bottom:1px solid #eee;">
                     ${c.section} <span style="font-weight:normal; color:#666; margin-left:8px;">(${(() => {
@@ -1339,7 +1405,7 @@ const Views = {
                         try {
                         // 差分表示ロジック
                         const renderAiChangeCards = () => {
-                            const aiOnlyHtml = (contract.ai_changes || []).map((c, idx) => {
+                            const aiOnlyHtml = normalizeChangesForDisplay(contract.ai_changes || []).map((c, idx) => {
                                 const escapedOld = escapeHtmlText(c.old || '');
                                 const escapedNew = escapeHtmlText(c.new || '');
                                 const typeLabel = c.type === 'ADD' ? '追加' : (c.type === 'DELETE' ? '削除' : '変更');
