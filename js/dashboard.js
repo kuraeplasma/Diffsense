@@ -1623,7 +1623,13 @@ class RegistrationFlow {
                 // 4. 詳細ページへ遷移（まずは原本を表示して安心させる）
                 this.app.activeDetailTab = 'original';
                 this.app.navigate('diff', newContract.id);
-                this.app.showToast('✅ 読み込み完了<br><small>※AI解析用テキストは「差分表示」で確認できます</small>', 'success', 5000);
+                Notify.toast('読み込み完了<br><small>※AI解析用テキストは「差分表示」で確認できます</small>', {
+                    type: 'success',
+                    title: '完了',
+                    duration: 3500,
+                    neutral: true,
+                    position: 'center'
+                });
             } else {
                 this.app.navigate('contracts');
                 this.app.showToast('⚠️ 登録は完了しましたが、テキスト抽出に失敗しました', 'warning', 5000);

@@ -13,15 +13,21 @@ const Notify = (() => {
             /* ── Toast（トースト通知・中央表示）── */
             .ds-toast-container {
                 position: fixed;
-                top: 32px;
                 left: 50%;
-                transform: translateX(-50%);
                 z-index: 9999;
                 display: flex;
                 flex-direction: column;
                 align-items: center;
                 gap: 10px;
                 pointer-events: none;
+            }
+            .ds-toast-container[data-position="top"] {
+                top: 32px;
+                transform: translateX(-50%);
+            }
+            .ds-toast-container[data-position="center"] {
+                top: 50%;
+                transform: translate(-50%, -50%);
             }
             .ds-toast {
                 pointer-events: auto;
@@ -86,6 +92,9 @@ const Notify = (() => {
             .ds-toast.error   { border-left-color: #ef4444; }
             .ds-toast.warning { border-left-color: #f59e0b; }
             .ds-toast.info    { border-left-color: #3b82f6; }
+            .ds-toast.neutral {
+                border-left: none;
+            }
 
             /* ── Modal（確認ダイアログ）── */
             .ds-modal-overlay {
@@ -198,11 +207,12 @@ const Notify = (() => {
     }
 
     // Toast container取得（なければ作成）
-    function getContainer() {
-        let c = document.querySelector('.ds-toast-container');
+    function getContainer(position = 'top') {
+        let c = document.querySelector(`.ds-toast-container[data-position="${position}"]`);
         if (!c) {
             c = document.createElement('div');
             c.className = 'ds-toast-container';
+            c.dataset.position = position;
             document.body.appendChild(c);
         }
         return c;
@@ -231,21 +241,26 @@ const Notify = (() => {
         const type = opts.type || 'info';
         const title = opts.title || TITLES[type];
         const duration = opts.duration ?? (type === 'error' ? 6000 : 4000);
+        const neutral = opts.neutral === true;
+        const position = opts.position === 'center' ? 'center' : 'top';
+        const iconHtml = neutral
+            ? '<i class="fa-solid fa-circle-check" style="color:#6b7280"></i>'
+            : ICONS[type];
 
         const el = document.createElement('div');
-        el.className = `ds-toast ${type}`;
+        el.className = `ds-toast ${type}${neutral ? ' neutral' : ''}`;
         el.style.position = 'relative';
         el.innerHTML = `
-            <span class="ds-toast-icon">${ICONS[type]}</span>
+            <span class="ds-toast-icon">${iconHtml}</span>
             <div class="ds-toast-body">
                 <div class="ds-toast-title">${title}</div>
                 <div class="ds-toast-msg">${message}</div>
             </div>
             <button class="ds-toast-close" aria-label="閉じる">&times;</button>
-            ${duration > 0 ? `<div class="ds-toast-progress" style="animation-duration:${duration}ms; color:${type === 'success' ? '#22c55e' : type === 'error' ? '#ef4444' : type === 'warning' ? '#f59e0b' : '#3b82f6'}"></div>` : ''}
+            ${duration > 0 ? `<div class="ds-toast-progress" style="animation-duration:${duration}ms; color:${neutral ? '#d1d5db' : (type === 'success' ? '#22c55e' : type === 'error' ? '#ef4444' : type === 'warning' ? '#f59e0b' : '#3b82f6')}"></div>` : ''}
         `;
 
-        const container = getContainer();
+        const container = getContainer(position);
         container.appendChild(el);
 
         // Animate in
