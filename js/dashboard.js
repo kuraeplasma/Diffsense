@@ -132,6 +132,44 @@ const renderClauseParagraphs = (text) => {
     return lines.map((line) => `<p class="clause-p">${escapeHtmlText(line)}</p>`).join('');
 };
 
+const isMeaningfulAnalysisPayload = (payload) => {
+    if (!payload || typeof payload !== 'object') return false;
+    const summary = String(payload.summary || '').trim();
+    const riskReason = String(payload.riskReason || '').trim();
+    const changes = Array.isArray(payload.changes) ? payload.changes.filter(Boolean) : [];
+
+    if (changes.length > 0) return true;
+    if (!summary) return false;
+    if (/まだ解析されていません|比較先を選択すると|AI解析がありません|解析データなし/.test(summary)) return false;
+    if (/^(未解析|差分抽出済み|表示用キャッシュ|比較表示のみ)$/.test(riskReason)) return false;
+    return true;
+};
+
+const buildStoredContractAnalysis = (contract) => {
+    if (!contract) return null;
+    const changes = Array.isArray(contract.ai_changes) ? contract.ai_changes.filter(Boolean) : [];
+    const summary = String(contract.ai_summary || '').trim();
+    const riskReason = String(contract.ai_risk_reason || '').trim();
+    if (!summary && changes.length === 0) return null;
+    return {
+        summary: summary || 'AI解析が完了しました',
+        riskLevel: contract.risk_level === 'High' ? 3 : (contract.risk_level === 'Medium' ? 2 : 1),
+        riskReason: riskReason || 'リスク判定が完了しました',
+        changes
+    };
+};
+
+const isCurrentVsLatestHistoryPair = (documentOptions, sourceDoc, targetDoc) => {
+    if (!Array.isArray(documentOptions) || !sourceDoc || !targetDoc?.is_current) return false;
+    const historicalDocs = documentOptions.filter((doc) => !doc.is_current);
+    if (historicalDocs.length === 0) return false;
+    const latestHistoricalDoc = historicalDocs.reduce((latest, doc) => {
+        if (!latest) return doc;
+        return (Number(doc.sort_order || 0) > Number(latest.sort_order || 0)) ? doc : latest;
+    }, null);
+    return Boolean(latestHistoricalDoc && latestHistoricalDoc.id === sourceDoc.id);
+};
+
 const renderStructuredDiffParagraphColumn = (paragraphs, counterpartParagraphs, tone) => {
     const own = Array.isArray(paragraphs) ? paragraphs : [];
     const other = Array.isArray(counterpartParagraphs) ? counterpartParagraphs : [];
@@ -897,6 +935,11 @@ const Views = {
         const selectedDiffResult = selectedSourceDoc && selectedTargetDoc
             ? dbService.getDiffResult(selectedSourceDoc.id, selectedTargetDoc.id)
             : null;
+        const latestCurrentPair = isCurrentVsLatestHistoryPair(documentOptions, selectedSourceDoc, selectedTargetDoc);
+        const storedContractAnalysis = latestCurrentPair ? buildStoredContractAnalysis(contract) : null;
+        const effectiveSelectedDiffData = isMeaningfulAnalysisPayload(selectedDiffResult?.diff_data)
+            ? selectedDiffResult.diff_data
+            : (storedContractAnalysis || null);
         const activeTab = window.app ? window.app.activeDetailTab : 'diff';
         const runtimePdfUrl = window.app?.getRuntimePdfPreviewUrl(id) || null;
         const resolvedPdfPreviewUrl = resolvePdfPreviewUrl(contract, runtimePdfUrl);
@@ -911,8 +954,8 @@ const Views = {
         const hasAIResults = Boolean(contract.ai_summary || (Array.isArray(contract.ai_changes) && contract.ai_changes.length > 0));
 
         let diffData;
-        if (selectedDiffResult?.diff_data) {
-            const cached = selectedDiffResult.diff_data;
+        if (effectiveSelectedDiffData) {
+            const cached = effectiveSelectedDiffData;
             diffData = {
                 title: `${contract.name} - 文書比較`,
                 summary: cached.summary || '選択した2文書の差分結果を表示しています。',
@@ -923,9 +966,9 @@ const Views = {
         } else if (selectedSourceDoc && selectedTargetDoc) {
             diffData = {
                 title: `${contract.name} - 文書比較`,
-                summary: '選択した2文書の差分はまだ解析されていません。比較先を選択すると、保存済み結果を検索します。',
+                summary: 'この文書ペアのAI差分要約はまだ保存されていません。必要に応じてAI差分解析を実行してください。',
                 riskLevel: 1,
-                riskReason: '未解析',
+                riskReason: 'AI差分未保存',
                 changes: []
             };
         } else if (comparisonContext?.analysis) {
@@ -4353,7 +4396,21 @@ class DashboardApp {
         }
 
         const cached = dbService.getDiffResult(sourceDoc.id, targetDoc.id);
-        if (cached) {
+        const canHydrateFromStoredAnalysis = isCurrentVsLatestHistoryPair(docs, sourceDoc, targetDoc)
+            && isMeaningfulAnalysisPayload(buildStoredContractAnalysis(dbService.getContractById(contractId)));
+        if (cached && isMeaningfulAnalysisPayload(cached.diff_data)) {
+            dbService.touchRecentDiff(sourceDoc.id, targetDoc.id);
+            this.navigate('diff', contractId);
+            return;
+        }
+        if (canHydrateFromStoredAnalysis) {
+            const contract = dbService.getContractById(contractId);
+            dbService.saveDiffResult({
+                docA_id: sourceDoc.id,
+                docB_id: targetDoc.id,
+                diff_data: buildStoredContractAnalysis(contract),
+                created_at: new Date().toISOString()
+            });
             dbService.touchRecentDiff(sourceDoc.id, targetDoc.id);
             this.navigate('diff', contractId);
             return;
@@ -4375,6 +4432,10 @@ class DashboardApp {
     async analyzeDocumentPair(contractId, sourceDoc, targetDoc) {
         const contract = dbService.getContractById(contractId);
         if (!contract || !sourceDoc || !targetDoc) return;
+        const docs = dbService.getDocumentsByContractId(contractId);
+        const storedContractAnalysis = buildStoredContractAnalysis(contract);
+        const canReuseStoredAnalysis = isCurrentVsLatestHistoryPair(docs, sourceDoc, targetDoc)
+            && isMeaningfulAnalysisPayload(storedContractAnalysis);
 
         const diffPayload = {
             summary: '選択した2文書の差分結果です。',
@@ -4389,7 +4450,9 @@ class DashboardApp {
             const sourceType = String(contract?.source_type || '').toUpperCase();
             const isPdfSource = sourceType === 'PDF' || (contract?.original_filename || '').toLowerCase().endsWith('.pdf');
 
-            if (targetDoc.is_current && contract.source_url) {
+            if (canReuseStoredAnalysis) {
+                Object.assign(diffPayload, storedContractAnalysis);
+            } else if (targetDoc.is_current && contract.source_url) {
                 const result = await aiService.analyzeContract(contractId, 'url', contract.source_url, sourceDoc.content);
                 if (!result.success) throw new Error(result.error || '差分解析に失敗しました');
                 Object.assign(diffPayload, result.data || {});
@@ -4409,8 +4472,12 @@ class DashboardApp {
                     Object.assign(diffPayload, result.data || {});
                 }
             } else {
-                diffPayload.summary = 'この文書ペアはAI再解析対象ではないため、保存済みテキストを用いた差分表示のみ作成しました。';
-                diffPayload.riskReason = '表示用キャッシュ';
+                diffPayload.summary = 'この文書ペアのAI差分要約は未保存です。比較表示のみを作成しました。';
+                diffPayload.riskReason = 'AI差分未保存';
+            }
+
+            if (!isMeaningfulAnalysisPayload(diffPayload) && canReuseStoredAnalysis) {
+                Object.assign(diffPayload, storedContractAnalysis);
             }
 
             dbService.saveDiffResult({
