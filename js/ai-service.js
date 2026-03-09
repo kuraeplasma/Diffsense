@@ -123,24 +123,10 @@ export const aiService = {
             return previousVersion;
         }
         if (Array.isArray(previousVersion)) {
-            return previousVersion.map((section) => {
-                if (!section || typeof section !== 'object') {
-                    return String(section || '');
-                }
-                const article = typeof section.article === 'string' ? section.article : '';
-                const title = typeof section.title === 'string' ? section.title : '';
-                const paragraphs = Array.isArray(section.paragraphs)
-                    ? section.paragraphs.map((p) => {
-                        if (typeof p === 'string') return p;
-                        if (p && typeof p === 'object') return p.content || p.body || JSON.stringify(p);
-                        return '';
-                    }).filter(Boolean).join('\n')
-                    : '';
-                return `${article} ${title}\n${paragraphs}`.trim();
-            }).filter(Boolean).join('\n\n');
+            return previousVersion;
         }
         if (typeof previousVersion === 'object') {
-            return JSON.stringify(previousVersion);
+            return previousVersion;
         }
         return String(previousVersion);
     },
