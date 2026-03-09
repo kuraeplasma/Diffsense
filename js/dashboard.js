@@ -341,9 +341,7 @@ const renderStructuredDiffParagraphColumn = (paragraphs, counterpartParagraphs, 
 
 const renderStructuredDiffView = (previousContent, currentContent, options = {}) => {
     const {
-        idPrefix = 'structured-diff',
-        previousLabel = 'Version 1',
-        currentLabel = 'Version 2'
+        idPrefix = 'structured-diff'
     } = options;
     const previousClauses = parseContractIntoClauses(previousContent);
     const currentClauses = parseContractIntoClauses(currentContent);
@@ -382,11 +380,9 @@ const renderStructuredDiffView = (previousContent, currentContent, options = {})
                 </div>
                 <div class="diff-compare structured-diff-grid">
                     <div class="diff-old structured-diff-pane">
-                        <div class="version-label">${escapeHtmlText(previousLabel)}</div>
                         <div class="diff-text structured-diff-text">${previousHtml}</div>
                     </div>
                     <div class="diff-new structured-diff-pane">
-                        <div class="version-label">${escapeHtmlText(currentLabel)}</div>
                         <div class="diff-text structured-diff-text">${currentHtml}</div>
                     </div>
                 </div>
