@@ -2,6 +2,8 @@
  * DIFFsense Simulated Database Service (localStorage based)
  * Data is isolated per user (UID-based keys)
  */
+const LOCAL_CACHE_VERSION = '20260310v2';
+
 export const dbService = {
     // Current user UID (set on login)
     _uid: null,
@@ -47,8 +49,8 @@ export const dbService = {
             ACTIVITY_LOGS: `${prefix}logs`,
             USERS: `${prefix}users`,
             INITIALIZED: `${prefix}initialized`,
-            DIFF_RESULTS: `${prefix}diff_results`,
-            RECENT_DIFF: `${prefix}recent_diff`
+            DIFF_RESULTS: `${prefix}diff_results_${LOCAL_CACHE_VERSION}`,
+            RECENT_DIFF: `${prefix}recent_diff_${LOCAL_CACHE_VERSION}`
         };
     },
 

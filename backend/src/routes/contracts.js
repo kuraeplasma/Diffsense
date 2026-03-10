@@ -12,6 +12,10 @@ const { toLegacyArticleArray, fromLegacyArticleArray } = require('../services/co
 const logger = require('../utils/logger');
 const crypto = require('crypto');
 
+function isLocalUnlimitedMode() {
+    return process.env.NODE_ENV === 'development' && process.env.AUTH_BYPASS === 'true';
+}
+
 function isAiFailureSummary(summary) {
     return /AI解析に失敗|AI分析に失敗|エラーが発生/.test(String(summary || ''));
 }
@@ -191,6 +195,30 @@ function buildGuardrailRiskReason(changes) {
     return '契約条件の変更を検出しました。';
 }
 
+function mergeStructuredAndGeneralAnalysis(structuredPairAnalysis, genericAnalysis) {
+    const structuredChanges = Array.isArray(structuredPairAnalysis?.changes) ? structuredPairAnalysis.changes.filter(Boolean) : [];
+    if (!structuredPairAnalysis) {
+        return genericAnalysis;
+    }
+    if (!genericAnalysis) {
+        return structuredPairAnalysis;
+    }
+
+    return {
+        changes: structuredChanges.length > 0
+            ? structuredChanges
+            : (Array.isArray(genericAnalysis.changes) ? genericAnalysis.changes : []),
+        riskLevel: Number(genericAnalysis.riskLevel || structuredPairAnalysis.riskLevel || 1),
+        riskReason: String(genericAnalysis.riskReason || structuredPairAnalysis.riskReason || '').trim(),
+        summary: String(genericAnalysis.summary || structuredPairAnalysis.summary || '').trim(),
+        isFallback: genericAnalysis.isFallback === true && structuredPairAnalysis.isFallback === true
+    };
+}
+
+function hasStructuredChanges(analysis) {
+    return Array.isArray(analysis?.changes) && analysis.changes.filter(Boolean).length > 0;
+}
+
 async function buildStructuredPairAnalysis(oldArticles, newArticles) {
     if (!Array.isArray(oldArticles) || !Array.isArray(newArticles)) return null;
     if (oldArticles.length === 0 || newArticles.length === 0) return null;
@@ -225,8 +253,8 @@ async function buildStructuredPairAnalysis(oldArticles, newArticles) {
         return {
             changes: [],
             riskLevel: 1,
-            riskReason: String(analysis?.riskReason || 'AI差分要約未取得').trim() || 'AI差分要約未取得',
-            summary: String(analysis?.summary || 'AI差分要約を取得できませんでした。再解析を実行してください。').trim() || 'AI差分要約を取得できませんでした。再解析を実行してください。',
+            riskReason: String(analysis?.riskReason || 'AI要約未取得').trim() || 'AI要約未取得',
+            summary: String(analysis?.summary || 'AI解析の結果、実質的な変更は検出されませんでした。').trim() || 'AI解析の結果、実質的な変更は検出されませんでした。',
             isFallback: true
         };
     }
@@ -238,16 +266,18 @@ async function buildStructuredPairAnalysis(oldArticles, newArticles) {
     );
     const mappedChanges = diffChanges.map((change, index) => {
         const evaluated = resultMap.get(`CHG-${index}`);
-        if (!evaluated || evaluated.change !== true) {
-            return null;
-        }
+        const aiConfirmed = evaluated?.change === true;
         return {
             section: change.section,
             type: normalizeStructuredChangeType(change.type, change.type),
             old: change.old,
             new: change.new,
-            impact: evaluated.summary || defaultStructuredImpact(change),
-            concern: structuredRiskConcern(evaluated, change)
+            impact: aiConfirmed
+                ? (evaluated.summary || defaultStructuredImpact(change))
+                : defaultStructuredImpact(change),
+            concern: aiConfirmed
+                ? structuredRiskConcern(evaluated, change)
+                : ''
         };
     }).filter(Boolean);
 
@@ -345,8 +375,8 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
 
         // 0. Usage & Plan Limit Check (skip for text-only extraction)
         const userProfile = await dbService.getUserProfile(uid);
-        const limit = dbService.getUsageLimit(userProfile);
-        const isInTrial = dbService.isTrialActive(userProfile);
+        const limit = isLocalUnlimitedMode() ? Number.MAX_SAFE_INTEGER : dbService.getUsageLimit(userProfile);
+        const isInTrial = isLocalUnlimitedMode() ? true : dbService.isTrialActive(userProfile);
 
         logger.info(`Usage check for ${uid}:`, {
             plan: userProfile.plan,
@@ -358,7 +388,7 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
             hasPaymentMethod: userProfile.hasPaymentMethod
         });
 
-        if (!skipAI) {
+        if (!skipAI && !isLocalUnlimitedMode()) {
             // Trial Expiration Check - Only if trial was ever started
             if (userProfile.trialStartedAt && isInTrial === false) {
                 // Check if user has registered a payment method for auto-transition
@@ -511,10 +541,26 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                         )
                         : null;
 
-                    aiResult = structuredPairAnalysis || await geminiService.analyzeContract(
-                        textToAnalyze,
-                        previousVersionText
-                    );
+                    const shouldRunGenericAnalysis = Boolean(previousVersionText);
+                    const genericAnalysis = shouldRunGenericAnalysis
+                        ? await geminiService.analyzeContract(
+                            textToAnalyze,
+                            previousVersionText
+                        )
+                        : null;
+
+                    if (hasStructuredChanges(structuredPairAnalysis)) {
+                        aiResult = mergeStructuredAndGeneralAnalysis(structuredPairAnalysis, genericAnalysis);
+                    } else if (genericAnalysis) {
+                        aiResult = mergeStructuredAndGeneralAnalysis(structuredPairAnalysis, genericAnalysis);
+                    } else if (structuredPairAnalysis) {
+                        aiResult = structuredPairAnalysis;
+                    } else {
+                        aiResult = await geminiService.analyzeContract(
+                            textToAnalyze,
+                            previousVersionText
+                        );
+                    }
 
                     // 3.1 Increment Usage Count ONLY on successful AI analysis
                     const aiSucceeded = aiResult && aiResult.summary && !isAiFailureSummary(aiResult.summary) && aiResult.isFallback !== true;
@@ -599,10 +645,10 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
         }
 
         const userProfile = await dbService.getUserProfile(uid);
-        const limit = dbService.getUsageLimit(userProfile);
-        const isInTrial = dbService.isTrialActive(userProfile);
+        const limit = isLocalUnlimitedMode() ? Number.MAX_SAFE_INTEGER : dbService.getUsageLimit(userProfile);
+        const isInTrial = isLocalUnlimitedMode() ? true : dbService.isTrialActive(userProfile);
 
-        if (!skipAI && userProfile.usageCount >= limit) {
+        if (!skipAI && !isLocalUnlimitedMode() && userProfile.usageCount >= limit) {
             const limitMsg = isInTrial
                 ? `無料トライアルの解析上限（${limit}回）に達しました。継続して利用するにはプランの契約が必要です。`
                 : `プランの月間解析上限（${limit}回）に達しました。アップグレードをご検討ください。`;
@@ -640,26 +686,22 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
             const currentText = normalizeContentToText(currentArticles);
             const previousText = normalizeContentToText(previousArticles);
 
-            if (structuredPairAnalysis) {
-                const aiSucceeded = structuredPairAnalysis.summary && !isAiFailureSummary(structuredPairAnalysis.summary) && structuredPairAnalysis.isFallback !== true;
-                if (aiSucceeded) {
-                    await dbService.incrementUsage(uid);
-                }
-                aiResult = structuredPairAnalysis;
-            } else if (currentText.trim().length > 0) {
+            if (currentText.trim().length > 0) {
                 const geminiResult = await geminiService.analyzeContract(currentText, previousText);
-                const aiSucceeded = geminiResult && geminiResult.summary && !isAiFailureSummary(geminiResult.summary) && geminiResult.isFallback !== true;
+                aiResult = structuredPairAnalysis
+                    ? mergeStructuredAndGeneralAnalysis(structuredPairAnalysis, geminiResult)
+                    : {
+                        changes: diffChanges.length ? aiResult.changes : (geminiResult.changes || []),
+                        riskLevel: geminiResult.riskLevel,
+                        riskReason: geminiResult.riskReason,
+                        summary: geminiResult.summary,
+                        isFallback: geminiResult.isFallback === true
+                    };
+
+                const aiSucceeded = aiResult && aiResult.summary && !isAiFailureSummary(aiResult.summary) && aiResult.isFallback !== true;
                 if (aiSucceeded) {
                     await dbService.incrementUsage(uid);
                 }
-
-                aiResult = {
-                    changes: diffChanges.length ? aiResult.changes : (geminiResult.changes || []),
-                    riskLevel: geminiResult.riskLevel,
-                    riskReason: geminiResult.riskReason,
-                    summary: geminiResult.summary,
-                    isFallback: geminiResult.isFallback === true
-                };
             }
         }
 

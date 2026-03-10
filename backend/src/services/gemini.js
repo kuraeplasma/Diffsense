@@ -8,6 +8,12 @@ const Diff = require('diff');
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
+if (GEMINI_API_KEY) {
+    logger.info(`GEMINI_API_KEY is configured (starts with ${GEMINI_API_KEY.slice(0, 4)}...)`);
+} else {
+    logger.warn('GEMINI_API_KEY is NOT configured in environment.');
+}
+
 function extractCandidateText(payload) {
     const candidate = payload?.candidates?.[0];
     const parts = candidate?.content?.parts;
@@ -29,33 +35,177 @@ function extractCandidateText(payload) {
     throw new Error('Gemini response text is empty');
 }
 
+/**
+ * Robust JSON extraction from LLM output.
+ */
 function extractJsonText(rawText) {
-    const cleanText = String(rawText || '')
+    const src = String(rawText || '').trim();
+
+    // Attempt to find the largest matching balanced { } or [ ] block
+    // but first, look for markdown code blocks if they exist anywhere
+    const codeBlockMatch = src.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    const targetText = codeBlockMatch ? codeBlockMatch[1].trim() : src;
+
+    const startIdx = targetText.indexOf('{');
+    const endIdx = targetText.lastIndexOf('}');
+
+    if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+        return targetText.substring(startIdx, endIdx + 1).trim();
+    }
+
+    const startArrIdx = targetText.indexOf('[');
+    const endArrIdx = targetText.lastIndexOf(']');
+    if (startArrIdx !== -1 && endArrIdx !== -1 && endArrIdx > startArrIdx) {
+        return targetText.substring(startArrIdx, endArrIdx + 1).trim();
+    }
+
+    throw new Error('Gemini response contains no JSON block');
+}
+
+function escapeNewlinesInsideStrings(text) {
+    let result = '';
+    let inString = false;
+    let escaping = false;
+
+    for (let i = 0; i < text.length; i += 1) {
+        const ch = text[i];
+        if (inString) {
+            if (escaping) {
+                result += ch;
+                escaping = false;
+                continue;
+            }
+            if (ch === '\\') {
+                result += ch;
+                escaping = true;
+                continue;
+            }
+            if (ch === '"') {
+                result += ch;
+                inString = false;
+                continue;
+            }
+            if (ch === '\r') {
+                if (text[i + 1] === '\n') {
+                    i += 1;
+                }
+                result += '\\n';
+                continue;
+            }
+            if (ch === '\n') {
+                result += '\\n';
+                continue;
+            }
+            result += ch;
+            continue;
+        }
+
+        if (ch === '"') {
+            inString = true;
+        }
+        result += ch;
+    }
+
+    return result;
+}
+
+function normalizeJsonLikeText(text) {
+    return String(text || '')
         .replace(/^\uFEFF/, '')
-        .replace(/```json/gi, '```')
-        .replace(/```/g, '')
-        .trim();
-    const candidates = [
-        [cleanText.indexOf('{'), cleanText.lastIndexOf('}')],
-        [cleanText.indexOf('['), cleanText.lastIndexOf(']')]
+        // Clean smart quotes
+        .replace(/[\u201C\u201D]/g, '"')
+        .replace(/[\u2018\u2019]/g, '\'')
+        // Remove trailing commas before closing braces
+        .replace(/,\s*([}\]])/g, '$1')
+        // Try to fix some common LLM JSON errors
+        .replace(/:\s*undefined/g, ': null')
+        .replace(/:\s*NaN/g, ': null');
+}
+
+/**
+ * Last ditch effort to extract fields if JSON.parse fails even after cleanup.
+ */
+function salvageAnalyzeJson(text) {
+    const source = String(text || '');
+
+    // Helper to extract field value via regex (support optional double quotes around field names)
+    const getField = (fieldName) => {
+        const re = new RegExp(`"?${fieldName}"?\\s*:\\s*"([\\s\\S]*?)"(?=\\s*[,}])`, 'i');
+        const match = source.match(re);
+        if (match) return match[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').trim();
+
+        // Try without trailing comma/brace for the very last field
+        const reLast = new RegExp(`"?${fieldName}"?\\s*:\\s*"([\\s\\S]*?)"\\s*$`, 'i');
+        const matchLast = source.match(reLast);
+        return matchLast ? matchLast[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').trim() : null;
+    };
+
+    // Special handling for riskLevel which might be numeric
+    const riskLevelMatch = source.match(/"riskLevel"\s*:\s*("?)([123]|LOW|MEDIUM|HIGH)\1/i);
+
+    const parsed = {
+        changes: [],
+        riskLevel: riskLevelMatch ? riskLevelMatch[2] : 1,
+        riskReason: getField('riskReason') || '',
+        summary: getField('summary') || ''
+    };
+
+    // Extract changes array block if possible
+    const changesMatch = source.match(/"changes"\s*:\s*\[([\s\S]*?)\]\s*(?:,|\})/i);
+    if (changesMatch) {
+        // We won't try to perfectly parse the nested array here, 
+        // as this is a last-ditch salvage. 
+        // But we want at least summary and riskLevel.
+    }
+
+    if (!parsed.summary && !parsed.riskReason) {
+        throw new Error('Gemini response could not be salvaged via regex');
+    }
+
+    return parsed;
+}
+
+function parseGeminiJsonResponse(aiText) {
+    const jsonText = extractJsonText(aiText);
+    const attempts = [
+        () => JSON.parse(jsonText),
+        () => JSON.parse(normalizeJsonLikeText(jsonText)),
+        () => JSON.parse(normalizeJsonLikeText(escapeNewlinesInsideStrings(jsonText))),
+        () => salvageAnalyzeJson(jsonText)
     ];
 
-    for (const [start, end] of candidates) {
-        if (start !== -1 && end !== -1 && end > start) {
-            return cleanText.substring(start, end + 1);
+    let lastError = null;
+    for (const attempt of attempts) {
+        try {
+            return attempt();
+        } catch (error) {
+            lastError = error;
         }
     }
 
-    throw new Error('Gemini response is not valid JSON');
+    logger.error('Gemini JSON parse failed after all attempts.');
+    logger.error(`Raw AI response: ${aiText}`);
+    logger.error(`Extracted segment: ${jsonText}`);
+    throw lastError || new Error('Gemini response JSON parse failed');
 }
 
 function normalizeAnalyzeResult(parsed) {
     const riskLevelNum = Number(parsed?.riskLevel);
+    const levelArr = [1, 2, 3];
+    let finalLevel = 1;
+    if (levelArr.includes(riskLevelNum)) {
+        finalLevel = riskLevelNum;
+    } else if (typeof parsed?.riskLevel === 'string') {
+        const val = parsed.riskLevel.toUpperCase();
+        if (val.includes('HIGH') || val === '3') finalLevel = 3;
+        else if (val.includes('MEDIUM') || val === '2') finalLevel = 2;
+    }
+
     return {
         changes: Array.isArray(parsed?.changes) ? parsed.changes : [],
-        riskLevel: [1, 2, 3].includes(riskLevelNum) ? riskLevelNum : 1,
+        riskLevel: finalLevel,
         riskReason: typeof parsed?.riskReason === 'string' ? parsed.riskReason : '',
-        summary: typeof parsed?.summary === 'string' ? parsed.summary : '解析完了',
+        summary: (typeof parsed?.summary === 'string' && parsed.summary.trim()) ? parsed.summary.trim() : '解析完了',
         isFallback: parsed?.isFallback === true
     };
 }
@@ -84,8 +234,8 @@ function buildLocalSingleAnalysis(contractText) {
             type: 'risk',
             old: section,
             new: '当該条項の文言を確認してください。',
-            impact: '条項の要点を抽出しました',
-            concern: '詳細なAI評価を取得できなかったため確認が必要です'
+            impact: '要点を簡易的に抽出しました',
+            concern: 'AIサービスへの接続が制限されている、または解析エラーのため簡易表示となっています。'
         })),
         riskLevel: 1,
         riskReason: 'AI評価を取得できなかったため補完要約を表示しています',
@@ -112,7 +262,7 @@ function buildLocalDiffAnalysis(currentText, previousText) {
             old: removed || lhs.slice(0, 240),
             new: added || rhs.slice(0, 240),
             impact: '差分のある条項を抽出しました',
-            concern: '要点の最終確認を推奨します'
+            concern: 'AI解析に失敗したため、プログラム的なテキスト比較結果を表示しています。詳細な法的影響は個別にご確認ください。'
         }],
         riskLevel: 1,
         riskReason: 'AI評価を取得できなかったため補完差分を表示しています',
@@ -345,7 +495,7 @@ class GeminiService {
             }],
             generationConfig: {
                 temperature: 0.1,
-                maxOutputTokens: 2048
+                maxOutputTokens: 4096
             }
         };
 
@@ -369,8 +519,7 @@ class GeminiService {
                 );
 
                 const aiText = extractCandidateText(response?.data);
-                const jsonText = extractJsonText(aiText);
-                return JSON.parse(jsonText);
+                return parseGeminiJsonResponse(aiText);
             } catch (error) {
                 lastError = error;
                 if (attempt >= 2 || !shouldRetryGeminiRequest(error)) {
@@ -385,10 +534,6 @@ class GeminiService {
         throw lastError || new Error('Gemini request failed');
     }
 
-    /**
-     * Analyze a structured set of changes (Article-based)
-     * @param {Array} changes - Array from DiffService.compare
-     */
     async analyzeStructuredDiff(changes) {
         if (shouldUseLocalAiFallback() && (!GEMINI_API_KEY || process.env.LOCAL_AI_ONLY === 'true')) {
             return {
@@ -403,7 +548,7 @@ class GeminiService {
             throw new Error('Gemini API key is not configured');
         }
 
-        const modifiedChanges = changes.filter(c => c.type !== 'UNTOUCHED').slice(0, 15); // limit to prioritized changes
+        const modifiedChanges = changes.filter(c => c.type !== 'UNTOUCHED').slice(0, 15);
         logger.info(`Analyzing structured diff with ${modifiedChanges.length} prioritized changes`);
 
         const clauseResults = await mapWithConcurrency(modifiedChanges, 3, async (change, index) => {
@@ -524,7 +669,6 @@ ${buildSemanticDiffCandidate(change?.old || '', change?.new || '')}
     }
 
     buildPrompt(contractText, previousVersion) {
-        // Truncate text if too long (Gemini has token limits)
         const maxLength = 30000;
         const truncatedText = contractText.length > maxLength
             ? contractText.substring(0, maxLength) + '\n\n[...テキストが長すぎるため省略されました]'
@@ -535,7 +679,7 @@ ${buildSemanticDiffCandidate(change?.old || '', change?.new || '')}
                 ? previousVersion.substring(0, maxLength) + '\n\n[...テキストが長すぎるため省略されました]'
                 : previousVersion;
 
-            return `あなたは契約書の差分解析の専門家です。以下の2つの契約書を比較し、変更点を抽出してください。
+            return `あなたは契約書の差分解析の専門家です。以下の2つの契約書を比較し、変更点を抽出した上で、全体的な総括を行ってください。
 
 【旧バージョン】
 ${truncatedPrev}
@@ -545,6 +689,9 @@ ${truncatedText}
 
 以下のJSON形式で回答してください（JSONのみを出力し、説明文は不要です）:
 {
+  "summary": "日本語で回答してください。まず最新版契約書の全体像とリスク状況、および前バージョンからの変更が契約全体に与える意義を統合し、実務上のアドバイスを含めて200〜300文字程度で詳しく要約してください。単なる箇条書きではなく、文脈を持った説明にしてください。",
+  "riskLevel": 3,
+  "riskReason": "リスク判定の理由を簡潔に（100文字以内）",
   "changes": [
     {
       "section": "条項名",
@@ -554,14 +701,13 @@ ${truncatedText}
       "impact": "この変更による法的な影響や拘束力の変化（50文字以内）",
       "concern": "この変更におけるリスクや注意点（ない場合は'特になし'）"
     }
-  ],
-  "riskLevel": 3,
-  "riskReason": "リスク判定の理由を簡潔に（100文字以内）",
-  "summary": "変更の要約を3行以内で"
+  ]
 }
 
-重要: Markdownのコードブロック（\`\`\`jsonなど）は絶対に含めず、純粋なJSONテキストのみを出力してください。コメントや解説も不要です。
-riskLevelは1（低リスク）、2（中リスク）、3（高リスク）のいずれかを設定してください。`;
+重要: 
+- summaryフィールドを必ず含め、新バージョンがどのような状態になり、どのようなリスクがあるかの「解説」を含めてください。
+- changesには、特に重要と思われる変更を優先的に抽出してください。
+- riskLevelは1（低リスク）、2（中リスク）、3（高リスク）のいずれかに設定してください。`;
         } else {
             return `あなたは契約書の解析の専門家です。以下の契約書を解析し、重要なリスク要因や注意すべき条項を抽出してください。
 
@@ -570,6 +716,9 @@ ${truncatedText}
 
 以下のJSON形式で回答してください（JSONのみを出力し、説明文は不要です）:
 {
+  "summary": "日本語で回答してください。契約書の要約とリスク概要を詳しく解説してください。",
+  "riskLevel": 2,
+  "riskReason": "リスク判定の理由を簡潔に（100文字以内）",
   "changes": [
     {
       "section": "該当する条項名",
@@ -579,15 +728,13 @@ ${truncatedText}
       "impact": "この条項による法的な影響（50文字以内）",
       "concern": "この条項におけるリスクや注意点"
     }
-  ],
-  "riskLevel": 2,
-  "riskReason": "リスク判定の理由を簡潔に（100文字以内）",
-  "summary": "契約書の要約とリスク概要を3行以内で"
+  ]
 }
 
 重要:
-- changesには、リスクが高い条項や注意すべき条項を最大5つまで抽出してください。リスクがない場合は空配列にしてください。
-- riskLevelは1（低リスク）、2（中リスク）、3（高リスク）のいずれかを設定してください。`;
+- summaryフィールドを先頭に含め、契約内容の丁寧な解説を行ってください。
+- changesには、リスクが高い条項や注意すべき条項を最大5つまで抽出してください。
+- riskLevelは1（低リスク）、2（中リスク）、3（高リスク）のいずれかに設定してください。`;
         }
     }
 

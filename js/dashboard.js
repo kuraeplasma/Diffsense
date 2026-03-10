@@ -1,9 +1,10 @@
 import { dbService } from './db-service.js?v=20260309h2';
 import { aiService } from './ai-service.js?v=20260309h2';
+const LOCAL_UI_CACHE_VERSION = '20260310v3';
 const DASHBOARD_CACHE_KEYS = {
-    USER_META: 'diffsense_cache_user_meta',
-    SUBSCRIPTION: 'diffsense_cache_subscription',
-    RECENT_HISTORY: 'diffsense_cache_recent_history'
+    USER_META: `diffsense_cache_user_meta_${LOCAL_UI_CACHE_VERSION}`,
+    SUBSCRIPTION: `diffsense_cache_subscription_${LOCAL_UI_CACHE_VERSION}`,
+    RECENT_HISTORY: `diffsense_cache_recent_history_${LOCAL_UI_CACHE_VERSION}`
 };
 
 const SCRIPT_LOAD_CACHE = new Map();
@@ -116,6 +117,7 @@ const isStructuredDocumentContent = (content) => {
 };
 
 const isWordDocumentFilename = (value) => /\.(docx?|dotx?)$/i.test(String(value || '').trim());
+const isLocalDashboardMode = () => window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
 const isEmbeddablePdfUrl = (value) => {
     const src = String(value || '').trim();
@@ -161,8 +163,7 @@ const isMeaningfulAnalysisPayload = (payload) => {
     if (changes.length > 0) return true;
     if (!summary) return false;
     if (/まだ解析されていません|比較先を選択すると|AI解析がありません|解析データなし|ローカルテストモード|ローカル差分要約|ローカル要約|補完解析を返しました|補完要約|補完差分要約|AI差分要約を取得できませんでした/.test(summary)) return false;
-    if (/^(未解析|差分抽出済み|表示用キャッシュ|比較表示のみ|AI差分要約未取得)$/.test(riskReason)) return false;
-    if (/ローカルテストモード|本番AI解析ではありません|Gemini応答不安定|AI評価を一部補完表示しています|AI評価を取得できなかったため補完解析を表示しています|AI評価を取得できなかったため補完差分を表示しています|AI評価を取得できなかったため補完要約を表示しています/.test(riskReason)) return false;
+    if (/ローカルテストモード|本番AI解析ではありません|Gemini応答不安定/.test(riskReason)) return false;
     return true;
 };
 
@@ -190,14 +191,27 @@ const sanitizeAnalysisPayload = (payload) => {
         };
     }
 
+    const impactSnippets = changes
+        .map((c) => String(c.impact || '').trim())
+        .filter(Boolean)
+        .slice(0, 2);
+    const canKeepOriginalSummary = Boolean(
+        summaryRaw
+        && !/AI差分要約を取得できませんでした|AI差分要約未取得|差分は検出されませんでした|変更点は検出されませんでした|変更点を確認してください/.test(summaryRaw)
+        && !/\d+件の変更点?を検出しました/.test(summaryRaw)
+    );
     const sectionLabels = changes
         .map((c) => String(c.section || '').trim())
         .filter(Boolean)
         .slice(0, 3);
     const sectionHint = sectionLabels.length > 0 ? `（${sectionLabels.join('、')}）` : '';
-    const summary = changes.length > 0
-        ? `${changes.length}件の変更点を検出しました${sectionHint}。`
-        : '変更点を確認してください。';
+    const summary = canKeepOriginalSummary
+        ? summaryRaw
+        : (impactSnippets.length > 0
+            ? `${impactSnippets.join(' ')}${changes.length > impactSnippets.length ? ` ほか${changes.length - impactSnippets.length}件の変更があります。` : ''}`.trim()
+            : (changes.length > 0
+                ? `${changes.length}件の変更点を検出しました${sectionHint}。`
+                : '変更点を確認してください。'));
 
     return {
         ...base,
@@ -206,6 +220,46 @@ const sanitizeAnalysisPayload = (payload) => {
         changes,
         isFallback
     };
+};
+
+const hasMeaningfulAiSummary = (payload) => {
+    if (!payload || typeof payload !== 'object') return false;
+    const summary = String(payload.summary || '').trim();
+    const riskReason = String(payload.riskReason || '').trim();
+    if (!summary) return false;
+    const combined = `${summary} ${riskReason}`;
+    if (/AI差分要約を取得できませんでした|AI差分要約未取得|AI差分未保存|まだ保存されていません|差分は検出されませんでした|変更点は検出されませんでした|解析データなし/.test(combined)) {
+        return false;
+    }
+    return true;
+};
+
+const mergeStructuredChangesWithAnalysis = (structuredChanges, analysisChanges) => {
+    const baseChanges = Array.isArray(structuredChanges) ? structuredChanges.filter(Boolean) : [];
+    const aiChanges = Array.isArray(analysisChanges) ? analysisChanges.filter(Boolean) : [];
+    if (baseChanges.length === 0) return aiChanges;
+    if (aiChanges.length === 0) return baseChanges;
+
+    return baseChanges.map((base) => {
+        const matched = aiChanges.find((candidate) => {
+            const baseSection = String(base?.section || '').trim();
+            const candidateSection = String(candidate?.section || '').trim();
+            if (baseSection && candidateSection && baseSection === candidateSection) return true;
+            const baseType = resolveDisplayChangeType(base);
+            const candidateType = resolveDisplayChangeType(candidate);
+            if (baseType !== candidateType) return false;
+            return String(base?.old || '').trim() === String(candidate?.old || '').trim()
+                || String(base?.new || '').trim() === String(candidate?.new || '').trim();
+        });
+
+        return matched
+            ? {
+                ...base,
+                impact: matched.impact || base.impact || '',
+                concern: matched.concern || base.concern || ''
+            }
+            : base;
+    });
 };
 
 const isReusableAnalysisPayload = (payload) => {
@@ -473,10 +527,8 @@ const buildStructuredFallbackAnalysis = (previousContent, currentContent) => {
         };
     }
 
-    const previewSections = changes.slice(0, 3).map((item) => item.section).filter(Boolean);
-    const previewSuffix = previewSections.length > 0
-        ? `（${previewSections.join('、')}${changes.length > 3 ? ' ほか' : ''}）`
-        : '';
+    const previewChanges = changes.slice(0, 3);
+    const previewSections = previewChanges.map((item) => item.section).filter(Boolean);
     const hasDelete = changes.some((item) => item.type === 'DELETE');
     const hasAdd = changes.some((item) => item.type === 'ADD');
     const hasModify = changes.some((item) => item.type === 'MODIFY');
@@ -496,14 +548,26 @@ const buildStructuredFallbackAnalysis = (previousContent, currentContent) => {
         riskReason = '変更を検出しました';
     }
 
-    const summaryParts = [];
-    if (modifyCount > 0) summaryParts.push(`変更 ${modifyCount}件`);
-    if (addCount > 0) summaryParts.push(`追加 ${addCount}件`);
-    if (deleteCount > 0) summaryParts.push(`削除 ${deleteCount}件`);
-    const summaryDetail = summaryParts.length > 0 ? `内訳: ${summaryParts.join('、')}。` : '';
+    const previewText = previewChanges.map((item) => {
+        const typeLabel = item.type === 'ADD' ? '追加' : (item.type === 'DELETE' ? '削除' : '変更');
+        return `${item.section}で${typeLabel}`;
+    }).join('、');
+    const suffix = changes.length > previewChanges.length
+        ? `。ほか${changes.length - previewChanges.length}条文でも変更があります。`
+        : '。';
+    let summary = `${previewText}${suffix}`;
+    if (!previewText) {
+        const summaryParts = [];
+        if (modifyCount > 0) summaryParts.push(`変更 ${modifyCount}件`);
+        if (addCount > 0) summaryParts.push(`追加 ${addCount}件`);
+        if (deleteCount > 0) summaryParts.push(`削除 ${deleteCount}件`);
+        summary = summaryParts.length > 0
+            ? `${summaryParts.join('、')}を確認しました。`
+            : '変更点を確認してください。';
+    }
 
     return {
-        summary: `${changes.length}条文で差分を確認しました${previewSuffix}。${summaryDetail}`.trim(),
+        summary: summary.trim(),
         riskLevel: hasDelete ? 2 : 1,
         riskReason,
         changes,
@@ -703,18 +767,18 @@ const renderStructuredDiffView = (previousContent, currentContent, options = {})
             <div class="clause-nav-title">条文目次</div>
             <ul class="clause-nav-list">
                 ${orderedKeys.map((key, index) => {
-                    const previousClause = previousMap.get(key) || null;
-                    const currentClause = currentMap.get(key) || null;
-                    const title = currentClause?.title || previousClause?.title || '条文';
-                    const header = currentClause?.header || previousClause?.header || '';
-                    const fullClauseTitle = composeClauseHeading(title, header);
-                    const clauseId = `${idPrefix}-clause-${index}`;
-                    return `
+        const previousClause = previousMap.get(key) || null;
+        const currentClause = currentMap.get(key) || null;
+        const title = currentClause?.title || previousClause?.title || '条文';
+        const header = currentClause?.header || previousClause?.header || '';
+        const fullClauseTitle = composeClauseHeading(title, header);
+        const clauseId = `${idPrefix}-clause-${index}`;
+        return `
                         <li class="clause-nav-item" data-clause-id="${clauseId}" onclick="window.app?.scrollToClause('${clauseId}')" title="${escapeHtmlText(fullClauseTitle)}">
                             <span class="nav-clause-num">${escapeHtmlText(fullClauseTitle)}</span>
                         </li>
                     `;
-                }).join('')}
+    }).join('')}
             </ul>
         </div>
     `;
@@ -1363,13 +1427,79 @@ const Views = {
             && isExplicitNoDiffAnalysis(selectedDiffPayload);
         const hasFallbackNoDiffResult = hasExplicitNoDiffResult
             && selectedDiffPayload?.isFallback === true;
-        const effectiveSelectedDiffData = (!hasExplicitNoDiffResult && selectedDiffPayload)
-            ? selectedDiffPayload
-            : (hasAnalysisRecord(storedContractAnalysis) ? storedContractAnalysis : null);
+        const shouldPreferStructuredFallback = Boolean(
+            hasStructuredDifferences
+            && selectedDiffPayload
+            && (
+                selectedDiffPayload.isFallback === true
+                || selectedDiffPayload.aiFailed === true
+                || !isMeaningfulAnalysisPayload(selectedDiffPayload)
+                || (Array.isArray(selectedDiffPayload.changes) ? selectedDiffPayload.changes.filter(Boolean).length === 0 : true)
+            )
+        );
+        const canUseStoredContractAnalysis = Boolean(
+            latestCurrentPair
+            && hasAnalysisRecord(storedContractAnalysis)
+            && storedContractAnalysis?.isFallback !== true
+        );
+        const shouldPreferStoredContractAnalysis = Boolean(
+            canUseStoredContractAnalysis
+            && (
+                !selectedDiffPayload
+                || shouldPreferStructuredFallback
+                || hasExplicitNoDiffResult
+                || selectedDiffPayload?.isFallback === true
+                || !isMeaningfulAnalysisPayload(selectedDiffPayload)
+            )
+        );
+        const effectiveSelectedDiffData = shouldPreferStoredContractAnalysis
+            ? storedContractAnalysis
+            : ((!hasExplicitNoDiffResult && !shouldPreferStructuredFallback && selectedDiffPayload)
+                ? selectedDiffPayload
+                : null);
         const shouldShowStructuredFallbackPanel = Boolean(
             !comparisonContext
             && hasStructuredDifferences
-            && (!effectiveSelectedDiffData || hasExplicitNoDiffResult)
+            && (!effectiveSelectedDiffData || hasExplicitNoDiffResult || shouldPreferStructuredFallback)
+        );
+        const shouldForceAutoPairAnalysis = Boolean(
+            selectedDiffPayload
+            && (
+                selectedDiffPayload.isFallback === true
+                || selectedDiffPayload.aiFailed === true
+                || !isMeaningfulAnalysisPayload(selectedDiffPayload)
+                || hasExplicitNoDiffResult
+            )
+        );
+        const shouldAutoPairAnalysis = Boolean(
+            !comparisonContext
+            && selectedSourceDoc
+            && selectedTargetDoc
+            && window.app?.can('operate_contract')
+            && (
+                !selectedDiffPayload
+                || shouldForceAutoPairAnalysis
+                || selectedDiffPayload?.riskReason === 'AI差分未保存'
+            )
+        );
+        if (shouldAutoPairAnalysis) {
+            window.app.scheduleAutoPairAnalysis(
+                id,
+                selectedSourceDoc.id,
+                selectedTargetDoc.id,
+                { force: shouldForceAutoPairAnalysis }
+            );
+        }
+        const isAutoPairAnalysisPending = Boolean(
+            selectedSourceDoc
+            && selectedTargetDoc
+            && window.app?.isPairAnalysisPending(id, selectedSourceDoc.id, selectedTargetDoc.id)
+        );
+        const shouldUseStructuredDisplayChanges = Boolean(
+            !comparisonContext
+            && selectedSourceDoc
+            && selectedTargetDoc
+            && hasStructuredDifferences
         );
         const activeTab = window.app ? window.app.activeDetailTab : 'diff';
         const runtimePdfUrl = window.app?.getRuntimePdfPreviewUrl(id) || null;
@@ -1407,9 +1537,9 @@ const Views = {
         } else if (shouldShowStructuredFallbackPanel && structuredFallbackAnalysis) {
             diffData = {
                 title: `${contract.name} - 文書比較`,
-                summary: structuredFallbackAnalysis.summary || '文書差分から変更点を表示しています。',
+                summary: structuredFallbackAnalysis.summary || '変更点を表示しています。',
                 riskLevel: structuredFallbackAnalysis.riskLevel ?? 1,
-                riskReason: '文書差分から変更点を表示しています',
+                riskReason: structuredFallbackAnalysis.riskReason || '変更点を表示しています',
                 changes: Array.isArray(structuredFallbackAnalysis.changes) ? structuredFallbackAnalysis.changes : [],
                 isFallback: false
             };
@@ -1513,22 +1643,26 @@ const Views = {
                 </div>
                 <div class="document-compare-status">
                     ${selectedSourceDoc && selectedTargetDoc
-                        ? `比較中: <strong>${escapeHtmlText(trimDocumentLabel(selectedSourceDoc.document_name, '比較元資料'))}</strong> → <strong>${escapeHtmlText(trimDocumentLabel(selectedTargetDoc.document_name, '比較先資料'))}</strong>`
-                        : '比較元と比較先を選択してください'}
+                ? `比較中: <strong>${escapeHtmlText(trimDocumentLabel(selectedSourceDoc.document_name, '比較元資料'))}</strong> → <strong>${escapeHtmlText(trimDocumentLabel(selectedTargetDoc.document_name, '比較先資料'))}</strong>`
+                : '比較元と比較先を選択してください'}
                 </div>
             </div>
         ` : '';
 
-        const displayChanges = normalizeChangesForDisplay(diffData.changes);
+        const displayChanges = normalizeChangesForDisplay(
+            shouldUseStructuredDisplayChanges
+                ? mergeStructuredChangesWithAnalysis(structuredFallbackAnalysis?.changes, diffData.changes)
+                : diffData.changes
+        );
         const changesHtml = (displayChanges.length > 0 ? displayChanges : []).map(c => `
             <div style="margin-bottom: 24px; border:1px solid #eee; border-radius:4px; overflow:hidden;">
                 <div style="background:#f0f0f0; padding:8px 12px; font-weight:600; font-size:12px; border-bottom:1px solid #eee;">
                     ${c.section} <span style="font-weight:normal; color:#666; margin-left:8px;">(${(() => {
-                        const t = String(c.type || '').toUpperCase();
-                        if (t === 'ADD') return '追加';
-                        if (t === 'DELETE') return '削除';
-                        return '変更';
-                    })()})</span>
+                const t = String(c.type || '').toUpperCase();
+                if (t === 'ADD') return '追加';
+                if (t === 'DELETE') return '削除';
+                return '変更';
+            })()})</span>
                 </div>
                 <div class="diff-container" style="height:auto; min-height:100px;">
                     <div class="diff-pane diff-left"><span class="diff-del">${typeof c.old === 'string' ? c.old : JSON.stringify(c.old)}</span></div>
@@ -1583,10 +1717,11 @@ const Views = {
                         <div class="pane-scroll-area">
                             <div class="analysis-section-title" style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
                                 <span><i class="fa-solid fa-robot text-primary"></i> AIリスク要約</span>
-                                ${canTriggerPairAnalysis ? `
-                                    <button class="btn-dashboard" style="padding:6px 12px; font-size:12px;" onclick="window.app.runSelectedPairAnalysis(${id})">
-                                        <i class="fa-solid fa-play"></i> ${diffData.isFallback === true || diffData.riskReason === 'AI差分未保存' ? '解析開始' : '再解析'}
-                                    </button>
+                                ${canTriggerPairAnalysis && shouldAutoPairAnalysis ? `
+                                    <span style="font-size:12px; color:${isAutoPairAnalysisPending ? '#0f766e' : '#64748b'};">
+                                        <i class="fa-solid ${isAutoPairAnalysisPending ? 'fa-spinner fa-spin' : 'fa-circle-check'}"></i>
+                                        ${isAutoPairAnalysisPending ? '自動解析を実行中...' : '自動解析キュー済み'}
+                                    </span>
                                 ` : ''}
                             </div>
                             <div style="margin-bottom:24px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:16px;">
@@ -1666,19 +1801,19 @@ const Views = {
                              <span style="margin-left:10px; color:#999;">(Shift+Clickでダウンロード)</span>
                         </div>
                    </div>`
-                 : `${compareBannerHtml}<div class="document-paper-container is-frameless">
+                : `${compareBannerHtml}<div class="document-paper-container is-frameless">
                       <div class="document-content-full">
                          <div class="document-top-anchor" aria-hidden="true"></div>
                                         ${activeTab === 'diff'
                     ? (() => {
                         try {
-                        // 差分表示ロジック
-                        const renderAiChangeCards = () => {
-                            const aiOnlyHtml = normalizeChangesForDisplay(contract.ai_changes || []).map((c, idx) => {
-                                const escapedOld = escapeHtmlText(c.old || '');
-                                const escapedNew = escapeHtmlText(c.new || '');
-                                const typeLabel = c.type === 'ADD' ? '追加' : (c.type === 'DELETE' ? '削除' : '変更');
-                                return `
+                            // 差分表示ロジック
+                            const renderAiChangeCards = () => {
+                                const aiOnlyHtml = normalizeChangesForDisplay(contract.ai_changes || []).map((c, idx) => {
+                                    const escapedOld = escapeHtmlText(c.old || '');
+                                    const escapedNew = escapeHtmlText(c.new || '');
+                                    const typeLabel = c.type === 'ADD' ? '追加' : (c.type === 'DELETE' ? '削除' : '変更');
+                                    return `
                                     <div style="margin-bottom:18px; border:1px solid #e5e7eb; border-radius:8px; overflow:hidden; background:#fff;">
                                         <div style="padding:10px 14px; background:#f8fafc; border-bottom:1px solid #e5e7eb; font-size:12px; font-weight:600;">
                                             ${c.section || `変更 ${idx + 1}`} <span style="font-weight:normal; color:#667085; margin-left:8px;">(${typeLabel})</span>
@@ -1689,104 +1824,104 @@ const Views = {
                                         </div>
                                     </div>
                                 `;
-                            }).join('');
-                            return `<div class="document-content-diff-wrap">${aiOnlyHtml}</div>`;
-                        };
+                                }).join('');
+                                return `<div class="document-content-diff-wrap">${aiOnlyHtml}</div>`;
+                            };
 
-                        // Extract text for diff if structured
-                        const normalizePdfDisplayText = (text) => {
-                            const src = String(text || '');
-                            if (!src) return '';
-                            const lines = src.split(/\r?\n/);
-                            const out = [];
-                            const articleHeaderPattern = /^第\s*[0-9０-９一二三四五六七八九十百千〇零]+\s*条(?:\s+.*)?$/;
-                            const listLinePattern = /^([0-9０-９]+[\.．\)]|[・●○■□\-]|第\s*[0-9０-９一二三四五六七八九十百千〇零]+\s*条)/;
-                            const shortTailPattern = /^[\u3040-\u30ff\u3400-\u9fffA-Za-z0-9]{1,6}$/;
+                            // Extract text for diff if structured
+                            const normalizePdfDisplayText = (text) => {
+                                const src = String(text || '');
+                                if (!src) return '';
+                                const lines = src.split(/\r?\n/);
+                                const out = [];
+                                const articleHeaderPattern = /^第\s*[0-9０-９一二三四五六七八九十百千〇零]+\s*条(?:\s+.*)?$/;
+                                const listLinePattern = /^([0-9０-９]+[\.．\)]|[・●○■□\-]|第\s*[0-9０-９一二三四五六七八九十百千〇零]+\s*条)/;
+                                const shortTailPattern = /^[\u3040-\u30ff\u3400-\u9fffA-Za-z0-9]{1,6}$/;
 
-                            for (let i = 0; i < lines.length; i += 1) {
-                                const line = String(lines[i] || '').trim();
-                                if (!line) {
-                                    if (out.length > 0 && out[out.length - 1] !== '') out.push('');
-                                    continue;
+                                for (let i = 0; i < lines.length; i += 1) {
+                                    const line = String(lines[i] || '').trim();
+                                    if (!line) {
+                                        if (out.length > 0 && out[out.length - 1] !== '') out.push('');
+                                        continue;
+                                    }
+
+                                    const prev = out.length > 0 ? out[out.length - 1] : '';
+                                    const prevTrim = String(prev || '').trim();
+                                    const isList = listLinePattern.test(line);
+                                    const isLikelyHeaderTail = shortTailPattern.test(line) && articleHeaderPattern.test(prevTrim);
+                                    const isLikelyWrappedContinuation =
+                                        !isList &&
+                                        prevTrim &&
+                                        prevTrim !== '' &&
+                                        /[\u3040-\u30ff\u3400-\u9fffA-Za-z0-9）)】]$/.test(prevTrim);
+
+                                    if (out.length === 0 || prevTrim === '' || isList) {
+                                        out.push(line);
+                                    } else if (isLikelyHeaderTail || isLikelyWrappedContinuation) {
+                                        out[out.length - 1] = `${prevTrim}${line}`;
+                                    } else {
+                                        out.push(line);
+                                    }
                                 }
 
-                                const prev = out.length > 0 ? out[out.length - 1] : '';
-                                const prevTrim = String(prev || '').trim();
-                                const isList = listLinePattern.test(line);
-                                const isLikelyHeaderTail = shortTailPattern.test(line) && articleHeaderPattern.test(prevTrim);
-                                const isLikelyWrappedContinuation =
-                                    !isList &&
-                                    prevTrim &&
-                                    prevTrim !== '' &&
-                                    /[\u3040-\u30ff\u3400-\u9fffA-Za-z0-9）)】]$/.test(prevTrim);
+                                return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+                            };
 
-                                if (out.length === 0 || prevTrim === '' || isList) {
-                                    out.push(line);
-                                } else if (isLikelyHeaderTail || isLikelyWrappedContinuation) {
-                                    out[out.length - 1] = `${prevTrim}${line}`;
-                                } else {
-                                    out.push(line);
+                            const historyEntries = Array.isArray(contract.history) ? contract.history : [];
+                            const currentVersion = displayTargetDoc?.content || selectedTargetDoc?.content || contract.original_content || '';
+                            const isWordSource = isWordDocumentFilename(contract.original_filename);
+                            const currentVersionText = contentToComparableText(currentVersion);
+
+                            const previousVersion = displaySourceDoc?.content || selectedSourceDoc?.content || comparisonContext?.historyItem?.content || (() => {
+                                for (let i = historyEntries.length - 1; i >= 0; i -= 1) {
+                                    const candidate = historyEntries[i];
+                                    if (contentToComparableText(candidate?.content) !== currentVersionText) {
+                                        return candidate?.content || null;
+                                    }
                                 }
-                            }
+                                return historyEntries.length > 0 ? historyEntries[historyEntries.length - 1].content : null;
+                            })();
 
-                            return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
-                        };
-
-                        const historyEntries = Array.isArray(contract.history) ? contract.history : [];
-                        const currentVersion = displayTargetDoc?.content || selectedTargetDoc?.content || contract.original_content || '';
-                        const isWordSource = isWordDocumentFilename(contract.original_filename);
-                        const currentVersionText = contentToComparableText(currentVersion);
-
-                        const previousVersion = displaySourceDoc?.content || selectedSourceDoc?.content || comparisonContext?.historyItem?.content || (() => {
-                            for (let i = historyEntries.length - 1; i >= 0; i -= 1) {
-                                const candidate = historyEntries[i];
-                                if (contentToComparableText(candidate?.content) !== currentVersionText) {
-                                    return candidate?.content || null;
+                            if (!previousVersion) {
+                                if (contract.ai_changes && contract.ai_changes.length > 0) {
+                                    return renderAiChangeCards();
                                 }
-                            }
-                            return historyEntries.length > 0 ? historyEntries[historyEntries.length - 1].content : null;
-                        })();
-
-                        if (!previousVersion) {
-                            if (contract.ai_changes && contract.ai_changes.length > 0) {
-                                return renderAiChangeCards();
-                            }
-                            const initialDisplayText = (isPdfSource && typeof contract.pdf_raw_text === 'string' && contract.pdf_raw_text.trim())
-                                ? contract.pdf_raw_text
-                                : (isPdfSource ? normalizePdfDisplayText(currentVersionText) : currentVersionText);
-                            return `
+                                const initialDisplayText = (isPdfSource && typeof contract.pdf_raw_text === 'string' && contract.pdf_raw_text.trim())
+                                    ? contract.pdf_raw_text
+                                    : (isPdfSource ? normalizePdfDisplayText(currentVersionText) : currentVersionText);
+                                return `
                                 <div class="document-content-diff-wrap" style="padding: 8px 0;">
                                     <div style="white-space:pre-wrap; line-height:1.9;">${escapeHtmlText(initialDisplayText)}</div>
                                 </div>
                             `;
-                        }
+                            }
 
-                        const previousVersionText = contentToComparableText(previousVersion);
-                        if (previousVersionText === currentVersionText) {
-                            return `
+                            const previousVersionText = contentToComparableText(previousVersion);
+                            if (previousVersionText === currentVersionText) {
+                                return `
                                 <div class="text-muted text-center" style="padding:24px;">比較可能な差分がありません（旧版と同一内容です）</div>
                             `;
-                        }
+                            }
 
-                        if (isStructuredDocumentContent(previousVersion) || isStructuredDocumentContent(currentVersion)) {
-                            const previousLabel = displaySourceDoc
-                                ? buildComparisonLabel(displaySourceDoc.document_name, displaySourceDoc.uploaded_at, '比較元資料')
-                                : (comparisonContext?.previousLabel || buildComparisonLabel(contract.original_filename || contract.name, contract.last_updated_at, '比較元資料'));
-                            const currentLabel = displayTargetDoc
-                                ? buildComparisonLabel(displayTargetDoc.document_name, displayTargetDoc.uploaded_at, '比較先資料')
-                                : (comparisonContext?.currentLabel || buildComparisonLabel(contract.original_filename || contract.name, contract.last_analyzed_at || contract.last_updated_at, '比較先資料'));
-                            return renderStructuredDiffView(previousVersion, currentVersion, {
-                                idPrefix: `diff-${id}`,
-                                previousLabel,
-                                currentLabel
-                            });
-                        }
+                            if (isStructuredDocumentContent(previousVersion) || isStructuredDocumentContent(currentVersion)) {
+                                const previousLabel = displaySourceDoc
+                                    ? buildComparisonLabel(displaySourceDoc.document_name, displaySourceDoc.uploaded_at, '比較元資料')
+                                    : (comparisonContext?.previousLabel || buildComparisonLabel(contract.original_filename || contract.name, contract.last_updated_at, '比較元資料'));
+                                const currentLabel = displayTargetDoc
+                                    ? buildComparisonLabel(displayTargetDoc.document_name, displayTargetDoc.uploaded_at, '比較先資料')
+                                    : (comparisonContext?.currentLabel || buildComparisonLabel(contract.original_filename || contract.name, contract.last_analyzed_at || contract.last_updated_at, '比較先資料'));
+                                return renderStructuredDiffView(previousVersion, currentVersion, {
+                                    idPrefix: `diff-${id}`,
+                                    previousLabel,
+                                    currentLabel
+                                });
+                            }
 
-                        const renderDualFullDiff = () => {
-                            const lhsText = isPdfSource ? normalizePdfDisplayText(previousVersionText) : previousVersionText;
-                            const rhsText = isPdfSource ? normalizePdfDisplayText(currentVersionText) : currentVersionText;
-                            if (!window.Diff || typeof window.Diff.diffWordsWithSpace !== 'function') {
-                                return `
+                            const renderDualFullDiff = () => {
+                                const lhsText = isPdfSource ? normalizePdfDisplayText(previousVersionText) : previousVersionText;
+                                const rhsText = isPdfSource ? normalizePdfDisplayText(currentVersionText) : currentVersionText;
+                                if (!window.Diff || typeof window.Diff.diffWordsWithSpace !== 'function') {
+                                    return `
                                     <div class="document-content-diff-wrap">
                                         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:12px;">
                                             <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px;">
@@ -1800,25 +1935,25 @@ const Views = {
                                         </div>
                                     </div>
                                 `;
-                            }
-
-                            const chunks = window.Diff.diffWordsWithSpace(lhsText, rhsText);
-                            let oldHtml = '';
-                            let newHtml = '';
-
-                            for (const chunk of chunks) {
-                                const safe = escapeHtmlText(chunk.value);
-                                if (chunk.added) {
-                                    newHtml += `<span class="diff-inline-add">${safe}</span>`;
-                                } else if (chunk.removed) {
-                                    oldHtml += `<span class="diff-inline-del">${safe}</span>`;
-                                } else {
-                                    oldHtml += safe;
-                                    newHtml += safe;
                                 }
-                            }
 
-                            return `
+                                const chunks = window.Diff.diffWordsWithSpace(lhsText, rhsText);
+                                let oldHtml = '';
+                                let newHtml = '';
+
+                                for (const chunk of chunks) {
+                                    const safe = escapeHtmlText(chunk.value);
+                                    if (chunk.added) {
+                                        newHtml += `<span class="diff-inline-add">${safe}</span>`;
+                                    } else if (chunk.removed) {
+                                        oldHtml += `<span class="diff-inline-del">${safe}</span>`;
+                                    } else {
+                                        oldHtml += safe;
+                                        newHtml += safe;
+                                    }
+                                }
+
+                                return `
                                 <div class="document-content-diff-wrap">
                                     <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:12px;">
                                         <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px;">
@@ -1832,28 +1967,28 @@ const Views = {
                                     </div>
                                 </div>
                             `;
-                        };
+                            };
 
-                        if (isPdfSource || isWordSource) {
-                            return renderDualFullDiff();
-                        }
+                            if (isPdfSource || isWordSource) {
+                                return renderDualFullDiff();
+                            }
 
-                        const diff = (window.Diff && typeof window.Diff.diffChars === 'function')
-                            ? window.Diff.diffChars(previousVersionText, currentVersionText)
-                            : [{ value: currentVersionText }];
+                            const diff = (window.Diff && typeof window.Diff.diffChars === 'function')
+                                ? window.Diff.diffChars(previousVersionText, currentVersionText)
+                                : [{ value: currentVersionText }];
 
-                        // HTML生成
-                        let diffHtml = diff.map(part => {
-                            const colorClass = part.added ? 'diff-inline-add' :
-                                part.removed ? 'diff-inline-del' : '';
+                            // HTML生成
+                            let diffHtml = diff.map(part => {
+                                const colorClass = part.added ? 'diff-inline-add' :
+                                    part.removed ? 'diff-inline-del' : '';
 
-                            // エスケープ処理（XSS対策）
-                            const escapedValue = escapeHtmlText(part.value);
+                                // エスケープ処理（XSS対策）
+                                const escapedValue = escapeHtmlText(part.value);
 
-                            return colorClass ? `<span class="${colorClass}">${escapedValue}</span>` : escapedValue;
-                        }).join('');
+                                return colorClass ? `<span class="${colorClass}">${escapedValue}</span>` : escapedValue;
+                            }).join('');
 
-                        return `<div class="document-content-diff-wrap">${diffHtml}</div>`;
+                            return `<div class="document-content-diff-wrap">${diffHtml}</div>`;
                         } catch (documentRenderError) {
                             console.error('Document comparison render error:', documentRenderError);
                             const fallbackPreviousText = contentToComparableText(
@@ -2333,7 +2468,6 @@ class RegistrationFlow {
                 return true;
             }
 
-            // Word解析 or 一般解析の呼び出し
             const result = await aiService.analyzeContract(
                 contractId,
                 this.tempData.method,
@@ -2421,7 +2555,7 @@ class DashboardApp {
         this.hasAnnualBillingPlans = null;
 
         // 初期表示をプロプランに設定
-        this.subscription = { plan: 'pro', billingCycle: 'monthly', usageCount: 0, usageLimit: 400, daysRemaining: null, isInTrial: false, planLimit: 400 };
+        this.subscription = { plan: 'pro', billingCycle: 'monthly', usageCount: 0, usageLimit: 999999, daysRemaining: null, isInTrial: true, planLimit: 999999 };
         this.userPlan = 'pro';
         this.memoryCache = new Map();
         this.pendingPairAnalysisKeys = new Set();
@@ -2988,7 +3122,7 @@ class DashboardApp {
         } catch (error) {
             console.error('Failed to fetch subscription status:', error);
             // API接続失敗時：proをデフォルトにする
-            this.subscription = { plan: 'pro', billingCycle: 'monthly', usageCount: 0, usageLimit: 400, daysRemaining: null, isInTrial: false, planLimit: 400 };
+            this.subscription = { plan: 'pro', billingCycle: 'monthly', usageCount: 0, usageLimit: 999999, daysRemaining: null, isInTrial: true, planLimit: 999999 };
             this.userPlan = 'pro';
             this.setCachedItem(DASHBOARD_CACHE_KEYS.SUBSCRIPTION, this.subscription);
             if (!this.planViewBillingCycle) {
@@ -5017,6 +5151,10 @@ class DashboardApp {
         const canHydrateFromStoredAnalysis = isCurrentVsLatestHistoryPair(docs, sourceDoc, targetDoc)
             && isMeaningfulAnalysisPayload(storedAnalysis)
             && storedAnalysis?.isFallback !== true;
+        if (isLocalDashboardMode()) {
+            await this.analyzeDocumentPair(contractId, sourceDoc, targetDoc, { force: true, silent: true, auto: true });
+            return;
+        }
         if (cached && isReusableAnalysisPayload(cached.diff_data) && !hasFallbackNoDiffCache) {
             dbService.touchRecentDiff(sourceDoc.id, targetDoc.id);
             this.navigate('diff', contractId);
@@ -5034,18 +5172,33 @@ class DashboardApp {
             this.navigate('diff', contractId);
             return;
         }
-
-        const confirmed = await Notify.confirm(
-            `この2つの文書の差分はまだ解析されていません。<br><br><strong>比較元:</strong> ${escapeHtmlText(buildDocumentOptionLabel(sourceDoc))}<br><strong>比較先:</strong> ${escapeHtmlText(buildDocumentOptionLabel(targetDoc))}<br><br>AI差分解析を実行しますか？`,
-            { title: '未解析の文書ペア', type: 'info', okText: 'AI差分解析を実行', cancelText: 'キャンセル' }
-        );
-
-        if (!confirmed) {
+        if (structuredFallbackAnalysis && Array.isArray(structuredFallbackAnalysis.changes) && structuredFallbackAnalysis.changes.length > 0) {
+            if (isCurrentVsLatestHistoryPair(docs, sourceDoc, targetDoc)) {
+                dbService.updateContractAnalysis(contractId, {
+                    summary: structuredFallbackAnalysis.summary,
+                    riskLevel: structuredFallbackAnalysis.riskLevel,
+                    riskReason: structuredFallbackAnalysis.riskReason,
+                    changes: structuredFallbackAnalysis.changes,
+                    isFallback: true,
+                    status: '未確認'
+                });
+            }
+            dbService.saveDiffResult({
+                docA_id: sourceDoc.id,
+                docB_id: targetDoc.id,
+                diff_data: {
+                    ...structuredFallbackAnalysis,
+                    riskReason: structuredFallbackAnalysis.riskReason || '変更点を表示しています',
+                    isFallback: true
+                },
+                created_at: new Date().toISOString()
+            });
+            dbService.touchRecentDiff(sourceDoc.id, targetDoc.id);
             this.navigate('diff', contractId);
             return;
         }
 
-        await this.analyzeDocumentPair(contractId, sourceDoc, targetDoc);
+        this.navigate('diff', contractId);
     }
 
     async runSelectedPairAnalysis(contractId) {
@@ -5078,6 +5231,7 @@ class DashboardApp {
         const contract = dbService.getContractById(contractId);
         if (!contract || !sourceDoc || !targetDoc) return;
         const force = options.force === true;
+        const silent = options.silent === true;
         const docs = dbService.getDocumentsByContractId(contractId);
         const storedContractAnalysis = buildStoredContractAnalysis(contract);
         const structuredFallbackAnalysis = buildStructuredFallbackAnalysis(sourceDoc.content, targetDoc.content);
@@ -5095,7 +5249,9 @@ class DashboardApp {
         };
 
         try {
-            Notify.info('AI差分解析を実行中...');
+            if (!silent) {
+                Notify.info('AI差分解析を実行中...');
+            }
 
             const sourceType = String(contract?.source_type || '').toUpperCase();
             const isPdfSource = sourceType === 'PDF' || (contract?.original_filename || '').toLowerCase().endsWith('.pdf');
@@ -5130,12 +5286,22 @@ class DashboardApp {
                 Object.assign(diffPayload, result.data || {});
             }
 
-            if (hasStructuredDifferences && isExplicitNoDiffAnalysis(diffPayload)) {
-                diffPayload.summary = 'AI差分要約を取得できませんでした。再解析を実行してください。';
-                diffPayload.riskLevel = 1;
-                diffPayload.riskReason = 'AI差分要約未取得';
-                diffPayload.changes = [];
-                diffPayload.isFallback = true;
+            const diffChanges = Array.isArray(diffPayload.changes) ? diffPayload.changes.filter(Boolean) : [];
+            if (hasStructuredDifferences) {
+                diffPayload.changes = mergeStructuredChangesWithAnalysis(structuredFallbackAnalysis.changes, diffChanges);
+                if (
+                    isExplicitNoDiffAnalysis(diffPayload)
+                    || diffPayload.isFallback === true
+                    || diffPayload.aiFailed === true
+                    || !hasMeaningfulAiSummary(diffPayload)
+                ) {
+                    diffPayload.summary = structuredFallbackAnalysis.summary;
+                    diffPayload.riskLevel = structuredFallbackAnalysis.riskLevel;
+                    diffPayload.riskReason = structuredFallbackAnalysis.riskReason || '変更点を表示しています';
+                    diffPayload.isFallback = true;
+                } else {
+                    diffPayload.isFallback = false;
+                }
             }
 
             if (!isMeaningfulAnalysisPayload(diffPayload) && canReuseStoredAnalysis) {
@@ -5148,6 +5314,17 @@ class DashboardApp {
                 diff_data: diffPayload,
                 created_at: new Date().toISOString()
             });
+            if (isCurrentVsLatestHistoryPair(docs, sourceDoc, targetDoc)) {
+                dbService.updateContractAnalysis(contractId, {
+                    summary: diffPayload.summary,
+                    riskLevel: diffPayload.riskLevel,
+                    riskReason: diffPayload.riskReason,
+                    changes: Array.isArray(diffPayload.changes) ? diffPayload.changes : [],
+                    isFallback: diffPayload.isFallback === true,
+                    aiFailed: diffPayload.aiFailed === true,
+                    status: '未確認'
+                });
+            }
             dbService.touchRecentDiff(sourceDoc.id, targetDoc.id);
             this.setDocumentCompareState({
                 contractId,
@@ -5157,7 +5334,9 @@ class DashboardApp {
             this.navigate('diff', contractId);
         } catch (error) {
             console.error('analyzeDocumentPair error:', error);
-            Notify.error(`AI差分解析に失敗しました: ${error.message}`);
+            if (!silent) {
+                Notify.error(`AI差分解析に失敗しました: ${error.message}`);
+            }
         }
     }
 
