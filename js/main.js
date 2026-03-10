@@ -199,12 +199,13 @@ document.addEventListener('DOMContentLoaded', () => {
     async function hasAnnualBillingPlans() {
         try {
             const res = await fetch(`${getApiBase()}/payment/config`, { cache: 'no-store' });
-            if (!res.ok) return false;
+            if (!res.ok) return null;
             const json = await res.json();
             const annual = json?.data?.planIds?.annual;
-            return !!(annual?.starter && annual?.business && annual?.pro);
+            // UI fallback: if annual map is present, keep annual toggle available.
+            return Boolean(annual && typeof annual === 'object');
         } catch (_) {
-            return false;
+            return null;
         }
     }
 
@@ -218,7 +219,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let annualEnabled = await hasAnnualBillingPlans();
         const annualBtn = toggleButtons.find((btn) => btn.dataset.billingToggle === 'annual');
-        if (!annualEnabled && annualBtn) {
+        if (annualEnabled === false && annualBtn) {
             annualBtn.disabled = true;
             annualBtn.setAttribute('aria-disabled', 'true');
             annualBtn.textContent = '年額（準備中）';
@@ -234,7 +235,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         const setBillingCycle = (cycle) => {
-            if (!annualEnabled && cycle === 'annual') {
+            if (annualEnabled === false && cycle === 'annual') {
                 cycle = 'monthly';
             }
             const isAnnual = cycle === 'annual';
