@@ -40,7 +40,7 @@ const Notify = (() => {
                 border-radius: 10px;
                 background: #fff;
                 box-shadow: 0 8px 32px rgba(0,0,0,0.15), 0 2px 8px rgba(0,0,0,0.08);
-                border-left: 4px solid #c5a059;
+                border: 1px solid #ececec;
                 transform: translateY(-20px);
                 opacity: 0;
                 transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
@@ -88,13 +88,11 @@ const Notify = (() => {
             }
             .ds-toast-close:hover { color: #24292E; }
             /* Types */
-            .ds-toast.success { border-left-color: #22c55e; }
-            .ds-toast.error   { border-left-color: #ef4444; }
-            .ds-toast.warning { border-left-color: #f59e0b; }
-            .ds-toast.info    { border-left-color: #3b82f6; }
-            .ds-toast.neutral {
-                border-left: none;
-            }
+            .ds-toast.success {}
+            .ds-toast.error   {}
+            .ds-toast.warning {}
+            .ds-toast.info    {}
+            .ds-toast.neutral {}
 
             /* ── Modal（確認ダイアログ）── */
             .ds-modal-overlay {
@@ -190,9 +188,9 @@ const Notify = (() => {
             /* Progress bar for auto-close */
             .ds-toast-progress {
                 position: absolute;
-                bottom: 0; left: 4px; right: 0;
+                bottom: 0; left: 0; right: 0;
                 height: 3px;
-                border-radius: 0 0 10px 0;
+                border-radius: 0 0 10px 10px;
                 background: currentColor;
                 opacity: 0.2;
                 transform-origin: left;
@@ -257,7 +255,7 @@ const Notify = (() => {
                 <div class="ds-toast-msg">${message}</div>
             </div>
             <button class="ds-toast-close" aria-label="閉じる">&times;</button>
-            ${duration > 0 ? `<div class="ds-toast-progress" style="animation-duration:${duration}ms; color:${neutral ? '#d1d5db' : (type === 'success' ? '#22c55e' : type === 'error' ? '#ef4444' : type === 'warning' ? '#f59e0b' : '#3b82f6')}"></div>` : ''}
+            ${duration > 0 ? `<div class="ds-toast-progress" style="animation-duration:${duration}ms; color:#d1d5db"></div>` : ''}
         `;
 
         const container = getContainer(position);

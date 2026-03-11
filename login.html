@@ -462,8 +462,11 @@
                                 placeholder="••••••••">
                             <i class="fa-solid fa-eye-slash toggle-password" data-target="login-password"></i>
                         </div>
+                        <div style="margin-top: 0.55rem; text-align: right;">
+                            <a href="#" id="forgot-password-link"
+                                style="font-size: 0.82rem; color: #8a6a2d; text-decoration: underline;">パスワードをお忘れですか？</a>
+                        </div>
                     </div>
-                    <div class="auth-separator">または</div>
                     <button type="button" class="google-auth-btn" id="login-google-btn">
                         <i class="fa-brands fa-google"></i> Googleでログイン
                     </button>
@@ -490,7 +493,6 @@
                             <i class="fa-solid fa-eye-slash toggle-password" data-target="signup-password"></i>
                         </div>
                     </div>
-                    <div class="auth-separator">または</div>
                     <button type="button" class="google-auth-btn" id="signup-google-btn">
                         <i class="fa-brands fa-google"></i> Googleで無料登録
                     </button>
@@ -507,7 +509,7 @@
     </div>
 
     <!-- Notification System -->
-    <script src="js/notify.js"></script>
+    <script src="js/notify.js?v=20260311b"></script>
     <script>
         // --- UI State Logic (works on file:// and http://) ---
         window.switchTab = (tab) => {
@@ -566,7 +568,7 @@
     </script>
     <!-- Auth Logic -->
     <script type="module">
-        import { handleLogin, handleSignUp, handleGoogleLogin, handleGoogleRedirectResult } from './js/auth.js?v=20260311c';
+        import { handleLogin, handleSignUp, handleGoogleLogin, handleGoogleRedirectResult, handlePasswordReset } from './js/auth.js?v=20260311d';
 
         await handleGoogleRedirectResult();
 
@@ -607,6 +609,13 @@
         document.getElementById('signup-google-btn').addEventListener('click', async () => {
             await handleGoogleLogin();
         });
+
+        document.getElementById('forgot-password-link').addEventListener('click', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            await handlePasswordReset(email);
+        });
+
     </script>
 </body>
 

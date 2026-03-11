@@ -2,6 +2,7 @@ import { auth } from './firebase-config.js?v=20260311c';
 import {
     createUserWithEmailAndPassword,
     signInWithEmailAndPassword,
+    sendPasswordResetEmail,
     GoogleAuthProvider,
     signInWithPopup,
     signInWithRedirect,
@@ -30,6 +31,14 @@ function getApiBase() {
 
 function normalizeBillingCycle(value) {
     return value === 'annual' ? 'annual' : 'monthly';
+}
+
+function getPasswordResetContinueUrl() {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1') {
+        return 'http://localhost:3000/login.html?tab=login';
+    }
+    return 'https://diffsense.spacegleam.co.jp/login.html?tab=login';
 }
 
 function persistPlanIntentFromUrl() {
@@ -130,6 +139,47 @@ export async function handleLogin(email, password) {
     } catch (error) {
         console.error("Error logging in:", error);
         Notify.error("メールアドレスまたはパスワードが間違っています。", { title: 'ログイン失敗' });
+    }
+}
+
+/**
+ * Send password reset email
+ * @param {string} email
+ */
+export async function handlePasswordReset(email) {
+    const normalizedEmail = (email || '').trim();
+    if (!normalizedEmail) {
+        Notify.error('メールアドレスを入力してください。', { title: '再発行メール送信' });
+        return false;
+    }
+    if (window.location.protocol === 'file:') {
+        Notify.error('ローカルファイルでは送信できません。http://localhost で開いてください。', { title: '再発行メール送信失敗' });
+        return false;
+    }
+
+    try {
+        auth.languageCode = 'ja';
+        const actionCodeSettings = {
+            url: getPasswordResetContinueUrl(),
+            handleCodeInApp: false
+        };
+        await sendPasswordResetEmail(auth, normalizedEmail, actionCodeSettings);
+        Notify.success('パスワード再発行メールを送信しました。メールをご確認ください。', { title: '送信完了' });
+        return true;
+    } catch (error) {
+        console.error('Error sending password reset email:', error);
+        let msg = '再発行メールの送信に失敗しました。時間をおいて再度お試しください。';
+        if (error?.code === 'auth/invalid-email') {
+            msg = 'メールアドレスの形式が正しくありません。';
+        } else if (error?.code === 'auth/missing-email') {
+            msg = 'メールアドレスを入力してください。';
+        } else if (error?.code === 'auth/user-not-found') {
+            msg = 'このメールアドレスのアカウントは見つかりません。';
+        } else if (error?.code === 'auth/too-many-requests') {
+            msg = '試行回数が多すぎます。しばらくしてから再度お試しください。';
+        }
+        Notify.error(msg, { title: '再発行メール送信失敗' });
+        return false;
     }
 }
 
