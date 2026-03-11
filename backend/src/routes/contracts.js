@@ -12,8 +12,10 @@ const { toLegacyArticleArray, fromLegacyArticleArray } = require('../services/co
 const logger = require('../utils/logger');
 const crypto = require('crypto');
 
-function isLocalUnlimitedMode() {
-    return process.env.NODE_ENV === 'development' && process.env.AUTH_BYPASS === 'true';
+function isLocalUnlimitedMode(req) {
+    const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').toLowerCase();
+    const isLocalHost = host.includes('localhost') || host.includes('127.0.0.1');
+    return process.env.NODE_ENV === 'development' && process.env.AUTH_BYPASS === 'true' && isLocalHost;
 }
 
 function isAiFailureSummary(summary) {
@@ -375,8 +377,9 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
 
         // 0. Usage & Plan Limit Check (skip for text-only extraction)
         const userProfile = await dbService.getUserProfile(uid);
-        const limit = isLocalUnlimitedMode() ? Number.MAX_SAFE_INTEGER : dbService.getUsageLimit(userProfile);
-        const isInTrial = isLocalUnlimitedMode() ? true : dbService.isTrialActive(userProfile);
+        const localUnlimited = isLocalUnlimitedMode(req);
+        const limit = localUnlimited ? Number.MAX_SAFE_INTEGER : dbService.getUsageLimit(userProfile);
+        const isInTrial = localUnlimited ? true : dbService.isTrialActive(userProfile);
 
         logger.info(`Usage check for ${uid}:`, {
             plan: userProfile.plan,
@@ -388,7 +391,7 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
             hasPaymentMethod: userProfile.hasPaymentMethod
         });
 
-        if (!skipAI && !isLocalUnlimitedMode()) {
+        if (!skipAI && !localUnlimited) {
             // Trial Expiration Check - Only if trial was ever started
             if (userProfile.trialStartedAt && isInTrial === false) {
                 // Check if user has registered a payment method for auto-transition
@@ -645,10 +648,11 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
         }
 
         const userProfile = await dbService.getUserProfile(uid);
-        const limit = isLocalUnlimitedMode() ? Number.MAX_SAFE_INTEGER : dbService.getUsageLimit(userProfile);
-        const isInTrial = isLocalUnlimitedMode() ? true : dbService.isTrialActive(userProfile);
+        const localUnlimited = isLocalUnlimitedMode(req);
+        const limit = localUnlimited ? Number.MAX_SAFE_INTEGER : dbService.getUsageLimit(userProfile);
+        const isInTrial = localUnlimited ? true : dbService.isTrialActive(userProfile);
 
-        if (!skipAI && !isLocalUnlimitedMode() && userProfile.usageCount >= limit) {
+        if (!skipAI && !localUnlimited && userProfile.usageCount >= limit) {
             const limitMsg = isInTrial
                 ? `無料トライアルの解析上限（${limit}回）に達しました。継続して利用するにはプランの契約が必要です。`
                 : `プランの月間解析上限（${limit}回）に達しました。アップグレードをご検討ください。`;

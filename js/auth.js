@@ -1,4 +1,4 @@
-import { auth } from './firebase-config.js?v=20260311b';
+import { auth } from './firebase-config.js?v=20260311c';
 import {
     createUserWithEmailAndPassword,
     signInWithEmailAndPassword,
@@ -148,6 +148,16 @@ async function finalizePostLogin(user) {
     return true;
 }
 
+function redirectToThanksSignup() {
+    const selectedPlan = localStorage.getItem('diffsense_selected_plan');
+    const selectedBillingCycle = normalizeBillingCycle(localStorage.getItem('diffsense_selected_billing_cycle'));
+    if (selectedPlan) {
+        window.location.replace(`thanks-signup.html?next=dashboard&billing=${selectedBillingCycle}`);
+    } else {
+        window.location.replace('thanks-signup.html');
+    }
+}
+
 /**
  * Handle Google Login / Signup
  */
@@ -159,7 +169,12 @@ export async function handleGoogleLogin() {
 
         const userCredential = await signInWithPopup(auth, provider);
         const user = userCredential.user;
+        const isNewUser = Boolean(userCredential?.additionalUserInfo?.isNewUser);
         console.log("Google signed in user:", user);
+        if (isNewUser) {
+            redirectToThanksSignup();
+            return;
+        }
         await finalizePostLogin(user);
     } catch (error) {
         console.error("Error with Google login:", error);
@@ -191,6 +206,11 @@ export async function handleGoogleRedirectResult() {
     try {
         const result = await getRedirectResult(auth);
         if (!result || !result.user) return false;
+        const isNewUser = Boolean(result?.additionalUserInfo?.isNewUser);
+        if (isNewUser) {
+            redirectToThanksSignup();
+            return true;
+        }
         await finalizePostLogin(result.user);
         return true;
     } catch (error) {

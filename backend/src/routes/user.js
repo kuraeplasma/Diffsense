@@ -3,6 +3,12 @@ const router = express.Router();
 const dbService = require('../services/db');
 const logger = require('../utils/logger');
 
+function isLocalUnlimitedMode(req) {
+    const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').toLowerCase();
+    const isLocalHost = host.includes('localhost') || host.includes('127.0.0.1');
+    return process.env.NODE_ENV === 'development' && process.env.AUTH_BYPASS === 'true' && isLocalHost;
+}
+
 /**
  * GET /api/user/subscription
  * Get current user subscription status and limits
@@ -11,14 +17,15 @@ router.get('/subscription', async (req, res) => {
     try {
         const uid = req.user.uid;
         const userProfile = await dbService.getUserProfile(uid);
+        const localUnlimited = isLocalUnlimitedMode(req);
 
         const plan = userProfile.plan || 'pro';
         const billingCycle = userProfile.billingCycle || 'monthly';
-        const limit = dbService.getUsageLimit(userProfile);
-        const isInTrial = dbService.isTrialActive(userProfile);
+        const limit = localUnlimited ? Number.MAX_SAFE_INTEGER : dbService.getUsageLimit(userProfile);
+        const isInTrial = localUnlimited ? true : dbService.isTrialActive(userProfile);
 
         let daysRemaining = null;
-        if (isInTrial) {
+        if (isInTrial && !localUnlimited) {
             const trialStart = new Date(userProfile.trialStartedAt);
             const now = new Date();
             const elapsed = Math.floor((now - trialStart) / (1000 * 60 * 60 * 24));
@@ -30,12 +37,12 @@ router.get('/subscription', async (req, res) => {
             data: {
                 plan: plan,
                 billingCycle: billingCycle,
-                usageCount: userProfile.usageCount || 0,
+                usageCount: localUnlimited ? 0 : (userProfile.usageCount || 0),
                 usageLimit: limit,
                 daysRemaining: daysRemaining,
-                trialStartedAt: userProfile.trialStartedAt,
+                trialStartedAt: localUnlimited ? null : userProfile.trialStartedAt,
                 isInTrial: isInTrial,
-                planLimit: dbService.getOriginalPlanLimit(plan)
+                planLimit: localUnlimited ? Number.MAX_SAFE_INTEGER : dbService.getOriginalPlanLimit(plan)
             }
         });
     } catch (error) {
