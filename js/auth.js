@@ -1,7 +1,11 @@
-import { auth } from './firebase-config.js';
+import { auth } from './firebase-config.js?v=20260311b';
 import {
     createUserWithEmailAndPassword,
     signInWithEmailAndPassword,
+    GoogleAuthProvider,
+    signInWithPopup,
+    signInWithRedirect,
+    getRedirectResult,
     signOut,
     onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -129,6 +133,74 @@ export async function handleLogin(email, password) {
     }
 }
 
+async function finalizePostLogin(user) {
+    const mustShowPlanSelect = await isTrialExpiredWithoutPayment(user);
+    if (mustShowPlanSelect) {
+        localStorage.setItem('diffsense_trial_expired', '1');
+        const selectedBillingCycle = normalizeBillingCycle(localStorage.getItem('diffsense_selected_billing_cycle'));
+        window.location.replace(`${window.location.origin}/select-plan-preview.html?reason=trial_expired&billing=${selectedBillingCycle}`);
+        return true;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const next = params.get('next');
+    window.location.replace(resolveSafeNextUrl(next, 'dashboard.html'));
+    return true;
+}
+
+/**
+ * Handle Google Login / Signup
+ */
+export async function handleGoogleLogin() {
+    try {
+        persistPlanIntentFromUrl();
+        const provider = new GoogleAuthProvider();
+        provider.setCustomParameters({ prompt: 'select_account' });
+
+        const userCredential = await signInWithPopup(auth, provider);
+        const user = userCredential.user;
+        console.log("Google signed in user:", user);
+        await finalizePostLogin(user);
+    } catch (error) {
+        console.error("Error with Google login:", error);
+        const code = error?.code || 'unknown';
+        let msg = `Googleログインに失敗しました。（${code}）`;
+        if (error?.code === 'auth/popup-closed-by-user') {
+            msg = 'Googleログインがキャンセルされました。';
+        } else if (error?.code === 'auth/popup-blocked') {
+            msg = 'ポップアップがブロックされました。ブラウザ設定をご確認ください。';
+        } else if (error?.code === 'auth/operation-not-allowed') {
+            msg = 'Firebaseの設定で「Googleログイン」が有効になっていません。';
+        } else if (error?.code === 'auth/unauthorized-domain') {
+            msg = 'このドメインはGoogleログイン未許可です。Firebaseの承認済みドメインを確認してください。';
+        } else if (error?.code === 'auth/operation-not-supported-in-this-environment') {
+            msg = '現在の環境ではGoogleログインを実行できません（file:// など）。http(s)で開いてください。';
+        } else if (error?.code === 'auth/network-request-failed') {
+            msg = 'ネットワーク接続エラーです。接続環境またはブラウザ拡張を確認してください。';
+        } else if (error?.code === 'auth/invalid-api-key' || error?.code === 'auth/app-not-authorized') {
+            msg = 'Firebase APIキー設定でこの実行元が許可されていません。APIキー制限を確認してください。';
+        }
+        Notify.error(msg, { title: 'Googleログイン失敗' });
+    }
+}
+
+/**
+ * Complete Google redirect flow (mainly for localhost)
+ */
+export async function handleGoogleRedirectResult() {
+    try {
+        const result = await getRedirectResult(auth);
+        if (!result || !result.user) return false;
+        await finalizePostLogin(result.user);
+        return true;
+    } catch (error) {
+        console.error("Error handling Google redirect result:", error);
+        const code = error?.code || 'unknown';
+        Notify.error(`Googleログインに失敗しました。（${code}）`, { title: 'Googleログイン失敗' });
+        return false;
+    }
+}
+
 /**
  * Handle Logout
  */
@@ -147,6 +219,13 @@ export async function handleLogout() {
  * Call this on pages that require login (e.g. dashboard)
  */
 export function requireAuth() {
+    // Development Bypass for localhost
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        console.log("Local development detected, bypassing Firebase Auth check.");
+        processDevBypass();
+        return;
+    }
+
     onAuthStateChanged(auth, (user) => {
         if (!user) {
             console.log("No user found, redirecting to login.");

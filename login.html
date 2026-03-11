@@ -38,7 +38,7 @@
         /* The "Binder" Card */
         .auth-card {
             background: #fff;
-            padding: 4rem 3rem 4rem 5rem;
+            padding: 3.2rem 2.6rem 2.6rem 4.6rem;
             border-radius: 4px 12px 12px 4px;
             box-shadow:
                 -1px 0 0 #e2ddd9,
@@ -47,13 +47,15 @@
                 10px 20px 40px rgba(0, 0, 0, 0.08);
             width: 100%;
             max-width: 480px;
-            height: 650px;
-            /* Fixed height to perfectly prevent any jumping */
+            min-height: 760px;
+            height: 760px;
+            /* Keep login/signup card size stable on desktop */
             border-right: 2px solid rgba(197, 160, 89, 0.2);
             position: relative;
             display: flex;
             flex-direction: column;
-            overflow: visible;
+            overflow: hidden;
+            filter: drop-shadow(0 8px 16px rgba(23, 20, 15, 0.08));
         }
 
         /* Binder Spine (Black/Dark Grey for Professional Look) */
@@ -144,7 +146,7 @@
             display: flex;
             justify-content: center;
             gap: 2rem;
-            margin-bottom: 2rem;
+            margin-bottom: 1.4rem;
             border-bottom: 2px solid #f0f0f0;
             padding-bottom: 0;
         }
@@ -176,7 +178,7 @@
 
         .auth-logo {
             text-align: center;
-            margin-bottom: 2.5rem;
+            margin-bottom: 1.9rem;
             font-family: "Helvetica", "Arial", sans-serif;
             font-weight: 800;
             font-size: 1.8rem;
@@ -200,8 +202,98 @@
             letter-spacing: 0.05em;
         }
 
+        .signup-assurance-note {
+            margin: 0.1rem 0 0.9rem 0;
+            font-size: 0.81rem;
+            color: #7a5d2d;
+            text-align: center;
+            line-height: 1.55;
+            background: linear-gradient(180deg, #fdfaf2 0%, #f8f3e8 100%);
+            border: 1px solid #e7d9bd;
+            border-radius: 10px;
+            padding: 0.72rem 0.9rem;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+        }
+
+        #signup-btn {
+            border-radius: 10px !important;
+            letter-spacing: 0.02em;
+            box-shadow: 0 8px 18px rgba(145, 111, 43, 0.26);
+            transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease, background-color 0.2s ease;
+        }
+
+        #signup-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 20px rgba(145, 111, 43, 0.3);
+            filter: brightness(1.06);
+        }
+
+        #signup-btn:active {
+            transform: translateY(0);
+            box-shadow: 0 6px 14px rgba(145, 111, 43, 0.22);
+        }
+
+        .signup-trust-inline {
+            margin: 0.72rem 0 0;
+            text-align: center;
+            color: #6e6254;
+            font-size: 0.72rem;
+            line-height: 1.5;
+            letter-spacing: 0.01em;
+        }
+
+        .auth-separator {
+            margin: 0.7rem 0 0.65rem;
+            text-align: center;
+            color: #8f806f;
+            font-size: 0.76rem;
+            position: relative;
+            font-weight: 500;
+        }
+
+        .auth-separator::before,
+        .auth-separator::after {
+            content: "";
+            position: absolute;
+            top: 50%;
+            width: 42%;
+            border-top: 1px solid #d7cbb9;
+        }
+
+        .auth-separator::before {
+            left: 0;
+        }
+
+        .auth-separator::after {
+            right: 0;
+        }
+
+        .google-auth-btn {
+            width: 100%;
+            border-radius: 10px;
+            border: 1px solid #ccbca6;
+            background: #fff;
+            color: #52493f;
+            font-family: var(--font-body);
+            font-weight: 600;
+            font-size: 0.95rem;
+            padding: 0.8rem 0.95rem;
+            cursor: pointer;
+            transition: background-color 0.2s ease, border-color 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.55rem;
+            box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset;
+        }
+
+        .google-auth-btn:hover {
+            background: #faf8f5;
+            border-color: #d4c7b0;
+        }
+
         .form-group {
-            margin-bottom: 1.8rem;
+            margin-bottom: 1.45rem;
             position: relative;
         }
 
@@ -220,20 +312,20 @@
 
         .form-input {
             width: 100%;
-            padding: 1rem;
-            border: none;
-            border-bottom: 1px solid #e2ddd9;
-            border-radius: 0;
+            padding: 0.85rem;
+            border: 1px solid #e1d9ce;
+            border-radius: 12px;
             font-family: var(--font-body);
             font-size: 1rem;
             transition: all 0.3s ease;
-            background: transparent;
+            background: #fff;
         }
 
         .form-input:focus {
-            border-bottom-color: #c5a059;
+            border-color: #c5a059;
             outline: none;
             background: rgba(197, 160, 89, 0.03);
+            box-shadow: 0 0 0 3px rgba(197, 160, 89, 0.12);
         }
 
         .toggle-password {
@@ -251,7 +343,7 @@
         }
 
         .auth-links {
-            margin-top: 3rem;
+            margin-top: 0.7rem;
             text-align: center;
             font-size: 0.9rem;
             color: var(--color-text-muted);
@@ -269,7 +361,7 @@
 
         .back-link {
             display: inline-block;
-            margin-top: 1.5rem;
+            margin-top: 0.9rem;
             color: #999 !important;
             font-size: 0.85rem;
             font-weight: 400 !important;
@@ -303,6 +395,22 @@
                 transform: rotate(360deg);
             }
         }
+
+        @media (max-width: 640px) {
+            .auth-card {
+                height: auto;
+                min-height: 650px;
+                padding: 3.2rem 1.6rem 2.4rem 3.8rem;
+            }
+
+            .auth-tabs {
+                gap: 1.1rem;
+            }
+
+            .signup-trust-inline {
+                font-size: 0.68rem;
+            }
+        }
     </style>
     <meta name="description" content="DIFFsenseにログインして、契約書・利用規約の変更をAIで自動検知。">
 
@@ -318,7 +426,6 @@
     <meta name="twitter:description" content="DIFFsenseにログインして、契約書・利用規約の変更をAIで自動検知。">
     <meta name="twitter:image" content="https://diffsense.spacegleam.co.jp/images/ogp.png">
 
-    <link rel="icon" type="image/svg+xml" href="favicon.svg">
 </head>
 
 <body>
@@ -356,8 +463,12 @@
                             <i class="fa-solid fa-eye-slash toggle-password" data-target="login-password"></i>
                         </div>
                     </div>
+                    <div class="auth-separator">または</div>
+                    <button type="button" class="google-auth-btn" id="login-google-btn">
+                        <i class="fa-brands fa-google"></i> Googleでログイン
+                    </button>
                     <button type="submit" class="btn full-width" id="login-btn"
-                        style="border-radius: 4px; padding: 1.2rem; background: #c5a059; color: #fff; border: none; font-weight: 700;">ログイン</button>
+                        style="margin-top: 0.7rem; border-radius: 8px; padding: 0.98rem 1rem; background: #c5a059; color: #fff; border: none; font-weight: 700;">ログイン</button>
                 </form>
             </div>
 
@@ -379,8 +490,13 @@
                             <i class="fa-solid fa-eye-slash toggle-password" data-target="signup-password"></i>
                         </div>
                     </div>
+                    <div class="auth-separator">または</div>
+                    <button type="button" class="google-auth-btn" id="signup-google-btn">
+                        <i class="fa-brands fa-google"></i> Googleで無料登録
+                    </button>
                     <button type="submit" class="btn full-width" id="signup-btn"
-                        style="border-radius: 4px; padding: 1.2rem; background: #c5a059; color: #fff; border: none; font-weight: 700;">無料で始める</button>
+                        style="margin-top: 0.7rem; border-radius: 8px; padding: 0.98rem 1rem; background: #c5a059; color: #fff; border: none; font-weight: 700;">無料で始める</button>
+                    <p class="signup-trust-inline">7日間無料 ・ カード不要 ・ いつでも解約可能 ・ AI学習不使用</p>
                 </form>
             </div>
 
@@ -392,11 +508,8 @@
 
     <!-- Notification System -->
     <script src="js/notify.js"></script>
-    <!-- Auth Logic -->
-    <script type="module">
-        import { handleLogin, handleSignUp } from './js/auth.js';
-
-        // --- Tab Switching Logic ---
+    <script>
+        // --- UI State Logic (works on file:// and http://) ---
         window.switchTab = (tab) => {
             const loginView = document.getElementById('view-login');
             const signupView = document.getElementById('view-signup');
@@ -408,18 +521,19 @@
                 signupView.style.display = 'none';
                 loginTab.classList.add('active');
                 signupTab.classList.remove('active');
-                // Update URL without reload if needed, but keeping internal state is cleaner for SPA
-                const url = new URL(window.location);
-                url.searchParams.delete('tab');
-                history.replaceState(null, '', url);
             } else {
                 loginView.style.display = 'none';
                 signupView.style.display = 'block';
                 loginTab.classList.remove('active');
                 signupTab.classList.add('active');
-                const url = new URL(window.location);
-                url.searchParams.set('tab', 'signup');
-                history.replaceState(null, '', url);
+            }
+
+            try {
+                const url = new URL(window.location.href);
+                url.searchParams.set('tab', tab);
+                history.replaceState(null, '', url.toString());
+            } catch (e) {
+                // Ignore URL rewriting errors in restricted local environments.
             }
         };
 
@@ -434,6 +548,27 @@
                 this.classList.toggle('fa-eye-slash');
             });
         });
+
+        // --- Initial State Check ---
+        const urlParams = new URLSearchParams(window.location.search);
+        const selectedPlan = urlParams.get('plan');
+        const selectedBilling = urlParams.get('billing') === 'annual' ? 'annual' : 'monthly';
+        if (selectedPlan && ['starter', 'business', 'pro'].includes(selectedPlan)) {
+            localStorage.setItem('diffsense_selected_plan', selectedPlan);
+            localStorage.setItem('diffsense_selected_billing_cycle', selectedBilling);
+        }
+
+        if (urlParams.get('mode') === 'login' || urlParams.get('tab') === 'login') {
+            switchTab('login');
+        } else if (urlParams.get('mode') === 'signup' || urlParams.get('tab') === 'signup') {
+            switchTab('signup');
+        }
+    </script>
+    <!-- Auth Logic -->
+    <script type="module">
+        import { handleLogin, handleSignUp, handleGoogleLogin, handleGoogleRedirectResult } from './js/auth.js?v=20260311b';
+
+        await handleGoogleRedirectResult();
 
         // --- Login Form Submit ---
         document.getElementById('login-form').addEventListener('submit', async (e) => {
@@ -465,22 +600,13 @@
             }
         });
 
-        // --- Initial State Check ---
-        const urlParams = new URLSearchParams(window.location.search);
-        const selectedPlan = urlParams.get('plan');
-        const selectedBilling = urlParams.get('billing') === 'annual' ? 'annual' : 'monthly';
-        if (selectedPlan && ['starter', 'business', 'pro'].includes(selectedPlan)) {
-            localStorage.setItem('diffsense_selected_plan', selectedPlan);
-            localStorage.setItem('diffsense_selected_billing_cycle', selectedBilling);
-        }
+        document.getElementById('login-google-btn').addEventListener('click', async () => {
+            await handleGoogleLogin();
+        });
 
-        // mode=signup または tab=signup でサインアップタブを表示
-        // パラメータなしの場合もデフォルトは新規登録（HTML初期値）
-        if (urlParams.get('mode') === 'login' || urlParams.get('tab') === 'login') {
-            // 明示的にloginが指定された場合のみログインタブへ切り替え
-            switchTab('login');
-        }
-        // それ以外（mode=signup, tab=signup, パラメータなし）はデフォルトの新規登録タブのまま
+        document.getElementById('signup-google-btn').addEventListener('click', async () => {
+            await handleGoogleLogin();
+        });
     </script>
 </body>
 
