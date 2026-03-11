@@ -1104,6 +1104,7 @@ const Views = {
         const hasPayment = payment && payment.hasPaymentMethod;
 
         const cards = plans.map((p) => {
+            const isBusiness = p.id === 'business';
             const isCurrentPlan = sub.plan === p.id;
             const isCurrentSelection = isCurrentPlan && currentBillingCycle === selectedBillingCycle;
             const hideCurrentButtonInAnnual = selectedBillingCycle === 'annual' && isCurrentSelection;
@@ -1116,45 +1117,49 @@ const Views = {
             const ctaLabel = isCurrentSelection
                 ? '現在利用中'
                 : canStartSelectedCycle
-                    ? 'プランを変更する'
+                    ? (isBusiness ? 'このプランで始める' : 'プランを変更する')
                     : `${selectedCycleLabel}は準備中`;
             const ctaAction = ctaDisabled
                 ? 'disabled'
-                : `onclick="window.app.startPayPalSubscription('${p.id}', '${selectedBillingCycle}')"`;
+                : `onclick="window.app.startSubscriptionCheckout('${p.id}', '${selectedBillingCycle}')"`;
+            const ctaStyleClass = ctaDisabled
+                ? ''
+                : (isBusiness ? 'plan-cta-business' : 'plan-cta-outline');
 
             return `
-                <article class="plan-card ${isCurrentPlan ? 'is-current' : ''}">
+                <article class="plan-card ${isCurrentPlan ? 'is-current' : ''} ${isBusiness ? 'is-business' : 'is-muted'}">
                     <div class="plan-card-header">
+                        ${isBusiness ? `<span class="plan-recommend-chip">おすすめ</span>` : ''}
                         ${isCurrentPlan ? `<span class="plan-current-chip">現在の契約（${currentCycleLabel}）</span>` : ''}
                     </div>
                     <h3 class="plan-name">${p.name}</h3>
-                    <div class="plan-price-line">
-                        <span class="plan-price">${formatYen(selectedPrice)}</span>
-                        <span class="plan-price-unit">${selectedUnit}</span>
+                    <div class="plan-pricing-block">
+                        <div class="plan-price-line">
+                            <span class="plan-price">${formatYen(selectedPrice)}</span>
+                            <span class="plan-price-unit">${selectedUnit}</span>
+                        </div>
+                        <div class="plan-meta-slot ${selectedBillingCycle === 'annual' ? 'is-annual' : 'is-monthly'}">
+                            <div class="plan-annual-meta">
+                                <p class="plan-effective">月あたり <strong>${formatYen(annualMonthlyEquivalent)}</strong> で利用</p>
+                                <p class="plan-compare">通常価格 <span class="plan-regular">${formatYen(annualRegularPrice)}</span> → 年額合計 <span>${formatYen(p.prices.annual)}</span></p>
+                                <p class="plan-discount">2ヶ月分お得</p>
+                            </div>
+                            <div class="plan-price-meta">
+                                年額なら ${formatYen(p.prices.annual)} / 年（2ヶ月分お得）
+                            </div>
+                        </div>
                     </div>
-                    ${selectedBillingCycle === 'annual'
-                    ? `
-                    <div class="plan-annual-meta">
-                        <p class="plan-effective">月あたり <strong>${formatYen(annualMonthlyEquivalent)}</strong> で利用</p>
-                        <p class="plan-compare">通常価格 <span class="plan-regular">${formatYen(annualRegularPrice)}</span> → 年額合計 <span>${formatYen(p.prices.annual)}</span></p>
-                        <p class="plan-discount">2ヶ月分お得</p>
-                    </div>
-                    `
-                    : `
-                    <div class="plan-price-meta">
-                        年額なら ${formatYen(p.prices.annual)} / 年（2ヶ月分お得）
-                    </div>
-                    `}
                     <ul class="plan-feature-list">
                         ${p.features.map((f) => `<li><i class="fa-solid fa-check"></i>${f}</li>`).join('')}
                     </ul>
                     ${hideCurrentButtonInAnnual
                     ? ''
                     : `
-                    <button class="btn-dashboard plan-cta ${isCurrentSelection ? 'is-current' : ''} ${!canStartSelectedCycle ? 'is-disabled' : ''}" ${ctaAction}>
+                    <button class="btn-dashboard plan-cta ${ctaStyleClass} ${isCurrentSelection ? 'is-current' : ''} ${!canStartSelectedCycle ? 'is-disabled' : ''}" ${ctaAction}>
                         ${ctaLabel}
                     </button>
                     `}
+                    <p class="plan-trial-copy">トライアル終了後、このプランで継続できます</p>
                 </article>
             `;
         }).join('');
@@ -1162,29 +1167,18 @@ const Views = {
         let paymentSection = '';
         if (hasPayment) {
             paymentSection = `
-                <div class="plan-payment-card is-ok">
+                <div class="plan-payment-card is-ok compact">
                     <div class="plan-payment-title ok">
                         <i class="fa-solid fa-circle-check"></i>
                         <strong>お支払い方法が登録されています</strong>
                     </div>
-                    <p class="plan-payment-message">サブスクリプション: アクティブ</p>
                 </div>
             `;
         } else {
             paymentSection = `
-                <div class="plan-payment-card is-alert">
-                    <div class="plan-payment-title alert">
-                        <i class="fa-solid fa-triangle-exclamation"></i>
-                        <strong>お支払い方法が未登録です</strong>
-                    </div>
-                    <p class="plan-payment-message">
-                        ${sub.isInTrial
-                    ? 'トライアル終了後も継続利用するには、お支払い方法（PayPal/クレジットカード）の登録が必要です。'
-                    : 'トライアルが終了しました。継続利用にはお支払い方法の登録が必要です。'}
-                    </p>
-                    <button onclick="window.app.startPayPalSubscription(undefined, '${selectedBillingCycle}')" class="btn-dashboard btn-primary-action plan-payment-action">
-                        <i class="fa-solid fa-credit-card"></i> お支払い方法を登録する
-                    </button>
+                <div class="plan-inline-alert-badge">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <span>お支払い方法が未登録です</span>
                 </div>
             `;
         }
@@ -2553,6 +2547,8 @@ class DashboardApp {
         this.paymentConfig = null;
         this.paymentPlanAvailability = null;
         this.hasAnnualBillingPlans = null;
+        this.stripeEnabled = false;
+        this.stripePublishableKey = '';
 
         // 初期表示をプロプランに設定
         this.subscription = { plan: 'pro', billingCycle: 'monthly', usageCount: 0, usageLimit: 999999, daysRemaining: null, isInTrial: true, planLimit: 999999 };
@@ -2866,7 +2862,7 @@ class DashboardApp {
             if (shouldStartPayment) {
                 this.forceSubscriptionPayment = fromTrialExpired;
                 await bootstrapPromise;
-                await this.startPayPalSubscription(
+                await this.startSubscriptionCheckout(
                     paymentPlan || this.subscription?.plan || 'starter',
                     paymentBilling || this.subscription?.billingCycle || 'monthly',
                     fromTrialExpired
@@ -3000,6 +2996,16 @@ class DashboardApp {
                     } else if (this.paymentStatus?.hasPaymentMethod) {
                         window.location.replace(`${window.location.origin}/thanks-payment.html?plan=${returnedPlan}&billing=${returnedBillingCycle}`);
                         return;
+                    }
+                }
+
+                if (paymentState === 'stripe_success') {
+                    const returnedPlan = urlParams.get('plan') || this.subscription?.plan || 'starter';
+                    const returnedBillingCycle = urlParams.get('billing') || this.subscription?.billingCycle || 'monthly';
+                    const sessionId = urlParams.get('session_id');
+                    if (sessionId) {
+                        const confirmed = await this.confirmStripeSession(sessionId, returnedPlan, returnedBillingCycle, { redirectOnSuccess: true });
+                        if (confirmed) return;
                     }
                 }
 
@@ -3170,14 +3176,20 @@ class DashboardApp {
                 const planIds = config.planIds || {};
                 const monthlyPlanIds = planIds.monthly || {};
                 const annualPlanIds = planIds.annual || {};
+                const stripeConfig = config.stripe || {};
                 const planKeys = ['starter', 'business', 'pro'];
+                const stripeEnabled = Boolean(stripeConfig.enabled);
 
                 const monthlyAvailability = {};
                 const annualAvailability = {};
 
                 planKeys.forEach((key) => {
-                    monthlyAvailability[key] = Boolean(monthlyPlanIds[key] || planIds[key]);
-                    annualAvailability[key] = Boolean(annualPlanIds[key]);
+                    monthlyAvailability[key] = stripeEnabled
+                        ? true
+                        : Boolean(monthlyPlanIds[key] || planIds[key]);
+                    annualAvailability[key] = stripeEnabled
+                        ? true
+                        : Boolean(annualPlanIds[key]);
                 });
 
                 this.paymentConfig = config;
@@ -3187,6 +3199,8 @@ class DashboardApp {
                 };
                 // Annual is available only when at least one annual plan ID is configured.
                 this.hasAnnualBillingPlans = Object.values(annualAvailability).some(Boolean);
+                this.stripeEnabled = stripeEnabled;
+                this.stripePublishableKey = stripeConfig.publishableKey || '';
 
                 return this.paymentConfig;
             }
@@ -3198,6 +3212,8 @@ class DashboardApp {
             this.paymentConfig = null;
             this.paymentPlanAvailability = null;
             this.hasAnnualBillingPlans = null;
+            this.stripeEnabled = false;
+            this.stripePublishableKey = '';
         }
 
         return previousConfig || null;
@@ -3214,6 +3230,149 @@ class DashboardApp {
         if (this.currentView === 'plan') {
             this.navigate('plan');
         }
+    }
+
+    async startSubscriptionCheckout(plan, billingCycle = this.subscription?.billingCycle || 'monthly', forcePayment = this.forceSubscriptionPayment) {
+        if (!this.stripeEnabled) {
+            Notify.error('Stripe決済の設定が未完了です。環境変数をご確認ください。');
+            // 切り戻し用（残置）:
+            // await this.startPayPalSubscription(plan, billingCycle, forcePayment);
+            return;
+        }
+        await this.startStripeCheckout(plan, billingCycle, forcePayment);
+    }
+
+    showStripeCheckoutModal(plan, billingCycle = this.subscription?.billingCycle || 'monthly', forcePayment = this.forceSubscriptionPayment) {
+        const targetPlan = plan || this.subscription?.plan || 'starter';
+        const cycle = billingCycle === 'annual' ? 'annual' : 'monthly';
+        const showTrialNote = !this.subscription?.trialStartedAt && !this.paymentStatus?.hasPaymentMethod;
+        const existing = document.getElementById('stripe-modal-overlay');
+        if (existing) existing.remove();
+
+        const planNames = { starter: 'Starter', business: 'Business', pro: 'Pro / Legal' };
+        const billingLabel = cycle === 'annual' ? '年額（一括）' : '月額';
+        const planPrices = {
+            monthly: { starter: '¥1,480 / 月（税込）', business: '¥4,980 / 月（税込）', pro: '¥9,800 / 月（税込）' },
+            annual: { starter: '¥14,800 / 年（税込）', business: '¥49,800 / 年（税込）', pro: '¥98,000 / 年（税込）' }
+        };
+
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay active';
+        overlay.id = 'stripe-modal-overlay';
+        overlay.innerHTML = `
+        <div class="modal-content" style="max-width:480px;">
+            <div class="modal-header">
+                <h3 style="margin:0; font-size:1.1rem;">
+                    <i class="fa-solid fa-credit-card" style="margin-right:8px; color:#B8860B;"></i>お支払い方法を登録
+                </h3>
+                ${forcePayment ? '' : '<button class="btn-close" onclick="document.getElementById(\'stripe-modal-overlay\').remove()">&times;</button>'}
+            </div>
+            <div class="modal-body" style="padding:24px;">
+                <div style="background:#faf8f5; border:1px solid #e8e0d4; border-radius:8px; padding:16px; margin-bottom:16px; text-align:center;">
+                    <div style="font-size:0.8rem; color:#888; margin-bottom:4px;">選択プラン</div>
+                    <div style="font-size:1.1rem; font-weight:700; color:#24292E;">${planNames[targetPlan] || targetPlan}</div>
+                    <div style="font-size:0.8rem; color:#8a6f40; margin-top:4px;">請求サイクル: ${billingLabel}</div>
+                    <div style="font-size:1.3rem; font-weight:700; color:#B8860B; margin-top:4px;">${planPrices[cycle]?.[targetPlan] || ''}</div>
+                </div>
+                <button class="btn-dashboard full-width" style="background:#B8860B; color:#fff; border:none; font-weight:700;" onclick="window.app.startStripeCheckout('${targetPlan}', '${cycle}', ${forcePayment ? 'true' : 'false'})">
+                    無料トライアルを開始する
+                </button>
+                <p style="margin-top:8px; font-size:0.8rem; color:#8b8b8b; text-align:center;">${showTrialNote ? '7日間は請求されません' : '追加の無料期間は付与されません'}</p>
+            </div>
+        </div>`;
+        document.body.appendChild(overlay);
+    }
+
+    async startStripeCheckout(plan, billingCycle = this.subscription?.billingCycle || 'monthly', forcePayment = this.forceSubscriptionPayment) {
+        const targetPlan = plan || this.subscription?.plan || 'starter';
+        const selectedBillingCycle = billingCycle === 'annual' ? 'annual' : 'monthly';
+        this.planViewBillingCycle = selectedBillingCycle;
+        try {
+            const authModule = await import('./auth.js');
+            const token = await authModule.getIdToken();
+            const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            if (!token && !isLocalDev) {
+                Notify.error('ログイン状態を確認できませんでした。再ログインしてください。');
+                return;
+            }
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            if (token) {
+                headers.Authorization = `Bearer ${token}`;
+            }
+            const stripeModal = document.getElementById('stripe-modal-overlay');
+            if (stripeModal) stripeModal.remove();
+
+            const response = await fetch(`${aiService.API_BASE}/api/createCheckoutSession`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                    plan: targetPlan,
+                    billingCycle: selectedBillingCycle,
+                    email: this.currentUser?.email || '',
+                    userId: this.currentUser?.uid || ''
+                })
+            });
+            const result = await response.json();
+            if (!result.success || !result.data?.url) {
+                Notify.error(result.error || 'Stripe決済ページの作成に失敗しました。');
+                if (forcePayment) {
+                    window.location.replace(`${window.location.origin}/select-plan-preview.html?reason=trial_expired&billing=${selectedBillingCycle}`);
+                }
+                return;
+            }
+            window.location.href = result.data.url;
+        } catch (error) {
+            console.error('Stripe checkout error:', error);
+            Notify.error('Stripe決済の開始に失敗しました。');
+            if (forcePayment) {
+                window.location.replace(`${window.location.origin}/select-plan-preview.html?reason=trial_expired&billing=${selectedBillingCycle}`);
+            }
+        }
+    }
+
+    async confirmStripeSession(sessionId, plan, billingCycle = 'monthly', options = {}) {
+        const redirectOnSuccess = options.redirectOnSuccess !== false;
+        const selectedBillingCycle = billingCycle === 'annual' ? 'annual' : 'monthly';
+        try {
+            const authModule = await import('./auth.js');
+            const token = await authModule.getIdToken();
+            const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            if (!token && !isLocalDev) {
+                Notify.error('ログイン状態を確認できませんでした。再ログインしてください。');
+                return false;
+            }
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            if (token) {
+                headers.Authorization = `Bearer ${token}`;
+            }
+            const response = await fetch(`${aiService.API_BASE}/payment/confirm-stripe-session`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ sessionId, plan, billingCycle: selectedBillingCycle })
+            });
+            const result = await response.json();
+            if (result.success) {
+                this.forceSubscriptionPayment = false;
+                localStorage.removeItem('diffsense_trial_expired_flow');
+                await this.fetchSubscriptionStatus(token);
+                await this.fetchPaymentStatus(token);
+                if (redirectOnSuccess) {
+                    const confirmedPlan = result.data.plan || plan || this.subscription?.plan || 'starter';
+                    const confirmedBillingCycle = result.data.billingCycle || selectedBillingCycle;
+                    window.location.replace(`${window.location.origin}/thanks-payment.html?plan=${confirmedPlan}&billing=${confirmedBillingCycle}`);
+                }
+                return true;
+            }
+            Notify.error(result.error || 'Stripe決済の確定に失敗しました。');
+        } catch (error) {
+            console.error('Confirm Stripe session error:', error);
+            Notify.error('Stripe決済の確定処理でエラーが発生しました。');
+        }
+        return false;
     }
 
     async startPayPalSubscription(plan, billingCycle = this.subscription?.billingCycle || 'monthly', forcePayment = this.forceSubscriptionPayment) {

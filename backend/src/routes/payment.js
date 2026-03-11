@@ -1,8 +1,45 @@
 const express = require('express');
 const router = express.Router();
 const paypalService = require('../services/paypal');
+const stripeService = require('../services/stripe');
 const dbService = require('../services/db');
 const logger = require('../utils/logger');
+
+function isValidEmail(value) {
+    return typeof value === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function resolveFrontendBase(req) {
+    if (process.env.NODE_ENV === 'production') {
+        return 'https://diffsense.spacegleam.co.jp';
+    }
+    const origin = req.headers.origin;
+    if (origin && /^https?:\/\/[^/]+$/i.test(origin)) {
+        return origin;
+    }
+    return 'http://localhost:3000';
+}
+
+function resolveSafeCancelUrl(req, frontendBase) {
+    const requestedCancelUrl = req.body?.cancelUrl;
+    if (typeof requestedCancelUrl === 'string' && requestedCancelUrl.startsWith(frontendBase)) {
+        return requestedCancelUrl;
+    }
+    const referer = req.headers.referer;
+    if (typeof referer === 'string' && referer.startsWith(frontendBase)) {
+        return referer;
+    }
+    return `${frontendBase}/dashboard.html#plan`;
+}
+
+function shouldGrantStripeTrial(userProfile) {
+    // 既にトライアル開始済み、または決済登録済みユーザーには追加トライアルを付与しない
+    if (!userProfile) return true;
+    if (userProfile.trialStartedAt) return false;
+    if (userProfile.hasPaymentMethod) return false;
+    if (userProfile.paypalSubscriptionId || userProfile.stripeSubscriptionId) return false;
+    return true;
+}
 
 /**
  * POST /payment/create-subscription
@@ -195,11 +232,168 @@ router.get('/status', async (req, res) => {
                 pendingPlan: userProfile.pendingPlan || null,
                 pendingBillingCycle: userProfile.pendingBillingCycle || null,
                 paymentRegisteredAt: userProfile.paymentRegisteredAt || null,
-                cancelledAt: userProfile.cancelledAt || null
+                cancelledAt: userProfile.cancelledAt || null,
+                stripeStatus: userProfile.stripeStatus || null,
+                subscriptionState: userProfile.subscriptionState || null,
+                stripePlan: userProfile.stripePlan || null,
+                trialEndsAt: userProfile.trialEndsAt || null
             }
         });
     } catch (error) {
         logger.error('Payment status error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+async function createStripeCheckoutSessionHandler(req, res) {
+    try {
+        if (!stripeService.isConfigured()) {
+            return res.status(503).json({
+                success: false,
+                error: 'Stripe is not configured. Please set STRIPE_SECRET_KEY.'
+            });
+        }
+
+        const uid = req.user.uid;
+        const email = req.user.email || '';
+        const requestEmail = req.body?.email || '';
+        const emailForStripe = isValidEmail(requestEmail)
+            ? requestEmail
+            : (isValidEmail(email) ? email : '');
+        const userProfile = await dbService.getUserProfile(uid);
+
+        if (req.body?.userId && req.body.userId !== uid) {
+            logger.warn(`createCheckoutSession: userId mismatch ignored (body=${req.body.userId}, auth=${uid})`);
+        }
+
+        const requestedPriceId = (req.body?.priceId || '').trim();
+        const requestedPlan = req.body.plan;
+        const requestedBillingCycle = req.body.billingCycle;
+        const validPlans = ['starter', 'business', 'pro'];
+        const validBillingCycles = ['monthly', 'annual'];
+        let plan = (requestedPlan && validPlans.includes(requestedPlan))
+            ? requestedPlan
+            : (userProfile.plan || 'starter');
+        let billingCycle = (requestedBillingCycle && validBillingCycles.includes(requestedBillingCycle))
+            ? requestedBillingCycle
+            : (userProfile.billingCycle || 'monthly');
+
+        const resolvedFromPriceId = requestedPriceId
+            ? stripeService.resolvePlanByPriceId(requestedPriceId)
+            : null;
+        if (resolvedFromPriceId) {
+            plan = resolvedFromPriceId.plan;
+            billingCycle = resolvedFromPriceId.billingCycle;
+        }
+
+        const priceId = requestedPriceId || stripeService.getPriceId(plan, billingCycle);
+        const inlinePrice = priceId ? null : stripeService.getInlinePlanPrice(plan, billingCycle);
+        if (!priceId && !inlinePrice) {
+            return res.status(400).json({
+                success: false,
+                error: 'Stripe決済設定が不正です（プラン価格を解決できません）。'
+            });
+        }
+
+        const frontendBase = resolveFrontendBase(req);
+        const successUrl = `${frontendBase}/thanks-plan.html?plan=${plan}&billing=${billingCycle}`;
+        const cancelUrl = resolveSafeCancelUrl(req, frontendBase);
+
+        const session = await stripeService.createCheckoutSession({
+            priceId,
+            inlinePrice,
+            successUrl,
+            cancelUrl,
+            customerEmail: emailForStripe,
+            metadata: { uid, plan, billingCycle, source: 'checkout' },
+            trialPeriodDays: shouldGrantStripeTrial(userProfile) ? 7 : null
+        });
+
+        await dbService.updatePaymentInfo(uid, {
+            pendingPlan: plan,
+            pendingBillingCycle: billingCycle,
+            stripeCheckoutSessionId: session.id,
+            stripeCheckoutCreatedAt: new Date().toISOString()
+        });
+
+        res.json({
+            success: true,
+            data: {
+                sessionId: session.id,
+                url: session.url,
+                plan,
+                billingCycle
+            }
+        });
+    } catch (error) {
+        logger.error('Create Stripe checkout session error:', error.response?.data || error.message);
+        res.status(500).json({ success: false, error: error.message });
+    }
+}
+
+/**
+ * POST /payment/create-stripe-checkout-session
+ * POST /payment/create-checkout-session
+ * POST /payment/createCheckoutSession
+ * Create a Stripe Checkout session and return redirect URL
+ */
+router.post('/create-stripe-checkout-session', createStripeCheckoutSessionHandler);
+router.post('/create-checkout-session', createStripeCheckoutSessionHandler);
+router.post('/createCheckoutSession', createStripeCheckoutSessionHandler);
+
+/**
+ * POST /payment/confirm-stripe-session
+ * Confirm Stripe Checkout session after redirect
+ */
+router.post('/confirm-stripe-session', async (req, res) => {
+    try {
+        if (!stripeService.isConfigured()) {
+            return res.status(503).json({ success: false, error: 'Stripe is not configured.' });
+        }
+
+        const uid = req.user.uid;
+        const { sessionId, plan: requestedPlan, billingCycle: requestedBillingCycle } = req.body || {};
+        if (!sessionId) {
+            return res.status(400).json({ success: false, error: 'sessionId is required' });
+        }
+
+        const session = await stripeService.getCheckoutSession(sessionId);
+        if (!session || session.payment_status !== 'paid') {
+            return res.status(400).json({
+                success: false,
+                error: `Stripe決済が未完了です（status: ${session?.payment_status || 'unknown'}）`
+            });
+        }
+
+        const userProfile = await dbService.getUserProfile(uid);
+        const validPlans = ['starter', 'business', 'pro'];
+        const validBillingCycles = ['monthly', 'annual'];
+        const targetPlan = (requestedPlan && validPlans.includes(requestedPlan))
+            ? requestedPlan
+            : (session?.metadata?.plan || userProfile.pendingPlan || userProfile.plan || 'starter');
+        const targetBillingCycle = (requestedBillingCycle && validBillingCycles.includes(requestedBillingCycle))
+            ? requestedBillingCycle
+            : (session?.metadata?.billingCycle || userProfile.pendingBillingCycle || userProfile.billingCycle || 'monthly');
+
+        await dbService.updatePaymentInfo(uid, {
+            hasPaymentMethod: true,
+            paymentRegisteredAt: new Date().toISOString(),
+            pendingPlan: null,
+            pendingBillingCycle: null,
+            stripeCheckoutSessionId: session.id,
+            stripeCustomerId: session.customer || null,
+            stripeSubscriptionId: typeof session.subscription === 'string'
+                ? session.subscription
+                : (session.subscription?.id || null),
+            stripeStatus: 'ACTIVE'
+        });
+
+        await dbService.setUserPlan(uid, targetPlan, targetBillingCycle);
+
+        logger.info(`User ${uid} Stripe checkout confirmed: ${session.id}, plan: ${targetPlan}, billingCycle: ${targetBillingCycle}`);
+        res.json({ success: true, data: { status: 'ACTIVE', plan: targetPlan, billingCycle: targetBillingCycle } });
+    } catch (error) {
+        logger.error('Confirm Stripe session error:', error.response?.data || error.message);
         res.status(500).json({ success: false, error: error.message });
     }
 });

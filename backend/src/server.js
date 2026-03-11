@@ -1,5 +1,5 @@
 const path = require('path');
-require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
+require('dotenv').config({ path: path.resolve(__dirname, '..', '.env'), override: true });
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -10,12 +10,26 @@ const dbRoutes = require('./routes/db');
 const inviteRoutes = require('./routes/invite'); // Added
 const userRoutes = require('./routes/user'); // Added
 const paymentRoutes = require('./routes/payment'); // Added
+const stripeWebhookRoutes = require('./routes/stripeWebhook');
 const authMiddleware = require('./middleware/authMiddleware');
 const errorHandler = require('./middleware/errorHandler');
 const logger = require('./utils/logger');
 const crawlRoutes = require('./routes/crawl');
 const webhookRoutes = require('./routes/webhook');
 const cronService = require('./services/cronService');
+
+const DEFAULT_STRIPE_PRICE_IDS = {
+    monthly: {
+        starter: 'price_1T9iXH2NMkk9rteNzfHmJ6IH',
+        business: 'price_1T9iXI2NMkk9rteNKImWXoud',
+        pro: 'price_1T9iXI2NMkk9rteN3MXhXIZE'
+    },
+    annual: {
+        starter: 'price_1T9iXI2NMkk9rteNNDv4X0lP',
+        business: 'price_1T9iXJ2NMkk9rteNReZKwrBq',
+        pro: 'price_1T9iXJ2NMkk9rteNMtxh3vIU'
+    }
+};
 
 
 // Initialize Firebase Admin (Using shared module)
@@ -81,6 +95,10 @@ app.use(cors({
 // Request logging
 app.use(morgan('combined', { stream: logger.stream }));
 
+// Stripe webhook must receive the raw body for signature verification.
+app.use('/api/stripe', express.raw({ type: 'application/json' }), stripeWebhookRoutes);
+app.use('/stripe', express.raw({ type: 'application/json' }), stripeWebhookRoutes);
+
 // Body parser with size limits
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
@@ -101,6 +119,7 @@ app.use('/webhook', webhookRoutes);
 // Public payment config (no auth - needed for PayPal JS SDK on frontend)
 app.get('/payment/config', (req, res) => {
     const mode = process.env.PAYPAL_MODE || 'sandbox';
+    const stripePublishableKey = process.env.STRIPE_PUBLISHABLE_KEY || '';
     res.json({
         success: true,
         data: {
@@ -118,6 +137,22 @@ app.get('/payment/config', (req, res) => {
                     pro: process.env.PAYPAL_PLAN_PRO_ANNUAL
                 }
             },
+            stripe: {
+                publishableKey: stripePublishableKey,
+                enabled: Boolean(stripePublishableKey && process.env.STRIPE_SECRET_KEY),
+                priceIds: {
+                    monthly: {
+                        starter: process.env.STRIPE_PRICE_STARTER || DEFAULT_STRIPE_PRICE_IDS.monthly.starter,
+                        business: process.env.STRIPE_PRICE_BUSINESS || DEFAULT_STRIPE_PRICE_IDS.monthly.business,
+                        pro: process.env.STRIPE_PRICE_PRO || DEFAULT_STRIPE_PRICE_IDS.monthly.pro
+                    },
+                    annual: {
+                        starter: process.env.STRIPE_PRICE_STARTER_ANNUAL || DEFAULT_STRIPE_PRICE_IDS.annual.starter,
+                        business: process.env.STRIPE_PRICE_BUSINESS_ANNUAL || DEFAULT_STRIPE_PRICE_IDS.annual.business,
+                        pro: process.env.STRIPE_PRICE_PRO_ANNUAL || DEFAULT_STRIPE_PRICE_IDS.annual.pro
+                    }
+                }
+            },
             defaultBillingCycle: 'monthly'
         }
     });
@@ -129,6 +164,7 @@ app.use('/db', authMiddleware, dbRoutes);
 app.use('/invite', authMiddleware, inviteRoutes);
 app.use('/user', authMiddleware, userRoutes);
 app.use('/payment', authMiddleware, paymentRoutes);
+app.use('/api', authMiddleware, paymentRoutes);
 app.use('/crawl', authMiddleware, crawlRoutes);
 
 

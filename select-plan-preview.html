@@ -517,6 +517,7 @@
         import { getIdToken } from './js/auth.js';
 
         const params = new URLSearchParams(window.location.search);
+        const forcePreview = params.get('preview') === '1';
         let selectedPlan = null;
         let selectedBillingCycle = params.get('billing') === 'annual' ? 'annual' : 'monthly';
         let canContinue = false;
@@ -591,6 +592,10 @@
         };
 
         onAuthStateChanged(auth, async (user) => {
+            if (forcePreview) {
+                canContinue = true;
+                return;
+            }
             if (!user) {
                 const next = `${window.location.pathname}${window.location.search}`;
                 window.location.replace(`${window.location.origin}/login.html?next=${encodeURIComponent(next)}`);
@@ -664,23 +669,27 @@
 
                 localStorage.setItem('diffsense_trial_expired_flow', '1');
 
-                const response = await fetch(`${API_BASE}/payment/create-subscription`, {
+                const response = await fetch(`${API_BASE}/api/createCheckoutSession`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ plan: selectedPlan, billingCycle: selectedBillingCycle })
+                    body: JSON.stringify({
+                        plan: selectedPlan,
+                        billingCycle: selectedBillingCycle,
+                        cancelUrl: `${window.location.origin}/select-plan-preview.html?reason=trial_expired&billing=${selectedBillingCycle}`
+                    })
                 });
                 const result = await response.json();
 
-                if (!response.ok || !result?.success || !result?.data?.approvalUrl) {
+                if (!response.ok || !result?.success || !result?.data?.url) {
                     throw new Error(result?.error || '決済ページを開けませんでした。時間をおいて再度お試しください。');
                 }
 
-                window.location.replace(result.data.approvalUrl);
+                window.location.replace(result.data.url);
             } catch (error) {
-                console.error('Failed to open PayPal approval page:', error);
+                console.error('Failed to open Stripe checkout page:', error);
                 if (errorEl) errorEl.textContent = error.message || '決済ページへの移動に失敗しました。';
                 btn.disabled = false;
                 updateConfirmButtonText();

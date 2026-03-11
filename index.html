@@ -457,62 +457,54 @@
         <div class="section-header text-center">
             <h2 class="section-title">こんな業務で<span class="text-accent">使われています</span></h2>
         </div>
-        <div class="usecases-grid scroll-fade" data-delay="80">
-            <!-- Card 1 -->
-            <article class="usecase-card">
-                <div class="usecase-icon">
-                    <i class="fa-solid fa-file-contract"></i>
+        <div class="usecases-grid">
+            <article class="usecase-item">
+                <div class="usecase-icon"><i class="fa-solid fa-file-contract"></i></div>
+                <div class="usecase-content">
+                    <h3 class="usecase-title">契約変更チェック</h3>
+                    <p class="usecase-desc">取引先から送られた契約書の変更を確認。AIが変更箇所を抽出して要点を整理します。</p>
+                    <div class="usecase-tags">
+                        <span class="usecase-tag">更新契約</span>
+                        <span class="usecase-tag">条件変更</span>
+                        <span class="usecase-tag">支払条件変更</span>
+                    </div>
                 </div>
-                <h3 class="usecase-title">契約変更チェック</h3>
-                <p class="usecase-desc">取引先から送られた契約書の変更を確認。</p>
-                <ul class="usecase-tags">
-                    <li>更新契約</li>
-                    <li>条件変更</li>
-                    <li>支払条件変更</li>
-                </ul>
-                <p class="usecase-note">AIが変更箇所を抽出して要点を整理します。</p>
             </article>
-            <!-- Card 2 -->
-            <article class="usecase-card">
-                <div class="usecase-icon">
-                    <i class="fa-solid fa-cloud"></i>
+            <article class="usecase-item">
+                <div class="usecase-icon"><i class="fa-solid fa-cloud"></i></div>
+                <div class="usecase-content">
+                    <h3 class="usecase-title">利用規約の変更確認</h3>
+                    <p class="usecase-desc">SaaSやサービスの利用規約変更チェック。変更部分を自動検出して要約します。</p>
+                    <div class="usecase-tags">
+                        <span class="usecase-tag">料金変更</span>
+                        <span class="usecase-tag">免責条項変更</span>
+                        <span class="usecase-tag">利用条件変更</span>
+                    </div>
                 </div>
-                <h3 class="usecase-title">利用規約の変更確認</h3>
-                <p class="usecase-desc">SaaSやサービスの利用規約変更チェック。</p>
-                <ul class="usecase-tags">
-                    <li>料金変更</li>
-                    <li>免責条項変更</li>
-                    <li>利用条件変更</li>
-                </ul>
-                <p class="usecase-note">変更部分を自動検出して要約します。</p>
             </article>
-            <!-- Card 3 -->
-            <article class="usecase-card">
-                <div class="usecase-icon">
-                    <i class="fa-solid fa-magnifying-glass-chart"></i>
+            <article class="usecase-item">
+                <div class="usecase-icon"><i class="fa-solid fa-magnifying-glass-chart"></i></div>
+                <div class="usecase-content">
+                    <h3 class="usecase-title">契約レビューの効率化</h3>
+                    <p class="usecase-desc">契約レビューの一次チェック。差分と重要ポイントを整理できます。</p>
+                    <div class="usecase-tags">
+                        <span class="usecase-tag">契約書比較</span>
+                        <span class="usecase-tag">変更点整理</span>
+                        <span class="usecase-tag">レビュー材料作成</span>
+                    </div>
                 </div>
-                <h3 class="usecase-title">契約レビューの効率化</h3>
-                <p class="usecase-desc">契約レビューの一次チェック。</p>
-                <ul class="usecase-tags">
-                    <li>契約書比較</li>
-                    <li>変更点整理</li>
-                    <li>レビュー材料作成</li>
-                </ul>
-                <p class="usecase-note">差分と重要ポイントを整理できます。</p>
             </article>
-            <!-- Card 4 -->
-            <article class="usecase-card">
-                <div class="usecase-icon">
-                    <i class="fa-solid fa-clock-rotate-left"></i>
+            <article class="usecase-item">
+                <div class="usecase-icon"><i class="fa-solid fa-clock-rotate-left"></i></div>
+                <div class="usecase-content">
+                    <h3 class="usecase-title">契約更新履歴の管理</h3>
+                    <p class="usecase-desc">契約の変更履歴を可視化。契約の変化を履歴として管理できます。</p>
+                    <div class="usecase-tags">
+                        <span class="usecase-tag">契約更新履歴</span>
+                        <span class="usecase-tag">変更箇所記録</span>
+                        <span class="usecase-tag">差分管理</span>
+                    </div>
                 </div>
-                <h3 class="usecase-title">契約更新履歴の管理</h3>
-                <p class="usecase-desc">契約の変更履歴を可視化。</p>
-                <ul class="usecase-tags">
-                    <li>契約更新履歴</li>
-                    <li>変更箇所記録</li>
-                    <li>差分管理</li>
-                </ul>
-                <p class="usecase-note">契約の変化を履歴として管理できます。</p>
             </article>
         </div>
         <div class="usecases-cta-wrap scroll-fade text-center" data-delay="200" style="margin-top: 3rem;">
@@ -596,15 +588,16 @@
                         <div class="diagram-side side-safe">
                             <div class="diagram-box box-safe">
                                 <div class="box-icon"><i class="fa-solid fa-shield-check"></i><i
-                                        class="fa-solid fa-scale-balanced" style="color:#a17e1a; margin-left:5px;"></i>
+                                        class="fa-solid fa-scale-balanced" style="margin-left:5px;"></i>
                                 </div>
-                                <h5>DIFFsense</h5>
+                                <h5 class="logo-font diagram-brand-title">DIFFsense</h5>
                                 <div class="safe-flow">
                                     <div class="flow-step">① 変更検知（AI不使用）</div>
                                     <div class="flow-step">② 差分抽出</div>
                                     <div class="flow-step flow-step-compact">③ 必要時のみAI要約</div>
                                 </div>
                                 <p class="flow-note">※必要箇所のみ限定送信</p>
+                                <p class="security-inline-note">アップロードデータは学習に利用されません<br>API経由で安全に処理されます</p>
                             </div>
                         </div>
                     </div>
@@ -614,13 +607,6 @@
 
     </div>
 </section>
-
-<div class="container social-proof-mini-wrap desktop-only scroll-fade" data-delay="120">
-    <div class="social-proof-mini-card">
-        <p class="social-proof-mini-title">アップロードデータは学習に利用されません</p>
-        <p class="social-proof-mini-desc">API経由で安全に処理されます</p>
-    </div>
-</div>
 
 <!-- Market Advantage -->
 <section class="section market-section">
@@ -802,33 +788,29 @@
                 </div>
             </div>
         </div>
-        <div class="pricing-annual-reasons" aria-label="年額が選ばれている理由">
-            <h3>年額が選ばれている理由</h3>
-            <ul>
-                <li>年間で契約管理を行う企業が多数</li>
-                <li>経費処理が年1回で簡単</li>
-                <li>月額より実質コストが低い</li>
-            </ul>
-        </div>
-        <div class="pricing-trust-list" aria-label="安心して始められます">
-            <h3>安心して始められます</h3>
-            <ul>
-                <li>7日間無料（AI差分チェック5回まで）</li>
-                <li>トライアル中の課金はありません</li>
-                <li>いつでも次回更新を停止できます</li>
-            </ul>
-        </div>
-        <div class="pricing-corporate-safety" aria-label="法人向け安心設計">
-            <h3>🔐 法人向け安心設計</h3>
-            <ul>
-                <li>登録データは機械学習に利用されません</li>
-                <li>成果物の権利は利用者に帰属</li>
-                <li>第三者提供は行いません</li>
-                <li>重要な規約変更は事前に通知します</li>
-            </ul>
-            <p class="pricing-corporate-safety-note">
-                経済産業省公表「AI契約チェック観点」を踏まえた設計です。
-            </p>
+        <div class="pricing-info-grid">
+            <div class="pricing-annual-reasons" aria-label="年額が選ばれている理由">
+                <h3>年額が選ばれている理由</h3>
+                <ul>
+                    <li>年間で契約管理を行う企業が多数</li>
+                    <li>経費処理が年1回で簡単</li>
+                    <li>月額より実質コストが低い</li>
+                </ul>
+            </div>
+            <div class="pricing-trust-list" aria-label="安心して始められます">
+                <h3>安心して始められます</h3>
+                <ul>
+                    <li>7日間無料（AI差分チェック5回まで）</li>
+                    <li>トライアル中の課金はありません</li>
+                    <li>いつでも次回更新を停止できます</li>
+                    <li>登録データはAI学習に使用されません</li>
+                    <li>第三者提供は行いません</li>
+                    <li>重要な規約変更は事前に通知します</li>
+                </ul>
+                <p class="pricing-corporate-safety-note">
+                    経済産業省公表「AI契約チェック観点」を踏まえた設計です。
+                </p>
+            </div>
         </div>
         <p class="pricing-section-footnote">※無料トライアル終了後の継続利用には、お支払い方法の登録が必要です。</p>
     </div>
@@ -890,8 +872,24 @@
                     <span>導入までどのくらいの期間がかかりますか？</span>
                 </div>
                 <div class="faq-answer">
-                    <p>アカウント作成後、すぐにご利用いただけます。複雑な環境構築やインストールは不要で、ブラウザからWord（.docx）またはPDFファイルをアップロード、またはWEBサイトのURLを登録するだけで解析を開始できます。
+                        <p>アカウント作成後、すぐにご利用いただけます。複雑な環境構築やインストールは不要で、ブラウザからWord（.docx）またはPDFファイルをアップロード、またはWEBサイトのURLを登録するだけで解析を開始できます。
                     </p>
+                </div>
+            </div>
+            <div class="faq-item">
+                <div class="faq-question">
+                    <span>他の契約書管理ツールとの違いは何ですか？</span>
+                </div>
+                <div class="faq-answer">
+                    <p>DIFFsenseは契約書の「保管・管理」ではなく、「変更検知・差分確認」に特化したツールです。既存の契約書管理システムと併用でき、契約書のどこがどう変わったかをAIが瞬時に日本語で要約します。重厚な導入準備は不要で、月額1,480円から5分で使い始められます。</p>
+                </div>
+            </div>
+            <div class="faq-item">
+                <div class="faq-question">
+                    <span>無料トライアルはクレジットカードなしで使えますか？</span>
+                </div>
+                <div class="faq-answer">
+                    <p>はい、クレジットカードの登録なしで7日間お試しいただけます。トライアル期間中はAI差分チェックを5回まで無料でご利用可能です。トライアル終了後は自動で課金されることはなく、継続利用を希望される場合はご自身でプランをお選びください。</p>
                 </div>
             </div>
             <div class="faq-item">
