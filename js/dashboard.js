@@ -3185,7 +3185,8 @@ class DashboardApp {
                     monthly: monthlyAvailability,
                     annual: annualAvailability
                 };
-                this.hasAnnualBillingPlans = planKeys.some((key) => annualAvailability[key]);
+                // Annual is available only when at least one annual plan ID is configured.
+                this.hasAnnualBillingPlans = Object.values(annualAvailability).some(Boolean);
 
                 return this.paymentConfig;
             }
