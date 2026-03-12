@@ -1097,7 +1097,7 @@ const Views = {
                 id: 'pro',
                 name: 'Pro / Legal',
                 prices: { monthly: 9800, annual: 98000 },
-                features: ['AI解析 400回/月', '定期URL監視', 'CSV/PDFエクスポート', 'チーム5人']
+                features: ['AI解析 400回/月', '定期URL監視', 'PDFエクスポート', 'チーム5人']
             }
         ];
 
