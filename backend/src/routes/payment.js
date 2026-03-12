@@ -32,15 +32,6 @@ function resolveSafeCancelUrl(req, frontendBase) {
     return `${frontendBase}/dashboard.html#plan`;
 }
 
-function shouldGrantStripeTrial(userProfile) {
-    // 既にトライアル開始済み、または決済登録済みユーザーには追加トライアルを付与しない
-    if (!userProfile) return true;
-    if (userProfile.trialStartedAt) return false;
-    if (userProfile.hasPaymentMethod) return false;
-    if (userProfile.paypalSubscriptionId || userProfile.stripeSubscriptionId) return false;
-    return true;
-}
-
 /**
  * POST /payment/create-subscription
  * Create a PayPal subscription and return approval URL
@@ -150,6 +141,7 @@ router.post('/confirm-subscription', async (req, res) => {
                 paypalSubscriptionId: subscriptionId,
                 paypalStatus: 'ACTIVE',
                 paymentRegisteredAt: new Date().toISOString(),
+                trialStartedAt: null,
                 pendingPlan: null,
                 pendingBillingCycle: null
             });
@@ -296,7 +288,7 @@ async function createStripeCheckoutSessionHandler(req, res) {
         }
 
         const frontendBase = resolveFrontendBase(req);
-        const successUrl = `${frontendBase}/thanks-plan.html?plan=${plan}&billing=${billingCycle}`;
+        const successUrl = `${frontendBase}/thanks-payment.html?plan=${plan}&billing=${billingCycle}`;
         const cancelUrl = resolveSafeCancelUrl(req, frontendBase);
 
         const session = await stripeService.createCheckoutSession({
@@ -306,7 +298,7 @@ async function createStripeCheckoutSessionHandler(req, res) {
             cancelUrl,
             customerEmail: emailForStripe,
             metadata: { uid, plan, billingCycle, source: 'checkout' },
-            trialPeriodDays: shouldGrantStripeTrial(userProfile) ? 7 : null
+            trialPeriodDays: null
         });
 
         await dbService.updatePaymentInfo(uid, {
@@ -378,6 +370,7 @@ router.post('/confirm-stripe-session', async (req, res) => {
         await dbService.updatePaymentInfo(uid, {
             hasPaymentMethod: true,
             paymentRegisteredAt: new Date().toISOString(),
+            trialStartedAt: null,
             pendingPlan: null,
             pendingBillingCycle: null,
             stripeCheckoutSessionId: session.id,

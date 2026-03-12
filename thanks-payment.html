@@ -274,8 +274,11 @@
 
     <script>
         const params = new URLSearchParams(window.location.search);
-        const plan = params.get('plan') || 'starter';
-        const billing = params.get('billing') === 'annual' ? 'annual' : 'monthly';
+        const validPlans = ['starter', 'business', 'pro'];
+        const rawPlan = (params.get('plan') || localStorage.getItem('diffsense_selected_plan') || '').toLowerCase();
+        const plan = validPlans.includes(rawPlan) ? rawPlan : 'starter';
+        const rawBilling = (params.get('billing') || localStorage.getItem('diffsense_selected_billing_cycle') || '').toLowerCase();
+        const billing = rawBilling === 'annual' ? 'annual' : 'monthly';
         const planNames = { starter: 'Starter', business: 'Business', pro: 'Pro / Legal' };
         const billingLabels = { monthly: '月額', annual: '年額' };
         const planPrices = {
@@ -283,6 +286,9 @@
             annual: { starter: '¥14,800 / 年（税込）', business: '¥49,800 / 年（税込）', pro: '¥98,000 / 年（税込）' }
         };
         const planLimits = { starter: '月15回', business: '月120回', pro: '月400回' };
+
+        localStorage.setItem('diffsense_selected_plan', plan);
+        localStorage.setItem('diffsense_selected_billing_cycle', billing);
 
         document.getElementById('plan-name').textContent = planNames[plan] || plan;
         document.getElementById('plan-price-label').textContent = billing === 'annual' ? '年額料金' : '月額料金';

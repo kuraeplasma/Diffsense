@@ -221,11 +221,15 @@
 
     <script>
         const params = new URLSearchParams(window.location.search);
-        const plan = params.get('plan') || 'pro';
+        const validPlans = ['starter', 'business', 'pro'];
+        const rawPlan = (params.get('plan') || localStorage.getItem('diffsense_selected_plan') || '').toLowerCase();
+        const plan = validPlans.includes(rawPlan) ? rawPlan : 'pro';
         const isTrialExpiredFlow = params.get('reason') === 'trial_expired' || localStorage.getItem('diffsense_trial_expired_flow') === '1';
         const planNames = { starter: 'Starter', business: 'Business', pro: 'Pro / Legal' };
         const planPrices = { starter: '¥1,480', business: '¥4,980', pro: '¥9,800' };
         const planLimits = { starter: '月15回', business: '月120回', pro: '月400回' };
+
+        localStorage.setItem('diffsense_selected_plan', plan);
 
         document.getElementById('plan-name').textContent = `${planNames[plan] || plan}`;
 

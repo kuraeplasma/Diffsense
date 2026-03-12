@@ -22,11 +22,13 @@ router.get('/subscription', async (req, res) => {
         const plan = userProfile.plan || 'pro';
         const billingCycle = userProfile.billingCycle || 'monthly';
         const limit = localUnlimited ? Number.MAX_SAFE_INTEGER : dbService.getUsageLimit(userProfile);
-        const isInTrial = localUnlimited ? true : dbService.isTrialActive(userProfile);
-        const trialStartedAt = userProfile.trialStartedAt || new Date().toISOString();
+        const isInTrial = localUnlimited
+            ? (!userProfile.hasPaymentMethod && dbService.isTrialActive(userProfile))
+            : dbService.isTrialActive(userProfile);
+        const trialStartedAt = userProfile.trialStartedAt || null;
 
         let daysRemaining = null;
-        if (isInTrial) {
+        if (isInTrial && trialStartedAt) {
             const trialStart = new Date(trialStartedAt);
             const now = new Date();
             const elapsed = Math.floor((now - trialStart) / (1000 * 60 * 60 * 24));
@@ -71,7 +73,8 @@ router.post('/select-plan', async (req, res) => {
             ? billingCycle
             : 'monthly';
 
-        await dbService.setUserPlan(uid, plan, selectedBillingCycle, { forceTrialStart: startTrial === true });
+        const shouldStartTrial = startTrial === true && plan === 'pro';
+        await dbService.setUserPlan(uid, plan, selectedBillingCycle, { forceTrialStart: shouldStartTrial });
         logger.info(`User ${uid} selected plan: ${plan}, billingCycle: ${selectedBillingCycle}`);
 
         res.json({ success: true, data: { plan, billingCycle: selectedBillingCycle } });
