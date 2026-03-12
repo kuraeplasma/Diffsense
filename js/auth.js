@@ -41,13 +41,19 @@ function getPasswordResetContinueUrl() {
     return 'https://diffsense.spacegleam.co.jp/login.html?tab=login';
 }
 
-function persistPlanIntentFromUrl() {
+function persistPlanIntentFromUrl(options = {}) {
+    const markSignupFlow = options.markSignupFlow === true;
     const params = new URLSearchParams(window.location.search);
     const billing = normalizeBillingCycle(params.get('billing'));
 
     // 無料登録導線はすべてProトライアルへ統一
     localStorage.setItem('diffsense_selected_plan', 'pro');
     localStorage.setItem('diffsense_selected_billing_cycle', billing);
+    if (markSignupFlow) {
+        localStorage.setItem('diffsense_signup_flow', '1');
+        localStorage.removeItem('diffsense_trial_expired_flow');
+        localStorage.removeItem('diffsense_trial_expired');
+    }
 }
 
 async function isTrialExpiredWithoutPayment(user) {
@@ -86,7 +92,7 @@ async function isTrialExpiredWithoutPayment(user) {
  */
 export async function handleSignUp(email, password) {
     try {
-        persistPlanIntentFromUrl();
+        persistPlanIntentFromUrl({ markSignupFlow: true });
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
         console.log("Signed up user:", user);
@@ -199,6 +205,7 @@ async function finalizePostLogin(user) {
 }
 
 function redirectToThanksSignup() {
+    persistPlanIntentFromUrl({ markSignupFlow: true });
     const selectedPlan = localStorage.getItem('diffsense_selected_plan');
     const selectedBillingCycle = normalizeBillingCycle(localStorage.getItem('diffsense_selected_billing_cycle'));
     if (selectedPlan) {
@@ -211,9 +218,11 @@ function redirectToThanksSignup() {
 /**
  * Handle Google Login / Signup
  */
-export async function handleGoogleLogin() {
+export async function handleGoogleLogin(intent = 'auto') {
     try {
-        persistPlanIntentFromUrl();
+        const normalizedIntent = intent === 'signup' ? 'signup' : 'login';
+        persistPlanIntentFromUrl({ markSignupFlow: normalizedIntent === 'signup' });
+        localStorage.setItem('diffsense_auth_intent', normalizedIntent);
         const provider = new GoogleAuthProvider();
         provider.setCustomParameters({ prompt: 'select_account' });
 
@@ -221,7 +230,8 @@ export async function handleGoogleLogin() {
         const user = userCredential.user;
         const isNewUser = Boolean(userCredential?.additionalUserInfo?.isNewUser);
         console.log("Google signed in user:", user);
-        if (isNewUser) {
+        localStorage.removeItem('diffsense_auth_intent');
+        if (normalizedIntent === 'signup' || isNewUser) {
             redirectToThanksSignup();
             return;
         }
@@ -257,7 +267,9 @@ export async function handleGoogleRedirectResult() {
         const result = await getRedirectResult(auth);
         if (!result || !result.user) return false;
         const isNewUser = Boolean(result?.additionalUserInfo?.isNewUser);
-        if (isNewUser) {
+        const authIntent = localStorage.getItem('diffsense_auth_intent');
+        localStorage.removeItem('diffsense_auth_intent');
+        if (authIntent === 'signup' || isNewUser) {
             redirectToThanksSignup();
             return true;
         }

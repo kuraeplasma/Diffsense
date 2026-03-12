@@ -23,10 +23,11 @@ router.get('/subscription', async (req, res) => {
         const billingCycle = userProfile.billingCycle || 'monthly';
         const limit = localUnlimited ? Number.MAX_SAFE_INTEGER : dbService.getUsageLimit(userProfile);
         const isInTrial = localUnlimited ? true : dbService.isTrialActive(userProfile);
+        const trialStartedAt = userProfile.trialStartedAt || new Date().toISOString();
 
         let daysRemaining = null;
-        if (isInTrial && !localUnlimited) {
-            const trialStart = new Date(userProfile.trialStartedAt);
+        if (isInTrial) {
+            const trialStart = new Date(trialStartedAt);
             const now = new Date();
             const elapsed = Math.floor((now - trialStart) / (1000 * 60 * 60 * 24));
             daysRemaining = Math.max(0, 7 - elapsed);
@@ -40,7 +41,7 @@ router.get('/subscription', async (req, res) => {
                 usageCount: localUnlimited ? 0 : (userProfile.usageCount || 0),
                 usageLimit: limit,
                 daysRemaining: daysRemaining,
-                trialStartedAt: localUnlimited ? null : userProfile.trialStartedAt,
+                trialStartedAt: trialStartedAt,
                 isInTrial: isInTrial,
                 planLimit: localUnlimited ? Number.MAX_SAFE_INTEGER : dbService.getOriginalPlanLimit(plan)
             }

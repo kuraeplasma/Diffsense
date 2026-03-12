@@ -568,7 +568,7 @@
     </script>
     <!-- Auth Logic -->
     <script type="module">
-        import { handleLogin, handleSignUp, handleGoogleLogin, handleGoogleRedirectResult, handlePasswordReset } from './js/auth.js?v=20260311d';
+        import { handleLogin, handleSignUp, handleGoogleLogin, handleGoogleRedirectResult, handlePasswordReset } from './js/auth.js?v=20260312a';
 
         await handleGoogleRedirectResult();
 
@@ -603,11 +603,11 @@
         });
 
         document.getElementById('login-google-btn').addEventListener('click', async () => {
-            await handleGoogleLogin();
+            await handleGoogleLogin('login');
         });
 
         document.getElementById('signup-google-btn').addEventListener('click', async () => {
-            await handleGoogleLogin();
+            await handleGoogleLogin('signup');
         });
 
         document.getElementById('forgot-password-link').addEventListener('click', async (e) => {

@@ -1,5 +1,21 @@
 const { admin, firebaseInitialized } = require('../firebase');
 const logger = require('../utils/logger');
+const dbService = require('../services/db');
+
+function decodeJwtPayload(token) {
+    try {
+        if (!token || typeof token !== 'string') return null;
+        const parts = token.split('.');
+        if (parts.length < 2) return null;
+        const payloadBase64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+        const padded = payloadBase64.padEnd(Math.ceil(payloadBase64.length / 4) * 4, '=');
+        const decoded = Buffer.from(padded, 'base64').toString('utf8');
+        return JSON.parse(decoded);
+    } catch (error) {
+        logger.warn(`Failed to decode JWT payload in dev bypass: ${error.message}`);
+        return null;
+    }
+}
 
 /**
  * Firebase Auth Middleware
@@ -11,9 +27,21 @@ const authMiddleware = async (req, res, next) => {
         // Development bypass: skip auth when Firebase is not configured
         if (process.env.NODE_ENV === 'development' && process.env.AUTH_BYPASS === 'true') {
             const authHeader = req.headers.authorization;
-            if (!authHeader || !authHeader.startsWith('Bearer ') || !firebaseInitialized) {
-                logger.warn('DEV AUTH BYPASS: Assigning temporary user.');
-                req.user = { uid: 'dev-user-001', email: 'dev@localhost' };
+            const bearerToken = (authHeader && authHeader.startsWith('Bearer '))
+                ? authHeader.split('Bearer ')[1]
+                : null;
+            if (!firebaseInitialized) {
+                const decoded = decodeJwtPayload(bearerToken);
+                req.user = {
+                    uid: decoded?.user_id || decoded?.sub || 'dev-user-001',
+                    email: decoded?.email || 'dev@localhost'
+                };
+                logger.warn(`DEV AUTH BYPASS: Using ${decoded ? 'decoded token user' : 'temporary user'} (${req.user.uid}).`);
+                try {
+                    await dbService.upsertUserEmail(req.user.uid, req.user.email);
+                } catch (e) {
+                    logger.warn(`Failed to sync dev user email: ${e.message}`);
+                }
                 return next();
             }
         }
@@ -39,6 +67,13 @@ const authMiddleware = async (req, res, next) => {
         try {
             const decodedToken = await admin.auth().verifyIdToken(token);
             req.user = decodedToken;
+            if (decodedToken?.uid && decodedToken?.email) {
+                try {
+                    await dbService.upsertUserEmail(decodedToken.uid, decodedToken.email);
+                } catch (e) {
+                    logger.warn(`Failed to sync user email: ${e.message}`);
+                }
+            }
             next();
         } catch (error) {
             logger.warn('Auth blocked: Token verification failed', error.message);
