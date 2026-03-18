@@ -1320,7 +1320,6 @@ const Views = {
             <div class="flex justify-between items-center mb-md">
                 <h2 class="page-title" style="margin-bottom:0;">契約・規約管理</h2>
                 <div class="flex gap-sm">
-                   ${(window.app.subscription?.plan === 'pro') ? `<button class="btn-dashboard" onclick="window.app.exportCSV()"><i class="fa-solid fa-download"></i> CSV出力</button>` : ''}
                 </div>
             </div>
 

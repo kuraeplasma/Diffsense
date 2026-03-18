@@ -100,3 +100,73 @@ exports.sendInviteEmail = async (to, name, role, inviterName, tempPassword) => {
         throw error;
     }
 };
+/**
+ * Send a trial reminder email to a user whose trial is ending in 3 days
+ * @param {string} to - Recipient email
+ * @param {string} name - Recipient name
+ * @param {number} daysLeft - Days remaining in trial
+ */
+exports.sendTrialReminderEmail = async (to, name, daysLeft) => {
+    const msg = {
+        to: to,
+        from: {
+            email: FROM_EMAIL,
+            name: FROM_NAME
+        },
+        subject: `【重要】DIFFsense 無料トライアル終了まで残り${daysLeft}日のお知らせ`,
+        text: [
+            `${name} 様`,
+            '',
+            'DIFFsense をご利用いただきありがとうございます。',
+            '',
+            `現在ご利用中の無料トライアルの終了期限まで、残り ${daysLeft}日 となりました。`,
+            '',
+            'トライアル終了後も解析データや高度なAI判定機能を引き続きご利用いただくには、',
+            'プランの継続（決済情報の登録）が必要となります。',
+            '',
+            '以下のURLよりプラン管理画面へアクセスし、お手続きをお願いいたします。',
+            '',
+            `プラン管理URL: ${DASHBOARD_URL}#plan`,
+            '',
+            'ご不明な点がございましたら、本メールへの返信にてお問い合わせください。',
+            '',
+            '今後とも DIFFsense をよろしくお願いいたします。',
+        ].join('\n'),
+        html: `
+            <div style="font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #eee; border-radius: 8px;">
+                <div style="background: #24292e; padding: 24px 30px; border-radius: 8px 8px 0 0; text-align: center;">
+                    <h2 style="color: #c5a059; margin: 0; font-size: 20px;">無料トライアル終了のお知らせ</h2>
+                </div>
+                <div style="padding: 30px;">
+                    <p style="font-size: 16px; color: #333;"><strong>${name}</strong> 様</p>
+                    <p style="font-size: 15px; color: #555; line-height: 1.6;">
+                        DIFFsense をご利用いただきありがとうございます。<br>
+                        現在ご利用中の無料トライアルの終了期限まで、残り <strong style="color: #d73a49; font-size: 18px;">${daysLeft}日</strong> となりました。
+                    </p>
+
+                    <p style="font-size: 14px; color: #555; line-height: 1.6; background: #fffcf0; border-left: 4px solid #ccb37a; padding: 15px; margin: 24px 0;">
+                        トライアル終了後も解析データや高度なAI判定機能を引き続きご利用いただくには、プランの継続（決済情報の登録）が必要となります。
+                    </p>
+
+                    <div style="text-align: center; margin: 36px 0;">
+                        <a href="${DASHBOARD_URL}#plan" style="background-color: #c5a059; color: #ffffff; padding: 14px 40px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; display: inline-block; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">プランを継続・管理する</a>
+                    </div>
+
+                    <p style="font-size: 13px; color: #666; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; line-height: 1.6;">
+                        ※ トライアル期間終了までに決済登録がない場合、一部の機能が制限されます。<br>
+                        ※ すでに登録済みの場合は、このメールを破棄してください。
+                    </p>
+                </div>
+            </div>
+        `,
+    };
+
+    try {
+        await sgMail.send(msg);
+        logger.info(`Trial reminder email sent to ${to}`);
+        return true;
+    } catch (error) {
+        logger.error(`Error sending trial reminder email: ${error.message}`);
+        throw error;
+    }
+};
