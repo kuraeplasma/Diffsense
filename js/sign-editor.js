@@ -703,7 +703,14 @@ export const SignEditor = {
             this.renderFieldSettings();
             return;
         }
+
         const dropTarget = this.findPageWrapperAtPoint(event.clientX, event.clientY);
+        this._pointerDrag = null;
+        this._addMode = null;
+        this.removePointerGhost();
+        this.clearDragPreview();
+        this.updateToolUI();
+
         if (dropTarget) {
             const { wrapper, pageNum } = dropTarget;
             const rect = wrapper.getBoundingClientRect();
@@ -716,11 +723,6 @@ export const SignEditor = {
             }
         }
 
-        this._pointerDrag = null;
-        this._addMode = null;
-        this.removePointerGhost();
-        this.clearDragPreview();
-        this.updateToolUI();
         this.renderFields();
         this.scheduleDraftSave();
     },
@@ -897,7 +899,7 @@ export const SignEditor = {
 
     async loadPdf(url, container) {
         if (!url) {
-            container.innerHTML = '<div style="padding:100px; color:#999;">PDFファイルが見つかりません</div>';
+            container.innerHTML = '<div style="padding:100px; color:#999;">署名対象の原本ファイルが見つかりません</div>';
             return;
         }
 
@@ -990,52 +992,60 @@ export const SignEditor = {
     },
 
     renderDocumentFallback(contract, container) {
-        const previewHtml = buildSignDocumentPreviewHtml(contract?.original_content);
-        if (!previewHtml) {
+        const contentPages = this.buildFallbackContentPages(contract?.original_content);
+        if (!Array.isArray(contentPages) || contentPages.length === 0) {
             container.innerHTML = '<div style="padding:100px; color:#999;">表示できる本文データが見つかりません</div>';
             return;
         }
-
-        const pageWrapper = document.createElement('div');
-        pageWrapper.className = 'editor-page-wrapper';
-        pageWrapper.style.position = 'relative';
-        pageWrapper.style.width = '794px';
-        pageWrapper.style.margin = '0 auto 40px auto';
-        pageWrapper.style.background = '#fff';
-        pageWrapper.style.borderRadius = '6px';
-        pageWrapper.style.boxShadow = '0 8px 30px rgba(0,0,0,0.15)';
-        pageWrapper.style.overflow = 'visible';
-        pageWrapper.dataset.baseWidth = '794';
-        pageWrapper.style.transformOrigin = 'top center';
-        pageWrapper.onclick = (e) => this.handleCanvasClick(e, 1, pageWrapper);
-
-        const header = document.createElement('div');
-        header.style.padding = '18px 24px';
-        header.style.borderBottom = '1px solid #eee';
-        header.style.fontSize = '12px';
-        header.style.color = '#666';
-        header.innerHTML = `
-            <strong style="color:#333;">抽出テキスト・プレビュー</strong>
-            ${contract?.source_url ? ` <span style="margin-left:8px;"><a href="${this.escapeHtml(contract.source_url)}" target="_blank" style="color:#1a73e8;">元ソースを開く</a></span>` : ''}
-        `;
-
-        const body = document.createElement('div');
-        body.style.padding = '42px 48px 56px';
-        body.style.lineHeight = '1.8';
-        body.style.fontSize = '13px';
-        body.style.color = '#333';
-        body.style.fontFamily = '"Noto Sans JP", sans-serif';
-        body.style.boxSizing = 'border-box';
-        body.style.background = '#fff';
-        body.innerHTML = previewHtml;
-
-        pageWrapper.appendChild(header);
-        pageWrapper.appendChild(body);
-        pageWrapper.dataset.baseHeight = String(Math.max(640, Math.ceil(header.offsetHeight + body.scrollHeight + 24)));
         container.innerHTML = '';
-        container.appendChild(pageWrapper);
-        this._totalPages = 1;
-        this._activePage = 1;
+        const totalPages = Math.max(1, contentPages.length);
+
+        contentPages.forEach((content, index) => {
+            const previewHtml = buildSignDocumentPreviewHtml(content);
+            const pageNum = index + 1;
+
+            const pageWrapper = document.createElement('div');
+            pageWrapper.className = 'editor-page-wrapper';
+            pageWrapper.style.position = 'relative';
+            pageWrapper.style.width = '794px';
+            pageWrapper.style.margin = '0 auto 40px auto';
+            pageWrapper.style.background = '#fff';
+            pageWrapper.style.borderRadius = '6px';
+            pageWrapper.style.boxShadow = '0 8px 30px rgba(0,0,0,0.15)';
+            pageWrapper.style.overflow = 'visible';
+            pageWrapper.dataset.baseWidth = '794';
+            pageWrapper.style.transformOrigin = 'top center';
+            pageWrapper.onclick = (e) => this.handleCanvasClick(e, pageNum, pageWrapper);
+
+            const header = document.createElement('div');
+            header.style.padding = '18px 24px';
+            header.style.borderBottom = '1px solid #eee';
+            header.style.fontSize = '12px';
+            header.style.color = '#666';
+            header.innerHTML = `
+                <strong style="color:#333;">抽出テキスト・プレビュー</strong>
+                ${totalPages > 1 ? ` <span style="margin-left:8px; color:#9ca3af;">${pageNum} / ${totalPages}</span>` : ''}
+                ${contract?.source_url ? ` <span style="margin-left:8px;"><a href="${this.escapeHtml(contract.source_url)}" target="_blank" style="color:#1a73e8;">元ソースを開く</a></span>` : ''}
+            `;
+
+            const body = document.createElement('div');
+            body.style.padding = '42px 48px 56px';
+            body.style.lineHeight = '1.8';
+            body.style.fontSize = '13px';
+            body.style.color = '#333';
+            body.style.fontFamily = '"Noto Sans JP", sans-serif';
+            body.style.boxSizing = 'border-box';
+            body.style.background = '#fff';
+            body.innerHTML = previewHtml;
+
+            pageWrapper.appendChild(header);
+            pageWrapper.appendChild(body);
+            pageWrapper.dataset.baseHeight = String(Math.max(640, Math.ceil(header.offsetHeight + body.scrollHeight + 24)));
+            container.appendChild(pageWrapper);
+        });
+
+        this._totalPages = totalPages;
+        this._activePage = Math.min(this._activePage || 1, totalPages);
         this.updateVisiblePages();
         this.renderPageSwitcher();
         this.fitPreviewPages();
@@ -1096,6 +1106,87 @@ export const SignEditor = {
                 </button>
             </div>
         `;
+    },
+
+    buildFallbackContentPages(content) {
+        if (!content) return [];
+
+        if (Array.isArray(content)) {
+            const groups = this.chunkFallbackList(content, 6, 4200);
+            return groups.length > 0 ? groups : [content];
+        }
+
+        if (typeof content === 'object' && Array.isArray(content.articles)) {
+            const base = content || {};
+            const groups = this.chunkFallbackList(base.articles || [], 6, 4200);
+            if (groups.length <= 1) return [base];
+            return groups.map((articles, index) => ({
+                ...base,
+                preamble: index === 0 ? base.preamble : '',
+                articles
+            }));
+        }
+
+        if (typeof content === 'string') {
+            const blocks = String(content)
+                .split(/\r?\n{2,}/)
+                .map((line) => line.trim())
+                .filter(Boolean);
+            if (blocks.length <= 1) return [content];
+            const pages = [];
+            let bucket = [];
+            let bucketChars = 0;
+            blocks.forEach((block) => {
+                const weight = block.length + 80;
+                const shouldSplit = bucket.length >= 8 || (bucketChars + weight > 4200 && bucket.length > 0);
+                if (shouldSplit) {
+                    pages.push(bucket.join('\n\n'));
+                    bucket = [];
+                    bucketChars = 0;
+                }
+                bucket.push(block);
+                bucketChars += weight;
+            });
+            if (bucket.length > 0) {
+                pages.push(bucket.join('\n\n'));
+            }
+            return pages.length > 0 ? pages : [content];
+        }
+
+        return [content];
+    },
+
+    chunkFallbackList(list, maxItems, maxWeight) {
+        const items = Array.isArray(list) ? list : [];
+        if (items.length === 0) return [];
+        const groups = [];
+        let bucket = [];
+        let bucketWeight = 0;
+        items.forEach((item) => {
+            const weight = this.measureFallbackItemWeight(item);
+            const shouldSplit = bucket.length >= maxItems || (bucketWeight + weight > maxWeight && bucket.length > 0);
+            if (shouldSplit) {
+                groups.push(bucket);
+                bucket = [];
+                bucketWeight = 0;
+            }
+            bucket.push(item);
+            bucketWeight += weight;
+        });
+        if (bucket.length > 0) {
+            groups.push(bucket);
+        }
+        return groups;
+    },
+
+    measureFallbackItemWeight(item) {
+        if (!item) return 120;
+        if (typeof item === 'string') return Math.max(120, item.length + 80);
+        const title = String(item.article || item.articleNumber || item.title || item.header || '').length;
+        const body = Array.isArray(item.paragraphs)
+            ? item.paragraphs.map((line) => String(line || '')).join('\n').length
+            : String(item.body || item.content || '').length;
+        return Math.max(200, title + body + 120);
     },
 
     normalizePreviewText(content) {
@@ -1186,9 +1277,6 @@ export const SignEditor = {
         this._fields.forEach((field, index) => {
             const wrapper = wrappers[field.page - 1];
             if (!wrapper) return;
-            if (String(field.id) === String(this._pointerDrag?.fieldId) && this._pointerDrag?.mode === 'move') {
-                return;
-            }
 
             const div = document.createElement('div');
             div.className = 'field-marker';
@@ -1200,6 +1288,7 @@ export const SignEditor = {
             div.style.alignItems = 'center';
             div.style.justifyContent = 'center';
             div.style.zIndex = '1000';
+            const isMovingField = String(field.id) === String(this._pointerDrag?.fieldId) && this._pointerDrag?.mode === 'move';
             const label = this.escapeHtml(field.label || (field.type === 'signature' ? '署名' : '日付'));
             const sequenceLabel = `No.${index + 1}`;
             if (this._inlinePreviewMode) {
@@ -1239,7 +1328,9 @@ export const SignEditor = {
                 div.style.color = field.type === 'signature' ? '#c53030' : '#34a853';
                 div.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
                 div.style.cursor = 'move';
-                div.style.opacity = this._pointerDrag?.mode === 'resize' && String(field.id) === String(this._pointerDrag?.fieldId) ? '0.96' : '1';
+                div.style.opacity = isMovingField
+                    ? '0.58'
+                    : (this._pointerDrag?.mode === 'resize' && String(field.id) === String(this._pointerDrag?.fieldId) ? '0.96' : '1');
                 div.style.outline = String(field.id) === String(this._selectedFieldId) ? '3px solid rgba(17,24,39,0.18)' : 'none';
                 div.title = 'ドラッグして移動';
                 div.innerHTML = field.type === 'signature'
