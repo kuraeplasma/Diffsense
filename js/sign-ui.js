@@ -407,6 +407,7 @@ export const SignUI = {
             </tr>
         `;
 
+        await dbService.syncContractsFromApi();
         const contracts = this.applyContractFiltersAndSort(await this.ensureLocalDummyContracts());
         
         if (contracts.length === 0) {

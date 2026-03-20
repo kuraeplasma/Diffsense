@@ -201,6 +201,51 @@ export const dbService = {
         return JSON.parse(localStorage.getItem(this.KEYS.CONTRACTS) || '[]');
     },
 
+    async syncContractsFromApi() {
+        const apiData = await this._callApi('/contracts');
+        if (Array.isArray(apiData)) {
+            localStorage.setItem(this.KEYS.CONTRACTS, JSON.stringify(apiData));
+            return apiData;
+        }
+        return this.getContracts();
+    },
+
+    _mergeContractIntoCache(contract) {
+        if (!contract) return;
+        const contracts = this.getContracts();
+        const index = contracts.findIndex(c => String(c.id) === String(contract.id));
+        if (index >= 0) {
+            contracts[index] = { ...contracts[index], ...contract };
+        } else {
+            contracts.unshift(contract);
+        }
+        localStorage.setItem(this.KEYS.CONTRACTS, JSON.stringify(contracts));
+    },
+
+    _persistContractToApi(contract, method = 'PATCH') {
+        if (!contract?.id) return;
+        (async () => {
+            try {
+                const saved = await this.persistContractToApi(contract, method);
+                if (saved) {
+                    this._mergeContractIntoCache(saved);
+                }
+            } catch (error) {
+                console.warn('Contract sync failed:', error);
+            }
+        })();
+    },
+
+    async persistContractToApi(contract, method = 'PATCH') {
+        if (!contract?.id) return null;
+        const endpoint = method === 'POST' ? '/contracts' : `/contracts/${contract.id}`;
+        const saved = await this._callApi(endpoint, method, contract);
+        if (saved) {
+            this._mergeContractIntoCache(saved);
+        }
+        return saved;
+    },
+
     getPaginatedContracts(page = 1, pageSize = 10, filters = {}) {
         let contracts = this.getContracts();
         const { query = "", risk = "all", status = "all", type = "all", sortBy = "date_desc" } = filters;
@@ -346,6 +391,7 @@ export const dbService = {
             contract.status = status;
             contract.last_updated_at = new Date().toISOString().split('T')[0];
             localStorage.setItem(this.KEYS.CONTRACTS, JSON.stringify(contracts));
+            this._persistContractToApi(contract);
 
             // Log this action
             this.addActivityLog(`ステータス更新 (${status})`, contract.name, "ユーザー", "成功");
@@ -380,6 +426,7 @@ export const dbService = {
         contracts.unshift(newContract); // Add to top
         localStorage.setItem(this.KEYS.CONTRACTS, JSON.stringify(contracts));
         this.addActivityLog("新規登録", data.name, "ユーザー", "成功");
+        this._persistContractToApi(newContract, 'POST');
         return newContract;
     },
 
@@ -567,6 +614,7 @@ export const dbService = {
             contract.last_updated_at = new Date().toISOString().split('T')[0];
 
             localStorage.setItem(this.KEYS.CONTRACTS, JSON.stringify(contracts));
+            this._persistContractToApi(contract);
             this.addActivityLog('テキスト抽出完了', contract.name, 'system', '成功');
             return true;
         }
@@ -638,6 +686,7 @@ export const dbService = {
             contract.last_analyzed_at = new Date().toISOString().split('T')[0];
 
             localStorage.setItem(this.KEYS.CONTRACTS, JSON.stringify(contracts));
+            this._persistContractToApi(contract);
 
             if (shouldBumpVersion) {
                 const latestHistory = Array.isArray(contract.history) && contract.history.length > 0

@@ -12,6 +12,70 @@ const { toLegacyArticleArray, fromLegacyArticleArray } = require('../services/co
 const logger = require('../utils/logger');
 const crypto = require('crypto');
 
+router.get('/', async (req, res, next) => {
+    try {
+        const ownerUid = req.user.uid;
+        const contracts = await dbService.getContracts(ownerUid);
+        res.json({ success: true, data: contracts });
+    } catch (error) {
+        logger.error('Contracts list error:', error);
+        next(error);
+    }
+});
+
+router.post('/', async (req, res, next) => {
+    try {
+        const ownerUid = req.user.uid;
+        const payload = req.body || {};
+        const contract = {
+            id: Number(payload.id) || Date.now(),
+            name: String(payload.name || '').trim() || '書類',
+            type: String(payload.type || '').trim() || '契約書',
+            last_updated_at: payload.last_updated_at || new Date().toISOString().split('T')[0],
+            risk_level: payload.risk_level || 'None',
+            status: payload.status || '未解析',
+            assignee_name: payload.assignee_name || '-',
+            original_content: payload.original_content || '',
+            source_url: payload.source_url || '',
+            original_filename: payload.original_filename || '',
+            monitoring_enabled: payload.monitoring_enabled === true,
+            last_checked_at: payload.last_checked_at || null,
+            last_hash: payload.last_hash || null,
+            stable_count: Number(payload.stable_count || 0),
+            extract_status: payload.extract_status || null,
+            source_type: payload.source_type || null,
+            pdf_storage_path: payload.pdf_storage_path || null,
+            pdf_url: payload.pdf_url || null,
+            history: Array.isArray(payload.history) ? payload.history : []
+        };
+        const saved = await dbService.saveContract(contract, ownerUid);
+        res.status(201).json({ success: true, data: saved });
+    } catch (error) {
+        logger.error('Contracts create error:', error);
+        next(error);
+    }
+});
+
+router.patch('/:id', async (req, res, next) => {
+    try {
+        const ownerUid = req.user.uid;
+        const contractId = Number(req.params.id);
+        if (!Number.isFinite(contractId)) {
+            return res.status(400).json({ success: false, error: '契約IDが不正です' });
+        }
+        const updates = { ...(req.body || {}) };
+        delete updates.ownerUid;
+        const updated = await dbService.updateContract(contractId, updates, ownerUid);
+        if (!updated) {
+            return res.status(404).json({ success: false, error: '契約が見つかりません' });
+        }
+        res.json({ success: true, data: updated });
+    } catch (error) {
+        logger.error('Contracts update error:', error);
+        next(error);
+    }
+});
+
 function isLocalUnlimitedMode(req) {
     const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').toLowerCase();
     const isLocalHost = host.includes('localhost') || host.includes('127.0.0.1');

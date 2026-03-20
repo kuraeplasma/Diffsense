@@ -2366,6 +2366,7 @@ class RegistrationFlow {
                 sourceUrl: this.tempData.method === 'url' ? this.tempData.source : '',
                 originalFilename: (this.tempData.method === 'pdf' || isWord) ? this.tempData.fileData.name : ''
             });
+            await dbService.persistContractToApi(newContract, 'POST');
             // 2. テキスト抽出を実行（失敗しても登録は維持する）
             let extractionSucceeded = false;
             try {
@@ -3866,14 +3867,14 @@ class DashboardApp {
 
         if (viewId === 'sign') {
             console.trace('Routing to sign');
-            const { SignUI } = await import('./sign-ui.js?v=20260320bd');
+            const { SignUI } = await import('./sign-ui.js?v=20260320bf');
             this.mainContent.innerHTML = await SignUI.renderSignView(this);
             SignUI.refreshList(this);
             return;
         }
 
         if (viewId === 'sign-viewer') {
-            const { SignUI } = await import('./sign-ui.js?v=20260320bd');
+            const { SignUI } = await import('./sign-ui.js?v=20260320bf');
             const { SignViewer } = await import('./sign-viewer.js?v=20260320ay');
             this.mainContent.innerHTML = await SignUI.renderSignViewer(this, params);
             await SignViewer.init(this, params);
@@ -3881,7 +3882,7 @@ class DashboardApp {
         }
         
         if (viewId === 'sign-editor') {
-            const { SignUI } = await import('./sign-ui.js?v=20260320bd');
+            const { SignUI } = await import('./sign-ui.js?v=20260320bf');
             const { SignEditor } = await import('./sign-editor.js?v=20260320ag');
             this.mainContent.innerHTML = await SignUI.renderSignEditor(this, params);
             await SignEditor.init(this, params);
@@ -3889,7 +3890,7 @@ class DashboardApp {
         }
 
         if (viewId === 'sign-recipient') {
-            const { SignUI } = await import('./sign-ui.js?v=20260320bd');
+            const { SignUI } = await import('./sign-ui.js?v=20260320bf');
             const { SignRecipient } = await import('./sign-recipient.js?v=20260320aa');
             this.mainContent.innerHTML = await SignUI.renderSignRecipient(this, params);
             await SignRecipient.init(this, params);
