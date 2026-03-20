@@ -20,9 +20,10 @@ function collectEnvValidation() {
         'APP_URL',
         'FRONTEND_URL',
         'ALLOWED_ORIGINS',
-        'FIREBASE_CLIENT_EMAIL',
-        'FIREBASE_PRIVATE_KEY',
-        'FIREBASE_STORAGE_BUCKET'
+        'FB_PROJECT_ID',
+        'FB_CLIENT_EMAIL',
+        'FB_PRIVATE_KEY',
+        'FB_STORAGE_BUCKET'
     ];
 
     for (const key of requiredEnvKeys) {
