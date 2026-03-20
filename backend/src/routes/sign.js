@@ -180,11 +180,13 @@ function extractUploadsRelativePath(value) {
     return '';
 }
 
-function resolveSignRequestPdfUrl(signRequest, req) {
+function resolveSignRequestPdfUrl(signRequest, req, contract = null) {
     const backendBaseUrl = getBackendBaseUrl(req);
     const candidates = [
         signRequest?.document_snapshot?.pdf_url,
         signRequest?.document_snapshot?.pdf_storage_path,
+        contract?.pdf_url,
+        contract?.pdf_storage_path,
         signRequest?.completed_document_url
     ];
     for (const candidate of candidates) {
@@ -843,7 +845,17 @@ router.get('/verify', async (req, res) => {
         }
 
         const fields = annotateFieldsWithRecipientEmail(signRequest.fields || [], signRequest.recipients || []);
-        const pdfUrl = resolveSignRequestPdfUrl(signRequest, req);
+        let contract = null;
+        const ownerUid = String(signRequest.ownerUid || signRequest.requestedBy || '').trim();
+        if (signRequest.contract_id && ownerUid) {
+            try {
+                const contracts = await dbService.getContracts(ownerUid);
+                contract = (Array.isArray(contracts) ? contracts : []).find((item) => String(item.id) === String(signRequest.contract_id)) || null;
+            } catch (contractError) {
+                logger.warn(`Sign verify contract lookup failed requestId=${signRequest.id} contractId=${signRequest.contract_id} error=${contractError.message}`);
+            }
+        }
+        const pdfUrl = resolveSignRequestPdfUrl(signRequest, req, contract);
         if (!pdfUrl) {
             return res.status(404).json({ success: false, error: '原本PDFが見つかりません' });
         }
