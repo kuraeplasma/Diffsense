@@ -95,6 +95,63 @@ class DBService {
         }
     }
 
+    // --- New Firestore support for Contracts ---
+
+    async _firestoreGetContracts(ownerUid) {
+        if (!this.useFirestore) return null;
+        try {
+            const snapshot = await firestore.collection('contracts')
+                .where('ownerUid', '==', ownerUid).get();
+            return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        } catch (error) {
+            logger.error(`Firestore contracts read error: ${error.message}`);
+            return null;
+        }
+    }
+
+    async _firestoreSaveContract(ownerUid, contract) {
+        if (!this.useFirestore) return;
+        try {
+            const docId = contract.id ? String(contract.id) : null;
+            if (docId) {
+                await firestore.collection('contracts').doc(docId).set({ ...contract, ownerUid }, { merge: true });
+            } else {
+                await firestore.collection('contracts').add({ ...contract, ownerUid });
+            }
+        } catch (error) {
+            logger.error(`Firestore contract write error: ${error.message}`);
+        }
+    }
+
+    // --- New Firestore support for Sign Requests ---
+
+    async _firestoreGetSignRequests(ownerUid) {
+        if (!this.useFirestore) return null;
+        try {
+            const snapshot = await firestore.collection('sign_requests')
+                .where('ownerUid', '==', ownerUid).get();
+            return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        } catch (error) {
+            logger.error(`Firestore sign_requests read error: ${error.message}`);
+            return null;
+        }
+    }
+
+    async _firestoreSaveSignRequest(ownerUid, request) {
+        if (!this.useFirestore) return;
+        try {
+            const docId = request.id ? String(request.id) : null;
+            const payload = { ...request, ownerUid, updatedAt: new Date().toISOString() };
+            if (docId) {
+                await firestore.collection('sign_requests').doc(docId).set(payload, { merge: true });
+            } else {
+                await firestore.collection('sign_requests').add(payload);
+            }
+        } catch (error) {
+            logger.error(`Firestore sign_request write error: ${error.message}`);
+        }
+    }
+
     async canAddMember(uid) {
         const user = await this.getUserProfile(uid);
         const plan = user.plan || 'pro';
@@ -479,32 +536,126 @@ class DBService {
     /**
      * Get all contracts for Pro-plan users that have monitoring enabled
      */
-    async getMonitoringContracts() {
-        const users = await this.readData('users');
-        const proUsers = users.filter(u => u.plan === 'pro');
-        const proUids = proUsers.map(u => u.uid);
+    async getContracts(ownerUid) {
+        if (this.useFirestore && ownerUid) {
+            const fsContracts = await this._firestoreGetContracts(ownerUid);
+            if (fsContracts) return fsContracts;
+        }
+        return await this.readData('contracts');
+    }
 
+    async saveContract(ownerUid, contract) {
+        if (this.useFirestore && ownerUid) {
+            await this._firestoreSaveContract(ownerUid, contract);
+        }
+        // Always sync to file as fallback/cache
         const contracts = await this.readData('contracts');
-        return contracts.filter(c =>
-            c.source_type === 'URL' &&
-            c.monitoring_enabled === true
-        );
+        const index = contracts.findIndex(c => c.id === contract.id);
+        if (index > -1) {
+            contracts[index] = { ...contracts[index], ...contract };
+        } else {
+            contracts.push(contract);
+        }
+        await this.writeData('contracts', contracts);
+        return contract;
+    }
+
+    async getSignRequests(ownerUid) {
+        if (this.useFirestore && ownerUid) {
+            const fsRequests = await this._firestoreGetSignRequests(ownerUid);
+            if (fsRequests) return fsRequests;
+        }
+        return await this.readData('sign_requests');
+    }
+
+    async addSignRequest(ownerUid, request) {
+        const timestamp = new Date().toISOString();
+        const newRequest = {
+            id: request.id || Date.now(),
+            created_at: timestamp,
+            ...request
+        };
+
+        if (this.useFirestore && ownerUid) {
+            await this._firestoreSaveSignRequest(ownerUid, newRequest);
+        }
+
+        // Sync to file
+        const requests = await this.readData('sign_requests');
+        requests.push(newRequest);
+        await this.writeData('sign_requests', requests);
+        return newRequest;
     }
 
     /**
      * Update a contract by ID
      */
-    async updateContract(id, updates) {
+    async updateContract(id, updates, ownerUid = null) {
         const contracts = await this.readData('contracts');
         const index = contracts.findIndex(c => c.id === id);
 
         if (index > -1) {
             contracts[index] = { ...contracts[index], ...updates };
+            if (this.useFirestore && ownerUid) {
+                await this._firestoreSaveContract(ownerUid, contracts[index]);
+            }
             await this.writeData('contracts', contracts);
             return contracts[index];
         }
         return null;
     }
+
+    /**
+     * Update sign request status by Zoho Request ID (called by webhook)
+     */
+    async updateSignRequestStatusByZohoId(zohoRequestId, status, metadata = {}) {
+        const requests = await this.readData('sign_requests');
+        const index = requests.findIndex(r => r.zoho_request_id === zohoRequestId);
+
+        if (index > -1) {
+            const request = requests[index];
+            request.status = status;
+            request.updated_at = new Date().toISOString();
+            request.zoho_last_event = metadata;
+
+            // Also update recipients if present in metadata
+            if (metadata.requests?.actions) {
+                request.actions = metadata.requests.actions;
+                request.recipients = metadata.requests.actions.map(a => ({
+                    email: a.recipient_email,
+                    name: a.recipient_name,
+                    status: a.action_status,
+                    action_id: a.action_id
+                }));
+            }
+
+            if (this.useFirestore && request.ownerUid) {
+                await this._firestoreSaveSignRequest(request.ownerUid, request);
+            }
+
+            await this.writeData('sign_requests', requests);
+            return request;
+        } else {
+            logger.warn(`Sign request with zoho_request_id ${zohoRequestId} not found for webhook update.`);
+            return null;
+        }
+    }
+
+    async updateSignRequest(id, updates, ownerUid = null) {
+        const requests = await this.readData('sign_requests');
+        const index = requests.findIndex(r => r.id === id || String(r.id) === String(id));
+
+        if (index > -1) {
+            requests[index] = { ...requests[index], ...updates };
+            if (this.useFirestore && ownerUid) {
+                await this._firestoreSaveSignRequest(ownerUid, requests[index]);
+            }
+            await this.writeData('sign_requests', requests);
+            return requests[index];
+        }
+        return null;
+    }
 }
+
 
 module.exports = new DBService();

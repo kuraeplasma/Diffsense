@@ -16,7 +16,9 @@ const errorHandler = require('./middleware/errorHandler');
 const logger = require('./utils/logger');
 const crawlRoutes = require('./routes/crawl');
 const webhookRoutes = require('./routes/webhook');
+const signRoutes = require('./routes/sign');
 const cronService = require('./services/cronService');
+const { assertProductionEnv } = require('./config/env');
 
 const DEFAULT_STRIPE_PRICE_IDS = {
     monthly: {
@@ -37,6 +39,9 @@ const { admin, db, bucket } = require('./firebase');
 
 const app = express();
 
+const envValidation = assertProductionEnv();
+envValidation.warnings.forEach((message) => logger.warn(`[env] ${message}`));
+
 // Create logs directory if it doesn't exist (skip in Cloud Functions)
 const isCloudFunction = !!process.env.FUNCTION_TARGET || !!process.env.K_SERVICE;
 if (!isCloudFunction) {
@@ -50,12 +55,18 @@ if (!isCloudFunction) {
 // Enable trust proxy for correct protocol detection behind Load Balancers (Cloud Run)
 app.set('trust proxy', 1);
 
+const configuredFrontendOrigin = String(process.env.FRONTEND_URL || '').trim();
+const frameAncestors = ["'self'", "http://localhost:3000", "http://localhost:8000", "https://diffsense.netlify.app", "https://diffsense.spacegleam.co.jp"];
+if (configuredFrontendOrigin) {
+    frameAncestors.push(configuredFrontendOrigin);
+}
+
 // Security headers with custom CSP to allow framing from frontend
 app.use(helmet({
     contentSecurityPolicy: {
         directives: {
             ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-            "frame-ancestors": ["'self'", "http://localhost:3000", "http://localhost:8000", "https://diffsense.netlify.app", "https://diffsense.spacegleam.co.jp"],
+            "frame-ancestors": [...new Set(frameAncestors)],
         },
     },
     crossOriginResourcePolicy: { policy: "cross-origin" },
@@ -68,7 +79,7 @@ const envOrigins = process.env.ALLOWED_ORIGINS
     : ['http://localhost:3000', 'http://localhost:8000'];
 // 本番ドメインを常に許可（環境変数の設定漏れ対策）
 const requiredOrigins = ['https://diffsense.spacegleam.co.jp', 'https://diffsense.netlify.app'];
-const allowedOrigins = [...new Set([...envOrigins, ...requiredOrigins])];
+const allowedOrigins = [...new Set([...envOrigins, ...requiredOrigins, configuredFrontendOrigin].filter(Boolean))];
 
 app.use(cors({
     origin: (origin, callback) => {
@@ -159,6 +170,18 @@ app.get('/payment/config', (req, res) => {
 });
 
 // API routes (Protected by Auth Middleware)
+app.use('/api/sign', (req, res, next) => {
+    if (req.path === '/verify' || req.path === '/submit' || req.path === '/decline') {
+        return signRoutes(req, res, next);
+    }
+    return next();
+});
+app.use('/sign', (req, res, next) => {
+    if (req.path === '/verify' || req.path === '/submit' || req.path === '/decline') {
+        return signRoutes(req, res, next);
+    }
+    return next();
+});
 app.use('/contracts', authMiddleware, contractRoutes);
 app.use('/db', authMiddleware, dbRoutes);
 app.use('/invite', authMiddleware, inviteRoutes);
@@ -166,6 +189,8 @@ app.use('/user', authMiddleware, userRoutes);
 app.use('/payment', authMiddleware, paymentRoutes);
 app.use('/api', authMiddleware, paymentRoutes);
 app.use('/crawl', authMiddleware, crawlRoutes);
+app.use('/api/sign', authMiddleware, signRoutes);
+app.use('/sign', authMiddleware, signRoutes); // Alias for convenience
 
 
 // Static files (PDF Uploads)

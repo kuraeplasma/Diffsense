@@ -7,6 +7,7 @@
     "node": "20"
   },
   "scripts": {
+    "check:env:prod": "node scripts/check-production-env.js",
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -34,10 +35,13 @@
     "firebase-functions": "^7.0.5",
     "helmet": "^7.1.0",
     "joi": "^17.11.0",
+    "jsonwebtoken": "^9.0.3",
     "morgan": "^1.10.0",
     "node-cron": "^4.2.1",
+    "pdf-lib": "^1.17.1",
     "pdf-parse": "^1.1.1",
     "pdfjs-dist": "^5.4.624",
+    "resend": "^6.9.4",
     "string-similarity": "^4.0.4",
     "stripe": "^17.7.0",
     "winston": "^3.11.0"

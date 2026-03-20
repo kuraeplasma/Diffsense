@@ -383,6 +383,8 @@ const Notify = (() => {
 window.Notify = Notify;
 
 // ESM export
+export { Notify };
+
 if (typeof module !== 'undefined') {
     module.exports = Notify;
 }

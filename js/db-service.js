@@ -1,7 +1,10 @@
 /**
- * DIFFsense Simulated Database Service (localStorage based)
- * Data is isolated per user (UID-based keys)
+ * DIFFsense Simulated Database Service (localStorage + Backend API)
+ * Data is isolated per user (UID-based keys or Backend Auth)
  */
+import { auth } from './firebase-config.js';
+import { toApiUrl } from './api-base.js';
+
 const LOCAL_CACHE_VERSION = '20260310v2';
 
 export const dbService = {
@@ -15,7 +18,8 @@ export const dbService = {
         USERS: 'users',
         INITIALIZED: 'initialized',
         DIFF_RESULTS: 'diff_results',
-        RECENT_DIFF: 'recent_diff'
+        RECENT_DIFF: 'recent_diff',
+        SIGN_REQUESTS: 'sign_requests'
     },
 
     cloneContent(value) {
@@ -50,7 +54,8 @@ export const dbService = {
             USERS: `${prefix}users`,
             INITIALIZED: `${prefix}initialized`,
             DIFF_RESULTS: `${prefix}diff_results_${LOCAL_CACHE_VERSION}`,
-            RECENT_DIFF: `${prefix}recent_diff_${LOCAL_CACHE_VERSION}`
+            RECENT_DIFF: `${prefix}recent_diff_${LOCAL_CACHE_VERSION}`,
+            SIGN_REQUESTS: `${prefix}sign_requests`
         };
     },
 
@@ -61,6 +66,49 @@ export const dbService = {
     setCurrentUser(uid) {
         this._uid = uid;
         console.log(`DB Service: User set to ${uid}`);
+    },
+
+    /**
+     * Helper to call backend API with Firebase Auth
+     */
+    async _callApi(endpoint, method = 'GET', body = null) {
+        const user = auth.currentUser;
+        try {
+            const url = toApiUrl(endpoint);
+            const options = {
+                method,
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            };
+
+            if (user) {
+                const token = await user.getIdToken();
+                options.headers.Authorization = `Bearer ${token}`;
+            } else if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                // Local development uses backend AUTH_BYPASS, so allow API access without Firebase login.
+                console.warn(`API Call proceeding without authenticated user in local dev: ${endpoint}`);
+            } else {
+                console.error('API Call failed: No authenticated user');
+                return null;
+            }
+
+            if (body) {
+                options.body = JSON.stringify(body);
+            }
+
+            const response = await fetch(url, options);
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || `API Error: ${response.status}`);
+            }
+
+            return result.data;
+        } catch (error) {
+            console.error(`API Call failed (${endpoint}):`, error);
+            return null;
+        }
     },
 
     PLAN_LIMITS: {
@@ -83,7 +131,14 @@ export const dbService = {
             this._seed();
             localStorage.setItem(this.KEYS.INITIALIZED, 'true');
         }
+
+        // Always seed signatures if missing, for restoration purposes
+        if (!localStorage.getItem(this.KEYS.SIGN_REQUESTS)) {
+            console.log('Restoring Signature Seed Data...');
+            this._seedSignatures();
+        }
     },
+
 
     /**
      * Migrate old non-UID data to the current user (one-time)
@@ -653,5 +708,140 @@ export const dbService = {
             return true;
         }
         return false;
+    },
+
+    /**
+     * Signature Request Methods (Async API-based)
+     */
+    async getSignRequests() {
+        // Try API first
+        const apiData = await this._callApi('/api/sign/list');
+        if (apiData) {
+            // Update local cache
+            localStorage.setItem(this.KEYS.SIGN_REQUESTS, JSON.stringify(apiData));
+            return apiData;
+        }
+        // Fallback to local
+        return JSON.parse(localStorage.getItem(this.KEYS.SIGN_REQUESTS) || '[]');
+    },
+
+    async addSignRequest(data) {
+        const recipients = Array.isArray(data?.recipients) ? data.recipients.filter(Boolean) : [];
+        const shouldCreateLocalDraft = recipients.length === 0;
+
+        if (shouldCreateLocalDraft) {
+            const requests = JSON.parse(localStorage.getItem(this.KEYS.SIGN_REQUESTS) || '[]');
+            const newRequest = {
+                id: Date.now(),
+                created_at: new Date().toISOString(),
+                status: 'pending',
+                recipients: [],
+                ...data
+            };
+            requests.unshift(newRequest);
+            localStorage.setItem(this.KEYS.SIGN_REQUESTS, JSON.stringify(requests));
+            this.addActivityLog('署名依頼ドラフト作成', newRequest.document_name || '未命名書類', 'user', '成功');
+            return newRequest;
+        }
+
+        // data should contain { contractId, recipients }
+        const result = await this._callApi('/api/sign/create', 'POST', data);
+        if (result) {
+            // Update local cache immediately
+            const requests = JSON.parse(localStorage.getItem(this.KEYS.SIGN_REQUESTS) || '[]');
+            requests.unshift(result);
+            localStorage.setItem(this.KEYS.SIGN_REQUESTS, JSON.stringify(requests));
+            
+            this.addActivityLog('署名依頼作成', result.document_name, 'user', '成功');
+            return result;
+        }
+        
+        // Fallback (for testing if API fails)
+        const requests = JSON.parse(localStorage.getItem(this.KEYS.SIGN_REQUESTS) || '[]');
+        const newRequest = {
+            id: Date.now(),
+            created_at: new Date().toISOString(),
+            status: 'pending',
+            ...data
+        };
+        requests.unshift(newRequest);
+        localStorage.setItem(this.KEYS.SIGN_REQUESTS, JSON.stringify(requests));
+        this.addActivityLog('署名依頼作成 (ローカル)', newRequest.document_name, 'user', '警告');
+        return newRequest;
+    },
+
+    async getEmbeddedSignUrl(requestId, actionId) {
+        const result = await this._callApi(`/api/sign/embed/${requestId}/${actionId}`);
+        return result ? result.url : null;
+    },
+
+    async updateSignRequest(id, data) {
+        const result = await this._callApi(`/api/sign/${id}`, 'PATCH', data);
+        if (result) {
+            // Also update local cache
+            const requests = JSON.parse(localStorage.getItem(this.KEYS.SIGN_REQUESTS) || '[]');
+            const index = requests.findIndex(r => String(r.id) === String(id));
+            if (index !== -1) {
+                requests[index] = { ...requests[index], ...result, updated_at: new Date().toISOString() };
+                localStorage.setItem(this.KEYS.SIGN_REQUESTS, JSON.stringify(requests));
+            }
+            return result;
+        }
+        const requests = JSON.parse(localStorage.getItem(this.KEYS.SIGN_REQUESTS) || '[]');
+        const index = requests.findIndex(r => String(r.id) === String(id));
+        if (index !== -1) {
+            requests[index] = { ...requests[index], ...data, updated_at: new Date().toISOString() };
+            localStorage.setItem(this.KEYS.SIGN_REQUESTS, JSON.stringify(requests));
+            return requests[index];
+        }
+        return null;
+    },
+
+    async remindSignRequest(id) {
+        const result = await this._callApi(`/api/sign/${id}/remind`, 'POST', {});
+        if (result) {
+            const requests = JSON.parse(localStorage.getItem(this.KEYS.SIGN_REQUESTS) || '[]');
+            const index = requests.findIndex(r => String(r.id) === String(id));
+            if (index !== -1 && result.request) {
+                requests[index] = { ...requests[index], ...result.request };
+                localStorage.setItem(this.KEYS.SIGN_REQUESTS, JSON.stringify(requests));
+            }
+            return result;
+        }
+        return null;
+    },
+
+    deleteSignRequest(id) {
+        let requests = JSON.parse(localStorage.getItem(this.KEYS.SIGN_REQUESTS) || '[]');
+        requests = requests.filter(r => r.id !== parseInt(id));
+        localStorage.setItem(this.KEYS.SIGN_REQUESTS, JSON.stringify(requests));
+        return true;
+    },
+
+    _seedSignatures() {
+        const seedData = [
+            {
+                id: 101,
+                document_name: '業務委託契約書_202403.pdf',
+                sender: '山田 太郎',
+                recipients: [
+                    { name: '田中 実', email: 'tanaka@example.com', status: 'completed' },
+                    { name: '佐藤 健', email: 'sato@example.com', status: 'pending' }
+                ],
+                status: 'pending',
+                created_at: '2024-03-15T10:00:00Z'
+            },
+            {
+                id: 102,
+                document_name: '秘密保持契約書(NDA).pdf',
+                sender: '山田 太郎',
+                recipients: [
+                    { name: '鈴木 一郎', email: 'suzuki@example.com', status: 'completed' }
+                ],
+                status: 'completed',
+                created_at: '2024-03-10T14:30:00Z'
+            }
+        ];
+        localStorage.setItem(this.KEYS.SIGN_REQUESTS, JSON.stringify(seedData));
     }
 };

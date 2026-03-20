@@ -1,4 +1,4 @@
-import { dbService } from './db-service.js?v=20260309h2';
+import { dbService } from './db-service.js?v=20260319b';
 import { aiService } from './ai-service.js?v=20260309h2';
 const LOCAL_UI_CACHE_VERSION = '20260310v3';
 const DASHBOARD_CACHE_KEYS = {
@@ -2784,6 +2784,20 @@ class DashboardApp {
         regBtn.style.display = (this.can('operate_contract') && canShowOnView) ? 'inline-flex' : 'none';
     }
 
+    updateActiveMenu(viewId = this.currentView) {
+        const groupedViewId = ['sign', 'sign-editor', 'sign-recipient', 'sign-viewer'].includes(viewId)
+            ? 'sign'
+            : viewId;
+        const navItems = document.querySelectorAll('.nav-item');
+        navItems.forEach((item) => item.classList.remove('active'));
+        navItems.forEach((item) => {
+            const onclick = item.getAttribute('onclick') || '';
+            if (onclick.includes(`navigate('${groupedViewId}')`)) {
+                item.classList.add('active');
+            }
+        });
+    }
+
     async init() {
         try {
             console.log('Dashboard App Initializing...');
@@ -2795,22 +2809,28 @@ class DashboardApp {
             const planNav = document.getElementById('nav-plan');
             if (planNav) planNav.style.display = '';
 
-            // Get current user UID first for data isolation
+            // Get current user UID first for data isolation.
+            // On localhost, avoid blocking dashboard startup on Firebase auth state.
             try {
-                const { auth } = await import('./firebase-config.js');
-                const { onAuthStateChanged } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
-                const user = auth.currentUser;
-                if (user) {
-                    dbService.setCurrentUser(user.uid);
-                } else {
-                    // Wait for auth state
-                    await new Promise((resolve) => {
-                        const unsubscribe = onAuthStateChanged(auth, (u) => {
-                            unsubscribe();
-                            if (u) dbService.setCurrentUser(u.uid);
-                            resolve();
+                const isLocalDev = window.location.protocol === 'file:'
+                    || window.location.hostname === 'localhost'
+                    || window.location.hostname === '127.0.0.1';
+                if (!isLocalDev) {
+                    const { auth } = await import('./firebase-config.js');
+                    const { onAuthStateChanged } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
+                    const user = auth.currentUser;
+                    if (user) {
+                        dbService.setCurrentUser(user.uid);
+                    } else {
+                        // Wait for auth state
+                        await new Promise((resolve) => {
+                            const unsubscribe = onAuthStateChanged(auth, (u) => {
+                                unsubscribe();
+                                if (u) dbService.setCurrentUser(u.uid);
+                                resolve();
+                            });
                         });
-                    });
+                    }
                 }
             } catch (e) {
                 console.warn('Could not get UID for data isolation:', e);
@@ -3814,6 +3834,55 @@ class DashboardApp {
             return;
         }
 
+        // --- FIX: Update UI state early before any branches return ---
+        this.currentView = viewId;
+        this.updateActiveMenu(viewId);
+        this.updateRegistrationButtonVisibility(viewId);
+        
+        // Toggle Fluid Layout Mode for Detail View
+        if (viewId === 'diff') {
+            this.mainContent.classList.add('is-detail-view');
+        } else {
+            this.mainContent.classList.remove('is-detail-view');
+        }
+
+        if (viewId !== 'contracts') {
+            this.searchQuery = "";
+            this.currentPage = 1;
+        }
+
+        if (viewId === 'sign') {
+            console.trace('Routing to sign');
+            const { SignUI } = await import('./sign-ui.js?v=20260320bc');
+            this.mainContent.innerHTML = await SignUI.renderSignView(this);
+            SignUI.refreshList(this);
+            return;
+        }
+
+        if (viewId === 'sign-viewer') {
+            const { SignUI } = await import('./sign-ui.js?v=20260320bc');
+            const { SignViewer } = await import('./sign-viewer.js?v=20260319ax');
+            this.mainContent.innerHTML = await SignUI.renderSignViewer(this, params);
+            await SignViewer.init(this, params);
+            return;
+        }
+        
+        if (viewId === 'sign-editor') {
+            const { SignUI } = await import('./sign-ui.js?v=20260320bc');
+            const { SignEditor } = await import('./sign-editor.js?v=20260320af');
+            this.mainContent.innerHTML = await SignUI.renderSignEditor(this, params);
+            await SignEditor.init(this, params);
+            return;
+        }
+
+        if (viewId === 'sign-recipient') {
+            const { SignUI } = await import('./sign-ui.js?v=20260320bc');
+            const { SignRecipient } = await import('./sign-recipient.js?v=20260320aa');
+            this.mainContent.innerHTML = await SignUI.renderSignRecipient(this, params);
+            await SignRecipient.init(this, params);
+            return;
+        }
+
         // RBAC: Protect team view - Allow if Business+ OR Trial
         if (viewId === 'team' && this.subscription?.plan === 'starter' && !this.subscription?.isInTrial) {
             const upgradeModal = document.getElementById('upgrade-modal');
@@ -3826,21 +3895,6 @@ class DashboardApp {
         if (viewId === 'history') {
             dbService.cleanupLogs(this.userPlan || 'starter');
             this.cacheRecentHistorySnapshot();
-        }
-
-        this.currentView = viewId;
-        this.updateRegistrationButtonVisibility(viewId);
-
-        // Toggle Fluid Layout Mode for Detail View
-        if (viewId === 'diff') {
-            this.mainContent.classList.add('is-detail-view');
-        } else {
-            this.mainContent.classList.remove('is-detail-view');
-        }
-
-        if (viewId !== 'contracts') {
-            this.searchQuery = "";
-            this.currentPage = 1;
         }
 
         let renderParams = params;
@@ -3895,11 +3949,11 @@ class DashboardApp {
         }
 
         const navMap = {
-            'dashboard': 0, 'contracts': 1, 'history': 2, 'team': 3, 'plan': 4
+            'dashboard': 0, 'contracts': 1, 'history': 2, 'sign': 3, 'team': 4, 'plan': 5
         };
 
         // Update active menu state
-        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+        // (Moved to top of navigate)
         const navItems = document.querySelectorAll('.nav-item');
         // Find by content or click handler match
         navItems.forEach(item => {
@@ -3919,7 +3973,9 @@ class DashboardApp {
                     'contracts': '契約・規約管理',
                     'diff': '解析詳細',
                     'history': '履歴・ログ',
-                    'team': 'チーム設定'
+                    'team': 'チーム設定',
+                    'sign': '署名管理',
+                    'sign-viewer': '署名ビューワー'
                 };
                 if (this.pageTitle) {
                     this.pageTitle.textContent = titles[viewId] || 'DIFFsense';

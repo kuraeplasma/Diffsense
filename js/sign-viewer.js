@@ -1,0 +1,412 @@
+/**
+ * SignViewer - Signature Detail Viewer Logic (provider embed + pdf.js)
+ */
+
+import { dbService } from './db-service.js';
+import { Notify } from './notify.js';
+import { buildSignDocumentPreviewHtml } from './sign-document-preview.js';
+
+export const SignViewer = {
+    _pdfjsLoaded: false,
+    _activePage: 1,
+    _totalPages: 1,
+
+    /**
+     * Initialize the viewer for a specific request
+     */
+    async init(app, id) {
+        console.log('Initializing SignViewer for ID:', id);
+        
+        const requests = await dbService.getSignRequests();
+        const request = requests.find(r => String(r.id) === String(id));
+        
+        if (!request) {
+            Notify.error('依頼が見つかりません');
+            app.navigate('sign');
+            return;
+        }
+
+        const container = document.getElementById('sign-viewer-content');
+        if (!container) return;
+        this._currentRequest = request;
+
+        // 1. Check if provider embedding is needed
+        const actionId = this.findPendingActionId(request);
+
+        const providerRequestId = request.firma_request_id || request.zoho_request_id;
+        if (providerRequestId && actionId && request.status !== 'completed') {
+            await this.renderZohoSign(providerRequestId, actionId, container, request.firma_request_id ? 'Firma' : 'Zoho Sign');
+        } else {
+            // 2. Otherwise show the PDF using pdf.js
+            const contract = dbService.getContractById(request.contract_id);
+            const runtimeUrl = (typeof app.getRuntimePdfPreviewUrl === 'function') ? app.getRuntimePdfPreviewUrl(request.contract_id) : null;
+            const pdfUrl = request.completed_document_url || runtimeUrl || contract?.pdf_url || contract?.pdf_storage_path;
+            
+            // Check if it's a real PDF file or just a reference
+            const isActuallyPdf = pdfUrl && (pdfUrl.toLowerCase().endsWith('.pdf') || pdfUrl.startsWith('blob:'));
+
+            if (isActuallyPdf) {
+                await this.renderPdf(pdfUrl, container);
+            } else if (contract && contract.original_content) {
+                // Fallback: Show original text for web/crawled contracts
+                this.renderTextFallback(contract, container);
+            } else {
+                container.innerHTML = `
+                    <div style="text-align:center; color:var(--text-muted); padding:60px;">
+                        <i class="fa-solid fa-file-circle-exclamation" style="font-size:64px; margin-bottom:16px;"></i>
+                        <p>ドキュメントファイルが見つかりません</p>
+                        ${contract?.source_url ? `<a href="${contract.source_url}" target="_blank" style="color:var(--color-primary); font-size:12px;">元のソースを開く <i class="fa-solid fa-external-link"></i></a>` : ''}
+                    </div>
+                `;
+            }
+        }
+        
+        this.setupEventListeners(app, request);
+    },
+
+    findPendingActionId(request) {
+        if (!request.actions || !Array.from(request.actions).length) {
+            // Check recipients as fallback
+            const pendingRec = request.recipients?.find(r => r.status === 'pending');
+            return pendingRec?.action_id || null;
+        }
+        // Return first action ID for now
+        return request.actions[0].action_id;
+    },
+
+    /**
+     * Renders Zoho Sign Embedded Iframe
+     */
+    async renderZohoSign(requestId, actionId, container, providerLabel = 'Zoho Sign') {
+        container.innerHTML = `
+            <div style="display:flex; flex-direction:column; align-items:center; width:100%; height:100%;">
+                <div style="padding:10px; background:#fff; width:100%; text-align:center; font-size:12px; border-bottom:1px solid #eee;">
+                    <i class="fa-solid fa-shield-halved"></i> ${providerLabel} セキュア・埋め込み署名
+                </div>
+                <div id="zoho-iframe-container" style="flex:1; width:100%; position:relative;">
+                    <div class="loader-spinner" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);"></div>
+                    <p style="position:absolute; top:60%; width:100%; text-align:center; color:#888;">署名ページを読み込み中...</p>
+                </div>
+            </div>
+        `;
+
+        const iframeContainer = document.getElementById('zoho-iframe-container');
+        
+        try {
+            const embedUrl = await dbService.getEmbeddedSignUrl(requestId, actionId);
+            if (!embedUrl) throw new Error('Could not retrieve signing URL');
+
+            iframeContainer.innerHTML = `
+                <iframe src="${embedUrl}" 
+                        style="width:100%; height:100%; border:none;" 
+                        allow="camera; geolocation"
+                        onload="this.previousElementSibling?.remove();">
+                </iframe>
+            `;
+        } catch (error) {
+            console.error('Embedded sign loading error:', error);
+            iframeContainer.innerHTML = `
+                <div style="padding:40px; text-align:center; color:#ea4335;">
+                    <i class="fa-solid fa-triangle-exclamation" style="font-size:48px; margin-bottom:16px;"></i>
+                    <p>${providerLabel}の読み込みに失敗しました<br><span style="font-size:12px;">${error.message}</span></p>
+                </div>
+            `;
+        }
+    },
+
+    /**
+     * Renders PDF using pdf.js with interactive controls
+     */
+    async renderPdf(url, container) {
+        this._currentPdfUrl = url;
+        this._currentScale = this._currentScale || 1.2;
+
+        container.innerHTML = `
+            <div class="pdf-viewer-wrapper" style="display:flex; flex-direction:column; width:100%; height:100%; background:#525659; position:relative;">
+                <div style="display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:16px; padding:14px 18px; background:#2d3136; color:white; border-bottom:1px solid #444;">
+                    <div></div>
+                    <div id="sign-viewer-page-switcher" class="sign-page-switcher" style="max-width:240px; margin:0 auto;"></div>
+                    <div style="display:flex; align-items:center; gap:8px; justify-self:end;">
+                        <button class="btn-pdf-tool" onclick="window.signViewer.zoomOut()"><i class="fa-solid fa-minus"></i></button>
+                        <span id="zoom-percent" style="font-size:13px; min-width:45px; text-align:center;">${Math.round(this._currentScale * 100)}%</span>
+                        <button class="btn-pdf-tool" onclick="window.signViewer.zoomIn()"><i class="fa-solid fa-plus"></i></button>
+                    </div>
+                </div>
+                <div id="pdf-viewer-scroll" style="flex:1; width:100%; overflow:hidden; padding:20px 0;">
+                    <div id="pdf-pages-container" style="display:flex; flex-direction:column; align-items:center; gap:20px;">
+                        <div class="loader-spinner"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        await this.refreshPdfRendering();
+    },
+
+    async refreshPdfRendering() {
+        const pagesContainer = document.getElementById('pdf-pages-container');
+        if (!pagesContainer || !this._currentPdfUrl) return;
+
+        try {
+            await this.loadPdfJs();
+            
+            pagesContainer.innerHTML = '<div class="loader-spinner"></div>';
+            
+            const loadingTask = pdfjsLib.getDocument({
+                url: this._currentPdfUrl,
+                cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/cmaps/',
+                cMapPacked: true,
+                standardFontDataUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/standard_fonts/',
+                useWorkerFetch: true
+            });
+            const pdf = await loadingTask.promise;
+            this._totalPages = pdf.numPages;
+            this._activePage = Math.min(this._activePage || 1, this._totalPages || 1);
+            
+            pagesContainer.innerHTML = ''; // Clear loader
+
+            for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                const page = await pdf.getPage(pageNum);
+                const viewport = page.getViewport({ scale: this._currentScale });
+
+                const pageShell = document.createElement('div');
+                pageShell.style.position = 'relative';
+                pageShell.style.display = 'inline-block';
+                pageShell.style.marginBottom = '20px';
+                pageShell.style.contain = 'paint';
+                pageShell.style.isolation = 'isolate';
+                pageShell.dataset.page = String(pageNum);
+
+                const canvas = document.createElement('canvas');
+                canvas.className = 'pdf-page-canvas';
+                canvas.style.boxShadow = 'none';
+                canvas.style.borderRadius = '2px';
+                canvas.style.display = 'block';
+                canvas.style.background = '#fff';
+                const context = canvas.getContext('2d');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+
+                await page.render({
+                    canvasContext: context,
+                    viewport: viewport
+                }).promise;
+
+                pageShell.appendChild(canvas);
+                pageShell.appendChild(this.createFieldOverlay(pageNum, viewport.width, viewport.height));
+                pagesContainer.appendChild(pageShell);
+            }
+
+            this.updateVisiblePages();
+            this.renderPageSwitcher();
+            const zoomTxt = document.getElementById('zoom-percent');
+            if (zoomTxt) zoomTxt.textContent = `${Math.round(this._currentScale * 100)}%`;
+
+        } catch (error) {
+            console.error('PDF.js Error:', error);
+            pagesContainer.innerHTML = `
+                <div style="padding:40px; text-align:center; color:#eee;">
+                    <i class="fa-solid fa-circle-xmark" style="font-size:48px; margin-bottom:16px;"></i>
+                    <p>PDFの表示に失敗しました</p>
+                </div>
+            `;
+        }
+    },
+
+    createFieldOverlay(pageNum, viewportWidth, viewportHeight) {
+        const overlay = document.createElement('div');
+        overlay.style.position = 'absolute';
+        overlay.style.inset = '0';
+        overlay.style.pointerEvents = 'none';
+
+        const request = this._currentRequest || {};
+        const recipients = Array.isArray(request.recipients) ? request.recipients : [];
+        const signatures = request.signatures || {};
+        const fields = (Array.isArray(request.fields) ? request.fields : []).filter((field) => Number(field.page || 1) === Number(pageNum));
+
+        fields.forEach((field, index) => {
+            const marker = document.createElement('div');
+            const recipientIndex = Number(field.assigneeIndex ?? field.recipientIndex ?? 0);
+            const recipient = recipients[recipientIndex] || null;
+            const recipientLabel = recipient?.name || recipient?.display_name || recipient?.email || `署名者${recipientIndex + 1}`;
+            const fieldId = String(field.id);
+            const recipientEmail = String(recipient?.email || field?.recipientEmail || '').trim();
+            const signedValue = recipientEmail ? signatures?.[recipientEmail]?.[fieldId] : null;
+            const isDone = field.type === 'date'
+                ? Boolean(recipient?.signedAt || recipient?.signed_at || signedValue)
+                : Boolean(signedValue);
+            const isCompletedRequest = String(request?.status || '').toLowerCase() === 'completed';
+
+            const pageDims = request?.page_dimensions?.[pageNum] || request?.page_dimensions?.[String(pageNum)] || null;
+            const baseWidth = Math.max(1, Number(pageDims?.width || viewportWidth / Math.max(this._currentScale || 1, 0.01)));
+            const baseHeight = Math.max(1, Number(pageDims?.height || viewportHeight / Math.max(this._currentScale || 1, 0.01)));
+            const widthPx = Math.max(24, (Number(field.width || (field.type === 'signature' ? 88 : 130)) / baseWidth) * viewportWidth);
+            const heightPx = Math.max(18, (Number(field.height || (field.type === 'signature' ? 88 : 48)) / baseHeight) * viewportHeight);
+
+            marker.style.position = 'absolute';
+            marker.style.left = `${Number(field.x || 0)}%`;
+            marker.style.top = `${Number(field.y || 0)}%`;
+            marker.style.width = `${widthPx}px`;
+            marker.style.height = `${heightPx}px`;
+            marker.style.transform = 'translate(-50%, -50%)';
+            marker.style.borderRadius = field.type === 'signature' ? '16px' : '12px';
+            marker.style.border = isDone
+                ? (isCompletedRequest ? 'none' : '2px solid rgba(29, 158, 117, 0.7)')
+                : '2px dashed rgba(197, 160, 89, 0.95)';
+            marker.style.background = isDone
+                ? (isCompletedRequest ? 'transparent' : 'rgba(29, 158, 117, 0.08)')
+                : 'rgba(197, 160, 89, 0.12)';
+            marker.style.boxShadow = 'none';
+            marker.style.display = 'flex';
+            marker.style.alignItems = 'center';
+            marker.style.justifyContent = 'center';
+            marker.style.padding = isCompletedRequest && isDone ? '0' : '6px';
+            marker.style.textAlign = 'center';
+            marker.style.color = isDone ? '#167a5b' : '#8b6b2f';
+            marker.style.fontSize = isCompletedRequest && isDone ? '10px' : '11px';
+            marker.style.fontWeight = '700';
+            marker.style.lineHeight = '1.45';
+            marker.innerHTML = isCompletedRequest && isDone ? `
+                <div style="
+                    transform:translateY(-${Math.max(28, heightPx * 0.55)}px);
+                    display:inline-flex;
+                    align-items:center;
+                    gap:6px;
+                    padding:3px 8px;
+                    border-radius:999px;
+                    background:rgba(255,255,255,0.92);
+                    border:1px solid rgba(22,122,91,0.18);
+                    color:#167a5b;
+                    white-space:nowrap;
+                    box-shadow:0 1px 2px rgba(15,23,42,0.06);
+                ">
+                    <span>${field.type === 'date' ? '日付欄' : '署名欄'} ${index + 1}</span>
+                    <span style="font-size:9px; font-weight:600; opacity:0.88;">${this.escapeHtml(recipientLabel)}</span>
+                </div>
+            ` : `
+                <div>
+                    <div>${field.type === 'date' ? '日付欄' : '署名欄'} ${index + 1}</div>
+                    <div style="font-size:10px; font-weight:600; opacity:0.9;">${this.escapeHtml(recipientLabel)}</div>
+                    <div style="font-size:10px; font-weight:700; margin-top:2px;">${isDone ? '入力済み' : '未入力'}</div>
+                </div>
+            `;
+
+            overlay.appendChild(marker);
+        });
+
+        return overlay;
+    },
+
+    setActivePage(page) {
+        const nextPage = Math.max(1, Math.min(Number(page) || 1, this._totalPages || 1));
+        if (nextPage === this._activePage) return;
+        this._activePage = nextPage;
+        this.updateVisiblePages();
+        this.renderPageSwitcher();
+    },
+
+    updateVisiblePages() {
+        document.querySelectorAll('#pdf-pages-container > div[data-page]').forEach((pageShell, index) => {
+            const isActive = index + 1 === this._activePage;
+            pageShell.style.display = isActive ? 'inline-block' : 'none';
+        });
+    },
+
+    renderPageSwitcher() {
+        const root = document.getElementById('sign-viewer-page-switcher');
+        if (!root) return;
+        const total = Math.max(1, Number(this._totalPages || 1));
+        root.innerHTML = `
+            <div class="sign-page-switcher-summary">
+                <span class="sign-page-switcher-value">${this._activePage} / ${total}</span>
+            </div>
+            <div class="sign-page-switcher-actions">
+                <button class="btn-dashboard" ${this._activePage <= 1 ? 'disabled' : ''} onclick="window.signViewer.setActivePage(${this._activePage - 1})">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </button>
+                <button class="btn-dashboard" ${this._activePage >= total ? 'disabled' : ''} onclick="window.signViewer.setActivePage(${this._activePage + 1})">
+                    <i class="fa-solid fa-chevron-right"></i>
+                </button>
+            </div>
+        `;
+    },
+
+    zoomIn() {
+        if (this._currentScale >= 3.0) return;
+        this._currentScale += 0.2;
+        this.refreshPdfRendering();
+    },
+
+    zoomOut() {
+        if (this._currentScale <= 0.5) return;
+        this._currentScale -= 0.2;
+        this.refreshPdfRendering();
+    },
+
+    async downloadPdf() {
+        if (!this._currentPdfUrl) return;
+        
+        try {
+            const link = document.createElement('a');
+            link.href = this._currentPdfUrl;
+            link.download = `contract_${Date.now()}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            Notify.success('ダウンロードを開始しました');
+        } catch (error) {
+            Notify.error('ダウンロードに失敗しました');
+        }
+    },
+
+    renderTextFallback(contract, container) {
+        container.innerHTML = `
+            <div class="text-fallback-wrapper" style="width:100%; height:100%; display:flex; flex-direction:column; background:#fff; border-radius:var(--radius-md); overflow:hidden; border:1px solid var(--border-subtle);">
+                <div style="padding:16px; background:#f8f9fa; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-size:13px; font-weight:600; color:var(--text-main);">
+                        <i class="fa-solid fa-file-lines"></i> 抽出テキスト・プレビュー
+                    </span>
+                    <a href="${contract.source_url}" target="_blank" style="font-size:12px; color:var(--color-primary);">
+                        元のソースを表示 <i class="fa-solid fa-external-link"></i>
+                    </a>
+                </div>
+                <div style="flex:1; padding:32px; overflow-y:auto; line-height:1.8; color:#333; font-family:'Noto Sans JP', sans-serif; font-size:14px;">
+                    ${buildSignDocumentPreviewHtml(contract.original_content)}
+                </div>
+                <div style="padding:12px; background:#fff9e6; border-top:1px solid #ffeeba; font-size:11px; color:#856404; text-align:center;">
+                    <i class="fa-solid fa-circle-info"></i> このドキュメントはURLから取り込まれたため、PDF形式のプレビューは利用できません。
+                </div>
+            </div>
+        `;
+    },
+
+    escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>"']/g, m => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[m]));
+    },
+
+    async loadPdfJs() {
+
+        if (this._pdfjsLoaded) return;
+
+        return new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js';
+            script.onload = () => {
+                window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+                this._pdfjsLoaded = true;
+                resolve();
+            };
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
+    },
+
+    setupEventListeners(app, request) {
+        // Placeholder for future interactive logic
+    }
+};
+
+window.signViewer = SignViewer;
