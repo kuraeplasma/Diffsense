@@ -71,7 +71,7 @@ export const dbService = {
     /**
      * Helper to call backend API with Firebase Auth
      */
-    async _callApi(endpoint, method = 'GET', body = null) {
+    async _callApi(endpoint, method = 'GET', body = null, options = {}) {
         const user = auth.currentUser;
         try {
             const url = toApiUrl(endpoint);
@@ -101,12 +101,18 @@ export const dbService = {
             const result = await response.json();
 
             if (!response.ok) {
-                throw new Error(result.error || `API Error: ${response.status}`);
+                const error = new Error(result.error || `API Error: ${response.status}`);
+                error.code = result.code || null;
+                error.status = response.status;
+                throw error;
             }
 
             return result.data;
         } catch (error) {
             console.error(`API Call failed (${endpoint}):`, error);
+            if (options.throwOnError) {
+                throw error;
+            }
             return null;
         }
     },
@@ -745,7 +751,7 @@ export const dbService = {
         }
 
         // data should contain { contractId, recipients }
-        const result = await this._callApi('/api/sign/create', 'POST', data);
+        const result = await this._callApi('/api/sign/create', 'POST', data, { throwOnError: true });
         if (result) {
             // Update local cache immediately
             const requests = JSON.parse(localStorage.getItem(this.KEYS.SIGN_REQUESTS) || '[]');
@@ -755,19 +761,10 @@ export const dbService = {
             this.addActivityLog('署名依頼作成', result.document_name, 'user', '成功');
             return result;
         }
-        
-        // Fallback (for testing if API fails)
-        const requests = JSON.parse(localStorage.getItem(this.KEYS.SIGN_REQUESTS) || '[]');
-        const newRequest = {
-            id: Date.now(),
-            created_at: new Date().toISOString(),
-            status: 'pending',
-            ...data
-        };
-        requests.unshift(newRequest);
-        localStorage.setItem(this.KEYS.SIGN_REQUESTS, JSON.stringify(requests));
-        this.addActivityLog('署名依頼作成 (ローカル)', newRequest.document_name, 'user', '警告');
-        return newRequest;
+
+        // Do not silently fall back for real signature requests.
+        // Otherwise production-only validation such as trial limits can be bypassed.
+        throw new Error('署名依頼の作成に失敗しました');
     },
 
     async getEmbeddedSignUrl(requestId, actionId) {

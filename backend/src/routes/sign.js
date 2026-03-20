@@ -13,6 +13,7 @@ const dbService = require('../services/db');
 const mailer = require('../services/mailer');
 const { admin, bucket, firebaseInitialized } = require('../firebase');
 const SIGN_LINK_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const TRIAL_SIGN_REQUEST_LIMIT = 3;
 
 function useDiffsenseProvider() {
     return Boolean(String(process.env.JWT_SECRET || '').trim());
@@ -521,6 +522,38 @@ async function getRequestSigningUrl(signRequest, recipient) {
     return null;
 }
 
+async function ensureSignTrialQuota(ownerUid) {
+    const userProfile = await dbService.getUserProfile(ownerUid);
+    if (!dbService.isTrialActive(userProfile)) {
+        return { limited: false, remaining: null };
+    }
+
+    const requests = await dbService.getSignRequests(ownerUid);
+    const count = (Array.isArray(requests) ? requests : []).filter((request) => {
+        const requestOwner = String(request?.ownerUid || request?.requestedBy || '').trim();
+        if (requestOwner && requestOwner !== String(ownerUid)) return false;
+        const createdAt = new Date(request?.created_at || 0).getTime();
+        const trialStartedAt = new Date(userProfile?.trialStartedAt || 0).getTime();
+        if (!Number.isNaN(trialStartedAt) && trialStartedAt > 0 && !Number.isNaN(createdAt) && createdAt > 0) {
+            return createdAt >= trialStartedAt;
+        }
+        return true;
+    }).length;
+
+    if (count >= TRIAL_SIGN_REQUEST_LIMIT) {
+        return {
+            limited: true,
+            remaining: 0,
+            message: `トライアル期間中の署名は${TRIAL_SIGN_REQUEST_LIMIT}回までです。継続して利用するにはプラン登録をお願いします。`
+        };
+    }
+
+    return {
+        limited: false,
+        remaining: Math.max(0, TRIAL_SIGN_REQUEST_LIMIT - count)
+    };
+}
+
 router.post('/create', async (req, res) => {
     try {
         const { contractId, recipients, document_snapshot: documentSnapshot, document_name: documentName } = req.body;
@@ -533,6 +566,15 @@ router.post('/create', async (req, res) => {
         const normalizedRecipients = normalizeRecipients(recipients);
         if (normalizedRecipients.length === 0) {
             return res.status(400).json({ success: false, error: 'Recipient name and email are required' });
+        }
+
+        const quota = await ensureSignTrialQuota(ownerUid);
+        if (quota.limited) {
+            return res.status(403).json({
+                success: false,
+                error: quota.message,
+                code: 'TRIAL_SIGN_LIMIT_REACHED'
+            });
         }
 
         const contracts = await dbService.getContracts(ownerUid);

@@ -18,6 +18,7 @@ router.get('/subscription', async (req, res) => {
         const uid = req.user.uid;
         const userProfile = await dbService.getUserProfile(uid);
         const localUnlimited = isLocalUnlimitedMode(req);
+        const signRequests = await dbService.getSignRequests(uid);
 
         const plan = userProfile.plan || 'pro';
         const billingCycle = userProfile.billingCycle || 'monthly';
@@ -26,6 +27,18 @@ router.get('/subscription', async (req, res) => {
             ? (!userProfile.hasPaymentMethod && dbService.isTrialActive(userProfile))
             : dbService.isTrialActive(userProfile);
         const trialStartedAt = userProfile.trialStartedAt || null;
+        const signUsageLimit = localUnlimited ? Number.MAX_SAFE_INTEGER : 3;
+
+        const trialStartTime = new Date(trialStartedAt || 0).getTime();
+        const signUsageCount = localUnlimited
+            ? 0
+            : (Array.isArray(signRequests) ? signRequests : []).filter((request) => {
+                const createdTime = new Date(request?.created_at || 0).getTime();
+                if (!isInTrial) return false;
+                if (Number.isNaN(trialStartTime) || trialStartTime <= 0) return true;
+                if (Number.isNaN(createdTime) || createdTime <= 0) return true;
+                return createdTime >= trialStartTime;
+            }).length;
 
         let daysRemaining = null;
         if (isInTrial && trialStartedAt) {
@@ -45,7 +58,9 @@ router.get('/subscription', async (req, res) => {
                 daysRemaining: daysRemaining,
                 trialStartedAt: trialStartedAt,
                 isInTrial: isInTrial,
-                planLimit: localUnlimited ? Number.MAX_SAFE_INTEGER : dbService.getOriginalPlanLimit(plan)
+                planLimit: localUnlimited ? Number.MAX_SAFE_INTEGER : dbService.getOriginalPlanLimit(plan),
+                signUsageCount,
+                signUsageLimit
             }
         });
     } catch (error) {

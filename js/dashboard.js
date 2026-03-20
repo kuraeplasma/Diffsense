@@ -3625,6 +3625,14 @@ class DashboardApp {
         return isTrialExpired && hasNoPayment;
     }
 
+    isTrialSignLimitReached() {
+        const sub = this.subscription;
+        if (!sub?.isInTrial) return false;
+        const count = Number(sub?.signUsageCount || 0);
+        const limit = Number(sub?.signUsageLimit || 3);
+        return count >= limit;
+    }
+
     redirectToPlanSelection(reason = 'trial_expired') {
         const billing = this.subscription?.billingCycle === 'annual' ? 'annual' : 'monthly';
         localStorage.setItem('diffsense_trial_expired', '1');
@@ -3740,9 +3748,14 @@ class DashboardApp {
             <div class="plan-info-text">
                 ${sub.isInTrial ? `残り期間: <strong>${sub.daysRemaining}日間</strong><br>` : ''}
                 AI解析: <strong>${sub.usageCount}</strong> / ${sub.usageLimit}回
-                ${sub.isInTrial ? `<br><small style="font-size: 0.75rem; opacity: 0.7;">通常枠: ${sub.planLimit}回</small>` : ''}
+                ${sub.isInTrial ? `<br>署名: <strong>${sub.signUsageCount || 0}</strong> / ${sub.signUsageLimit || 3}回<br><small style="font-size: 0.75rem; opacity: 0.7;">通常枠: ${sub.planLimit}回</small>` : ''}
             </div>
             ${upgradeAdvice}
+            ${this.isTrialSignLimitReached() ? `
+                <div style="margin-top:10px; padding:8px 10px; background:rgba(234,67,53,0.08); border:1px solid rgba(234,67,53,0.2); border-radius:6px; font-size:0.72rem; color:#c2410c;">
+                    署名依頼のトライアル上限に達しました。継続利用にはプラン登録が必要です。
+                </div>
+            ` : ''}
             ${sub.isInTrial ? `
                 <div style="margin-top: 12px; font-size: 0.75rem; color: #a17e1a; border-top: 1px solid rgba(255, 255, 255, 0.05); padding-top: 8px;">
                     <i class="fa-solid fa-circle-info"></i> トライアル終了後、継続には決済登録が必要です。

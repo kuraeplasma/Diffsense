@@ -244,11 +244,43 @@ export const SignUI = {
         this.refreshList();
     },
 
+    getTrialSignQuotaMeta(app = window.app) {
+        const sub = app?.subscription || null;
+        if (!sub?.isInTrial) {
+            return { isLimited: false, count: 0, limit: 0 };
+        }
+
+        const count = Number(sub?.signUsageCount || 0);
+        const limit = Number(sub?.signUsageLimit || 3);
+        return {
+            isLimited: count >= limit,
+            count,
+            limit
+        };
+    },
+
+    redirectToBillingForSignLimit(app = window.app) {
+        Notify.warning('トライアル期間中の署名は3回までです。プラン選択画面へ移動します。');
+        if (app?.redirectToPlanSelection) {
+            app.redirectToPlanSelection('trial_sign_limit');
+            return;
+        }
+        window.location.replace(`${window.location.origin}/select-plan-preview.html?reason=trial_sign_limit&billing=monthly`);
+    },
+
+    ensureSignQuota(app = window.app) {
+        const quota = this.getTrialSignQuotaMeta(app);
+        if (!quota.isLimited) return true;
+        this.redirectToBillingForSignLimit(app);
+        return false;
+    },
+
     /**
      * Renders the main Signature Management view
      */
     async renderSignView(app) {
         this.selectedDocIds.clear();
+        const quota = this.getTrialSignQuotaMeta(app);
         return `
             <div class="sign-container">
                 <div class="sign-header">
@@ -257,6 +289,19 @@ export const SignUI = {
                         <p>契約済み書類や未解析の書類から、電子署名の依頼を開始・管理できます</p>
                     </div>
                 </div>
+
+                ${app?.subscription?.isInTrial ? `
+                    <div class="sign-list-card" style="margin-bottom:16px; padding:16px 20px; border:1px solid ${quota.isLimited ? '#f3c2c2' : '#ead9b0'}; background:${quota.isLimited ? '#fff6f6' : '#fffbf0'};">
+                        <div style="font-size:13px; color:#6b7280;">
+                            トライアル中の署名: <strong style="color:#111827;">${quota.count} / ${quota.limit}回</strong>
+                            ${quota.isLimited ? `
+                                <button class="btn-dashboard btn-primary-action" style="margin-left:12px; font-size:12px;" onclick="window.signUI.redirectToBillingForSignLimit()">
+                                    プラン登録へ進む
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                ` : ''}
 
                 <div class="sign-tabs">
                     <button class="sign-tab ${this.currentTab === 'new-request' ? 'active' : ''}" 
@@ -400,7 +445,7 @@ export const SignUI = {
                     <td><span class="badge ${riskClass}">${riskLabel}</span></td>
                     <td>${updatedAt}</td>
                     <td style="text-align:right;" onclick="event.stopPropagation()">
-                        <button class="btn-dashboard btn-primary-action" style="font-size:12px; min-width:140px; justify-content:center;" onclick="window.signUI.startSingleRequest(${c.id})">
+                        <button class="btn-dashboard btn-primary-action" style="font-size:12px; min-width:140px; justify-content:center;${this.getTrialSignQuotaMeta(window.app).isLimited ? ' opacity:0.5; cursor:not-allowed;' : ''}" onclick="window.signUI.startSingleRequest(${c.id})" ${this.getTrialSignQuotaMeta(window.app).isLimited ? 'disabled' : ''}>
                             署名依頼を開始
                         </button>
                     </td>
@@ -540,6 +585,7 @@ export const SignUI = {
     },
 
     async startSingleRequest(id) {
+        if (!this.ensureSignQuota()) return;
         this.selectedDocIds.clear();
         this.selectedDocIds.add(id);
         await this.startOneScreenEditor();
@@ -600,6 +646,7 @@ export const SignUI = {
      */
     async openRecipientModalBatch() {
         console.log("SignUI: Opening batch recipient modal...");
+        if (!this.ensureSignQuota()) return;
         const selectedCount = this.selectedDocIds.size;
         if (selectedCount === 0) {
             Notify.warning('書類を選択してください');
@@ -653,6 +700,7 @@ export const SignUI = {
     },
 
     async submitBatchRequest() {
+        if (!this.ensureSignQuota()) return;
         const contracts = await dbService.getContracts();
         const selectedContracts = contracts.filter(c => this.selectedDocIds.has(c.id));
         
@@ -706,6 +754,10 @@ export const SignUI = {
             }
         } catch (error) {
             console.error('Batch sign request failed:', error);
+            if (error?.code === 'TRIAL_SIGN_LIMIT_REACHED') {
+                this.redirectToBillingForSignLimit();
+                return;
+            }
             Notify.error('署名依頼の一部または全ての作成に失敗しました');
         }
     },
@@ -775,6 +827,7 @@ export const SignUI = {
      * One-Screen Flow: Start Editor directly
      */
     async startOneScreenEditor() {
+        if (!this.ensureSignQuota()) return;
         const contracts = await dbService.getContracts();
         const selected = contracts.filter(c => this.selectedDocIds.has(c.id));
         
@@ -843,6 +896,7 @@ export const SignUI = {
         }
 
         if (this.selectedDocIds.size === 1) {
+            if (!this.ensureSignQuota()) return;
             const contracts = await dbService.getContracts();
             const contract = contracts.find((item) => this.selectedDocIds.has(item.id));
             if (!contract) {
@@ -850,26 +904,35 @@ export const SignUI = {
                 return;
             }
 
-            const draft = await dbService.addSignRequest({
-                contractId: contract.id,
-                contract_id: contract.id,
-                document_name: contract.name,
-                document_snapshot: this.buildDocumentSnapshot(contract),
-                sender: '山田 太郎',
-                recipients,
-                status: 'pending'
-            });
+            try {
+                const draft = await dbService.addSignRequest({
+                    contractId: contract.id,
+                    contract_id: contract.id,
+                    document_name: contract.name,
+                    document_snapshot: this.buildDocumentSnapshot(contract),
+                    sender: '山田 太郎',
+                    recipients,
+                    status: 'pending'
+                });
 
-            if (!draft) {
+                if (!draft) {
+                    Notify.error('署名依頼の作成に失敗しました');
+                    return;
+                }
+
+                this.closeSignUploadModal();
+                this.selectedDocIds.clear();
+                window._lastSignDraft = draft;
+                window.app.navigate('sign-editor', draft.id);
+                return;
+            } catch (error) {
+                if (error?.code === 'TRIAL_SIGN_LIMIT_REACHED') {
+                    this.redirectToBillingForSignLimit();
+                    return;
+                }
                 Notify.error('署名依頼の作成に失敗しました');
                 return;
             }
-
-            this.closeSignUploadModal();
-            this.selectedDocIds.clear();
-            window._lastSignDraft = draft;
-            window.app.navigate('sign-editor', draft.id);
-            return;
         }
 
         const fileInput = document.getElementById('sign-file-input');
