@@ -96,8 +96,18 @@ export const SignEditor = {
             await this.loadPdf(previewUrl, canvasContainer);
             this._previewMode = 'pdf';
         } else {
-            this.renderUnavailableDocument(contract, canvasContainer);
-            this._previewMode = 'unavailable';
+            const hasFallbackContent = Boolean(
+                contract?.original_content
+                || this._currentRequest?.document_snapshot?.original_content
+                || this._currentRequest?.contract_snapshot?.original_content
+            );
+            if (hasFallbackContent) {
+                this.renderDocumentFallback(contract, canvasContainer);
+                this._previewMode = 'fallback';
+            } else {
+                this.renderUnavailableDocument(contract, canvasContainer);
+                this._previewMode = 'unavailable';
+            }
         }
 
         this.renderFields();
@@ -546,7 +556,7 @@ export const SignEditor = {
         for (const raw of candidates) {
             const value = resolveBackendAssetUrl(raw);
             if (!value) continue;
-            if (value.startsWith('blob:') || /^https?:\/\//i.test(value)) {
+            if (this.isPdfLikeUrl(value)) {
                 return value;
             }
         }
@@ -555,7 +565,12 @@ export const SignEditor = {
 
     isPdfLikeUrl(value) {
         const src = String(value || '').trim();
-        return Boolean(src) && (src.startsWith('blob:') || /^https?:\/\//i.test(src) || /\.pdf($|[?#])/i.test(src));
+        return Boolean(src) && (
+            src.startsWith('blob:')
+            || /\.pdf($|[?#])/i.test(src)
+            || /\/uploads\//i.test(src)
+            || /firebasestorage\.googleapis\.com/i.test(src)
+        );
     },
 
     // --- Tool Management ---
@@ -948,6 +963,11 @@ export const SignEditor = {
             this.fitPreviewPages();
         } catch (error) {
             console.error('PDF Load Error:', error);
+            if (this._currentDoc?.original_content) {
+                this.renderDocumentFallback(this._currentDoc, container);
+                this._previewMode = 'fallback';
+                return;
+            }
             this.renderUnavailableDocument(this._currentDoc, container, `PDFの読み込みに失敗しました: ${error.message}`);
         }
     },
