@@ -27,11 +27,13 @@ router.post('/', async (req, res, next) => {
     try {
         const ownerUid = req.user.uid;
         const payload = req.body || {};
+        const nowIso = new Date().toISOString();
         const contract = {
             id: Number(payload.id) || Date.now(),
             name: String(payload.name || '').trim() || '書類',
             type: String(payload.type || '').trim() || '契約書',
-            last_updated_at: payload.last_updated_at || new Date().toISOString().split('T')[0],
+            created_at: payload.created_at || nowIso,
+            last_updated_at: payload.last_updated_at || nowIso,
             risk_level: payload.risk_level || 'None',
             status: payload.status || '未解析',
             assignee_name: payload.assignee_name || '-',
@@ -48,7 +50,7 @@ router.post('/', async (req, res, next) => {
             pdf_url: payload.pdf_url || null,
             history: Array.isArray(payload.history) ? payload.history : []
         };
-        const saved = await dbService.saveContract(contract, ownerUid);
+        const saved = await dbService.saveContract(ownerUid, contract);
         res.status(201).json({ success: true, data: saved });
     } catch (error) {
         logger.error('Contracts create error:', error);

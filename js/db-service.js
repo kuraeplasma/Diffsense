@@ -45,6 +45,10 @@ export const dbService = {
         }
     },
 
+    nowIso() {
+        return new Date().toISOString();
+    },
+
     // Dynamic KEYS getter (with UID prefix)
     get KEYS() {
         const prefix = this._uid ? `diffsense_${this._uid}_` : 'diffsense_';
@@ -388,7 +392,7 @@ export const dbService = {
         const contract = contracts.find(c => c.id === parseInt(id));
         if (contract) {
             contract.status = status;
-            contract.last_updated_at = new Date().toISOString().split('T')[0];
+            contract.last_updated_at = this.nowIso();
             localStorage.setItem(this.KEYS.CONTRACTS, JSON.stringify(contracts));
             this._persistContractToApi(contract);
 
@@ -409,7 +413,8 @@ export const dbService = {
             id: newId,
             name: data.name,
             type: data.type,
-            last_updated_at: new Date().toISOString().split('T')[0],
+            created_at: this.nowIso(),
+            last_updated_at: this.nowIso(),
             risk_level: 'None', // "未判定"
             status: '未解析',  // "未解析"
             assignee_name: "-",
@@ -610,7 +615,7 @@ export const dbService = {
             // ステータスを更新
             contract.extract_status = 'success';
             contract.status = data.status || '未処理';
-            contract.last_updated_at = new Date().toISOString().split('T')[0];
+            contract.last_updated_at = this.nowIso();
 
             localStorage.setItem(this.KEYS.CONTRACTS, JSON.stringify(contracts));
             this._persistContractToApi(contract);
@@ -638,7 +643,7 @@ export const dbService = {
                 if (!contract.history) contract.history = [];
                 contract.history.push({
                     version: contract.history.length + 1,
-                    date: contract.last_analyzed_at || contract.last_updated_at || new Date().toISOString().split('T')[0],
+                    date: contract.last_analyzed_at || contract.last_updated_at || this.nowIso(),
                     content: this.cloneContent(contract.original_content),
                     original_filename: contract.original_filename || contract.name || '',
                     pdf_storage_path: contract.pdf_storage_path, // PDFパスも一応残すが、実体は削除される前提
@@ -682,7 +687,8 @@ export const dbService = {
             contract.ai_risk_reason = analysisData.riskReason || '';
             contract.ai_changes = analysisData.changes || [];
             contract.ai_is_fallback = analysisData.isFallback === true;
-            contract.last_analyzed_at = new Date().toISOString().split('T')[0];
+            contract.last_analyzed_at = this.nowIso();
+            contract.last_updated_at = this.nowIso();
 
             localStorage.setItem(this.KEYS.CONTRACTS, JSON.stringify(contracts));
             this._persistContractToApi(contract);
