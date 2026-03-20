@@ -2,7 +2,7 @@
  * DIFFsense Simulated Database Service (localStorage + Backend API)
  * Data is isolated per user (UID-based keys or Backend Auth)
  */
-import { auth } from './firebase-config.js';
+import { getIdToken } from './auth.js';
 import { toApiUrl } from './api-base.js';
 
 const LOCAL_CACHE_VERSION = '20260310v2';
@@ -72,19 +72,18 @@ export const dbService = {
      * Helper to call backend API with Firebase Auth
      */
     async _callApi(endpoint, method = 'GET', body = null, options = {}) {
-        const user = auth.currentUser;
         try {
             const url = toApiUrl(endpoint);
-            const options = {
+            const fetchOptions = {
                 method,
                 headers: {
                     'Content-Type': 'application/json'
                 }
             };
 
-            if (user) {
-                const token = await user.getIdToken();
-                options.headers.Authorization = `Bearer ${token}`;
+            const token = await getIdToken();
+            if (token) {
+                fetchOptions.headers.Authorization = `Bearer ${token}`;
             } else if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
                 // Local development uses backend AUTH_BYPASS, so allow API access without Firebase login.
                 console.warn(`API Call proceeding without authenticated user in local dev: ${endpoint}`);
@@ -94,10 +93,10 @@ export const dbService = {
             }
 
             if (body) {
-                options.body = JSON.stringify(body);
+                fetchOptions.body = JSON.stringify(body);
             }
 
-            const response = await fetch(url, options);
+            const response = await fetch(url, fetchOptions);
             const result = await response.json();
 
             if (!response.ok) {

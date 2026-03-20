@@ -1,4 +1,4 @@
-import { dbService } from './db-service.js?v=20260319b';
+import { dbService } from './db-service.js?v=20260321a';
 import { aiService } from './ai-service.js?v=20260309h2';
 const LOCAL_UI_CACHE_VERSION = '20260310v3';
 const DASHBOARD_CACHE_KEYS = {
@@ -3867,14 +3867,14 @@ class DashboardApp {
 
         if (viewId === 'sign') {
             console.trace('Routing to sign');
-            const { SignUI } = await import('./sign-ui.js?v=20260320bf');
+            const { SignUI } = await import('./sign-ui.js?v=20260321a');
             this.mainContent.innerHTML = await SignUI.renderSignView(this);
             SignUI.refreshList(this);
             return;
         }
 
         if (viewId === 'sign-viewer') {
-            const { SignUI } = await import('./sign-ui.js?v=20260320bf');
+            const { SignUI } = await import('./sign-ui.js?v=20260321a');
             const { SignViewer } = await import('./sign-viewer.js?v=20260320ay');
             this.mainContent.innerHTML = await SignUI.renderSignViewer(this, params);
             await SignViewer.init(this, params);
@@ -3882,7 +3882,7 @@ class DashboardApp {
         }
         
         if (viewId === 'sign-editor') {
-            const { SignUI } = await import('./sign-ui.js?v=20260320bf');
+            const { SignUI } = await import('./sign-ui.js?v=20260321a');
             const { SignEditor } = await import('./sign-editor.js?v=20260320ag');
             this.mainContent.innerHTML = await SignUI.renderSignEditor(this, params);
             await SignEditor.init(this, params);
@@ -3890,7 +3890,7 @@ class DashboardApp {
         }
 
         if (viewId === 'sign-recipient') {
-            const { SignUI } = await import('./sign-ui.js?v=20260320bf');
+            const { SignUI } = await import('./sign-ui.js?v=20260321a');
             const { SignRecipient } = await import('./sign-recipient.js?v=20260320aa');
             this.mainContent.innerHTML = await SignUI.renderSignRecipient(this, params);
             await SignRecipient.init(this, params);
