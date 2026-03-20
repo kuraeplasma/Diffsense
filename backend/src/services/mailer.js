@@ -19,6 +19,17 @@ function getResendClient() {
     resendClient = new Resend(apiKey);
     return resendClient;
 }
+
+function formatResendError(error) {
+    if (!error) return 'Unknown Resend error';
+    if (typeof error === 'string') return error;
+    if (error.message) return error.message;
+    try {
+        return JSON.stringify(error);
+    } catch (_) {
+        return String(error);
+    }
+}
 function _frontendBaseUrl() {
     const explicit = String(process.env.FRONTEND_URL || '').trim();
     if (explicit) {
@@ -45,7 +56,7 @@ async function sendSigningRequestEmail({ to, recipientName, senderName, fileName
     const resend = getResendClient();
     const wrappedSigningUrl = _wrapSigningUrl(signingUrl, fileName);
     const result = await resend.emails.send({
-        from: `DIFFsense <${FROM}>`,
+        from: FROM,
         to: [to],
         reply_to: REPLY_TO,
         subject: `【署名依頼】${fileName}`,
@@ -53,22 +64,17 @@ async function sendSigningRequestEmail({ to, recipientName, senderName, fileName
         text: `${recipientName} 様\n\n${senderName}より署名依頼をお送りしています。\n\n対象書類: ${fileName}\n\n署名はこちら:\n${wrappedSigningUrl}\n\nご不明点は依頼元（${senderName}）へご確認ください。\n---\nDIFFsense`
     });
     if (result.error) {
-        logger.error('[mailer] sendSigningRequestEmail failed', {
-            to,
-            error: result.error.message || String(result.error)
-        });
-        throw new Error(result.error.message);
+        const detail = formatResendError(result.error);
+        logger.error(`[mailer] sendSigningRequestEmail failed to=${to} from=${FROM} replyTo=${REPLY_TO} error=${detail}`);
+        throw new Error(detail);
     }
-    logger.info('[mailer] sendSigningRequestEmail sent', {
-        to,
-        emailId: result.data?.id || null
-    });
+    logger.info(`[mailer] sendSigningRequestEmail sent to=${to} emailId=${result.data?.id || 'unknown'}`);
 }
 
 async function sendCompletionEmail({ to, senderName, fileName, downloadUrl }) {
     const resend = getResendClient();
     const result = await resend.emails.send({
-        from: `DIFFsense <${FROM}>`,
+        from: FROM,
         to: [to],
         reply_to: REPLY_TO,
         subject: `【署名完了】${fileName}`,
@@ -76,23 +82,18 @@ async function sendCompletionEmail({ to, senderName, fileName, downloadUrl }) {
         text: `${senderName} 様\n\n「${fileName}」の署名が完了しました。\n\nダウンロード（7日間有効）:\n${downloadUrl}\n---\nDIFFsense`
     });
     if (result.error) {
-        logger.error('[mailer] sendCompletionEmail failed', {
-            to,
-            error: result.error.message || String(result.error)
-        });
-        throw new Error(result.error.message);
+        const detail = formatResendError(result.error);
+        logger.error(`[mailer] sendCompletionEmail failed to=${to} from=${FROM} replyTo=${REPLY_TO} error=${detail}`);
+        throw new Error(detail);
     }
-    logger.info('[mailer] sendCompletionEmail sent', {
-        to,
-        emailId: result.data?.id || null
-    });
+    logger.info(`[mailer] sendCompletionEmail sent to=${to} emailId=${result.data?.id || 'unknown'}`);
 }
 
 async function sendReminderEmail({ to, recipientName, senderName, fileName, signingUrl }) {
     const resend = getResendClient();
     const wrappedSigningUrl = _wrapSigningUrl(signingUrl, fileName);
     const result = await resend.emails.send({
-        from: `DIFFsense <${FROM}>`,
+        from: FROM,
         to: [to],
         reply_to: REPLY_TO,
         subject: `【署名リマインド】${fileName}`,
@@ -100,22 +101,17 @@ async function sendReminderEmail({ to, recipientName, senderName, fileName, sign
         text: `${recipientName} 様\n\n署名依頼がまだ完了していません。\n\n対象書類: ${fileName}\n\n署名はこちら:\n${wrappedSigningUrl}\n---\nDIFFsense`
     });
     if (result.error) {
-        logger.error('[mailer] sendReminderEmail failed', {
-            to,
-            error: result.error.message || String(result.error)
-        });
-        throw new Error(result.error.message);
+        const detail = formatResendError(result.error);
+        logger.error(`[mailer] sendReminderEmail failed to=${to} from=${FROM} replyTo=${REPLY_TO} error=${detail}`);
+        throw new Error(detail);
     }
-    logger.info('[mailer] sendReminderEmail sent', {
-        to,
-        emailId: result.data?.id || null
-    });
+    logger.info(`[mailer] sendReminderEmail sent to=${to} emailId=${result.data?.id || 'unknown'}`);
 }
 
 async function sendRecipientActionEmail({ to, senderName, fileName, recipientName, actionLabel, dashboardUrl }) {
     const resend = getResendClient();
     const result = await resend.emails.send({
-        from: `DIFFsense <${FROM}>`,
+        from: FROM,
         to: [to],
         reply_to: REPLY_TO,
         subject: `【署名状況更新】${fileName}`,
@@ -123,16 +119,11 @@ async function sendRecipientActionEmail({ to, senderName, fileName, recipientNam
         text: `${senderName} 様\n\n「${fileName}」の署名状況が更新されました。\n署名者: ${recipientName}\n状態: ${actionLabel}\n\n確認はこちら:\n${dashboardUrl}\n---\nDIFFsense`
     });
     if (result.error) {
-        logger.error('[mailer] sendRecipientActionEmail failed', {
-            to,
-            error: result.error.message || String(result.error)
-        });
-        throw new Error(result.error.message);
+        const detail = formatResendError(result.error);
+        logger.error(`[mailer] sendRecipientActionEmail failed to=${to} from=${FROM} replyTo=${REPLY_TO} error=${detail}`);
+        throw new Error(detail);
     }
-    logger.info('[mailer] sendRecipientActionEmail sent', {
-        to,
-        emailId: result.data?.id || null
-    });
+    logger.info(`[mailer] sendRecipientActionEmail sent to=${to} emailId=${result.data?.id || 'unknown'}`);
 }
 
 function _signingHtml({ recipientName, senderName, fileName, signingUrl }) {

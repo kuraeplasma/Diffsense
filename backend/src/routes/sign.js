@@ -11,7 +11,7 @@ const zohoService = require('../services/zoho');
 const firmaService = require('../services/firma');
 const dbService = require('../services/db');
 const mailer = require('../services/mailer');
-const { admin, bucket, firebaseInitialized } = require('../firebase');
+const { admin, db, bucket, firebaseInitialized } = require('../firebase');
 const SIGN_LINK_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const TRIAL_SIGN_REQUEST_LIMIT = 3;
 
@@ -106,6 +106,12 @@ function isSignRequestExpired(signRequest, now = Date.now()) {
     if (!expiryIso) return false;
     const expiryTime = new Date(expiryIso).getTime();
     return !Number.isNaN(expiryTime) && now >= expiryTime;
+}
+
+function formatMailFailure(recipient, error) {
+    const email = String(recipient?.email || '').trim() || 'unknown';
+    const detail = String(error?.message || error || 'unknown error');
+    return { email, error: detail };
 }
 
 async function markSignRequestExpired(signRequest) {
@@ -522,6 +528,24 @@ async function getRequestSigningUrl(signRequest, recipient) {
     return null;
 }
 
+async function saveAuditEvent({ signRequestId, ownerUid, event, actorEmail, ipAddress, userAgent, meta = null }) {
+    if (!db) return;
+    try {
+        await db.collection('audit_events').add({
+            signRequestId,
+            ownerUid,
+            event,
+            actorEmail,
+            ipAddress: ipAddress || null,
+            userAgent: userAgent || null,
+            timestamp: new Date().toISOString(),
+            meta
+        });
+    } catch (e) {
+        console.error('audit_events保存失敗:', e);
+    }
+}
+
 async function ensureSignTrialQuota(ownerUid) {
     const userProfile = await dbService.getUserProfile(ownerUid);
     if (!dbService.isTrialActive(userProfile)) {
@@ -661,7 +685,7 @@ router.post('/create', async (req, res) => {
         });
 
         if (!useFirmaProvider()) {
-            await Promise.allSettled(newRequest.recipients.map(async (recipient) => {
+            const mailResults = await Promise.allSettled(newRequest.recipients.map(async (recipient) => {
                 try {
                     const signUrl = await getRequestSigningUrl(newRequest, recipient);
                     await mailer.sendSigningRequestEmail({
@@ -672,12 +696,28 @@ router.post('/create', async (req, res) => {
                         signingUrl: signUrl
                     });
                 } catch (mailError) {
-                    logger.warn('Signature email send skipped/failed', {
-                        email: recipient.email,
-                        error: mailError.message
-                    });
+                    const failure = formatMailFailure(recipient, mailError);
+                    logger.error(`Signature email send failed email=${failure.email} error=${failure.error}`);
+                    throw mailError;
                 }
             }));
+
+            const failedRecipients = mailResults
+                .map((result, index) => ({ result, recipient: newRequest.recipients[index] }))
+                .filter(({ result }) => result.status === 'rejected')
+                .map(({ result, recipient }) => formatMailFailure(recipient, result.reason));
+
+            if (failedRecipients.length > 0) {
+                return res.status(502).json({
+                    success: false,
+                    code: 'MAIL_SEND_FAILED',
+                    error: '署名依頼は作成されましたが、メール送信に失敗しました',
+                    data: {
+                        request: newRequest,
+                        failedRecipients
+                    }
+                });
+            }
         }
 
         res.json({ success: true, data: newRequest });
@@ -722,6 +762,35 @@ router.get('/list', async (req, res) => {
         res.json({ success: true, data: requests });
     } catch (error) {
         logger.error('API Sign List Error:', error.message);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+router.get('/:id/audit-events', async (req, res) => {
+    try {
+        const ownerUid = req.user.uid;
+        const signRequestId = req.params.id;
+
+        const requests = await dbService.getSignRequests(ownerUid);
+        const signRequest = findSignRequestById(requests, signRequestId);
+        if (!signRequest) {
+            return res.status(404).json({ success: false, error: '署名依頼が見つかりません' });
+        }
+
+        if (!db) {
+            return res.status(503).json({ success: false, error: 'DB未初期化' });
+        }
+
+        const snapshot = await db.collection('audit_events')
+            .where('signRequestId', '==', signRequestId)
+            .where('ownerUid', '==', ownerUid)
+            .orderBy('timestamp', 'asc')
+            .get();
+
+        const events = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        res.json({ success: true, data: events });
+    } catch (error) {
+        logger.error('API Audit Events Error:', error.message);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -817,9 +886,11 @@ router.post('/decline', async (req, res) => {
         }
 
         const declinedAt = new Date().toISOString();
+        const declineIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || null;
+        const declineUserAgent = req.headers['user-agent'] || null;
         const updatedRecipients = (signRequest.recipients || []).map((recipient) =>
             String(recipient.email || '').trim() === String(payload.email || '').trim()
-                ? { ...recipient, status: 'declined', declinedAt }
+                ? { ...recipient, status: 'declined', declinedAt, ipAddress: declineIp, userAgent: declineUserAgent }
                 : recipient
         );
 
@@ -828,10 +899,21 @@ router.post('/decline', async (req, res) => {
             {
                 status: 'declined',
                 declinedAt,
+                declineIp,
+                declineUserAgent,
                 recipients: updatedRecipients
             },
             signRequest.ownerUid || signRequest.requestedBy || null
         );
+
+        await saveAuditEvent({
+            signRequestId: signRequest.id,
+            ownerUid: signRequest.ownerUid || signRequest.requestedBy || null,
+            event: 'declined',
+            actorEmail: payload.email,
+            ipAddress: declineIp,
+            userAgent: declineUserAgent
+        });
 
         const declinedRecipient = updatedRecipients.find((recipient) =>
             String(recipient.email || '').trim() === String(payload.email || '').trim()
@@ -884,7 +966,8 @@ router.post('/submit', async (req, res) => {
                 fontName: signature.fontName || '',
                 fontText: hasTextData ? String(signature.fontText || '').trim() : '',
                 signedAt: new Date().toISOString(),
-                ipAddress: req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown'
+                ipAddress: req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown',
+                userAgent: req.headers['user-agent'] || null
             };
         }
         currentSignatures[email] = signatureMap;
@@ -939,6 +1022,31 @@ router.post('/submit', async (req, res) => {
             updates,
             signRequest.ownerUid || signRequest.requestedBy || null
         );
+
+        await saveAuditEvent({
+            signRequestId: signRequest.id,
+            ownerUid: signRequest.ownerUid || signRequest.requestedBy || null,
+            event: 'signed',
+            actorEmail: payload.email,
+            ipAddress: req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || null,
+            userAgent: req.headers['user-agent'] || null,
+            meta: { pdfHash: signRequest.pdfHash || null }
+        });
+
+        if (allSigned) {
+            await saveAuditEvent({
+                signRequestId: signRequest.id,
+                ownerUid: signRequest.ownerUid || signRequest.requestedBy || null,
+                event: 'completed',
+                actorEmail: payload.email,
+                ipAddress: req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || null,
+                userAgent: req.headers['user-agent'] || null,
+                meta: {
+                    pdfHash: saved?.pdfHash || updates?.pdfHash || null,
+                    completedDocumentUrl: saved?.completed_document_url || updates?.completed_document_url || null
+                }
+            });
+        }
 
         const actingRecipient = updatedRecipients.find((recipient) =>
             String(recipient.email || '').trim() === email
@@ -1050,6 +1158,7 @@ router.patch('/:id', async (req, res) => {
                     fileName
                 });
 
+                const mailFailures = [];
                 for (const recipient of recipients) {
                     const signingUrl = updated.provider === 'diffsense'
                         ? buildTokenSigningUrl(updated.recipientTokens?.[recipient.email])
@@ -1067,16 +1176,33 @@ router.patch('/:id', async (req, res) => {
                         senderName,
                         fileName,
                         signingUrl
-                    }).catch((mailError) => logger.error('[sign PATCH] mail error', {
-                        requestId: updated.id || id,
-                        email: recipient.email,
-                        error: mailError.message
-                    }));
+                    }).catch((mailError) => {
+                        const failure = formatMailFailure(recipient, mailError);
+                        mailFailures.push(failure);
+                        logger.error(`[sign PATCH] mail error requestId=${updated.id || id} email=${failure.email} error=${failure.error}`);
+                    });
+                }
+
+                if (mailFailures.length > 0) {
+                    return res.status(502).json({
+                        success: false,
+                        code: 'MAIL_SEND_FAILED',
+                        error: '署名依頼は保存されましたが、メール送信に失敗しました',
+                        data: {
+                            request: updated,
+                            failedRecipients: mailFailures
+                        }
+                    });
                 }
             } catch (mailFlowErr) {
-                logger.error('[sign PATCH] mail flow error', {
-                    requestId: updated?.id || id,
-                    error: mailFlowErr.message
+                logger.error(`[sign PATCH] mail flow error requestId=${updated?.id || id} error=${mailFlowErr.message}`);
+                return res.status(502).json({
+                    success: false,
+                    code: 'MAIL_SEND_FAILED',
+                    error: '署名依頼は保存されましたが、メール送信に失敗しました',
+                    data: {
+                        request: updated || existing || null
+                    }
                 });
             }
         }
@@ -1115,6 +1241,7 @@ router.post('/:id/remind', async (req, res) => {
                     ? null
                     : await firmaService.getSigningUrls(signRequest.firma_request_id);
                 let count = 0;
+                const failedRecipients = [];
 
                 for (const recipient of (signRequest.recipients || []).filter((item) => item.status !== 'signed')) {
                     const signingUrl = signRequest.provider === 'diffsense'
@@ -1127,24 +1254,35 @@ router.post('/:id/remind', async (req, res) => {
                         senderName,
                         fileName: signRequest.document_name || '',
                         signingUrl
-                    }).catch((mailError) => logger.error('[sign/remind] mail error', {
-                        requestId: signRequest.id || id,
-                        email: recipient.email,
-                        error: mailError.message
-                    }));
-                    count++;
+                    }).then(() => {
+                        count++;
+                    }).catch((mailError) => {
+                        const failure = formatMailFailure(recipient, mailError);
+                        failedRecipients.push(failure);
+                        logger.error(`[sign/remind] mail error requestId=${signRequest.id || id} email=${failure.email} error=${failure.error}`);
+                    });
                 }
 
                 const updated = await dbService.updateSignRequest(id, {
                     reminder_sent_at: new Date().toISOString()
                 }, ownerUid);
 
+                if (failedRecipients.length > 0) {
+                    return res.status(502).json({
+                        success: false,
+                        code: 'MAIL_SEND_FAILED',
+                        error: '催促メールの送信に失敗しました',
+                        data: {
+                            reminded: count,
+                            request: updated || signRequest,
+                            failedRecipients
+                        }
+                    });
+                }
+
                 return res.json({ success: true, data: { reminded: count, request: updated || signRequest } });
             } catch (err) {
-                logger.error('[sign/remind] error', {
-                    requestId: signRequest?.id || id,
-                    error: err.message
-                });
+                logger.error(`[sign/remind] error requestId=${signRequest?.id || id} error=${err.message}`);
                 return res.status(500).json({ success: false, error: 'リマインド送信に失敗しました' });
             }
         }
