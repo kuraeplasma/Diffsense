@@ -770,11 +770,11 @@
       const forceProd = params.get('api') === 'prod' || localStorage.getItem('diffsense_api_mode') === 'prod';
       if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
         if (forceProd) {
-          return location.origin;
+          return 'https://api-qf37m5ba2q-an.a.run.app';
         }
         return 'http://localhost:3001';
       }
-      return location.origin;
+      return 'https://api-qf37m5ba2q-an.a.run.app';
     })();
 
     const state = {
