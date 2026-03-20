@@ -123,21 +123,6 @@ class DBService {
         }
     }
 
-    async _firestoreGetContractById(ownerUid, id) {
-        if (!this.useFirestore || !ownerUid || id === null || id === undefined) return null;
-        try {
-            const docId = String(id);
-            const snapshot = await firestore.collection('contracts').doc(docId).get();
-            if (!snapshot.exists) return null;
-            const data = snapshot.data() || {};
-            if (data.ownerUid !== ownerUid) return null;
-            return { ...data, id: data.id ?? id };
-        } catch (error) {
-            logger.error(`Firestore contract read by id error: ${error.message}`);
-            return null;
-        }
-    }
-
     // --- New Firestore support for Sign Requests ---
 
     async _firestoreGetSignRequests(ownerUid) {
@@ -150,6 +135,25 @@ class DBService {
             logger.error(`Firestore sign_requests read error: ${error.message}`);
             return null;
         }
+    }
+
+    async getSignRequestById(signRequestId) {
+        if (this.useFirestore) {
+            try {
+                const snapshot = await firestore.collection('sign_requests')
+                    .where('id', '==', String(signRequestId))
+                    .limit(1)
+                    .get();
+                if (!snapshot.empty) {
+                    return snapshot.docs[0].data();
+                }
+            } catch (error) {
+                logger.warn(`getSignRequestById Firestore failed id=${signRequestId} error=${error.message}`);
+            }
+        }
+
+        const requests = await this.readData('sign_requests');
+        return (Array.isArray(requests) ? requests : []).find((request) => String(request.id) === String(signRequestId)) || null;
     }
 
     async _firestoreSaveSignRequest(ownerUid, request) {
@@ -608,28 +612,14 @@ class DBService {
     async updateContract(id, updates, ownerUid = null) {
         const contracts = await this.readData('contracts');
         const index = contracts.findIndex(c => c.id === id);
-        let baseContract = index > -1 ? contracts[index] : null;
 
-        if (!baseContract && this.useFirestore && ownerUid) {
-            baseContract = await this._firestoreGetContractById(ownerUid, id);
-            if (baseContract) {
-                contracts.push(baseContract);
-            }
-        }
-
-        if (baseContract) {
-            const nextContract = { ...baseContract, ...updates };
-            const nextIndex = contracts.findIndex(c => c.id === id);
-            if (nextIndex > -1) {
-                contracts[nextIndex] = nextContract;
-            } else {
-                contracts.push(nextContract);
-            }
+        if (index > -1) {
+            contracts[index] = { ...contracts[index], ...updates };
             if (this.useFirestore && ownerUid) {
-                await this._firestoreSaveContract(ownerUid, nextContract);
+                await this._firestoreSaveContract(ownerUid, contracts[index]);
             }
             await this.writeData('contracts', contracts);
-            return nextContract;
+            return contracts[index];
         }
         return null;
     }

@@ -823,8 +823,9 @@ router.get('/verify', async (req, res) => {
         }
 
         const payload = jwt.verify(token, String(process.env.JWT_SECRET || '').trim());
-        const requests = await dbService.getSignRequests(null);
-        const signRequest = await markSignRequestExpired(findSignRequestById(requests, payload.signRequestId));
+        const signRequest = await markSignRequestExpired(
+            await dbService.getSignRequestById(payload.signRequestId)
+        );
 
         if (!signRequest) {
             return res.status(404).json({ success: false, error: '署名依頼が見つかりません' });
