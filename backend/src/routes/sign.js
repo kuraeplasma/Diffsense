@@ -851,6 +851,7 @@ router.get('/verify', async (req, res) => {
             try {
                 const contracts = await dbService.getContracts(ownerUid);
                 contract = (Array.isArray(contracts) ? contracts : []).find((item) => String(item.id) === String(signRequest.contract_id)) || null;
+                logger.info(`Sign verify contract lookup contractId=${signRequest.contract_id} found=${!!contract} pdf_url=${contract?.pdf_url || 'none'} pdf_storage_path=${contract?.pdf_storage_path || 'none'}`);
             } catch (contractError) {
                 logger.warn(`Sign verify contract lookup failed requestId=${signRequest.id} contractId=${signRequest.contract_id} error=${contractError.message}`);
             }
