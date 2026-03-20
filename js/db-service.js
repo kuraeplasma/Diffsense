@@ -3,7 +3,7 @@
  * Data is isolated per user (UID-based keys or Backend Auth)
  */
 import { getIdToken } from './auth.js';
-import { toApiUrl } from './api-base.js';
+import { toApiUrl } from './api-base.js?v=20260321b';
 
 const LOCAL_CACHE_VERSION = '20260310v2';
 

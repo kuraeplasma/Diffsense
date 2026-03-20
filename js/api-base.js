@@ -2,6 +2,8 @@ function normalizeBaseUrl(value) {
     return String(value || '').trim().replace(/\/$/, '');
 }
 
+const PROD_API_BASE_URL = 'https://api-qf37m5ba2q-an.a.run.app';
+
 export function getApiBaseUrl() {
     const params = new URLSearchParams(window.location.search);
     const explicit = normalizeBaseUrl(
@@ -12,10 +14,7 @@ export function getApiBaseUrl() {
     if (explicit) return explicit;
 
     const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    const forceProd = params.get('api') === 'prod' || localStorage.getItem('diffsense_api_mode') === 'prod';
-    if (forceProd) return normalizeBaseUrl(window.location.origin);
-
-    return isLocalHost ? 'http://localhost:3001' : normalizeBaseUrl(window.location.origin);
+    return isLocalHost ? 'http://localhost:3001' : PROD_API_BASE_URL;
 }
 
 export function toApiUrl(endpoint = '') {
