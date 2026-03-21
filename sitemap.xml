@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://diffsense.spacegleam.co.jp/</loc>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://diffsense.spacegleam.co.jp/onboarding.html</loc>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://diffsense.spacegleam.co.jp/company.html</loc>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://diffsense.spacegleam.co.jp/terms.html</loc>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://diffsense.spacegleam.co.jp/privacy.html</loc>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://diffsense.spacegleam.co.jp/law.html</loc>
+    <priority>0.5</priority>
+  </url>
+</urlset>

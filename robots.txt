@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://diffsense.spacegleam.co.jp/sitemap.xml
