@@ -33,7 +33,7 @@ function resolveSafeCancelUrl(req, frontendBase) {
     if (typeof referer === 'string' && referer.startsWith(frontendBase)) {
         return referer;
     }
-    return `${frontendBase}/dashboard.html#plan`;
+    return `${frontendBase}/select-plan.html`;
 }
 
 const ALLOWED_PRICE_IDS = Object.freeze({
