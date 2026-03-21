@@ -13,8 +13,6 @@ function normalizeBaseUrl(value) {
     return raw;
 }
 
-const PROD_API_BASE_URL = 'https://api-qf37m5ba2q-an.a.run.app';
-
 function shouldIgnoreExplicitBase(explicitBase) {
     if (!explicitBase) return false;
     try {

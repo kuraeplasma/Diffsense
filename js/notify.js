@@ -382,8 +382,8 @@ const Notify = (() => {
 // グローバルに公開
 window.Notify = Notify;
 
-// ESM export
-export { Notify };
+// ESM export (removed to avoid SyntaxError in standard script tags)
+// export { Notify };
 
 if (typeof module !== 'undefined') {
     module.exports = Notify;
