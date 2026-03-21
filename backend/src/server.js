@@ -6,7 +6,6 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const fs = require('fs');
 const contractRoutes = require('./routes/contracts');
-const dbRoutes = require('./routes/db');
 const inviteRoutes = require('./routes/invite'); // Added
 const userRoutes = require('./routes/user'); // Added
 const paymentRoutes = require('./routes/payment'); // Added
@@ -184,7 +183,6 @@ app.use('/sign', (req, res, next) => {
 });
 app.use('/contracts', authMiddleware, contractRoutes);
 app.use('/api/contracts', authMiddleware, contractRoutes);
-app.use('/db', authMiddleware, dbRoutes);
 app.use('/invite', authMiddleware, inviteRoutes);
 app.use('/user', authMiddleware, userRoutes);
 app.use('/payment', authMiddleware, paymentRoutes);
