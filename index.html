@@ -4,6 +4,15 @@
 <head>
     <meta charset="UTF-8">
     <script>
+        // Cloud Runウォームアップ
+        (function() {
+            fetch('https://api-qf37m5ba2q-an.a.run.app/health', {
+                method: 'GET',
+                cache: 'no-store'
+            }).catch(function() {});
+        })();
+    </script>
+    <script>
         // Stripeから戻ってきた場合はダッシュボードにリダイレクト
         if (sessionStorage.getItem('stripe_checkout_started') === 'true') {
             sessionStorage.removeItem('stripe_checkout_started');
