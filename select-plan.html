@@ -438,6 +438,7 @@
             localStorage.setItem('diffsense_selected_plan', enforcedPlan);
 
             // Redirect to thanks page
+            sessionStorage.setItem('stripe_checkout_started', 'true');
             window.location.replace(`${window.location.origin}/thanks-plan.html?plan=${enforcedPlan}`);
         };
 

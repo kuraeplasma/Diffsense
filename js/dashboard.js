@@ -3356,6 +3356,7 @@ class DashboardApp {
                 }
                 return;
             }
+            sessionStorage.setItem('stripe_checkout_started', 'true');
             window.location.href = result.data.url;
         } catch (error) {
             console.error('Stripe checkout error:', error);

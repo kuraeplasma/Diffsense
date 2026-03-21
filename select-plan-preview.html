@@ -687,6 +687,7 @@
                     throw new Error(result?.error || '決済ページを開けませんでした。時間をおいて再度お試しください。');
                 }
 
+                sessionStorage.setItem('stripe_checkout_started', 'true');
                 window.location.replace(result.data.url);
             } catch (error) {
                 console.error('Failed to open Stripe checkout page:', error);

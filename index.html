@@ -3,6 +3,13 @@
 
 <head>
     <meta charset="UTF-8">
+    <script>
+        // Stripeから戻ってきた場合はダッシュボードにリダイレクト
+        if (sessionStorage.getItem('stripe_checkout_started') === 'true') {
+            sessionStorage.removeItem('stripe_checkout_started');
+            window.location.replace('/dashboard.html');
+        }
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DIFFsense | AI契約差分検知SaaS - 契約変更をスマートに管理</title>
     <meta name="description" content="利用規約や契約書の「どこが・どう変わったか」だけをAIが要約・通知。法務業務を効率化するAI差分検知ツール。">
