@@ -183,6 +183,7 @@ app.use('/sign', (req, res, next) => {
     return next();
 });
 app.use('/contracts', authMiddleware, contractRoutes);
+app.use('/api/contracts', authMiddleware, contractRoutes);
 app.use('/db', authMiddleware, dbRoutes);
 app.use('/invite', authMiddleware, inviteRoutes);
 app.use('/user', authMiddleware, userRoutes);

@@ -1,0 +1,7 @@
+[
+  {
+    "origin": ["https://diffsense.spacegleam.co.jp"],
+    "method": ["GET"],
+    "maxAgeSeconds": 3600
+  }
+]

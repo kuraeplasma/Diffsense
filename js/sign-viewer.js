@@ -5,6 +5,8 @@
 import { dbService } from './db-service.js';
 import { Notify } from './notify.js';
 import { buildSignDocumentPreviewHtml } from './sign-document-preview.js';
+import { getIdToken } from './auth.js';
+import { resolveBackendAssetUrl, toApiUrl } from './api-base.js';
 
 export const SignViewer = {
     _pdfjsLoaded: false,
@@ -40,10 +42,16 @@ export const SignViewer = {
             // 2. Otherwise show the PDF using pdf.js
             const contract = dbService.getContractById(request.contract_id);
             const runtimeUrl = (typeof app.getRuntimePdfPreviewUrl === 'function') ? app.getRuntimePdfPreviewUrl(request.contract_id) : null;
-            const pdfUrl = request.completed_document_url || runtimeUrl || contract?.pdf_url || contract?.pdf_storage_path;
+            const rawPdfUrl = request.completed_document_url || runtimeUrl || contract?.pdf_url || contract?.pdf_storage_path;
+            const pdfUrl = resolveBackendAssetUrl(rawPdfUrl);
             
             // Check if it's a real PDF file or just a reference
-            const isActuallyPdf = pdfUrl && (pdfUrl.toLowerCase().endsWith('.pdf') || pdfUrl.startsWith('blob:'));
+            const normalizedPdfUrl = String(pdfUrl || '').trim().toLowerCase();
+            const isActuallyPdf = Boolean(pdfUrl) && (
+                normalizedPdfUrl.startsWith('blob:')
+                || /\.pdf($|[?#])/i.test(String(pdfUrl || ''))
+                || normalizedPdfUrl.includes('/uploads/')
+            );
 
             if (isActuallyPdf) {
                 await this.renderPdf(pdfUrl, container);
@@ -62,6 +70,43 @@ export const SignViewer = {
         }
         
         this.setupEventListeners(app, request);
+
+        const auditContainer = document.getElementById('audit-events-list');
+        if (auditContainer) {
+            try {
+                const token = await getIdToken();
+                const res = await fetch(toApiUrl(`/api/sign/${id}/audit-events`), {
+                    headers: { 'Authorization': token ? `Bearer ${token}` : '' }
+                });
+                const json = await res.json();
+                if (json.success && json.data.length > 0) {
+                    const eventLabels = {
+                        created: '📄 作成',
+                        signed: '✅ 署名',
+                        declined: '❌ 辞退',
+                        completed: '🎉 完了',
+                        viewed: '👁 閲覧'
+                    };
+                    auditContainer.innerHTML = json.data.map((ev) => `
+                        <div style="display:flex; gap:10px; padding:8px 0; border-bottom:1px solid #f0f0f0; font-size:12px;">
+                            <div style="white-space:nowrap; color:var(--text-muted);">
+                                ${new Date(ev.timestamp).toLocaleString('ja-JP')}
+                            </div>
+                            <div>
+                                <span>${eventLabels[ev.event] || ev.event}</span>
+                                <span style="color:#888; margin-left:6px;">${ev.actorEmail || ''}</span>
+                                ${ev.ipAddress ? `<span style="color:#aaa; margin-left:6px;">IP: ${ev.ipAddress}</span>` : ''}
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    auditContainer.innerHTML = '<div style="font-size:12px; color:var(--text-muted);">記録なし</div>';
+                }
+            } catch (e) {
+                console.error('監査証跡取得失敗:', e);
+                auditContainer.innerHTML = '<div style="font-size:12px; color:var(--text-muted);">取得失敗</div>';
+            }
+        }
     },
 
     findPendingActionId(request) {

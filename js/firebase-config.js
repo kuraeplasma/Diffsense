@@ -17,7 +17,17 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const analytics = getAnalytics(app);
+
+// Analytics is optional. In some local/browser contexts it throws during module load,
+// which prevents the dashboard bootstrap from running and leaves the page stuck on
+// the initial "loading" markup.
+try {
+    if (typeof window !== 'undefined' && window.location?.protocol !== 'file:') {
+        getAnalytics(app);
+    }
+} catch (error) {
+    console.warn('Firebase Analytics init skipped:', error);
+}
 
 // Export servcies to be used in other files
 export { auth };

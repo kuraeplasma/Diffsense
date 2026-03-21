@@ -30,6 +30,29 @@ function formatResendError(error) {
         return String(error);
     }
 }
+
+function _isEmailLike(value) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
+}
+
+function _normalizeHonorificName(name, email, fallback = 'ご担当者') {
+    const rawName = String(name || '').trim();
+    if (rawName && !_isEmailLike(rawName)) {
+        return rawName;
+    }
+    const mail = String(email || '').trim();
+    if (mail) {
+        const localPart = mail.split('@')[0] || '';
+        const cleaned = localPart
+            .replace(/[._+-]+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+        if (cleaned) {
+            return cleaned;
+        }
+    }
+    return fallback;
+}
 function _frontendBaseUrl() {
     const explicit = String(process.env.FRONTEND_URL || '').trim();
     if (explicit) {
@@ -73,13 +96,14 @@ async function sendSigningRequestEmail({ to, recipientName, senderName, fileName
 
 async function sendCompletionEmail({ to, senderName, fileName, downloadUrl }) {
     const resend = getResendClient();
+    const honorificName = _normalizeHonorificName(senderName, to, 'ご担当者');
     const result = await resend.emails.send({
         from: FROM,
         to: [to],
         reply_to: REPLY_TO,
         subject: `【署名完了】${fileName}`,
-        html: _completionHtml({ senderName, fileName, downloadUrl }),
-        text: `${senderName} 様\n\n「${fileName}」の署名が完了しました。\n\nダウンロード（7日間有効）:\n${downloadUrl}\n---\nDIFFsense`
+        html: _completionHtml({ senderName: honorificName, fileName, downloadUrl }),
+        text: `${honorificName} 様\n\n「${fileName}」の署名が完了しました。\n\nダウンロード（7日間有効）:\n${downloadUrl}\n---\nDIFFsense`
     });
     if (result.error) {
         const detail = formatResendError(result.error);

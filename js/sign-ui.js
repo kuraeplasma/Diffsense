@@ -135,7 +135,12 @@ export const SignUI = {
     },
 
     formatDateTime(value) {
-        const time = new Date(value || '');
+        const raw = String(value || '').trim();
+        if (!raw) return '-';
+        if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+            return raw.replace(/-/g, '/');
+        }
+        const time = new Date(raw);
         if (Number.isNaN(time.getTime())) return '-';
         return time.toLocaleString('ja-JP', {
             year: 'numeric',
@@ -403,7 +408,7 @@ export const SignUI = {
                 <th>解析ステータス</th>
                 <th>リスク</th>
                 <th>最終更新</th>
-                <th style="width:180px; text-align:right;">操作</th>
+                <th style="width:180px; text-align:left;">操作</th>
             </tr>
         `;
 
@@ -418,6 +423,9 @@ export const SignUI = {
 
         listBody.innerHTML = contracts.map(c => {
             const isAnalyzed = this.isContractDiffAnalyzed(c);
+            const signable = this.hasSignablePdfSource(c);
+            const quotaLimited = this.getTrialSignQuotaMeta(window.app).isLimited;
+            const startDisabled = quotaLimited;
             const riskClass = !isAnalyzed
                 ? 'badge-neutral'
                 : (c.risk_level === 'High'
@@ -445,8 +453,8 @@ export const SignUI = {
                     </td>
                     <td><span class="badge ${riskClass}">${riskLabel}</span></td>
                     <td>${updatedAt}</td>
-                    <td style="text-align:right;" onclick="event.stopPropagation()">
-                        <button class="btn-dashboard btn-primary-action" style="font-size:12px; min-width:140px; justify-content:center;${this.getTrialSignQuotaMeta(window.app).isLimited ? ' opacity:0.5; cursor:not-allowed;' : ''}" onclick="window.signUI.startSingleRequest(${c.id})" ${this.getTrialSignQuotaMeta(window.app).isLimited ? 'disabled' : ''}>
+                    <td style="text-align:left;" onclick="event.stopPropagation()">
+                        <button class="btn-dashboard btn-primary-action" style="font-size:12px; min-width:140px; justify-content:center;${startDisabled ? ' opacity:0.5; cursor:not-allowed;' : ''}" onclick="window.signUI.startSingleRequest(${c.id})" ${startDisabled ? 'disabled' : ''} title="${!signable ? 'PDF原本がある書類のみ署名依頼できます' : ''}">
                             署名依頼を開始
                         </button>
                     </td>
@@ -587,9 +595,14 @@ export const SignUI = {
 
     async startSingleRequest(id) {
         if (!this.ensureSignQuota()) return;
+        const contracts = await dbService.getContracts();
         this.selectedDocIds.clear();
         this.selectedDocIds.add(id);
         await this.startOneScreenEditor();
+    },
+
+    hasSignablePdfSource(contract) {
+        return Boolean(String(contract?.pdf_url || '').trim() || String(contract?.pdf_storage_path || '').trim());
     },
 
     async ensureLocalDummyContracts() {
@@ -1140,6 +1153,15 @@ export const SignUI = {
                                 </a>
                             ` : ''}
                             ${this.isDraftRequest(request) ? `<p style="font-size:11px; color:#888; text-align:center; margin-top:12px;">※作成中の依頼は編集画面から配置を見直せます</p>` : ''}
+                        </div>
+
+                        <div style="margin-top:24px; padding-top:24px; border-top:1px solid var(--border-subtle);">
+                            <h3 style="font-size:14px; margin-bottom:12px;">
+                                <i class="fa-solid fa-shield-halved"></i> 監査証跡
+                            </h3>
+                            <div id="audit-events-list">
+                                <div style="font-size:12px; color:var(--text-muted);">読み込み中...</div>
+                            </div>
                         </div>
 
                     </div>

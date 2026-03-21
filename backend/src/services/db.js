@@ -140,12 +140,30 @@ class DBService {
     async getSignRequestById(signRequestId) {
         if (this.useFirestore) {
             try {
-                const snapshot = await firestore.collection('sign_requests')
-                    .where('id', '==', String(signRequestId))
-                    .limit(1)
-                    .get();
-                if (!snapshot.empty) {
-                    return snapshot.docs[0].data();
+                const docId = String(signRequestId || '').trim();
+                if (docId) {
+                    const direct = await firestore.collection('sign_requests').doc(docId).get();
+                    if (direct.exists) {
+                        return { id: direct.id, ...direct.data() };
+                    }
+                }
+
+                const idCandidates = [];
+                if (docId) idCandidates.push(docId);
+                const numericId = Number(signRequestId);
+                if (!Number.isNaN(numericId) && String(numericId) === docId) {
+                    idCandidates.push(numericId);
+                }
+
+                for (const idValue of idCandidates) {
+                    const snapshot = await firestore.collection('sign_requests')
+                        .where('id', '==', idValue)
+                        .limit(1)
+                        .get();
+                    if (!snapshot.empty) {
+                        const doc = snapshot.docs[0];
+                        return { id: doc.id, ...doc.data() };
+                    }
                 }
             } catch (error) {
                 logger.warn(`getSignRequestById Firestore failed id=${signRequestId} error=${error.message}`);
@@ -661,9 +679,67 @@ class DBService {
     }
 
     async updateSignRequest(id, updates, ownerUid = null) {
-        const requests = await this.readData('sign_requests');
-        const index = requests.findIndex(r => r.id === id || String(r.id) === String(id));
+        const requestId = String(id || '').trim();
 
+        // Firestore-first update (Cloud Run production-safe)
+        if (this.useFirestore && requestId) {
+            try {
+                const collection = firestore.collection('sign_requests');
+                let docRef = collection.doc(requestId);
+                let snapshot = await docRef.get();
+
+                if (!snapshot.exists) {
+                    const idCandidates = [requestId];
+                    const numericId = Number(requestId);
+                    if (!Number.isNaN(numericId) && String(numericId) === requestId) {
+                        idCandidates.push(numericId);
+                    }
+
+                    for (const idValue of idCandidates) {
+                        const queried = await collection.where('id', '==', idValue).limit(1).get();
+                        if (!queried.empty) {
+                            docRef = queried.docs[0].ref;
+                            snapshot = queried.docs[0];
+                            break;
+                        }
+                    }
+                }
+
+                if (snapshot.exists) {
+                    const base = snapshot.data() || {};
+                    const merged = {
+                        ...base,
+                        ...updates,
+                        updated_at: new Date().toISOString()
+                    };
+                    if (!merged.id) {
+                        const numericId = Number(requestId);
+                        merged.id = Number.isNaN(numericId) ? requestId : numericId;
+                    }
+                    if (!merged.ownerUid && ownerUid) {
+                        merged.ownerUid = ownerUid;
+                    }
+                    await docRef.set(merged, { merge: true });
+
+                    // Best-effort file cache sync
+                    const requests = await this.readData('sign_requests');
+                    const index = requests.findIndex(r => r.id === id || String(r.id) === requestId);
+                    if (index > -1) {
+                        requests[index] = { ...requests[index], ...merged };
+                    } else {
+                        requests.push(merged);
+                    }
+                    await this.writeData('sign_requests', requests);
+                    return merged;
+                }
+            } catch (error) {
+                logger.warn(`updateSignRequest Firestore failed id=${requestId} error=${error.message}`);
+            }
+        }
+
+        // File fallback
+        const requests = await this.readData('sign_requests');
+        const index = requests.findIndex(r => r.id === id || String(r.id) === requestId);
         if (index > -1) {
             requests[index] = { ...requests[index], ...updates };
             if (this.useFirestore && ownerUid) {

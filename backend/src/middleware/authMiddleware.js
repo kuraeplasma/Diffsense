@@ -30,20 +30,18 @@ const authMiddleware = async (req, res, next) => {
             const bearerToken = (authHeader && authHeader.startsWith('Bearer '))
                 ? authHeader.split('Bearer ')[1]
                 : null;
-            if (!firebaseInitialized) {
-                const decoded = decodeJwtPayload(bearerToken);
-                req.user = {
-                    uid: decoded?.user_id || decoded?.sub || 'dev-user-001',
-                    email: decoded?.email || 'dev@localhost'
-                };
-                logger.warn(`DEV AUTH BYPASS: Using ${decoded ? 'decoded token user' : 'temporary user'} (${req.user.uid}).`);
-                try {
-                    await dbService.upsertUserEmail(req.user.uid, req.user.email);
-                } catch (e) {
-                    logger.warn(`Failed to sync dev user email: ${e.message}`);
-                }
-                return next();
+            const decoded = decodeJwtPayload(bearerToken);
+            req.user = {
+                uid: decoded?.user_id || decoded?.sub || 'dev-user-001',
+                email: decoded?.email || 'dev@localhost'
+            };
+            logger.warn(`DEV AUTH BYPASS: Using ${decoded ? 'decoded token user' : 'temporary user'} (${req.user.uid}).`);
+            try {
+                await dbService.upsertUserEmail(req.user.uid, req.user.email);
+            } catch (e) {
+                logger.warn(`Failed to sync dev user email: ${e.message}`);
             }
+            return next();
         }
 
         const authHeader = req.headers.authorization;

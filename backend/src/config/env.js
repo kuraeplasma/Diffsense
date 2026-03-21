@@ -6,6 +6,7 @@ function isTruthy(value) {
 
 function collectEnvValidation() {
     const isProduction = String(process.env.NODE_ENV || '').trim() === 'production';
+    const isCloudRuntime = Boolean(process.env.FUNCTION_TARGET || process.env.K_SERVICE);
     const errors = [];
     const warnings = [];
 
@@ -23,7 +24,10 @@ function collectEnvValidation() {
         'FB_PROJECT_ID',
         'FB_CLIENT_EMAIL',
         'FB_PRIVATE_KEY',
-        'FB_STORAGE_BUCKET'
+        'FB_STORAGE_BUCKET',
+        'ZOHO_WEBHOOK_SECRET',
+        'PAYPAL_WEBHOOK_ID',
+        'STRIPE_WEBHOOK_SECRET'
     ];
 
     for (const key of requiredEnvKeys) {
@@ -46,7 +50,13 @@ function collectEnvValidation() {
     if (frontendUrl && !/^https:\/\//i.test(frontendUrl)) {
         errors.push('FRONTEND_URL must use https in production');
     }
-    if (allowedOrigins && !allowedOrigins.split(',').every((origin) => /^https:\/\//i.test(String(origin || '').trim()))) {
+    if (allowedOrigins && !allowedOrigins.split(',').every((origin) => {
+        const normalized = String(origin || '').trim();
+        if (!normalized) return false;
+        if (/^https:\/\//i.test(normalized)) return true;
+        if (!isCloudRuntime && /^http:\/\/localhost(?::\d+)?$/i.test(normalized)) return true;
+        return false;
+    })) {
         errors.push('ALLOWED_ORIGINS must contain only https origins in production');
     }
 

@@ -1,4 +1,5 @@
 import { getIdToken } from './auth.js';
+import { getApiBaseUrl } from './api-base.js';
 
 function redirectToTrialExpiredPlanPage() {
     const billingRaw = localStorage.getItem('diffsense_selected_billing_cycle');
@@ -19,12 +20,7 @@ export const aiService = {
 
     // API Base URL (Local vs Cloud). localhostでも本番APIを明示指定できる。
     getApiBase() {
-        const PROD_API = 'https://api-qf37m5ba2q-an.a.run.app';
-        const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-        const params = new URLSearchParams(window.location.search);
-        const forceProd = params.get('api') === 'prod' || localStorage.getItem('diffsense_api_mode') === 'prod';
-        if (forceProd) return PROD_API;
-        return isLocalHost ? 'http://localhost:3001' : PROD_API;
+        return getApiBaseUrl();
     },
 
     /**

@@ -528,7 +528,7 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                     }
                     logger.info(`PDF uploaded to Firebase Storage: ${pdfStoragePath}`);
                 } catch (storageError) {
-                    logger.warn('Firebase Storage upload failed (analysis will continue):', storageError.message);
+                    logger.warn('Firebase Storage upload failed. bucket=' + (bucket?.name || 'null') + ' error=' + (storageError?.message || String(storageError)) + ' stack=' + (storageError?.stack || ''));
                     pdfUrl = null;
                     pdfStoragePath = null;
                 }
@@ -651,7 +651,6 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
             aiResult.riskReason = 'エラーにより解析中断';
         }
 
-        const crypto = require('crypto');
         const textForHash = (extractedText && typeof extractedText === 'object')
             ? JSON.stringify(extractedText)
             : String(extractedText || '');
@@ -672,6 +671,7 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
 
         const aiFailed = !aiResult.summary || isAiFailureSummary(aiResult.summary) || aiResult.isFallback === true;
 
+        logger.info(`analyze response contractId=${contractId} pdfUrl=${pdfUrl || 'null'} pdfStoragePath=${pdfStoragePath || 'null'}`);
         res.json({
             success: true,
             data: {
@@ -775,7 +775,6 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
             }
         }
 
-        const crypto = require('crypto');
         const serialized = JSON.stringify(currentArticles);
         const extractedTextHash = crypto.createHash('sha256').update(serialized).digest('hex');
 

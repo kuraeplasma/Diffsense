@@ -10,6 +10,10 @@ function isValidEmail(value) {
 }
 
 function resolveFrontendBase(req) {
+    const configured = String(process.env.FRONTEND_URL || '').trim();
+    if (configured) {
+        return configured.replace(/\/$/, '');
+    }
     if (process.env.NODE_ENV === 'production') {
         return 'https://diffsense.spacegleam.co.jp';
     }
@@ -31,6 +35,19 @@ function resolveSafeCancelUrl(req, frontendBase) {
     }
     return `${frontendBase}/dashboard.html#plan`;
 }
+
+const ALLOWED_PRICE_IDS = Object.freeze({
+    starter_monthly: process.env.STRIPE_PRICE_STARTER || 'price_1T9iXH2NMkk9rteNzfHmJ6IH',
+    starter_yearly: process.env.STRIPE_PRICE_STARTER_ANNUAL || 'price_1T9iXI2NMkk9rteNNDv4X0lP',
+    business_monthly: process.env.STRIPE_PRICE_BUSINESS || 'price_1T9iXI2NMkk9rteNKImWXoud',
+    business_yearly: process.env.STRIPE_PRICE_BUSINESS_ANNUAL || 'price_1T9iXJ2NMkk9rteNReZKwrBq',
+    pro_monthly: process.env.STRIPE_PRICE_PRO || 'price_1T9iXI2NMkk9rteN3MXhXIZE',
+    pro_yearly: process.env.STRIPE_PRICE_PRO_ANNUAL || 'price_1T9iXJ2NMkk9rteNMtxh3vIU'
+});
+
+const ALLOWED_PRICE_ID_VALUES = new Set(
+    Object.values(ALLOWED_PRICE_IDS).filter((priceId) => typeof priceId === 'string' && priceId.trim())
+);
 
 /**
  * POST /payment/create-subscription
@@ -59,7 +76,7 @@ router.post('/create-subscription', async (req, res) => {
             });
         }
 
-        const dashboardUrl = process.env.DASHBOARD_URL || 'http://localhost:3000/dashboard';
+        const dashboardUrl = process.env.DASHBOARD_URL || `${resolveFrontendBase(req)}/dashboard.html`;
 
         const returnUrl = `${dashboardUrl}?payment=success&plan=${plan}&billing=${billingCycle}`;
         const cancelUrl = `${dashboardUrl}?payment=cancelled&plan=${plan}&billing=${billingCycle}`;
@@ -259,6 +276,12 @@ async function createStripeCheckoutSessionHandler(req, res) {
         }
 
         const requestedPriceId = (req.body?.priceId || '').trim();
+        if (requestedPriceId && !ALLOWED_PRICE_ID_VALUES.has(requestedPriceId)) {
+            return res.status(400).json({
+                success: false,
+                error: '許可されていない価格IDです'
+            });
+        }
         const requestedPlan = req.body.plan;
         const requestedBillingCycle = req.body.billingCycle;
         const validPlans = ['starter', 'business', 'pro'];
@@ -354,6 +377,14 @@ router.post('/confirm-stripe-session', async (req, res) => {
             return res.status(400).json({
                 success: false,
                 error: `Stripe決済が未完了です（status: ${session?.payment_status || 'unknown'}）`
+            });
+        }
+
+        const sessionOwnerUid = String(session?.metadata?.uid || '').trim();
+        if (!sessionOwnerUid || sessionOwnerUid !== String(uid).trim()) {
+            return res.status(403).json({
+                success: false,
+                error: 'この決済セッションにアクセスする権限がありません'
             });
         }
 

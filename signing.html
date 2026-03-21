@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
   <title>電子署名 - DIFFsense</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <style>
     :root {
       --bg: #f4f0ea;
@@ -132,8 +133,43 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 8px;
+      gap: 12px;
       margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    .page-switcher {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px 8px 16px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.96);
+      border: 1px solid rgba(232, 222, 206, 0.95);
+      box-shadow: 0 12px 28px rgba(17, 24, 39, 0.08);
+    }
+
+    .page-switcher-label {
+      color: #9a8a79;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+    }
+
+    .page-switcher-value {
+      color: #2b2623;
+      font-size: 15px;
+      font-weight: 800;
+      min-width: 54px;
+      text-align: center;
+    }
+
+    .page-switcher-actions,
+    .zoom-controls {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
     }
 
     .toolbar button,
@@ -150,6 +186,9 @@
 
     .toolbar button {
       cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .toolbar button:disabled {
@@ -177,6 +216,74 @@
 
     #pdf-canvas {
       display: block;
+    }
+
+    #document-fallback {
+      position: relative;
+      display: none;
+      width: 100%;
+    }
+
+    .fallback-page {
+      position: relative;
+      width: 794px;
+      margin: 0 auto;
+      background: #fff;
+      border-radius: 6px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+      overflow: visible;
+    }
+
+    .fallback-head {
+      padding: 18px 24px;
+      border-bottom: 1px solid #eee;
+      font-size: 12px;
+      color: #666;
+    }
+
+    .fallback-body {
+      padding: 42px 48px 56px;
+      line-height: 1.8;
+      font-size: 13px;
+      color: #333;
+      font-family: "Noto Sans JP", sans-serif;
+      box-sizing: border-box;
+      background: #fff;
+    }
+
+    .fallback-body .document-content-full {
+      white-space: normal;
+      word-break: break-word;
+    }
+
+    .fallback-body .contract-structured-container,
+    .fallback-body .clause-cards-container {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .fallback-body .clause-card {
+      border: 1px solid #ebe6de;
+      border-radius: 14px;
+      padding: 16px 18px;
+      background: #fffdfa;
+    }
+
+    .fallback-body .clause-card-header h3 {
+      margin: 0;
+      font-size: 15px;
+      color: #1f2937;
+    }
+
+    .fallback-body .clause-card-subtitle {
+      margin-top: 4px;
+      font-size: 12px;
+      color: #8a7a6a;
+    }
+
+    .fallback-body .clause-card-body p {
+      margin: 10px 0 0;
     }
 
     .fields-overlay {
@@ -659,15 +766,23 @@
           </div>
         </div>
         <div class="toolbar">
-          <button id="prev-btn" onclick="goPage(-1)" aria-label="前のページ">‹</button>
-          <span class="summary" id="page-summary">1 / 1</span>
-          <button id="next-btn" onclick="goPage(1)" aria-label="次のページ">›</button>
-          <button onclick="changeZoom(-0.15)">−</button>
-          <span class="summary" id="zoom-summary">100%</span>
-          <button onclick="changeZoom(0.15)">＋</button>
+          <div class="page-switcher">
+            <span class="page-switcher-label">ページ切替</span>
+            <span class="page-switcher-value" id="page-summary">1 / 1</span>
+            <div class="page-switcher-actions">
+              <button id="prev-btn" onclick="goPage(-1)" aria-label="前のページ">‹</button>
+              <button id="next-btn" onclick="goPage(1)" aria-label="次のページ">›</button>
+            </div>
+          </div>
+          <div class="zoom-controls">
+            <button onclick="changeZoom(-0.15)" aria-label="縮小">−</button>
+            <span class="summary" id="zoom-summary">100%</span>
+            <button onclick="changeZoom(0.15)" aria-label="拡大">＋</button>
+          </div>
         </div>
         <div class="canvas-wrap">
           <canvas id="pdf-canvas"></canvas>
+          <div id="document-fallback"></div>
           <div id="fields-overlay" class="fields-overlay"></div>
         </div>
       </section>
@@ -784,10 +899,13 @@
       totalPages: 1,
       zoom: 1,
       previewMode: !new URLSearchParams(location.search).get('token'),
+      documentMode: 'pdf',
       signRequestId: null,
       recipientEmail: '',
       recipientName: '',
       fileName: '',
+      originalContent: null,
+      sourceUrl: '',
       fields: [],
       myFields: [],
       signatures: {},
@@ -867,8 +985,15 @@
         state.signatures = data.signatures || {};
         state.myFields = state.fields.filter((field) => String(field.recipientEmail || '').trim() === state.recipientEmail);
         setFileName(data.fileName || '');
+        state.originalContent = data.originalContent || null;
+        state.sourceUrl = data.sourceUrl || '';
+        state.documentMode = data.previewMode === 'fallback' || !data.pdfUrl ? 'fallback' : 'pdf';
 
-        await loadPdf(data.pdfUrl);
+        if (state.documentMode === 'fallback') {
+          renderFallbackDocument();
+        } else {
+          await loadPdf(data.pdfUrl);
+        }
         renderFieldStatus();
         updateFinishState();
         showMain();
@@ -901,6 +1026,9 @@
     }
 
     function renderPreviewPage() {
+      state.documentMode = 'pdf';
+      document.getElementById('document-fallback').style.display = 'none';
+      document.getElementById('pdf-canvas').style.display = 'block';
       const canvas = document.getElementById('pdf-canvas');
       const context = canvas.getContext('2d');
       const width = Math.round(794 * state.zoom);
@@ -946,6 +1074,9 @@
     }
 
     async function loadPdf(url) {
+      state.documentMode = 'pdf';
+      document.getElementById('document-fallback').style.display = 'none';
+      document.getElementById('pdf-canvas').style.display = 'block';
       state.pdfDoc = await pdfjsLib.getDocument({
         url,
         cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
@@ -954,6 +1085,107 @@
       }).promise;
       state.totalPages = state.pdfDoc.numPages;
       await renderPage(state.currentPage);
+    }
+
+    function escapeHtml(value) {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function buildDocumentPreviewHtml(content) {
+      if (!content) {
+        return '<div class="document-content-full">表示できる本文データが見つかりません</div>';
+      }
+
+      if (typeof content === 'string') {
+        return `<div class="document-content-full">${escapeHtml(content).replace(/\r?\n/g, '<br>')}</div>`;
+      }
+
+      if (Array.isArray(content)) {
+        const clauses = content.map((item, index) => {
+          const title = escapeHtml(item.article || item.articleNumber || item.title || `第${index + 1}条`);
+          const header = escapeHtml(item.header || '');
+          const paragraphs = Array.isArray(item.paragraphs)
+            ? item.paragraphs.map((p) => `<p>${escapeHtml(p)}</p>`).join('')
+            : `<p>${escapeHtml(item.body || item.content || '')}</p>`;
+          return `
+            <article class="clause-card">
+              <div class="clause-card-header">
+                <h3>${title}</h3>
+                ${header ? `<div class="clause-card-subtitle">${header}</div>` : ''}
+              </div>
+              <div class="clause-card-body">${paragraphs}</div>
+            </article>
+          `;
+        }).join('');
+        return `<div class="contract-structured-container"><div class="clause-cards-container">${clauses}</div></div>`;
+      }
+
+      if (typeof content === 'object' && Array.isArray(content.articles)) {
+        const preamble = String(content.preamble || '').trim();
+        const articles = content.articles.map((item, index) => {
+          const title = escapeHtml(item.articleNumber || item.article || `第${index + 1}条`);
+          const header = escapeHtml(item.title || item.header || '');
+          const bodySource = Array.isArray(item.paragraphs)
+            ? item.paragraphs
+            : String(item.content || '').split(/\r?\n/).filter(Boolean);
+          const paragraphs = bodySource.map((p) => `<p>${escapeHtml(p)}</p>`).join('');
+          return `
+            <article class="clause-card">
+              <div class="clause-card-header">
+                <h3>${title}</h3>
+                ${header ? `<div class="clause-card-subtitle">${header}</div>` : ''}
+              </div>
+              <div class="clause-card-body">${paragraphs}</div>
+            </article>
+          `;
+        }).join('');
+        const preambleHtml = preamble
+          ? `<article class="clause-card"><div class="clause-card-header"><h3>前文</h3></div><div class="clause-card-body">${escapeHtml(preamble).replace(/\r?\n/g, '<br>')}</div></article>`
+          : '';
+        return `<div class="contract-structured-container"><div class="clause-cards-container">${preambleHtml}${articles}</div></div>`;
+      }
+
+      return `<div class="document-content-full">${escapeHtml(String(content))}</div>`;
+    }
+
+    function renderFallbackDocument() {
+      state.documentMode = 'fallback';
+      state.totalPages = 1;
+      state.currentPage = 1;
+      document.getElementById('pdf-canvas').style.display = 'none';
+      const fallback = document.getElementById('document-fallback');
+      fallback.style.display = 'block';
+      fallback.innerHTML = `
+        <div id="document-fallback-page" class="fallback-page">
+          <div class="fallback-head">
+            <strong style="color:#333;">抽出テキスト・プレビュー</strong>
+            ${state.sourceUrl ? ` <span style="margin-left:8px;"><a href="${escapeHtml(state.sourceUrl)}" target="_blank" style="color:#1a73e8; text-decoration:none;">元ソースを開く</a></span>` : ''}
+          </div>
+          <div class="fallback-body">${buildDocumentPreviewHtml(state.originalContent)}</div>
+        </div>
+      `;
+
+      const pageEl = document.getElementById('document-fallback-page');
+      const pageWidth = 794;
+      const pageHeight = Math.max(640, Math.ceil(pageEl.offsetHeight || 1123));
+      const overlay = document.getElementById('fields-overlay');
+      overlay.style.width = `${pageWidth}px`;
+      overlay.style.height = `${pageHeight}px`;
+      overlay.style.left = '50%';
+      overlay.style.transform = 'translateX(-50%)';
+      overlay.style.top = '0';
+      pageEl.style.minHeight = `${pageHeight}px`;
+
+      document.getElementById('page-summary').textContent = '1 / 1';
+      document.getElementById('zoom-summary').textContent = `${Math.round(state.zoom * 100)}%`;
+      document.getElementById('prev-btn').disabled = true;
+      document.getElementById('next-btn').disabled = true;
+      renderFieldMarkers();
     }
 
     async function renderPage(pageNumber) {
@@ -990,12 +1222,24 @@
         renderPreviewPage();
         return;
       }
+      if (state.documentMode === 'fallback') {
+        const pageEl = document.getElementById('document-fallback-page');
+        if (pageEl) {
+          pageEl.style.transformOrigin = 'top center';
+          pageEl.style.transform = `scale(${state.zoom})`;
+          pageEl.style.marginBottom = `${Math.max(24, Math.round(140 * state.zoom))}px`;
+        }
+        document.getElementById('zoom-summary').textContent = `${Math.round(state.zoom * 100)}%`;
+        return;
+      }
       renderPage(state.currentPage);
     }
 
     function renderFieldMarkers() {
       const overlay = document.getElementById('fields-overlay');
       overlay.innerHTML = '';
+      overlay.style.transform = state.documentMode === 'fallback' ? 'translateX(-50%)' : '';
+      overlay.style.left = state.documentMode === 'fallback' ? '50%' : '';
 
       state.fields
         .filter((field) => Number(field.page || 1) === state.currentPage)
@@ -1265,9 +1509,24 @@
       button.textContent = '送信中...';
 
       try {
+        let fallbackDocumentImageDataUrl = '';
+        if (state.documentMode === 'fallback') {
+          const fallbackPage = document.getElementById('document-fallback-page');
+          if (!fallbackPage || typeof html2canvas !== 'function') {
+            throw new Error('署名対象の書類プレビューを作成できませんでした');
+          }
+          const canvas = await html2canvas(fallbackPage, {
+            backgroundColor: '#ffffff',
+            scale: 2,
+            useCORS: true,
+            logging: false
+          });
+          fallbackDocumentImageDataUrl = canvas.toDataURL('image/png');
+        }
         const payload = {
           token: state.token,
-          signatures: Object.values(state.signatures)
+          signatures: Object.values(state.signatures),
+          fallbackDocumentImageDataUrl
         };
         const response = await fetch(`${API_BASE}/api/sign/submit`, {
           method: 'POST',

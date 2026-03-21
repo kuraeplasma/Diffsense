@@ -1,5 +1,33 @@
 function normalizeBaseUrl(value) {
-    return String(value || '').trim().replace(/\/$/, '');
+    const raw = String(value || '').trim().replace(/\/$/, '');
+    if (!raw) return '';
+    try {
+        const parsed = new URL(raw);
+        if (parsed.pathname === '/api') {
+            parsed.pathname = '';
+            return parsed.toString().replace(/\/$/, '');
+        }
+    } catch {
+        // keep raw value for non-URL inputs
+    }
+    return raw;
+}
+
+const PROD_API_BASE_URL = 'https://api-qf37m5ba2q-an.a.run.app';
+
+function shouldIgnoreExplicitBase(explicitBase) {
+    if (!explicitBase) return false;
+    try {
+        const explicitUrl = new URL(explicitBase);
+        const currentUrl = new URL(window.location.origin);
+        const isLocalHost = currentUrl.hostname === 'localhost' || currentUrl.hostname === '127.0.0.1';
+        if (isLocalHost) return false;
+
+        // If override points to the same frontend origin, API calls become /contracts 404.
+        return explicitUrl.host === currentUrl.host;
+    } catch {
+        return false;
+    }
 }
 
 const PROD_API_BASE_URL = 'https://api-qf37m5ba2q-an.a.run.app';
@@ -11,7 +39,7 @@ export function getApiBaseUrl() {
         || params.get('apiBase')
         || localStorage.getItem('diffsense_api_base')
     );
-    if (explicit) return explicit;
+    if (explicit && !shouldIgnoreExplicitBase(explicit)) return explicit;
 
     const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     return isLocalHost ? 'http://localhost:3001' : PROD_API_BASE_URL;

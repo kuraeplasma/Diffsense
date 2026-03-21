@@ -10,6 +10,7 @@ import {
     signOut,
     onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getApiBaseUrl } from './api-base.js';
 
 function resolveSafeNextUrl(nextRaw, fallbackPath = 'dashboard.html') {
     if (!nextRaw || typeof nextRaw !== 'string') {
@@ -24,9 +25,7 @@ function resolveSafeNextUrl(nextRaw, fallbackPath = 'dashboard.html') {
 }
 
 function getApiBase() {
-    return (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-        ? 'http://localhost:3001'
-        : 'https://api-qf37m5ba2q-an.a.run.app';
+    return getApiBaseUrl();
 }
 
 function normalizeBillingCycle(value) {
@@ -34,11 +33,7 @@ function normalizeBillingCycle(value) {
 }
 
 function getPasswordResetContinueUrl() {
-    const host = window.location.hostname;
-    if (host === 'localhost' || host === '127.0.0.1') {
-        return 'http://localhost:3000/login.html?tab=login';
-    }
-    return 'https://diffsense.spacegleam.co.jp/login.html?tab=login';
+    return `${window.location.origin}/login.html?tab=login`;
 }
 
 function persistPlanIntentFromUrl(options = {}) {

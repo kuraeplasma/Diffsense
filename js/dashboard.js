@@ -1,4 +1,5 @@
-import { dbService } from './db-service.js?v=20260321a';
+import { Notify } from './notify.js';
+import { dbService } from './db-service.js?v=20260321f';
 import { aiService } from './ai-service.js?v=20260309h2';
 const LOCAL_UI_CACHE_VERSION = '20260310v3';
 const DASHBOARD_CACHE_KEYS = {
@@ -941,7 +942,11 @@ const formatDisplayTimestamp = (value) => {
     if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
         return raw.replace(/-/g, '/');
     }
-    const normalized = raw.replace(' ', 'T');
+    const normalized = /^\d{4}-\d{2}-\d{2}T\d{2}$/.test(raw)
+        ? `${raw}:00:00`
+        : /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(raw)
+            ? `${raw}:00`
+            : raw.replace(' ', 'T');
     const parsed = new Date(normalized);
     if (Number.isNaN(parsed.getTime())) return raw;
     return parsed.toLocaleString('ja-JP', {
@@ -1233,6 +1238,7 @@ const Views = {
 
             let statusBadge = '';
             if (c.status === '未解析') statusBadge = '<span class="badge badge-info">未解析 (新規)</span>';
+            else if (c.status === '未処理') statusBadge = '<span class="badge badge-info">未処理</span>';
             else if (c.status === '未確認') statusBadge = '<span class="badge badge-warning">要確認 (変更)</span>';
             else if (c.status === '確認済') statusBadge = '<span class="badge badge-neutral"><i class="fa-solid fa-check"></i> 確認済</span>';
 
@@ -2369,7 +2375,11 @@ class RegistrationFlow {
                 sourceUrl: this.tempData.method === 'url' ? this.tempData.source : '',
                 originalFilename: (this.tempData.method === 'pdf' || isWord) ? this.tempData.fileData.name : ''
             });
-            await dbService.persistContractToApi(newContract, 'POST');
+            const savedContract = await dbService.persistContractToApi(newContract, 'POST', { throwOnError: true });
+            if (!savedContract) {
+                throw new Error('契約データの保存に失敗しました');
+            }
+            await dbService.syncContractsFromApi();
             // 2. テキスト抽出を実行（失敗しても登録は維持する）
             let extractionSucceeded = false;
             try {
@@ -2382,6 +2392,7 @@ class RegistrationFlow {
                 }
 
                 extractionSucceeded = await this.extractTextOnly(newContract.id, previousText, previousFileBase64) === true;
+                await dbService.syncContractsFromApi();
             } catch (extractError) {
                 console.error('Text Extraction Failed (Non-fatal):', extractError);
                 // 失敗時はステータスを更新しておく（ユーザーには後で通知）
@@ -3869,6 +3880,7 @@ class DashboardApp {
         }
 
         if (viewId === 'sign') {
+            await dbService.syncContractsFromApi();
             console.trace('Routing to sign');
             const { SignUI } = await import('./sign-ui.js?v=20260321a');
             this.mainContent.innerHTML = await SignUI.renderSignView(this);
@@ -3878,7 +3890,7 @@ class DashboardApp {
 
         if (viewId === 'sign-viewer') {
             const { SignUI } = await import('./sign-ui.js?v=20260321a');
-            const { SignViewer } = await import('./sign-viewer.js?v=20260320ay');
+            const { SignViewer } = await import('./sign-viewer.js?v=20260321az');
             this.mainContent.innerHTML = await SignUI.renderSignViewer(this, params);
             await SignViewer.init(this, params);
             return;
@@ -3886,7 +3898,7 @@ class DashboardApp {
         
         if (viewId === 'sign-editor') {
             const { SignUI } = await import('./sign-ui.js?v=20260321a');
-            const { SignEditor } = await import('./sign-editor.js?v=20260320ag');
+            const { SignEditor } = await import('./sign-editor.js?v=20260321b');
             this.mainContent.innerHTML = await SignUI.renderSignEditor(this, params);
             await SignEditor.init(this, params);
             return;
@@ -3915,6 +3927,9 @@ class DashboardApp {
         }
 
         let renderParams = params;
+        if (viewId === 'dashboard' || viewId === 'contracts') {
+            await dbService.syncContractsFromApi();
+        }
         if (viewId === 'contracts') {
             renderParams = {
                 page: this.currentPage,
@@ -4073,6 +4088,7 @@ class DashboardApp {
 
                 let statusBadge = '';
                 if (c.status === '未解析') statusBadge = '<span class="badge badge-info">未解析 (新規)</span>';
+                else if (c.status === '未処理') statusBadge = '<span class="badge badge-info">未処理</span>';
                 else if (c.status === '未確認') statusBadge = '<span class="badge badge-warning">要確認 (変更)</span>';
                 else if (c.status === '確認済') statusBadge = '<span class="badge badge-neutral"><i class="fa-solid fa-check"></i> 確認済</span>';
 

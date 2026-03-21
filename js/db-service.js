@@ -3,7 +3,7 @@
  * Data is isolated per user (UID-based keys or Backend Auth)
  */
 import { getIdToken } from './auth.js';
-import { toApiUrl } from './api-base.js?v=20260321b';
+import { toApiUrl } from './api-base.js?v=20260321f';
 
 const LOCAL_CACHE_VERSION = '20260310v2';
 
@@ -49,6 +49,19 @@ export const dbService = {
         return new Date().toISOString();
     },
 
+    toSortableTime(value) {
+        const raw = String(value || '').trim();
+        if (!raw) return 0;
+        const normalized = /^\d{4}-\d{2}-\d{2}$/.test(raw)
+            ? `${raw}T00:00:00`
+            : /^\d{4}-\d{2}-\d{2}T\d{2}$/.test(raw)
+                ? `${raw}:00:00`
+                : /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(raw)
+                    ? `${raw}:00`
+                    : raw.replace(' ', 'T');
+        const parsed = new Date(normalized);
+        return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
+    },
     // Dynamic KEYS getter (with UID prefix)
     get KEYS() {
         const prefix = this._uid ? `diffsense_${this._uid}_` : 'diffsense_';
@@ -77,7 +90,6 @@ export const dbService = {
      */
     async _callApi(endpoint, method = 'GET', body = null, options = {}) {
         try {
-            const url = toApiUrl(endpoint);
             const fetchOptions = {
                 method,
                 headers: {
@@ -100,17 +112,46 @@ export const dbService = {
                 fetchOptions.body = JSON.stringify(body);
             }
 
-            const response = await fetch(url, fetchOptions);
-            const result = await response.json();
-
-            if (!response.ok) {
-                const error = new Error(result.error || `API Error: ${response.status}`);
-                error.code = result.code || null;
-                error.status = response.status;
-                throw error;
+            const path = String(endpoint || '').trim();
+            const candidates = [path];
+            if (path.startsWith('/api/')) {
+                candidates.push(path.replace(/^\/api/, ''));
+            } else if (path.startsWith('/')) {
+                candidates.push(`/api${path}`);
             }
 
-            return result.data;
+            let lastError = null;
+            for (let i = 0; i < candidates.length; i += 1) {
+                const candidate = candidates[i];
+                const url = toApiUrl(candidate);
+                const response = await fetch(url, fetchOptions);
+                const raw = await response.text();
+                let result = {};
+                try {
+                    result = raw ? JSON.parse(raw) : {};
+                } catch {
+                    result = { error: raw || `API Error: ${response.status}` };
+                }
+
+                if (!response.ok) {
+                    const message = String(result.error || `API Error: ${response.status}`);
+                    const isEndpointNotFound = response.status === 404 && /endpoint not found/i.test(message);
+                    const canRetry = isEndpointNotFound && i < candidates.length - 1;
+                    if (canRetry) {
+                        console.warn(`API fallback retry: ${candidate} -> ${candidates[i + 1]}`);
+                        continue;
+                    }
+                    const error = new Error(message);
+                    error.code = result.code || null;
+                    error.status = response.status;
+                    lastError = error;
+                    break;
+                }
+
+                return result.data;
+            }
+
+            throw (lastError || new Error('API request failed'));
         } catch (error) {
             console.error(`API Call failed (${endpoint}):`, error);
             if (options.throwOnError) {
@@ -205,7 +246,7 @@ export const dbService = {
     },
 
     async syncContractsFromApi() {
-        const apiData = await this._callApi('/contracts');
+        const apiData = await this._callApi('/api/contracts');
         if (Array.isArray(apiData)) {
             localStorage.setItem(this.KEYS.CONTRACTS, JSON.stringify(apiData));
             return apiData;
@@ -239,10 +280,10 @@ export const dbService = {
         })();
     },
 
-    async persistContractToApi(contract, method = 'PATCH') {
+    async persistContractToApi(contract, method = 'PATCH', options = {}) {
         if (!contract?.id) return null;
-        const endpoint = method === 'POST' ? '/contracts' : `/contracts/${contract.id}`;
-        const saved = await this._callApi(endpoint, method, contract);
+        const endpoint = method === 'POST' ? '/api/contracts' : `/api/contracts/${contract.id}`;
+        const saved = await this._callApi(endpoint, method, contract, options);
         if (saved) {
             this._mergeContractIntoCache(saved);
         }
@@ -276,9 +317,9 @@ export const dbService = {
 
         // 3. Sorting
         if (sortBy === "date_desc") {
-            contracts.sort((a, b) => new Date(b.last_updated_at) - new Date(a.last_updated_at));
+            contracts.sort((a, b) => this.toSortableTime(b.last_updated_at || b.last_analyzed_at || b.created_at) - this.toSortableTime(a.last_updated_at || a.last_analyzed_at || a.created_at));
         } else if (sortBy === "date_asc") {
-            contracts.sort((a, b) => new Date(a.last_updated_at) - new Date(b.last_updated_at));
+            contracts.sort((a, b) => this.toSortableTime(a.last_updated_at || a.last_analyzed_at || a.created_at) - this.toSortableTime(b.last_updated_at || b.last_analyzed_at || b.created_at));
         } else if (sortBy === "name_asc") {
             contracts.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
         }
@@ -434,18 +475,27 @@ export const dbService = {
         return newContract;
     },
 
+    isPendingContract(contract) {
+        const status = String(contract?.status || '').trim();
+        return !status || status === '未解析' || status === '未処理' || status === '未確認' || status === '登録失敗';
+    },
+
+    isMonitoringContract(contract) {
+        return !this.isPendingContract(contract);
+    },
+
     // --- Stats Method ---
     getStats() {
         const contracts = this.getContracts();
 
         // 1. Pending (未処理): Unconfirmed OR Not Analyzed
-        const pending = contracts.filter(c => c.status === '未確認' || c.status === '未解析').length;
+        const pending = contracts.filter(c => this.isPendingContract(c)).length;
 
         // 2. Risk Review (リスク要確認): High Risk AND NOT Confirmed
         const highRisk = contracts.filter(c => c.risk_level === 'High' && c.status !== '確認済').length;
 
-        // 3. Monitoring (監視中): Total managed contracts
-        const total = contracts.length;
+        // 3. Monitoring (監視中): 差分チェック未実施を除外
+        const total = contracts.filter(c => this.isMonitoringContract(c)).length;
 
         return {
             pending,
@@ -457,15 +507,15 @@ export const dbService = {
     getFilteredContracts(type) {
         let contracts = [...this.getContracts()];
         // Sort by last_updated_at desc to show recent items first
-        contracts.sort((a, b) => new Date(b.last_updated_at) - new Date(a.last_updated_at));
+        contracts.sort((a, b) => this.toSortableTime(b.last_updated_at || b.last_analyzed_at || b.created_at) - this.toSortableTime(a.last_updated_at || a.last_analyzed_at || a.created_at));
 
         switch (type) {
             case 'pending':
-                return contracts.filter(c => c.status === '未確認' || c.status === '未解析');
+                return contracts.filter(c => this.isPendingContract(c));
             case 'risk':
                 return contracts.filter(c => c.risk_level === 'High' && c.status !== '確認済');
             case 'total':
-                return contracts; // Now sorted
+                return contracts.filter(c => this.isMonitoringContract(c)); // Now sorted
             default:
                 return contracts;
         }

@@ -10,10 +10,20 @@ if (process.env.SENDGRID_API_KEY) {
 
 const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@diffsense.com';
 const FROM_NAME = process.env.FROM_NAME || 'DIFFsense';
-const DASHBOARD_URL = process.env.DASHBOARD_URL || 'https://diffsense.netlify.app/dashboard';
-const LOGIN_URL = DASHBOARD_URL.replace('/dashboard', '/login.html');
+const FRONTEND_BASE_URL = String(process.env.FRONTEND_URL || 'https://diffsense.spacegleam.co.jp').replace(/\/$/, '');
+const DASHBOARD_URL = process.env.DASHBOARD_URL || `${FRONTEND_BASE_URL}/dashboard.html`;
+const LOGIN_URL = `${FRONTEND_BASE_URL}/login.html`;
 
 logger.info(`Email Service Configured: From: "${FROM_NAME}" <${FROM_EMAIL}>, Link: ${DASHBOARD_URL}`);
+
+function escapeHtml(value) {
+    return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
 
 /**
  * Send an invitation email to a new member with login credentials
@@ -167,6 +177,142 @@ exports.sendTrialReminderEmail = async (to, name, daysLeft) => {
         return true;
     } catch (error) {
         logger.error(`Error sending trial reminder email: ${error.message}`);
+        throw error;
+    }
+};
+
+/**
+ * Send a signature request email
+ * @param {object} params
+ * @param {string} params.to
+ * @param {string} params.recipientName
+ * @param {string} params.documentName
+ * @param {string} params.senderName
+ * @param {string} params.signUrl
+ */
+exports.sendSignatureRequestEmail = async ({ to, recipientName, documentName, senderName, signUrl }) => {
+    const honorificName = String(recipientName || '').trim() || String(to || '').split('@')[0] || 'ご担当者';
+    const safeRecipientName = `${honorificName}様`;
+    const safeDocumentName = String(documentName || '署名書類').trim();
+    const safeSenderName = String(senderName || FROM_NAME).trim();
+    const resolvedSignUrl = signUrl || DASHBOARD_URL;
+
+    const msg = {
+        to,
+        from: {
+            email: FROM_EMAIL,
+            name: FROM_NAME
+        },
+        subject: `【DIFFsense】${safeDocumentName} への署名のお願い`,
+        text: [
+            safeRecipientName,
+            '',
+            `${safeSenderName}より、電子署名の依頼が届いています。`,
+            '',
+            `対象書類: ${safeDocumentName}`,
+            '',
+            '以下のリンクから内容をご確認のうえ、署名をお願いいたします。',
+            resolvedSignUrl,
+            '',
+            'ご不明な点がある場合は、この依頼元へご確認ください。',
+            '',
+            'よろしくお願いいたします。'
+        ].join('\n'),
+        html: `
+            <div style="font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #eee; border-radius: 8px; overflow: hidden;">
+                <div style="background: #24292e; padding: 24px 30px;">
+                    <h2 style="color: #c5a059; margin: 0; font-size: 20px;">電子署名のご依頼</h2>
+                </div>
+                <div style="padding: 30px;">
+                    <p style="font-size: 16px; color: #333; margin-top: 0;"><strong>${escapeHtml(safeRecipientName)}</strong></p>
+                    <p style="font-size: 14px; color: #555; line-height: 1.8;">
+                        ${escapeHtml(safeSenderName)}より、電子署名の依頼が届いています。<br>
+                        下記の書類をご確認のうえ、ご対応をお願いいたします。
+                    </p>
+
+                    <div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 18px 20px; margin: 24px 0;">
+                        <div style="font-size: 12px; color: #666; margin-bottom: 6px;">対象書類</div>
+                        <div style="font-size: 15px; color: #222; font-weight: 700;">${escapeHtml(safeDocumentName)}</div>
+                    </div>
+
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="${escapeHtml(resolvedSignUrl)}" style="background-color: #c5a059; color: #ffffff; padding: 14px 40px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 15px; display: inline-block;">書類を確認して署名する</a>
+                    </div>
+
+                    <p style="font-size: 12px; color: #777; line-height: 1.7; margin-top: 28px;">
+                        ボタンが開けない場合は、以下のURLをブラウザに貼り付けてください。<br>
+                        <a href="${escapeHtml(resolvedSignUrl)}" style="color: #8a6d2f; word-break: break-all;">${escapeHtml(resolvedSignUrl)}</a>
+                    </p>
+                </div>
+            </div>
+        `,
+    };
+
+    try {
+        await sgMail.send(msg);
+        logger.info(`Signature request email sent to ${to}`);
+        return true;
+    } catch (error) {
+        logger.error(`Error sending signature request email: ${error.message}`);
+        if (error.response) {
+            logger.error(JSON.stringify(error.response.body));
+        }
+        throw error;
+    }
+};
+
+exports.sendSignatureReminderEmail = async ({ to, recipientName, documentName, senderName, signUrl }) => {
+    const honorificName = String(recipientName || '').trim() || String(to || '').split('@')[0] || 'ご担当者';
+    const safeRecipientName = `${honorificName}様`;
+    const safeDocumentName = String(documentName || '署名書類').trim();
+    const safeSenderName = String(senderName || FROM_NAME).trim();
+    const resolvedSignUrl = signUrl || DASHBOARD_URL;
+
+    const msg = {
+        to,
+        from: {
+            email: FROM_EMAIL,
+            name: FROM_NAME
+        },
+        subject: `【再送】${safeDocumentName} への署名のお願い`,
+        text: [
+            safeRecipientName,
+            '',
+            `${safeSenderName}よりお送りした電子署名の依頼について、再度ご案内いたします。`,
+            '',
+            `対象書類: ${safeDocumentName}`,
+            '',
+            '以下のリンクから内容をご確認のうえ、署名をお願いいたします。',
+            resolvedSignUrl
+        ].join('\n'),
+        html: `
+            <div style="font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #eee; border-radius: 8px; overflow: hidden;">
+                <div style="background: #24292e; padding: 24px 30px;">
+                    <h2 style="color: #c5a059; margin: 0; font-size: 20px;">電子署名のご依頼（再送）</h2>
+                </div>
+                <div style="padding: 30px;">
+                    <p style="font-size: 16px; color: #333; margin-top: 0;"><strong>${escapeHtml(safeRecipientName)}</strong></p>
+                    <p style="font-size: 14px; color: #555; line-height: 1.8;">
+                        ${escapeHtml(safeSenderName)}よりお送りした電子署名の依頼について、再度ご案内いたします。<br>
+                        お手すきの際に、下記リンクよりご対応をお願いいたします。
+                    </p>
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="${escapeHtml(resolvedSignUrl)}" style="background-color: #c5a059; color: #ffffff; padding: 14px 40px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 15px; display: inline-block;">書類を確認して署名する</a>
+                    </div>
+                </div>
+            </div>
+        `
+    };
+
+    try {
+        await sgMail.send(msg);
+        logger.info(`Signature reminder email sent to ${to}`);
+        return true;
+    } catch (error) {
+        logger.error(`Error sending signature reminder email: ${error.message}`);
+        if (error.response) {
+            logger.error(JSON.stringify(error.response.body));
+        }
         throw error;
     }
 };

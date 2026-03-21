@@ -1,2 +1,67 @@
 {"level":"info","message":"Extracting text from PDF (26.09 KB) using pdfjs-dist","service":"diffsense-api","timestamp":"2026-02-09 15:58:52"}
 {"level":"info","message":"Successfully extracted 213 characters from 1 pages","service":"diffsense-api","timestamp":"2026-02-09 15:58:52"}
+{"level":"warn","message":"Firebase credentials not configured. Set FB_PROJECT_ID, FB_CLIENT_EMAIL, and FB_PRIVATE_KEY in .env","service":"diffsense-api","timestamp":"2026-03-19 12:11:03"}
+{"level":"warn","message":"Server will start without Firebase. Set AUTH_BYPASS=true in .env for local development.","service":"diffsense-api","timestamp":"2026-03-19 12:11:03"}
+{"level":"warn","message":"DBService: Firestore not available, falling back to file-based storage (data may be lost on restart)","service":"diffsense-api","timestamp":"2026-03-19 12:11:03"}
+{"level":"warn","message":"SENDGRID_API_KEY is not set. Email sending will fail.","service":"diffsense-api","timestamp":"2026-03-19 12:35:50"}
+{"level":"info","message":"Email Service Configured: From: \"DIFFsense\" <noreply@diffsense.com>, Link: https://diffsense.netlify.app/dashboard","service":"diffsense-api","timestamp":"2026-03-19 12:35:50"}
+{"level":"warn","message":"Firebase credentials not configured. Set FB_PROJECT_ID, FB_CLIENT_EMAIL, and FB_PRIVATE_KEY in .env","service":"diffsense-api","timestamp":"2026-03-19 12:35:50"}
+{"level":"warn","message":"Server will start without Firebase. Set AUTH_BYPASS=true in .env for local development.","service":"diffsense-api","timestamp":"2026-03-19 12:35:50"}
+{"level":"warn","message":"DBService: Firestore not available, falling back to file-based storage (data may be lost on restart)","service":"diffsense-api","timestamp":"2026-03-19 12:35:50"}
+{"level":"warn","message":"SENDGRID_API_KEY is not set. Email sending will fail.","service":"diffsense-api","timestamp":"2026-03-19 12:40:57"}
+{"level":"info","message":"Email Service Configured: From: \"DIFFsense\" <noreply@diffsense.com>, Link: https://diffsense.netlify.app/dashboard","service":"diffsense-api","timestamp":"2026-03-19 12:40:57"}
+{"level":"warn","message":"Firebase credentials not configured. Set FB_PROJECT_ID, FB_CLIENT_EMAIL, and FB_PRIVATE_KEY in .env","service":"diffsense-api","timestamp":"2026-03-19 12:40:57"}
+{"level":"warn","message":"Server will start without Firebase. Set AUTH_BYPASS=true in .env for local development.","service":"diffsense-api","timestamp":"2026-03-19 12:40:57"}
+{"level":"warn","message":"DBService: Firestore not available, falling back to file-based storage (data may be lost on restart)","service":"diffsense-api","timestamp":"2026-03-19 12:40:57"}
+{"level":"warn","message":"Firebase credentials not configured. Set FB_PROJECT_ID, FB_CLIENT_EMAIL, and FB_PRIVATE_KEY in .env","service":"diffsense-api","timestamp":"2026-03-20 21:01:06"}
+{"level":"warn","message":"Server will start without Firebase. Set AUTH_BYPASS=true in .env for local development.","service":"diffsense-api","timestamp":"2026-03-20 21:01:06"}
+{"level":"warn","message":"DBService: Firestore not available, falling back to file-based storage (data may be lost on restart)","service":"diffsense-api","timestamp":"2026-03-20 21:01:06"}
+{"level":"info","message":"GEMINI_API_KEY is configured (starts with AIza...)","service":"diffsense-api","timestamp":"2026-03-20 21:01:06"}
+{"level":"info","message":"Email Service Configured: From: \"DIFFsense\" <contact@spacegleam.co.jp>, Link: https://diffsense.spacegleam.co.jp/dashboard.html","service":"diffsense-api","timestamp":"2026-03-20 21:01:06"}
+{"level":"warn","message":"[env] DASHBOARD_URL is recommended when payment is enabled","service":"diffsense-api","timestamp":"2026-03-20 21:01:06"}
+{"level":"warn","message":"Firebase credentials not configured. Set FB_PROJECT_ID, FB_CLIENT_EMAIL, and FB_PRIVATE_KEY in .env","service":"diffsense-api","timestamp":"2026-03-20 21:27:32"}
+{"level":"warn","message":"Server will start without Firebase. Set AUTH_BYPASS=true in .env for local development.","service":"diffsense-api","timestamp":"2026-03-20 21:27:32"}
+{"level":"warn","message":"DBService: Firestore not available, falling back to file-based storage (data may be lost on restart)","service":"diffsense-api","timestamp":"2026-03-20 21:27:32"}
+{"level":"warn","message":"Firebase credentials not configured. Set FB_PROJECT_ID, FB_CLIENT_EMAIL, and FB_PRIVATE_KEY in .env","service":"diffsense-api","timestamp":"2026-03-20 21:31:57"}
+{"level":"warn","message":"Server will start without Firebase. Set AUTH_BYPASS=true in .env for local development.","service":"diffsense-api","timestamp":"2026-03-20 21:31:57"}
+{"level":"warn","message":"DBService: Firestore not available, falling back to file-based storage (data may be lost on restart)","service":"diffsense-api","timestamp":"2026-03-20 21:31:57"}
+{"level":"warn","message":"Firebase credentials not configured. Set FB_PROJECT_ID, FB_CLIENT_EMAIL, and FB_PRIVATE_KEY in .env","service":"diffsense-api","timestamp":"2026-03-20 21:44:42"}
+{"level":"warn","message":"Server will start without Firebase. Set AUTH_BYPASS=true in .env for local development.","service":"diffsense-api","timestamp":"2026-03-20 21:44:42"}
+{"level":"warn","message":"DBService: Firestore not available, falling back to file-based storage (data may be lost on restart)","service":"diffsense-api","timestamp":"2026-03-20 21:44:42"}
+{"level":"warn","message":"Firebase credentials not configured. Set FB_PROJECT_ID, FB_CLIENT_EMAIL, and FB_PRIVATE_KEY in .env","service":"diffsense-api","timestamp":"2026-03-20 21:46:55"}
+{"level":"warn","message":"Server will start without Firebase. Set AUTH_BYPASS=true in .env for local development.","service":"diffsense-api","timestamp":"2026-03-20 21:46:55"}
+{"level":"warn","message":"DBService: Firestore not available, falling back to file-based storage (data may be lost on restart)","service":"diffsense-api","timestamp":"2026-03-20 21:46:55"}
+{"level":"warn","message":"Firebase credentials not configured. Set FB_PROJECT_ID, FB_CLIENT_EMAIL, and FB_PRIVATE_KEY in .env","service":"diffsense-api","timestamp":"2026-03-20 21:50:11"}
+{"level":"warn","message":"Server will start without Firebase. Set AUTH_BYPASS=true in .env for local development.","service":"diffsense-api","timestamp":"2026-03-20 21:50:11"}
+{"level":"warn","message":"DBService: Firestore not available, falling back to file-based storage (data may be lost on restart)","service":"diffsense-api","timestamp":"2026-03-20 21:50:11"}
+{"level":"warn","message":"Firebase credentials not configured. Set FB_PROJECT_ID, FB_CLIENT_EMAIL, and FB_PRIVATE_KEY in .env","service":"diffsense-api","timestamp":"2026-03-20 21:53:16"}
+{"level":"warn","message":"Server will start without Firebase. Set AUTH_BYPASS=true in .env for local development.","service":"diffsense-api","timestamp":"2026-03-20 21:53:16"}
+{"level":"warn","message":"DBService: Firestore not available, falling back to file-based storage (data may be lost on restart)","service":"diffsense-api","timestamp":"2026-03-20 21:53:16"}
+{"level":"warn","message":"Firebase credentials not configured. Set FB_PROJECT_ID, FB_CLIENT_EMAIL, and FB_PRIVATE_KEY in .env","service":"diffsense-api","timestamp":"2026-03-20 23:15:40"}
+{"level":"warn","message":"Server will start without Firebase. Set AUTH_BYPASS=true in .env for local development.","service":"diffsense-api","timestamp":"2026-03-20 23:15:40"}
+{"level":"warn","message":"DBService: Firestore not available, falling back to file-based storage (data may be lost on restart)","service":"diffsense-api","timestamp":"2026-03-20 23:15:40"}
+{"emailId":"fec11683-92c5-4454-869f-bdfc624e0ab6","level":"info","message":"[mailer] sendSigningRequestEmail sent","service":"diffsense-api","timestamp":"2026-03-21 00:58:48","to":"contact@spacegleam.co.jp"}
+{"level":"warn","message":"Firebase credentials not configured. Set FB_PROJECT_ID, FB_CLIENT_EMAIL, and FB_PRIVATE_KEY in .env","service":"diffsense-api","timestamp":"2026-03-21 01:00:01"}
+{"level":"warn","message":"Server will start without Firebase. Set AUTH_BYPASS=true in .env for local development.","service":"diffsense-api","timestamp":"2026-03-21 01:00:01"}
+{"level":"warn","message":"DBService: Firestore not available, falling back to file-based storage (data may be lost on restart)","service":"diffsense-api","timestamp":"2026-03-21 01:00:01"}
+{"level":"warn","message":"Firebase credentials not configured. Set FB_PROJECT_ID, FB_CLIENT_EMAIL, and FB_PRIVATE_KEY in .env","service":"diffsense-api","timestamp":"2026-03-21 01:15:19"}
+{"level":"warn","message":"Server will start without Firebase. Set AUTH_BYPASS=true in .env for local development.","service":"diffsense-api","timestamp":"2026-03-21 01:15:19"}
+{"level":"warn","message":"DBService: Firestore not available, falling back to file-based storage (data may be lost on restart)","service":"diffsense-api","timestamp":"2026-03-21 01:15:19"}
+{"level":"warn","message":"Firebase credentials not configured. Set FB_PROJECT_ID, FB_CLIENT_EMAIL, and FB_PRIVATE_KEY in .env","service":"diffsense-api","timestamp":"2026-03-21 01:25:02"}
+{"level":"warn","message":"Server will start without Firebase. Set AUTH_BYPASS=true in .env for local development.","service":"diffsense-api","timestamp":"2026-03-21 01:25:02"}
+{"level":"warn","message":"DBService: Firestore not available, falling back to file-based storage (data may be lost on restart)","service":"diffsense-api","timestamp":"2026-03-21 01:25:02"}
+{"level":"warn","message":"Firebase credentials not configured. Set FB_PROJECT_ID, FB_CLIENT_EMAIL, and FB_PRIVATE_KEY in .env","service":"diffsense-api","timestamp":"2026-03-21 01:31:13"}
+{"level":"warn","message":"Server will start without Firebase. Set AUTH_BYPASS=true in .env for local development.","service":"diffsense-api","timestamp":"2026-03-21 01:31:13"}
+{"level":"warn","message":"DBService: Firestore not available, falling back to file-based storage (data may be lost on restart)","service":"diffsense-api","timestamp":"2026-03-21 01:31:13"}
+{"level":"warn","message":"Firebase credentials not configured. Set FB_PROJECT_ID, FB_CLIENT_EMAIL, and FB_PRIVATE_KEY in .env","service":"diffsense-api","timestamp":"2026-03-21 02:29:56"}
+{"level":"warn","message":"Server will start without Firebase. Set AUTH_BYPASS=true in .env for local development.","service":"diffsense-api","timestamp":"2026-03-21 02:29:56"}
+{"level":"warn","message":"DBService: Firestore not available, falling back to file-based storage (data may be lost on restart)","service":"diffsense-api","timestamp":"2026-03-21 02:29:56"}
+{"level":"warn","message":"Firebase credentials not configured. Set FB_PROJECT_ID, FB_CLIENT_EMAIL, and FB_PRIVATE_KEY in .env","service":"diffsense-api","timestamp":"2026-03-21 02:44:37"}
+{"level":"warn","message":"Server will start without Firebase. Set AUTH_BYPASS=true in .env for local development.","service":"diffsense-api","timestamp":"2026-03-21 02:44:37"}
+{"level":"warn","message":"DBService: Firestore not available, falling back to file-based storage (data may be lost on restart)","service":"diffsense-api","timestamp":"2026-03-21 02:44:37"}
+{"level":"warn","message":"Firebase credentials not configured. Set FB_PROJECT_ID, FB_CLIENT_EMAIL, and FB_PRIVATE_KEY in .env","service":"diffsense-api","timestamp":"2026-03-21 02:51:44"}
+{"level":"warn","message":"Server will start without Firebase. Set AUTH_BYPASS=true in .env for local development.","service":"diffsense-api","timestamp":"2026-03-21 02:51:44"}
+{"level":"warn","message":"DBService: Firestore not available, falling back to file-based storage (data may be lost on restart)","service":"diffsense-api","timestamp":"2026-03-21 02:51:44"}
+{"level":"warn","message":"Firebase credentials not configured. Set FB_PROJECT_ID, FB_CLIENT_EMAIL, and FB_PRIVATE_KEY in .env","service":"diffsense-api","timestamp":"2026-03-21 04:40:31"}
+{"level":"warn","message":"Server will start without Firebase. Set AUTH_BYPASS=true in .env for local development.","service":"diffsense-api","timestamp":"2026-03-21 04:40:31"}
+{"level":"warn","message":"DBService: Firestore not available, falling back to file-based storage (data may be lost on restart)","service":"diffsense-api","timestamp":"2026-03-21 04:40:31"}

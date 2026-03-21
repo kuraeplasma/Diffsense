@@ -55,23 +55,54 @@ function annotateFieldsWithRecipientEmail(fields, recipients) {
 }
 
 function createRecipientTokens(signRequestId, recipients) {
-    const secret = String(process.env.JWT_SECRET || '').trim();
-    if (!secret) {
-        throw new Error('JWT_SECRET is not configured');
-    }
     const tokens = {};
     for (const recipient of (Array.isArray(recipients) ? recipients : [])) {
         if (!recipient?.email) continue;
-        tokens[recipient.email] = jwt.sign(
-            {
-                signRequestId: String(signRequestId),
-                email: String(recipient.email).trim()
-            },
-            secret,
-            { expiresIn: '30d' }
-        );
+        const token = createRecipientToken(signRequestId, recipient.email);
+        if (!token) continue;
+        tokens[recipient.email] = token;
     }
     return tokens;
+}
+
+function createRecipientToken(signRequestId, recipientEmail) {
+    const secret = String(process.env.JWT_SECRET || '').trim();
+    const email = String(recipientEmail || '').trim();
+    if (!secret || !email) return '';
+    return jwt.sign(
+        {
+            signRequestId: String(signRequestId),
+            email
+        },
+        secret,
+        { expiresIn: '30d' }
+    );
+}
+
+function normalizeEmail(value) {
+    return String(value || '').trim().toLowerCase();
+}
+
+function isRecipientTokenUsable(token, signRequestId, recipientEmail) {
+    const raw = String(token || '').trim();
+    if (!raw) return false;
+    const decoded = jwt.decode(raw);
+    if (!decoded) return false;
+    if (String(decoded.signRequestId || '').trim() !== String(signRequestId || '').trim()) return false;
+    if (normalizeEmail(decoded.email) !== normalizeEmail(recipientEmail)) return false;
+    const expMs = Number(decoded.exp || 0) * 1000;
+    if (expMs && Date.now() >= expMs) return false;
+    return true;
+}
+
+function resolveRecipientToken(signRequest, recipientEmail) {
+    const email = String(recipientEmail || '').trim();
+    if (!email) return '';
+    const existing = signRequest?.recipientTokens?.[email];
+    if (isRecipientTokenUsable(existing, signRequest?.id, email)) {
+        return String(existing);
+    }
+    return createRecipientToken(signRequest?.id, email);
 }
 
 function getSignRequestExpiryIso(signRequest) {
@@ -149,8 +180,7 @@ async function markExpiredFromToken(token) {
     const decoded = jwt.decode(String(token || ''));
     const signRequestId = decoded?.signRequestId;
     if (!signRequestId) return null;
-    const requests = await dbService.getSignRequests(null);
-    const signRequest = findSignRequestById(requests, signRequestId);
+    const signRequest = await dbService.getSignRequestById(signRequestId);
     if (!signRequest) return null;
     return await markSignRequestExpired(signRequest);
 }
@@ -180,6 +210,9 @@ function extractUploadsRelativePath(value) {
     return '';
 }
 
+function buildFirebaseDownloadUrl(bucketName, objectPath, token) {
+    return `https://firebasestorage.googleapis.com/v0/b/${encodeURIComponent(bucketName)}/o/${encodeURIComponent(objectPath)}?alt=media&token=${encodeURIComponent(token)}`;
+}
 function resolveSignRequestPdfUrl(signRequest, req, contract = null) {
     const backendBaseUrl = getBackendBaseUrl(req);
     const candidates = [
@@ -203,30 +236,122 @@ function resolveSignRequestPdfUrl(signRequest, req, contract = null) {
     return '';
 }
 
-function resolveSignRequestPdfBuffer(signRequest) {
-    const candidates = [
-        signRequest?.document_snapshot?.pdf_storage_path,
-        signRequest?.document_snapshot?.pdf_url
-    ];
-    for (const candidate of candidates) {
-        const value = String(candidate || '').trim();
-        if (!value) continue;
+function hasSignablePdfSource(source) {
+    return Boolean(
+        String(source?.pdf_url || '').trim()
+        || String(source?.pdf_storage_path || '').trim()
+        || String(source?.document_snapshot?.pdf_url || '').trim()
+        || String(source?.document_snapshot?.pdf_storage_path || '').trim()
+    );
+}
+
+function hasFallbackDocumentContent(source) {
+    return Boolean(
+        source?.original_content
+        || source?.document_snapshot?.original_content
+        || source?.contract_snapshot?.original_content
+    );
+}
+
+async function loadPdfBufferFromCandidate(candidate, logLabel = 'sign') {
+    const value = String(candidate || '').trim();
+    if (!value) return null;
+
+    try {
+        if (fs.existsSync(value)) {
+            return fs.readFileSync(value);
+        }
+    } catch {}
+
+    const uploadsRelative = extractUploadsRelativePath(value);
+    if (uploadsRelative) {
+        const localPath = path.join(__dirname, '..', '..', uploadsRelative.replace(/^\//, ''));
         try {
-            if (fs.existsSync(value)) {
-                return fs.readFileSync(value);
+            if (fs.existsSync(localPath)) {
+                return fs.readFileSync(localPath);
             }
         } catch {}
-        const uploadsRelative = extractUploadsRelativePath(value);
-        if (uploadsRelative) {
-            const localPath = path.join(__dirname, '..', '..', uploadsRelative.replace(/^\//, ''));
-            try {
-                if (fs.existsSync(localPath)) {
-                    return fs.readFileSync(localPath);
-                }
-            } catch {}
+    }
+
+    if (bucket && !/^https?:\/\//i.test(value) && !value.includes('\\') && !value.startsWith('/')) {
+        try {
+            const [downloaded] = await bucket.file(value).download();
+            return Buffer.from(downloaded);
+        } catch (error) {
+            logger.warn(`[${logLabel}] bucket PDF download failed`, {
+                source: value,
+                bucket: bucket?.name || null,
+                error: error.message
+            });
         }
     }
+
+    if (/^https?:\/\//i.test(value)) {
+        try {
+            const response = await axios.get(value, { responseType: 'arraybuffer' });
+            return Buffer.from(response.data);
+        } catch (error) {
+            logger.warn(`[${logLabel}] remote PDF fetch failed`, {
+                source: value,
+                error: error.message
+            });
+        }
+    }
+
     return null;
+}
+
+async function resolveSignRequestPdfBuffer(signRequest, contract = null) {
+    const candidates = [
+        signRequest?.document_snapshot?.pdf_storage_path,
+        signRequest?.document_snapshot?.pdf_url,
+        contract?.pdf_storage_path,
+        contract?.pdf_url,
+        signRequest?.completed_document_url
+    ];
+
+    for (const candidate of candidates) {
+        const buffer = await loadPdfBufferFromCandidate(candidate, 'sign submit');
+        if (buffer?.length) {
+            return buffer;
+        }
+    }
+
+    return null;
+}
+
+async function createPdfBufferFromFallbackImage(fallbackDocumentImageDataUrl, signRequest) {
+    const dataUrl = String(fallbackDocumentImageDataUrl || '').trim();
+    if (!dataUrl) return null;
+
+    const pngMatch = dataUrl.match(/^data:image\/png;base64,(.+)$/);
+    const jpegMatch = dataUrl.match(/^data:image\/jpeg;base64,(.+)$/);
+    const jpgMatch = dataUrl.match(/^data:image\/jpg;base64,(.+)$/);
+    const imageBase64 = pngMatch?.[1] || jpegMatch?.[1] || jpgMatch?.[1] || '';
+    if (!imageBase64) {
+        throw new Error('署名対象のプレビュー画像を読み取れませんでした');
+    }
+
+    const imageBytes = Buffer.from(imageBase64, 'base64');
+    const pdfDoc = await PDFDocument.create();
+    const pageDims = signRequest?.page_dimensions?.[1]
+        || signRequest?.page_dimensions?.['1']
+        || { width: 794, height: 1123 };
+    const pageWidth = Math.max(320, Number(pageDims.width || 794));
+    const pageHeight = Math.max(420, Number(pageDims.height || 1123));
+    const page = pdfDoc.addPage([pageWidth, pageHeight]);
+    const image = pngMatch
+        ? await pdfDoc.embedPng(imageBytes)
+        : await pdfDoc.embedJpg(imageBytes);
+
+    page.drawImage(image, {
+        x: 0,
+        y: 0,
+        width: pageWidth,
+        height: pageHeight
+    });
+
+    return Buffer.from(await pdfDoc.save());
 }
 
 function buildFieldBox(field, signRequest, pageWidth, pageHeight) {
@@ -245,6 +370,18 @@ function buildFieldBox(field, signRequest, pageWidth, pageHeight) {
 
 function hasNonLatinText(value) {
     return /[^\u0000-\u00ff]/.test(String(value || ''));
+}
+
+function isEmailLike(value) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
+}
+
+function normalizeDisplayName(name, fallback = 'ご担当者') {
+    const trimmed = String(name || '').trim();
+    if (trimmed && !isEmailLike(trimmed)) {
+        return trimmed;
+    }
+    return fallback;
 }
 
 function saveCompletedPdfLocal(signRequestId, pdfBuffer, req) {
@@ -266,13 +403,35 @@ async function saveCompletedPdf(signRequestId, pdfBuffer, req) {
     const pdfHash = crypto.createHash('sha256').update(pdfBuffer).digest('hex');
     if (firebaseInitialized && bucket) {
         const storagePath = `sign_docs_completed/${signRequestId}_signed.pdf`;
-        await bucket.file(storagePath).save(pdfBuffer, {
+        const file = bucket.file(storagePath);
+        const downloadToken = crypto.randomUUID();
+        await file.save(pdfBuffer, {
             metadata: { contentType: 'application/pdf' }
         });
-        const [downloadUrl] = await bucket.file(storagePath).getSignedUrl({
-            action: 'read',
-            expires: Date.now() + 7 * 24 * 60 * 60 * 1000
+        await file.setMetadata({
+            metadata: {
+                firebaseStorageDownloadTokens: downloadToken
+            }
         });
+        let downloadUrl = '';
+        try {
+            const [signedUrl] = await file.getSignedUrl({
+                action: 'read',
+                expires: Date.now() + 7 * 24 * 60 * 60 * 1000
+            });
+            downloadUrl = signedUrl;
+        } catch (error) {
+            const bucketName = bucket.name || process.env.FB_STORAGE_BUCKET || process.env.FIREBASE_STORAGE_BUCKET;
+            if (!bucketName) {
+                throw error;
+            }
+            downloadUrl = buildFirebaseDownloadUrl(bucketName, storagePath, downloadToken);
+            logger.warn('[sign submit] completed PDF signed URL failed, falling back to token URL', {
+                signRequestId,
+                bucket: bucketName,
+                error: error.message
+            });
+        }
         return {
             signedPdfPath: storagePath,
             completedDocumentUrl: downloadUrl,
@@ -290,32 +449,55 @@ async function saveCompletedPdf(signRequestId, pdfBuffer, req) {
 }
 
 async function sendCompletionNotice(signRequest, completedDocumentUrl) {
-    const recipients = [];
+    const recipientsByEmail = new Map();
+    const upsertRecipient = (email, name, priority = 0) => {
+        const normalizedEmail = String(email || '').trim();
+        if (!normalizedEmail) return;
+        const key = normalizedEmail.toLowerCase();
+        const normalizedName = normalizeDisplayName(name, '');
+        const current = recipientsByEmail.get(key);
+        if (!current) {
+            recipientsByEmail.set(key, {
+                email: normalizedEmail,
+                name: normalizedName || 'ご担当者',
+                priority
+            });
+            return;
+        }
+        if (priority > current.priority && normalizedName) {
+            recipientsByEmail.set(key, {
+                email: normalizedEmail,
+                name: normalizedName,
+                priority
+            });
+            return;
+        }
+        if (!current.name || current.name === 'ご担当者') {
+            recipientsByEmail.set(key, {
+                email: normalizedEmail,
+                name: normalizedName || current.name || 'ご担当者',
+                priority: Math.max(current.priority, priority)
+            });
+        }
+    };
+
     const ownerEmail = String(signRequest?.requestedByEmail || signRequest?.sender_email || '').trim();
-    const ownerName = signRequest?.requestedByName || signRequest?.sender || ownerEmail || 'DIFFsense ユーザー';
+    const ownerName = signRequest?.requestedByName || signRequest?.sender || '';
     if (ownerEmail) {
-        recipients.push({ email: ownerEmail, name: ownerName });
+        upsertRecipient(ownerEmail, ownerName, 0);
     }
 
     for (const recipient of (Array.isArray(signRequest?.recipients) ? signRequest.recipients : [])) {
         const email = String(recipient?.email || '').trim();
         if (!email) continue;
-        recipients.push({
-            email,
-            name: recipient?.name || email
-        });
+        upsertRecipient(email, recipient?.name || '', 1);
     }
 
-    const delivered = new Set();
-    for (const recipient of recipients) {
-        const emailKey = String(recipient.email || '').toLowerCase();
-        if (!emailKey || delivered.has(emailKey)) continue;
-        delivered.add(emailKey);
-
+    for (const recipient of recipientsByEmail.values()) {
         try {
             await mailer.sendCompletionEmail({
                 to: recipient.email,
-                senderName: recipient.name,
+                senderName: normalizeDisplayName(recipient.name),
                 fileName: signRequest.document_name || signRequest.fileName || '署名済み書類',
                 downloadUrl: completedDocumentUrl
             });
@@ -351,10 +533,11 @@ async function sendRecipientActionNotice(signRequest, recipient, actionLabel) {
     }
 }
 
-async function generateSignedPdf(signRequest, req) {
-    const pdfBuffer = resolveSignRequestPdfBuffer(signRequest);
+async function generateSignedPdf(signRequest, req, contract = null, fallbackDocumentImageDataUrl = '') {
+    const pdfBuffer = await resolveSignRequestPdfBuffer(signRequest, contract)
+        || await createPdfBufferFromFallbackImage(fallbackDocumentImageDataUrl, signRequest);
     if (!pdfBuffer?.length) {
-        throw new Error('元のPDFファイルを取得できませんでした');
+        throw new Error('署名対象の原本ファイルを取得できませんでした');
     }
 
     const pdfDoc = await PDFDocument.load(pdfBuffer);
@@ -621,7 +804,6 @@ router.post('/create', async (req, res) => {
         if (!contract) {
             return res.status(404).json({ success: false, error: 'Contract not found' });
         }
-
         let providerPayload = {};
         if (useDiffsenseProvider()) {
             providerPayload = {
@@ -729,34 +911,6 @@ router.post('/create', async (req, res) => {
     }
 });
 
-router.get('/embed/:requestId/:actionId', async (req, res) => {
-    try {
-        const { requestId, actionId } = req.params;
-        if (useFirmaProvider()) {
-            const requests = await dbService.getSignRequests(req.user.uid);
-            const signRequest = requests.find((item) =>
-                String(item.firma_request_id || '') === String(requestId)
-                || String(item.id) === String(requestId)
-            );
-            if (!signRequest?.firma_request_id) {
-                throw new Error('Firma request not found');
-            }
-            const urls = await firmaService.getSigningUrls(signRequest.firma_request_id);
-            const url = urls[String(actionId || '').trim()];
-            if (!url) {
-                throw new Error('Could not retrieve signing URL');
-            }
-            return res.json({ success: true, data: { url } });
-        }
-
-        const url = await zohoService.getEmbeddedUrl(requestId, actionId);
-        res.json({ success: true, data: { url } });
-    } catch (error) {
-        logger.error('API Sign Embed URL Error:', error.message);
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
 router.get('/list', async (req, res) => {
     try {
         const ownerUid = req.user.uid;
@@ -764,53 +918,6 @@ router.get('/list', async (req, res) => {
         res.json({ success: true, data: requests });
     } catch (error) {
         logger.error('API Sign List Error:', error.message);
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-router.get('/:id/audit-events', async (req, res) => {
-    try {
-        const ownerUid = req.user.uid;
-        const signRequestId = req.params.id;
-
-        const requests = await dbService.getSignRequests(ownerUid);
-        const signRequest = findSignRequestById(requests, signRequestId);
-        if (!signRequest) {
-            return res.status(404).json({ success: false, error: '署名依頼が見つかりません' });
-        }
-
-        if (!db) {
-            return res.status(503).json({ success: false, error: 'DB未初期化' });
-        }
-
-        const snapshot = await db.collection('audit_events')
-            .where('signRequestId', '==', signRequestId)
-            .where('ownerUid', '==', ownerUid)
-            .orderBy('timestamp', 'asc')
-            .get();
-
-        const events = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-        res.json({ success: true, data: events });
-    } catch (error) {
-        logger.error('API Audit Events Error:', error.message);
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-router.get('/:id/signing-url', async (req, res) => {
-    try {
-        const requests = await dbService.getSignRequests(req.user.uid);
-        const signRequest = requests.find((item) => String(item.id) === String(req.params.id));
-        if (!signRequest) {
-            return res.status(404).json({ success: false, error: 'Request not found' });
-        }
-        if (!signRequest.firma_request_id) {
-            return res.json({ success: true, data: { urls: {} } });
-        }
-        const urls = await firmaService.getSigningUrls(signRequest.firma_request_id);
-        res.json({ success: true, data: { urls } });
-    } catch (error) {
-        logger.error('API Sign Signing URL Error:', error.message);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -858,8 +965,9 @@ router.get('/verify', async (req, res) => {
             }
         }
         const pdfUrl = resolveSignRequestPdfUrl(signRequest, req, contract);
-        if (!pdfUrl) {
-            return res.status(404).json({ success: false, error: '原本PDFが見つかりません' });
+        const originalContent = contract?.original_content || signRequest?.document_snapshot?.original_content || '';
+        if (!pdfUrl && !originalContent) {
+            return res.status(404).json({ success: false, error: '署名対象の原本ファイルが見つかりません。' });
         }
 
         return res.json({
@@ -870,6 +978,9 @@ router.get('/verify', async (req, res) => {
                 recipientName: recipient.name || recipient.email,
                 fileName: signRequest.document_name || '',
                 pdfUrl,
+                previewMode: pdfUrl ? 'pdf' : 'fallback',
+                originalContent,
+                sourceUrl: contract?.source_url || signRequest?.document_snapshot?.source_url || '',
                 provider: signRequest.provider || 'diffsense',
                 fields,
                 fieldStyles: signRequest.fieldStyles || {},
@@ -885,6 +996,99 @@ router.get('/verify', async (req, res) => {
     }
 });
 
+router.get('/embed/:requestId/:actionId', async (req, res) => {
+    try {
+        const { requestId, actionId } = req.params;
+        if (useFirmaProvider()) {
+            const requests = await dbService.getSignRequests(req.user.uid);
+            const signRequest = requests.find((item) =>
+                String(item.firma_request_id || '') === String(requestId)
+                || String(item.id) === String(requestId)
+            );
+            if (!signRequest?.firma_request_id) {
+                throw new Error('Firma request not found');
+            }
+            const urls = await firmaService.getSigningUrls(signRequest.firma_request_id);
+            const url = urls[String(actionId || '').trim()];
+            if (!url) {
+                throw new Error('Could not retrieve signing URL');
+            }
+            return res.json({ success: true, data: { url } });
+        }
+
+        const url = await zohoService.getEmbeddedUrl(requestId, actionId);
+        res.json({ success: true, data: { url } });
+    } catch (error) {
+        logger.error('API Sign Embed URL Error:', error.message);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+router.get('/:id/audit-events', async (req, res) => {
+    try {
+        const ownerUid = req.user.uid;
+        const signRequestId = req.params.id;
+
+        const requests = await dbService.getSignRequests(ownerUid);
+        const signRequest = findSignRequestById(requests, signRequestId);
+        if (!signRequest) {
+            return res.status(404).json({ success: false, error: '署名依頼が見つかりません' });
+        }
+
+        if (!db) {
+            return res.status(503).json({ success: false, error: 'DB未初期化' });
+        }
+
+        // Avoid composite-index dependency (where + orderBy) to keep audit view stable in production.
+        const snapshot = await db.collection('audit_events')
+            .where('ownerUid', '==', String(ownerUid))
+            .get();
+
+        const events = snapshot.docs
+            .map((doc) => ({ id: doc.id, ...doc.data() }))
+            .filter((event) => String(event.signRequestId || '') === String(signRequestId))
+            .sort((a, b) => new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime());
+        res.json({ success: true, data: events });
+    } catch (error) {
+        logger.error(`API Audit Events Error: ${error.message}\n${error.stack || ''}`);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+router.get('/:id/signing-url', async (req, res) => {
+    try {
+        const requests = await dbService.getSignRequests(req.user.uid);
+        const signRequest = requests.find((item) => String(item.id) === String(req.params.id));
+        if (!signRequest) {
+            return res.status(404).json({ success: false, error: 'Request not found' });
+        }
+        if (!signRequest.firma_request_id) {
+            return res.json({ success: true, data: { urls: {} } });
+        }
+        const urls = await firmaService.getSigningUrls(signRequest.firma_request_id);
+        res.json({ success: true, data: { urls } });
+    } catch (error) {
+        logger.error('API Sign Signing URL Error:', error.message);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+router.get('/:id', async (req, res) => {
+    try {
+        const ownerUid = req.user.uid;
+        const signRequestId = req.params.id;
+        const requests = await dbService.getSignRequests(ownerUid);
+        const signRequest = findSignRequestById(requests, signRequestId);
+        if (!signRequest) {
+            return res.status(404).json({ success: false, error: '署名依頼が見つかりません' });
+        }
+        return res.json({ success: true, data: signRequest });
+    } catch (error) {
+        logger.error('API Sign Get Error:', error.message);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 router.post('/decline', async (req, res) => {
     try {
         const token = String(req.body?.token || '').trim();
@@ -893,10 +1097,34 @@ router.post('/decline', async (req, res) => {
         }
 
         const payload = jwt.verify(token, String(process.env.JWT_SECRET || '').trim());
-        const requests = await dbService.getSignRequests(null);
-        const signRequest = findSignRequestById(requests, payload.signRequestId);
+        const signRequest = await dbService.getSignRequestById(payload.signRequestId);
         if (!signRequest) {
             return res.status(404).json({ success: false, error: '署名依頼が見つかりません' });
+        }
+
+        const requestStatus = String(signRequest.status || '').toLowerCase();
+        if (['completed', 'declined', 'expired'].includes(requestStatus)) {
+            return res.status(409).json({
+                success: false,
+                error: 'この署名依頼はすでに処理済みです'
+            });
+        }
+
+        const actingRecipient = (signRequest.recipients || []).find((recipient) =>
+            normalizeEmail(recipient?.email) === normalizeEmail(payload.email)
+        );
+        if (!actingRecipient) {
+            return res.status(403).json({
+                success: false,
+                error: '署名者として登録されていません'
+            });
+        }
+        const actingRecipientStatus = String(actingRecipient.status || '').toLowerCase();
+        if (actingRecipientStatus === 'declined' || actingRecipientStatus === 'signed' || actingRecipientStatus === 'completed') {
+            return res.status(409).json({
+                success: false,
+                error: 'すでに処理済みです'
+            });
         }
 
         const declinedAt = new Date().toISOString();
@@ -947,18 +1175,54 @@ router.post('/submit', async (req, res) => {
     try {
         const token = String(req.body?.token || '').trim();
         const signatures = Array.isArray(req.body?.signatures) ? req.body.signatures : [];
+        const fallbackDocumentImageDataUrl = String(req.body?.fallbackDocumentImageDataUrl || '').trim();
         if (!token) {
             return res.status(400).json({ success: false, error: 'トークンがありません' });
         }
 
         const payload = jwt.verify(token, String(process.env.JWT_SECRET || '').trim());
-        const requests = await dbService.getSignRequests(null);
-        const signRequest = findSignRequestById(requests, payload.signRequestId);
+        const signRequest = await dbService.getSignRequestById(payload.signRequestId);
         if (!signRequest) {
             return res.status(404).json({ success: false, error: '署名依頼が見つかりません' });
         }
 
+        const requestStatus = String(signRequest.status || '').toLowerCase();
+        if (['completed', 'declined', 'expired'].includes(requestStatus)) {
+            return res.status(409).json({
+                success: false,
+                error: 'この署名依頼はすでに処理済みです'
+            });
+        }
+
         const email = String(payload.email || '').trim();
+        const submitRecipient = (signRequest.recipients || []).find((recipient) =>
+            normalizeEmail(recipient?.email) === normalizeEmail(email)
+        );
+        if (!submitRecipient) {
+            return res.status(403).json({
+                success: false,
+                error: '署名者として登録されていません'
+            });
+        }
+        const submitRecipientStatus = String(submitRecipient.status || '').toLowerCase();
+        if (submitRecipientStatus === 'signed' || submitRecipientStatus === 'completed') {
+            return res.status(409).json({
+                success: false,
+                error: 'すでに署名済みです'
+            });
+        }
+
+        let contract = null;
+        const ownerUid = String(signRequest.ownerUid || signRequest.requestedBy || '').trim();
+        if (signRequest.contract_id && ownerUid) {
+            try {
+                const contracts = await dbService.getContracts(ownerUid);
+                contract = (Array.isArray(contracts) ? contracts : []).find((item) => String(item.id) === String(signRequest.contract_id)) || null;
+                logger.info(`Sign submit contract lookup contractId=${signRequest.contract_id} found=${!!contract} pdf_url=${contract?.pdf_url || 'none'} pdf_storage_path=${contract?.pdf_storage_path || 'none'}`);
+            } catch (contractError) {
+                logger.warn(`Sign submit contract lookup failed requestId=${signRequest.id} contractId=${signRequest.contract_id} error=${contractError.message}`);
+            }
+        }
         const annotatedFields = annotateFieldsWithRecipientEmail(signRequest.fields || [], signRequest.recipients || []);
         const updatedRecipients = (signRequest.recipients || []).map((recipient) =>
             String(recipient.email || '').trim() === email
@@ -1017,7 +1281,7 @@ router.post('/submit', async (req, res) => {
         };
 
         if (allSigned) {
-            const completed = await generateSignedPdf(draftForPdf, req);
+            const completed = await generateSignedPdf(draftForPdf, req, contract, fallbackDocumentImageDataUrl);
             Object.assign(updates, {
                 status: 'completed',
                 completedAt: completed.completedAt,
@@ -1066,15 +1330,23 @@ router.post('/submit', async (req, res) => {
             String(recipient.email || '').trim() === email
         );
 
+        logger.info(`[sign submit] updates.completed_document_url=${updates.completed_document_url || 'none'}`);
+        logger.info(`[sign submit] allSigned=${allSigned} completed_document_url=${saved?.completed_document_url || 'none'}`);
+
+        const currentRequest = saved || { ...signRequest, recipients: updatedRecipients };
         if (allSigned && saved?.completed_document_url) {
             await sendCompletionNotice(saved, saved.completed_document_url);
+            await sendRecipientActionNotice(currentRequest, actingRecipient, 'すべての署名が完了しました');
         } else {
-            await sendRecipientActionNotice(saved || { ...signRequest, recipients: updatedRecipients }, actingRecipient, '署名が完了しました');
+            await sendRecipientActionNotice(currentRequest, actingRecipient, '署名が完了しました');
         }
 
         return res.json({ success: true, data: { allSigned, request: saved || updates } });
     } catch (error) {
-        logger.error('[sign submit] error', { error: error.message });
+        logger.error('[sign submit] error', {
+            error: error.message,
+            stack: error.stack || null
+        });
         if (error.name === 'TokenExpiredError') {
             await markExpiredFromToken(req.body?.token);
             return res.status(401).json({ success: false, error: '有効期限が切れましたので、再度発行依頼をしていただくようお願いいたします。' });
@@ -1174,8 +1446,11 @@ router.patch('/:id', async (req, res) => {
 
                 const mailFailures = [];
                 for (const recipient of recipients) {
+                    const token = updated.provider === 'diffsense'
+                        ? resolveRecipientToken(updated, recipient.email)
+                        : '';
                     const signingUrl = updated.provider === 'diffsense'
-                        ? buildTokenSigningUrl(updated.recipientTokens?.[recipient.email])
+                        ? (token ? buildTokenSigningUrl(token) : null)
                         : (recipient.signing_url || null);
                     if (!signingUrl) {
                         logger.warn('[sign PATCH] signing URL not found', {
@@ -1243,8 +1518,11 @@ router.post('/:id/remind', async (req, res) => {
             return res.status(404).json({ success: false, error: 'Request not found' });
         }
 
-        const pendingRecipients = (signRequest.recipients || []).filter((recipient) => recipient.status !== 'completed');
-        if (pendingRecipients.length === 0) {
+        const remindTargets = (signRequest.recipients || []).filter((recipient) => {
+            const status = String(recipient?.status || '').toLowerCase();
+            return status !== 'signed' && status !== 'declined';
+        });
+        if (remindTargets.length === 0) {
             return res.json({ success: true, data: { reminded: 0 } });
         }
 
@@ -1256,10 +1534,27 @@ router.post('/:id/remind', async (req, res) => {
                     : await firmaService.getSigningUrls(signRequest.firma_request_id);
                 let count = 0;
                 const failedRecipients = [];
+                const nextRecipientTokens = signRequest?.recipientTokens && typeof signRequest.recipientTokens === 'object'
+                    ? { ...signRequest.recipientTokens }
+                    : {};
+                let tokenUpdated = false;
 
-                for (const recipient of (signRequest.recipients || []).filter((item) => item.status !== 'signed')) {
+                for (const recipient of remindTargets) {
+                    const token = signRequest.provider === 'diffsense'
+                        ? resolveRecipientToken({ ...signRequest, recipientTokens: nextRecipientTokens }, recipient.email)
+                        : '';
+                    if (signRequest.provider === 'diffsense') {
+                        if (!token) {
+                            logger.warn(`[sign/remind] token missing requestId=${signRequest.id || id} email=${recipient.email || ''}`);
+                            continue;
+                        }
+                        if (nextRecipientTokens?.[recipient.email] !== token) {
+                            nextRecipientTokens[recipient.email] = token;
+                            tokenUpdated = true;
+                        }
+                    }
                     const signingUrl = signRequest.provider === 'diffsense'
-                        ? buildTokenSigningUrl(signRequest.recipientTokens?.[recipient.email])
+                        ? buildTokenSigningUrl(token)
                         : (signingUrls?.[String(recipient.email || '').trim()] || recipient.signing_url || null);
                     if (!signingUrl) continue;
                     await mailer.sendReminderEmail({
@@ -1277,9 +1572,27 @@ router.post('/:id/remind', async (req, res) => {
                     });
                 }
 
-                const updated = await dbService.updateSignRequest(id, {
+                const updatePayload = {
                     reminder_sent_at: new Date().toISOString()
-                }, ownerUid);
+                };
+                if (signRequest.provider === 'diffsense' && tokenUpdated) {
+                    updatePayload.recipientTokens = nextRecipientTokens;
+                    updatePayload.expiresAt = new Date(Date.now() + SIGN_LINK_TTL_MS).toISOString();
+                }
+                const updated = await dbService.updateSignRequest(id, updatePayload, ownerUid);
+
+                if (failedRecipients.length > 0) {
+                    return res.status(502).json({
+                        success: false,
+                        code: 'MAIL_SEND_FAILED',
+                        error: '催促メールの送信に失敗しました',
+                        data: {
+                            reminded: count,
+                            request: updated || signRequest,
+                            failedRecipients
+                        }
+                    });
+                }
 
                 if (failedRecipients.length > 0) {
                     return res.status(502).json({
@@ -1301,7 +1614,7 @@ router.post('/:id/remind', async (req, res) => {
             }
         }
 
-        const reminderResults = await Promise.allSettled(pendingRecipients.map(async (recipient) => {
+        const reminderResults = await Promise.allSettled(remindTargets.map(async (recipient) => {
             const signUrl = await getRequestSigningUrl(signRequest, recipient);
             return mailer.sendReminderEmail({
                 to: recipient.email,

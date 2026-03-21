@@ -7,23 +7,33 @@ echo ローカルWebサーバー起動スクリプト
 echo ---------------------------------------------------
 echo.
 
+REM Check for Python
+where python >nul 2>nul
+if %errorlevel%==0 (
+    echo [OK] Python が見つかりました。サーバーを起動します...
+    echo ブラウザで http://localhost:3000 を開いてください。
+    echo.
+    python -m http.server 3000
+    goto :EOF
+)
+
+REM Check for py launcher
+where py >nul 2>nul
+if %errorlevel%==0 (
+    echo [OK] Python が見つかりました。サーバーを起動します...
+    echo ブラウザで http://localhost:3000 を開いてください。
+    echo.
+    py -m http.server 3000
+    goto :EOF
+)
+
 REM Check for npx (Node.js)
 where npx >nul 2>nul
 if %errorlevel%==0 (
     echo [OK] Node.js が見つかりました。サーバーを起動します...
     echo ブラウザで http://localhost:3000 を開いてください。
     echo.
-    call npx -y serve . -l 3000
-    goto :EOF
-)
-
-REM Check for Python
-where python >nul 2>nul
-if %errorlevel%==0 (
-    echo [OK] Python が見つかりました。サーバーを起動します...
-    echo ブラウザで http://localhost:8000 を開いてください。
-    echo.
-    python -m http.server 8000
+    npx serve . -l 3000
     goto :EOF
 )
 

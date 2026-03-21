@@ -1,4 +1,19 @@
 document.addEventListener('DOMContentLoaded', () => {
+    const PROD_API_BASE_URL = 'https://api-qf37m5ba2q-an.a.run.app';
+
+    function getApiBase() {
+        const params = new URLSearchParams(window.location.search);
+        const explicit = String(
+            window.__DIFFSENSE_API_BASE__
+            || params.get('apiBase')
+            || localStorage.getItem('diffsense_api_base')
+            || ''
+        ).trim().replace(/\/$/, '');
+        if (explicit) return explicit;
+
+        const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        return isLocalHost ? 'http://localhost:3001' : PROD_API_BASE_URL;
+    }
 
     // Mobile Menu Toggle
     const menuToggle = document.querySelector('.menu-toggle');
@@ -188,12 +203,6 @@ document.addEventListener('DOMContentLoaded', () => {
         container.style.display = 'flex';
         container.style.justifyContent = 'center';
         container.style.alignItems = 'center';
-    }
-
-    function getApiBase() {
-        return (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-            ? 'http://localhost:3001'
-            : 'https://api-qf37m5ba2q-an.a.run.app';
     }
 
     async function hasAnnualBillingPlans() {
