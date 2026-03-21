@@ -5546,4 +5546,25 @@ ul {
         margin-top: 0.34rem !important;
         line-height: 1.58 !important;
     }
+
+    .pricing-info-grid {
+        grid-template-columns: 1fr !important;
+        gap: 0.82rem !important;
+    }
+
+    .pricing-annual-reasons,
+    .pricing-trust-list {
+        width: 100%;
+    }
+
+    .pricing-annual-reasons li {
+        align-items: flex-start;
+    }
+
+    .pricing-annual-reasons li span:last-child {
+        flex: 1;
+        white-space: normal;
+        word-break: keep-all;
+        overflow-wrap: anywhere;
+    }
 }
