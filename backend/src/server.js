@@ -17,6 +17,7 @@ const crawlRoutes = require('./routes/crawl');
 const webhookRoutes = require('./routes/webhook');
 const signRoutes = require('./routes/sign');
 const notificationRoutes = require('./routes/notifications');
+const cronRoutes = require('./routes/cron');
 const slackRoutes = require('./routes/slack');
 const cronService = require('./services/cronService');
 const { assertProductionEnv } = require('./config/env');
@@ -128,6 +129,9 @@ app.get('/health', (req, res) => {
 
 // Webhook routes (NO auth - called directly by PayPal)
 app.use('/webhook', webhookRoutes);
+
+// Cron routes (NO Firebase auth - protected by CRON_SECRET header)
+app.use('/api/cron', cronRoutes);
 
 // Public payment config (no auth - needed for PayPal JS SDK on frontend)
 app.get('/payment/config', (req, res) => {
