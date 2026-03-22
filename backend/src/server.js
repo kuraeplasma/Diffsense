@@ -108,6 +108,7 @@ app.use(morgan('combined', { stream: logger.stream }));
 // Stripe webhook must receive the raw body for signature verification.
 app.use('/api/stripe', express.raw({ type: 'application/json' }), stripeWebhookRoutes);
 app.use('/stripe', express.raw({ type: 'application/json' }), stripeWebhookRoutes);
+app.use('/webhook/stripe', express.raw({ type: 'application/json' }), stripeWebhookRoutes);
 
 // Body parser with size limits
 app.use(express.json({ limit: '50mb' }));

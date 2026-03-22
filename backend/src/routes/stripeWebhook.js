@@ -183,7 +183,7 @@ async function handleInvoicePaid(invoice) {
     // For now, let's stick to initial purchase to fix the reported issue.
 }
 
-router.post('/webhook', async (req, res) => {
+router.post(['/', '/webhook'], async (req, res) => {
     if (!stripeService.isConfigured()) {
         return res.status(503).json({ success: false, error: 'Stripe is not configured.' });
     }
@@ -200,7 +200,8 @@ router.post('/webhook', async (req, res) => {
 
     let event;
     try {
-        event = stripeService.constructWebhookEvent(req.body, signature, webhookSecret);
+        const payload = req.rawBody || req.body;
+        event = stripeService.constructWebhookEvent(payload, signature, webhookSecret);
     } catch (error) {
         logger.warn(`Stripe webhook signature verification failed: ${error.message}`);
         return res.status(400).send(`Webhook Error: ${error.message}`);
