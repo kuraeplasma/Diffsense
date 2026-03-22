@@ -20,8 +20,13 @@
     "plan": "pro",
     "billingCycle": "monthly",
     "trialStartedAt": "2026-03-18T13:09:55.696Z",
-    "hasPaymentMethod": false,
+    "hasPaymentMethod": true,
     "usageCount": 0,
-    "lastResetDate": "2026-03-18T13:09:55.696Z"
+    "lastResetDate": "2026-03-18T13:09:55.696Z",
+    "email": "dev@localhost",
+    "lastPaymentAt": "2026-03-22T03:58:27.044Z",
+    "stripeStatus": "active",
+    "currentPeriodEnd": "2026-04-21",
+    "subscriptionState": "active"
   }
 ]

@@ -264,7 +264,7 @@
             </div>
         </div>
 
-        <a href="dashboard.html" class="thanks-btn">
+        <a href="dashboard.html" class="thanks-btn" id="dashboard-btn">
             <i class="fa-solid fa-gauge-high"></i>
             ダッシュボードへ
         </a>
@@ -297,6 +297,13 @@
 
         const badge = document.getElementById('plan-badge');
         badge.innerHTML = `<span class="plan-badge ${plan}">${planNames[plan] || plan}（${billingLabels[billing]}）</span>`;
+
+        // Update dashboard link with session_id
+        const sessionId = params.get('session_id');
+        if (sessionId) {
+            const dashboardBtn = document.getElementById('dashboard-btn');
+            dashboardBtn.href = `dashboard.html?payment=stripe_success&plan=${plan}&billing=${billing}&session_id=${sessionId}`;
+        }
 
         // Confetti animation
         const confetti = document.getElementById('confetti');

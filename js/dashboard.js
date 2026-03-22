@@ -2888,9 +2888,7 @@ class DashboardApp {
             const bootstrapPromise = this.checkAndRegisterAdmin()
                 .then(async () => {
                     this.bootstrapCompleted = true;
-                    if (!this.subscription) {
-                        await this.reloadPlanData({ silent: true });
-                    }
+                    await this.reloadPlanData({ silent: true });
                 })
                 .catch((error) => {
                     console.error('Bootstrap initialization failed:', error);
@@ -3118,7 +3116,9 @@ class DashboardApp {
         try {
             const authModule = await import('./auth.js');
             const token = await authModule.getIdToken();
-            if (!token) {
+            const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            
+            if (!token && !isLocalDev) {
                 if (!silent) Notify.warning('ログイン状態を確認できませんでした。');
                 return false;
             }
@@ -3670,7 +3670,7 @@ class DashboardApp {
 
     showCancelModal() {
         const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay';
+        overlay.className = 'modal-overlay active';
         overlay.id = 'cancel-modal-overlay';
         overlay.innerHTML = `
         <div class="modal-content" style="max-width:480px;">

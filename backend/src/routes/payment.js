@@ -311,7 +311,7 @@ async function createStripeCheckoutSessionHandler(req, res) {
         }
 
         const frontendBase = resolveFrontendBase(req);
-        const successUrl = `${frontendBase}/thanks-payment.html?plan=${plan}&billing=${billingCycle}`;
+        const successUrl = `${frontendBase}/thanks-payment.html?plan=${plan}&billing=${billingCycle}&session_id={CHECKOUT_SESSION_ID}`;
         const cancelUrl = resolveSafeCancelUrl(req, frontendBase);
 
         const session = await stripeService.createCheckoutSession({
