@@ -89,6 +89,7 @@ router.get('/oauth/callback', async (req, res) => {
         const channelName = tokenData.incoming_webhook?.channel || '';
         const channelId = tokenData.incoming_webhook?.channel_id || '';
         const teamName = tokenData.team?.name || '';
+        logger.info(`Slack token exchange: ok=${tokenData.ok}, scope=${tokenData.scope}, webhook=${webhookUrl ? 'present' : 'MISSING'}, channel=${channelName}, team=${teamName}`);
 
         // 通知設定にwebhook URLを保存 + 連携情報を保存
         const currentSettings = await dbService.getNotificationSettings(uid);
