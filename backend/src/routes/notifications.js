@@ -35,15 +35,15 @@ router.patch('/settings', async (req, res) => {
             settings.email = { crawlAlert: Boolean(email?.crawlAlert ?? true) };
         }
         if (slack !== undefined) {
-            const webhookUrl = String(slack?.webhookUrl || '').trim();
-            // Slack Webhook URLの簡易バリデーション
-            if (webhookUrl && !webhookUrl.startsWith('https://hooks.slack.com/')) {
-                return res.status(400).json({ success: false, error: 'Slack Webhook URLの形式が正しくありません' });
+            settings.slack = { enabled: Boolean(slack?.enabled ?? false) };
+            // webhookUrlは明示的に送られた場合のみ更新（省略時は既存値を保持）
+            if (slack?.webhookUrl !== undefined) {
+                const webhookUrl = String(slack.webhookUrl || '').trim();
+                if (webhookUrl && !webhookUrl.startsWith('https://hooks.slack.com/')) {
+                    return res.status(400).json({ success: false, error: 'Slack Webhook URLの形式が正しくありません' });
+                }
+                settings.slack.webhookUrl = webhookUrl;
             }
-            settings.slack = {
-                enabled: Boolean(slack?.enabled ?? false),
-                webhookUrl
-            };
         }
 
         // 既存設定とマージ
