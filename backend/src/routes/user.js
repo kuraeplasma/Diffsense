@@ -28,7 +28,7 @@ router.get('/subscription', async (req, res) => {
 
         const trialStartedAt = userProfile.trialStartedAt || null;
         const renewalDate = userProfile.currentPeriodEnd || userProfile.nextBillingDate || null;
-        const signUsageLimit = localUnlimited ? Number.MAX_SAFE_INTEGER : dbService.getSignUsageLimit(plan);
+        const signUsageLimit = localUnlimited ? Number.MAX_SAFE_INTEGER : dbService.getSignUsageLimitForUser(userProfile);
         
         // Calculate count since trial start OR current billing month start
         let countBaselineTime = 0;

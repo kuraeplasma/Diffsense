@@ -54,6 +54,15 @@ class DBService {
         return SIGN_USAGE_LIMITS[plan] || 0;
     }
 
+    getSignUsageLimitForUser(userProfile) {
+        // トライアル中はトライアル上限を適用（getUsageLimitと同様の挙動）
+        if (this.isTrialActive(userProfile)) {
+            return SIGN_USAGE_LIMITS['trial'];
+        }
+        const plan = userProfile.plan || 'pro';
+        return SIGN_USAGE_LIMITS[plan] || 0;
+    }
+
     // --- Firestore helpers for user profiles ---
 
     async _firestoreGetUser(uid) {
