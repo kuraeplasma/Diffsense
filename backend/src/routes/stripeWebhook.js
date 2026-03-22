@@ -29,6 +29,7 @@ async function handleCheckoutCompleted(session) {
     if (session.mode !== 'subscription') return;
 
     const uid = session?.metadata?.uid || null;
+    logger.info(`Stripe webhook: received checkout.session.completed, uid=${uid}, sessionId=${session.id}`);
     if (!uid) {
         logger.warn('Stripe checkout.session.completed: uid metadata not found, skipping user update');
         return;
@@ -38,6 +39,7 @@ async function handleCheckoutCompleted(session) {
     let billingCycle = session?.metadata?.billingCycle || null;
     let stripeStatus = 'ACTIVE';
     let trialEndsAt = null;
+    let currentPeriodEnd = null;
 
     const subscriptionId = typeof session.subscription === 'string'
         ? session.subscription
@@ -46,13 +48,14 @@ async function handleCheckoutCompleted(session) {
         try {
             const subscription = await stripeService.getSubscription(subscriptionId);
             stripeStatus = subscription?.status ? String(subscription.status).toUpperCase() : 'ACTIVE';
-            if (subscription?.trial_end) {
-                trialEndsAt = new Date(subscription.trial_end * 1000).toISOString();
+            if (subscription?.current_period_end) {
+                currentPeriodEnd = new Date(subscription.current_period_end * 1000).toISOString();
             }
             const resolved = stripeService.resolvePlanBySubscription(subscription);
             if (resolved) {
                 plan = resolved.plan;
                 billingCycle = resolved.billingCycle;
+                logger.info(`Stripe webhook: resolved plan=${plan}, billingCycle=${billingCycle} from subscription, next renewal=${currentPeriodEnd}`);
             }
         } catch (error) {
             logger.warn(`Stripe webhook: failed to resolve plan from subscription ${subscriptionId}: ${error.message}`);
@@ -68,6 +71,7 @@ async function handleCheckoutCompleted(session) {
         stripeStatus,
         subscriptionState: stripeStatus === 'TRIALING' ? 'trial' : 'active',
         trialEndsAt,
+        currentPeriodEnd,
         stripePaymentFailed: false,
         lastPaymentFailedAt: null,
         stripeCheckoutSessionId: session.id,
@@ -163,6 +167,7 @@ async function handleInvoicePaid(invoice) {
         subscriptionState: 'active',
         stripePaymentFailed: false,
         lastPaymentAt: new Date().toISOString(),
+        currentPeriodEnd: invoice.period_end ? new Date(invoice.period_end * 1000).toISOString() : null,
         stripeSubscriptionId: subscriptionId,
         stripeCustomerId: customerId
     });

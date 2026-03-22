@@ -26,7 +26,11 @@ router.get('/subscription', async (req, res) => {
         const isInTrial = localUnlimited
             ? (!userProfile.hasPaymentMethod && dbService.isTrialActive(userProfile))
             : dbService.isTrialActive(userProfile);
+        
+        logger.info(`GET /subscription: uid=${uid}, plan=${plan}, isInTrial=${isInTrial}, usageLimit=${limit}`);
+        
         const trialStartedAt = userProfile.trialStartedAt || null;
+        const renewalDate = userProfile.currentPeriodEnd || userProfile.nextBillingDate || null;
         const signUsageLimit = localUnlimited ? Number.MAX_SAFE_INTEGER : 3;
 
         const trialStartTime = new Date(trialStartedAt || 0).getTime();
@@ -57,6 +61,7 @@ router.get('/subscription', async (req, res) => {
                 usageLimit: limit,
                 daysRemaining: daysRemaining,
                 trialStartedAt: trialStartedAt,
+                renewalDate: renewalDate,
                 isInTrial: isInTrial,
                 planLimit: localUnlimited ? Number.MAX_SAFE_INTEGER : dbService.getOriginalPlanLimit(plan),
                 signUsageCount,

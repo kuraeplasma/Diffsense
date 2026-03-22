@@ -1174,12 +1174,16 @@ const Views = {
 
         let paymentSection = '';
         if (hasPayment) {
+            const renewalText = (sub && !sub.isInTrial && sub.renewalDate)
+                ? `<div style="margin-top:8px; font-size:13px; color:#555;">次回更新日: <strong>${new Date(sub.renewalDate).toLocaleDateString('ja-JP')}</strong></div>`
+                : '';
             paymentSection = `
                 <div class="plan-payment-card is-ok compact">
                     <div class="plan-payment-title ok">
                         <i class="fa-solid fa-circle-check"></i>
                         <strong>お支払い方法が登録されています</strong>
                     </div>
+                    ${renewalText}
                 </div>
             `;
         } else {
@@ -3764,6 +3768,7 @@ class DashboardApp {
             <div class="plan-info-text">
                 ${sub.isInTrial ? `残り期間: <strong>${sub.daysRemaining}日間</strong><br>` : ''}
                 AI解析: <strong>${sub.usageCount}</strong> / ${sub.usageLimit}回
+                ${(!sub.isInTrial && sub.renewalDate) ? `<br><span style="font-size:0.75rem; opacity:0.8;">次回更新: <strong>${new Date(sub.renewalDate).toLocaleDateString('ja-JP')}</strong></span>` : ''}
                 ${sub.isInTrial ? `<br>署名: <strong>${sub.signUsageCount || 0}</strong> / ${sub.signUsageLimit || 3}回<br><small style="font-size: 0.75rem; opacity: 0.7;">通常枠: ${sub.planLimit}回</small>` : ''}
             </div>
             ${upgradeAdvice}

@@ -299,19 +299,29 @@ class DBService {
      * @param {object} userProfile
      */
     isTrialActive(userProfile) {
+        if (!userProfile) return false;
+
         // If user has a paid active subscription, they are NOT in trial
-        if (userProfile.subscriptionState === 'active' || userProfile.stripeStatus === 'ACTIVE') {
+        if (userProfile.subscriptionState === 'active' || 
+            userProfile.stripeStatus === 'ACTIVE' || 
+            userProfile.paypalStatus === 'ACTIVE') {
+            logger.info(`isTrialActive(${userProfile.uid}): false (Active paid status detected)`);
             return false;
         }
 
-        if (!userProfile.trialStartedAt) return false;
+        if (!userProfile.trialStartedAt) {
+            logger.info(`isTrialActive(${userProfile.uid}): false (No trialStartedAt)`);
+            return false;
+        }
 
         const trialStart = new Date(userProfile.trialStartedAt);
         const now = new Date();
         const diffTime = now - trialStart;
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-        return diffDays <= TRIAL_DURATION_DAYS && diffDays >= 0;
+        const isActive = diffDays <= TRIAL_DURATION_DAYS && diffDays >= 0;
+        logger.info(`isTrialActive(${userProfile.uid}): ${isActive} (diffDays=${diffDays}, started=${userProfile.trialStartedAt})`);
+        return isActive;
     }
 
     /**
@@ -337,6 +347,7 @@ class DBService {
         // 1. Try Firestore first (persistent, survives cold starts)
         const firestoreUser = await this._firestoreGetUser(uid);
         if (firestoreUser) {
+            logger.info(`getUserProfile(${uid}): Found in Firestore (plan=${firestoreUser.plan}, trialStart=${firestoreUser.trialStartedAt})`);
             firestoreUser.billingCycle = normalizeBillingCycle(firestoreUser.billingCycle);
             logger.info(`getUserProfile(${uid}): Found in Firestore, plan=${firestoreUser.plan}`);
             // Also update local file cache
@@ -443,6 +454,7 @@ class DBService {
             : { uid, plan, trialStartedAt };
 
         // Always persist to Firestore first
+        logger.info(`setUserPlan(${uid}): Updating to plan=${plan}, billingCycle=${normalizedBillingCycle}, trialStart=${trialStartedAt}`);
         await this._firestoreSetUser(uid, firestorePayload);
 
         const users = await this.readData('users');
