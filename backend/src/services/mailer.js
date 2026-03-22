@@ -377,8 +377,8 @@ async function sendCrawlChangeAlertEmail(toEmail, userName, contractName, source
 <body style="margin:0;padding:0;background:#f5f5f5;font-family:sans-serif">
 <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:40px 20px">
 <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08)">
-<tr><td style="background:#1a1a2e;padding:28px 40px;text-align:left">
-<span style="color:#c5a059;font-size:20px;font-weight:700;letter-spacing:0.5px">⚖️ DIFFsense</span></td></tr>
+<tr><td style="background:#111827;padding:20px 40px;text-align:left">
+<span style="color:#c5a059;font-size:18px;font-weight:700;letter-spacing:0.5px">DIFFsense</span></td></tr>
 <tr><td style="padding:40px">
 <h2 style="color:#1a1a2e;margin-top:0;font-size:20px;border-left:4px solid #c5a059;padding-left:12px">変更を検知しました</h2>
 <p style="color:#444;margin-bottom:24px">DIFFsenseよりお知らせです。<br>監視中の対象に変更が検知されました。</p>
