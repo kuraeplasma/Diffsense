@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const stripeService = require('../services/stripe');
 const dbService = require('../services/db');
+const mailer = require('../services/mailer');
 const logger = require('../utils/logger');
 
 function normalizePlan(plan) {
@@ -81,6 +82,20 @@ async function handleCheckoutCompleted(session) {
         normalizeBillingCycle(billingCycle || 'monthly')
     );
     logger.info(`Stripe webhook: checkout completed, uid=${uid}, plan=${plan}, billingCycle=${billingCycle}`);
+
+    // Send confirmation email
+    try {
+        const userProfile = await dbService.getUserProfile(uid);
+        if (userProfile && userProfile.email) {
+            await mailer.sendPaymentSuccessEmail({
+                to: userProfile.email,
+                plan: normalizePlan(plan || 'starter'),
+                billingCycle: normalizeBillingCycle(billingCycle || 'monthly')
+            });
+        }
+    } catch (mailError) {
+        logger.error(`Stripe webhook: failed to send confirmation email for uid=${uid}: ${mailError.message}`);
+    }
 }
 
 async function handleSubscriptionDeleted(subscription) {
@@ -152,6 +167,15 @@ async function handleInvoicePaid(invoice) {
         stripeCustomerId: customerId
     });
     logger.info(`Stripe webhook: invoice paid, uid=${uid}, sub=${subscriptionId}`);
+
+    // For recurring payments (renewals), we might also want to send a notification, 
+    // but usually checkout.session.completed handles the first one.
+    // To avoid spamming, we only send if this invoice succeeded and it's not the same as the checkout session.
+    // However, for simplicity and ensuring "something" arrives, let's send it if we haven't sent one recently?
+    // Actually, let's just send it for invoice.paid if it's not a trial-to-active transition that we already handled.
+    // Better: Only send from handleCheckoutCompleted for the first purchase. 
+    // If the user wants renewal emails, we can add that later.
+    // For now, let's stick to initial purchase to fix the reported issue.
 }
 
 router.post('/webhook', async (req, res) => {

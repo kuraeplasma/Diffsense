@@ -298,9 +298,74 @@ function _e(s) {
         .replace(/"/g, '&quot;');
 }
 
+async function sendPaymentSuccessEmail({ to, plan, billingCycle }) {
+    const resend = getResendClient();
+    const planName = {
+        'starter': 'Starter',
+        'business': 'Business',
+        'pro': 'Pro'
+    }[plan] || plan;
+    const cycleName = billingCycle === 'annual' ? '年額' : '月額';
+
+    const result = await resend.emails.send({
+        from: FROM,
+        to: [to],
+        reply_to: REPLY_TO,
+        subject: `【重要】DIFFsense サブスクリプションお申し込み完了のお知らせ`,
+        html: _paymentSuccessHtml({ planName, cycleName }),
+        text: `お申し込みありがとうございます。\n\nDIFFsense の ${planName} プラン（${cycleName}）へのお申し込みが完了しました。\n\nダッシュボードより解析機能をご利用いただけます。\n---\nDIFFsense`
+    });
+
+    if (result.error) {
+        const detail = formatResendError(result.error);
+        logger.error(`[mailer] sendPaymentSuccessEmail failed to=${to} error=${detail}`);
+        throw new Error(detail);
+    }
+    logger.info(`[mailer] sendPaymentSuccessEmail sent to=${to} emailId=${result.data?.id || 'unknown'}`);
+}
+
+function _paymentSuccessHtml({ planName, cycleName }) {
+    return `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#fdfcfb;font-family:'Noto Sans JP','Inter','Hiragino Sans','Yu Gothic','Meiryo',sans-serif;color:#2b2623;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#fdfcfb;padding:40px 20px;">
+<tr><td align="center">
+<table width="520" cellpadding="0" cellspacing="0"
+       style="background:#fff;border-radius:16px;border:1px solid #e7e0d6;overflow:hidden;box-shadow:0 12px 32px rgba(26,21,18,0.08);">
+  <tr><td style="padding:32px;text-align:center;">
+    <p style="margin:0 0 24px;font-size:17px;line-height:1;font-family:Helvetica,Arial,sans-serif;font-weight:600;letter-spacing:0.5px;color:#c5a059;">DIFFsense</p>
+    <div style="display:inline-block;font-size:28px;line-height:1;margin-bottom:16px;">✨</div>
+    <p style="margin:0 0 6px;font-size:16px;font-weight:700;color:#2b2623;">サブスクリプションのお申し込み完了</p>
+    <p style="margin:0 0 24px;font-size:14px;color:#5e544d;line-height:1.8;">
+      お申し込みいただき、誠にありがとうございます。<br>
+      ご契約内容は以下の通りです。
+    </p>
+    <div style="background:#fbfaf8;border:1px solid #eee3d2;border-radius:12px;padding:16px 20px;margin-bottom:28px;text-align:left;">
+      <p style="margin:0 0 4px;font-size:12px;color:#8a7a6a;">プラン</p>
+      <p style="margin:0 0 12px;font-size:16px;font-weight:700;color:#2b2623;">${_e(planName)} プラン</p>
+      <p style="margin:0 0 4px;font-size:12px;color:#8a7a6a;">お支払いサイクル</p>
+      <p style="margin:0;font-size:16px;font-weight:700;color:#2b2623;">${_e(cycleName)}</p>
+    </div>
+    <a href="${_frontendBaseUrl()}/dashboard.html"
+       style="display:inline-block;background:#c5a059;color:#fff;text-decoration:none;
+              border-radius:12px;padding:14px 40px;font-size:14px;font-weight:700;box-shadow:0 8px 18px rgba(197,160,89,0.28);">
+      ダッシュボードへ移動
+    </a>
+  </td></tr>
+  <tr><td style="background:#f8f5f0;border-top:1px solid #eee3d2;padding:18px 32px;text-align:center;">
+    <p style="margin:0;font-size:11px;color:#8a7a6a;line-height:1.6;">
+      今後とも DIFFsense をよろしくお願いいたします。
+    </p>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>`;
+}
+
 module.exports = {
     sendSigningRequestEmail,
     sendCompletionEmail,
     sendReminderEmail,
-    sendRecipientActionEmail
+    sendRecipientActionEmail,
+    sendPaymentSuccessEmail
 };

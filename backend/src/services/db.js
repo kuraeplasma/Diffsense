@@ -299,6 +299,11 @@ class DBService {
      * @param {object} userProfile
      */
     isTrialActive(userProfile) {
+        // If user has a paid active subscription, they are NOT in trial
+        if (userProfile.subscriptionState === 'active' || userProfile.stripeStatus === 'ACTIVE') {
+            return false;
+        }
+
         if (!userProfile.trialStartedAt) return false;
 
         const trialStart = new Date(userProfile.trialStartedAt);
@@ -400,6 +405,22 @@ class DBService {
     }
 
     /**
+     * Set/Update user email in profile
+     * @param {string} uid 
+     * @param {string} email 
+     */
+    async upsertUserEmail(uid, email) {
+        if (!uid || !email) return;
+
+        // Try to get profile first to check if update is needed
+        const profile = await this.getUserProfile(uid);
+        if (profile.email === email) return;
+
+        logger.info(`upsertUserEmail: uid=${uid}, email=${email}`);
+        await this.updatePaymentInfo(uid, { email });
+    }
+
+    /**
      * Set user's selected plan
      * @param {string} uid - Firebase UID
      * @param {string} plan - Plan ID (starter, business, pro)
@@ -411,9 +432,11 @@ class DBService {
         logger.info(`setUserPlan: uid=${uid}, plan=${plan}, billingCycle=${normalizedBillingCycle || 'keep'}, forceTrialStart=${forceTrialStart}`);
 
         const existingProfile = await this.getUserProfile(uid);
-        const trialStartedAt = forceTrialStart
-            ? new Date().toISOString()
-            : (existingProfile?.trialStartedAt || new Date().toISOString());
+        let trialStartedAt = existingProfile?.trialStartedAt || null;
+
+        if (forceTrialStart) {
+            trialStartedAt = new Date().toISOString();
+        }
 
         const firestorePayload = normalizedBillingCycle
             ? { uid, plan, billingCycle: normalizedBillingCycle, trialStartedAt }
