@@ -110,27 +110,69 @@ class CronService {
             logger.info(`Change detected in contract ${contract.id}`);
             updates.status = 'リスク要確認';
             updates.original_content = result.text;
-            updates.stable_count = 0; // Reset stable count
+            updates.stable_count = 0;
 
-            // Note: AI analysis is NOT triggered here automatically per requirements.
-            // Requirement says: "差分があった場合のみAIによる差分解析を実行する"
-            // But also: "定期クローリングでは → 差分がない限りAIを絶対に実行しない"
-            // And: "手動実行（ユーザー操作）...この場合のみAI解析回数を消費する"
-            // Wait, does "定期クローリングで差分があったらAIを呼ぶ" or not?
-            // "差分があった場合のみAIによる差分解析を実行する" <- This implies it DOES call AI if there's a diff.
-            // "AI実行回数はプラン上限にカウントする" <- This also implies it calls AI.
-            // But "手動実行...この場合のみAI解析回数を消費する" might mean ONLY manual ones consume?
-            // No, the requirement says "AIを絶対に実行しない" IF NO DIFF.
-            // So if there IS a diff, it SHOULD execute AI.
-
-            // For now, I'll update the status so the user knows they need to check.
-            // If I call AI here, I need the owner_uid to check limits.
+            // 通知を送信
+            try {
+                await this.sendChangeNotifications(contract, result);
+            } catch (notifyErr) {
+                logger.error(`Notification failed for contract ${contract.id}: ${notifyErr.message}`);
+            }
         } else {
             logger.info(`No change in contract ${contract.id}`);
             updates.stable_count = (contract.stable_count || 0) + 1;
         }
 
         await dbService.updateContract(contract.id, updates);
+    }
+
+    /**
+     * 変更検知時の通知送信（Slack + Email）
+     */
+    async sendChangeNotifications(contract, crawlResult) {
+        const ownerUid = contract.ownerUid;
+        if (!ownerUid) return;
+
+        const notifSettings = await dbService.getNotificationSettings(ownerUid);
+        const userProfile = await dbService.getUserProfile(ownerUid);
+        const contractName = contract.name || contract.source_url || '契約';
+        const detectedAt = new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
+        const sourceUrl = contract.source_url || '';
+
+        const changeSummary = crawlResult.summary || '';
+
+        // メール通知
+        if (notifSettings?.email?.crawlAlert !== false && userProfile?.email) {
+            try {
+                const mailer = require('./mailer');
+                await mailer.sendCrawlChangeAlertEmail(
+                    userProfile.email,
+                    userProfile.name || '',
+                    contractName,
+                    sourceUrl,
+                    detectedAt,
+                    changeSummary
+                );
+            } catch (err) {
+                logger.error(`Email notification failed: ${err.message}`);
+            }
+        }
+
+        // Slack通知
+        if (notifSettings?.slack?.enabled && notifSettings?.slack?.webhookUrl) {
+            try {
+                const slackService = require('./slackService');
+                await slackService.sendSlackNotification(
+                    notifSettings.slack.webhookUrl,
+                    contractName,
+                    sourceUrl,
+                    detectedAt,
+                    changeSummary
+                );
+            } catch (err) {
+                logger.error(`Slack notification failed: ${err.message}`);
+            }
+        }
     }
     /**
      * Reset monthly usage counts for all paid users

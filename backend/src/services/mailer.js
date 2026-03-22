@@ -362,10 +362,72 @@ function _paymentSuccessHtml({ planName, cycleName }) {
 </body></html>`;
 }
 
+async function sendCrawlChangeAlertEmail(toEmail, userName, contractName, sourceUrl, detectedAt, changeSummary = '') {
+    const resend = getResendClient();
+    const displayName = _normalizeHonorificName(userName, toEmail);
+    const frontendUrl = _frontendBaseUrl();
+    const targetLabel = contractName || sourceUrl;
+    const summaryBlock = changeSummary
+        ? `<tr><td style="padding-top:8px"><strong>■ 変更概要</strong><br><span style="color:#555;line-height:1.7">${_e(changeSummary)}</span></td></tr>`
+        : '';
+
+    const html = `<!DOCTYPE html>
+<html lang="ja">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f5f5f5;font-family:sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:40px 20px">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08)">
+<tr><td style="background:#1a1a2e;padding:28px 40px;text-align:left">
+<span style="color:#c5a059;font-size:20px;font-weight:700;letter-spacing:0.5px">⚖️ DIFFsense</span></td></tr>
+<tr><td style="padding:40px">
+<h2 style="color:#1a1a2e;margin-top:0;font-size:20px;border-left:4px solid #c5a059;padding-left:12px">変更を検知しました</h2>
+<p style="color:#444;margin-bottom:24px">DIFFsenseよりお知らせです。<br>監視中の対象に変更が検知されました。</p>
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#fafafa;border:1px solid #e1e4e8;border-radius:6px;padding:20px;margin:0 0 24px">
+<tr><td style="padding-bottom:10px"><strong style="color:#1a1a2e">■ 対象</strong><br><span style="color:#555">${_e(targetLabel)}</span></td></tr>
+<tr><td style="padding:10px 0;border-top:1px solid #e1e4e8"><strong style="color:#1a1a2e">■ 検知日時</strong><br><span style="color:#555">${_e(detectedAt)}</span></td></tr>
+${summaryBlock}
+</table>
+<p style="color:#444;margin-bottom:24px">この変更は契約条件やリスクに影響する可能性があります。</p>
+<div style="text-align:center;margin:28px 0">
+<a href="${frontendUrl}/dashboard.html" style="background:#c5a059;color:#fff;padding:14px 36px;border-radius:6px;text-decoration:none;font-weight:700;display:inline-block;font-size:15px">▼ 詳細を確認する</a>
+</div>
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f7fa;border-radius:6px;padding:16px;margin:0 0 28px">
+<tr><td style="color:#555;font-size:13px;line-height:1.9">
+<strong style="color:#1a1a2e">▼ そのまま対応する</strong><br>
+・差分を確認<br>
+・リスクをチェック<br>
+・署名依頼を送信
+</td></tr>
+</table>
+<hr style="border:none;border-top:1px solid #e1e4e8;margin:24px 0">
+<p style="color:#888;font-size:12px;line-height:1.7">
+DIFFsense ― 契約の変更点を見逃さない<br>
+メール通知は設定画面からON/OFFできます。<br>
+© DIFFsense - spacegleam.co.jp
+</p>
+</td></tr></table></td></tr></table>
+</body></html>`;
+
+    const result = await resend.emails.send({
+        from: FROM,
+        to: toEmail,
+        replyTo: REPLY_TO,
+        subject: `【DIFFsense】変更を検知しました｜${targetLabel}`,
+        html
+    });
+
+    if (result.error) {
+        throw new Error(`Resend error: ${formatResendError(result.error)}`);
+    }
+    logger.info(`Crawl change alert email sent to ${toEmail} for contract: ${contractName}`);
+    return result;
+}
+
 module.exports = {
     sendSigningRequestEmail,
     sendCompletionEmail,
     sendReminderEmail,
     sendRecipientActionEmail,
-    sendPaymentSuccessEmail
+    sendPaymentSuccessEmail,
+    sendCrawlChangeAlertEmail
 };

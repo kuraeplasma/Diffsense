@@ -18,28 +18,24 @@ router.get('/subscription', async (req, res) => {
         const uid = req.user.uid;
         const userProfile = await dbService.getUserProfile(uid);
         const localUnlimited = isLocalUnlimitedMode(req);
-        const signRequests = await dbService.getSignRequests(uid);
-
+        
         const plan = userProfile.plan || 'pro';
         const billingCycle = userProfile.billingCycle || 'monthly';
         const limit = localUnlimited ? Number.MAX_SAFE_INTEGER : dbService.getUsageLimit(userProfile);
         const isInTrial = localUnlimited
             ? (!userProfile.hasPaymentMethod && dbService.isTrialActive(userProfile))
             : dbService.isTrialActive(userProfile);
-        
-        logger.info(`GET /subscription: uid=${uid}, plan=${plan}, isInTrial=${isInTrial}, usageLimit=${limit}`);
-        
+
         const trialStartedAt = userProfile.trialStartedAt || null;
         const renewalDate = userProfile.currentPeriodEnd || userProfile.nextBillingDate || null;
         const signUsageLimit = localUnlimited ? Number.MAX_SAFE_INTEGER : dbService.getSignUsageLimit(plan);
-
+        
         // Calculate count since trial start OR current billing month start
         let countBaselineTime = 0;
         if (isInTrial) {
             countBaselineTime = new Date(trialStartedAt || 0).getTime();
         } else {
             // Paid user: count within current billing period
-            // Try to find a billing start date in profile, fallback to the 1st of this month
             const billingStart = userProfile.currentPeriodStart || userProfile.lastPaymentDate;
             if (billingStart) {
                 countBaselineTime = new Date(billingStart).getTime();
@@ -49,6 +45,7 @@ router.get('/subscription', async (req, res) => {
             }
         }
 
+        const signRequests = await dbService.getSignRequests(uid);
         const signUsageCount = localUnlimited
             ? 0
             : (Array.isArray(signRequests) ? signRequests : []).filter((request) => {
@@ -57,6 +54,8 @@ router.get('/subscription', async (req, res) => {
                 if (Number.isNaN(createdTime) || createdTime <= 0) return true;
                 return createdTime >= countBaselineTime;
             }).length;
+
+        logger.info(`GET /subscription: uid=${uid}, plan=${plan}, isInTrial=${isInTrial}, AI=${userProfile.usageCount}/${limit}, Sign=${signUsageCount}/${signUsageLimit}`);
 
         let daysRemaining = null;
         if (isInTrial && trialStartedAt) {

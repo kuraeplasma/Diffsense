@@ -1,0 +1,12 @@
+.gcloudignore
+.git
+.gitignore
+node_modules/
+.env
+*.log
+.DS_Store
+coverage/
+dist/
+uploads/
+logs/
+data/

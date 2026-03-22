@@ -3669,6 +3669,210 @@ class DashboardApp {
         return false;
     }
 
+    renderNotificationSettings(settings, apiBase = '') {
+        const emailEnabled = settings?.email?.crawlAlert !== false;
+        const slack = settings?.slack || {};
+        const slackEnabled = slack.enabled === true;
+        const slackConnected = Boolean(slack.webhookUrl);
+        const channelName = slack.channelName || '';
+        const teamName = slack.teamName || '';
+
+        const slackStatus = slackConnected
+            ? `<div style="display:flex;align-items:center;gap:8px;margin-top:12px;padding:10px 14px;background:#f0faf4;border:1px solid #b7dfc7;border-radius:6px">
+                <i class="fa-brands fa-slack" style="color:#4a154b;font-size:16px"></i>
+                <i class="fa-solid fa-circle-check" style="color:#28a745;font-size:13px"></i>
+                <span style="font-size:13px;color:#1a6b35;font-weight:500">${channelName}</span>
+                <span style="font-size:12px;color:var(--text-muted)">${teamName ? `（${teamName}）` : ''}</span>
+                <button onclick="window.app.disconnectSlack()"
+                    style="margin-left:auto;font-size:12px;color:var(--text-muted);background:none;border:none;cursor:pointer;padding:2px 8px;border-radius:4px;transition:background .15s"
+                    onmouseover="this.style.background='#fee'" onmouseout="this.style.background='none'">
+                    連携解除
+                </button>
+               </div>`
+            : `<div style="margin-top:14px">
+                <button onclick="window.app.connectSlack()"
+                    style="display:inline-flex;align-items:center;gap:8px;padding:10px 18px;background:#4a154b;color:#fff;border-radius:6px;border:none;cursor:pointer;font-size:13px;font-weight:600;transition:opacity .2s"
+                    onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
+                    <i class="fa-brands fa-slack" style="font-size:16px"></i>
+                    Slackと連携する
+                </button>
+                <p style="font-size:12px;color:var(--text-faint);margin-top:8px;line-height:1.6">
+                    Slackのチャンネルを選ぶだけで連携完了。アプリ作成は不要です。
+                </p>
+               </div>`;
+
+        return `
+            <div class="plan-section">
+                <div style="margin-bottom:28px">
+                    <h2 class="section-title" style="margin-bottom:6px">通知設定</h2>
+                    <p style="color:var(--text-muted);font-size:13px;margin:0">URLクローリングで変更が検知された際の通知先を設定します</p>
+                </div>
+
+                <div style="display:flex;flex-direction:column;gap:12px;max-width:640px">
+
+                    <!-- メール通知 -->
+                    <div style="background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:8px;padding:20px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px">
+                        <div style="display:flex;align-items:center;gap:14px">
+                            <div style="width:36px;height:36px;border-radius:8px;background:var(--color-primary-dim);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                                <i class="fa-solid fa-envelope" style="color:var(--color-primary);font-size:15px"></i>
+                            </div>
+                            <div>
+                                <div style="font-weight:600;font-size:14px;color:var(--text-main);margin-bottom:2px">メール通知</div>
+                                <div style="font-size:12px;color:var(--text-muted)">変更検知時に登録メールアドレスへ通知</div>
+                            </div>
+                        </div>
+                        <label class="toggle-switch" style="flex-shrink:0">
+                            <input type="checkbox" id="notif-email-toggle" ${emailEnabled ? 'checked' : ''}
+                                onchange="window.app.saveNotificationSettings()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+
+                    <!-- Slack通知 -->
+                    <div style="background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:8px;padding:20px 24px">
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px">
+                            <div style="display:flex;align-items:center;gap:14px">
+                                <div style="width:36px;height:36px;border-radius:8px;background:var(--color-primary-dim);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                                    <i class="fa-brands fa-slack" style="color:var(--color-primary);font-size:16px"></i>
+                                </div>
+                                <div>
+                                    <div style="font-weight:600;font-size:14px;color:var(--text-main);margin-bottom:2px">Slack通知</div>
+                                    <div style="font-size:12px;color:var(--text-muted)">変更検知時に指定チャンネルへ通知</div>
+                                </div>
+                            </div>
+                            ${slackConnected ? `<label class="toggle-switch" style="flex-shrink:0">
+                                <input type="checkbox" id="notif-slack-toggle" ${slackEnabled ? 'checked' : ''}
+                                    onchange="window.app.saveNotificationSettings()">
+                                <span class="toggle-slider"></span>
+                            </label>` : ''}
+                        </div>
+                        ${slackStatus}
+                    </div>
+
+                </div>
+            </div>
+        `;
+    }
+
+    async saveNotificationSettings() {
+        const emailToggle = document.getElementById('notif-email-toggle');
+        const slackToggle = document.getElementById('notif-slack-toggle');
+
+        const settings = {
+            email: { crawlAlert: emailToggle?.checked !== false },
+            slack: {
+                enabled: slackToggle?.checked === true
+            }
+        };
+
+        try {
+            const authModule = await import('./auth.js');
+            const token = await authModule.getIdToken();
+            if (!token) return; // ローカル環境ではサイレントにスキップ
+
+            const apiBase = (await import('./api-base.js')).getApiBaseUrl();
+            const res = await fetch(`${apiBase}/api/notifications/settings`, {
+                method: 'PATCH',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify(settings)
+            });
+            const data = await res.json();
+            if (data.success) {
+                Notify.success('通知設定を保存しました');
+            } else {
+                Notify.error(data.error || '保存に失敗しました');
+            }
+        } catch (err) {
+            Notify.error('保存に失敗しました: ' + err.message);
+        }
+    }
+
+    async connectSlack() {
+        try {
+            const authModule = await import('./auth.js');
+            const token = await authModule.getIdToken();
+            if (!token) {
+                Notify.error('ログインが必要です');
+                return;
+            }
+            const apiBase = (await import('./api-base.js')).getApiBaseUrl();
+            const res = await fetch(`${apiBase}/api/slack/oauth/start`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'application/json'
+                }
+            });
+            const data = await res.json();
+            if (data.success && data.url) {
+                window.location.href = data.url;
+            } else {
+                Notify.error(data.error || 'Slack連携の開始に失敗しました');
+            }
+        } catch (err) {
+            Notify.error('Slack連携の開始に失敗しました: ' + err.message);
+        }
+    }
+
+    async disconnectSlack() {
+        if (!await Notify.confirm('Slack連携を解除しますか？', { title: '確認', type: 'warning' })) return;
+        try {
+            const authModule = await import('./auth.js');
+            const token = await authModule.getIdToken();
+            if (!token) return;
+            const apiBase = (await import('./api-base.js')).getApiBaseUrl();
+            await fetch(`${apiBase}/api/slack/oauth/disconnect`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            Notify.success('Slack連携を解除しました');
+            this.loadAndRenderNotificationSettings();
+        } catch (err) {
+            Notify.error('解除に失敗しました: ' + err.message);
+        }
+    }
+
+    async loadAndRenderNotificationSettings() {
+        // Slack OAuth結果をチェック
+        const urlParams = new URLSearchParams(window.location.search);
+        const slackConnected = urlParams.get('slack_connected');
+        const slackError = urlParams.get('slack_error');
+        const slackChannel = urlParams.get('channel');
+        if (slackConnected === '1') {
+            Notify.success('Slack連携が完了しました');
+            history.replaceState(null, '', window.location.pathname);
+        } else if (slackError) {
+            Notify.error(`Slack連携に失敗しました: ${decodeURIComponent(slackError)}`);
+            history.replaceState(null, '', window.location.pathname);
+        }
+
+        const main = this.mainContent;
+        if (!main) return;
+        main.innerHTML = '<div style="padding:40px;color:#888;">読み込み中...</div>';
+
+        let apiBase = '';
+        try {
+            apiBase = (await import('./api-base.js')).getApiBaseUrl();
+        } catch (_) { /* fallback to empty */ }
+
+        try {
+            const authModule = await import('./auth.js');
+            const token = await authModule.getIdToken();
+            if (!token) {
+                // ローカル開発環境などトークンなしの場合はデフォルト設定を表示
+                main.innerHTML = this.renderNotificationSettings({}, apiBase);
+                return;
+            }
+            const res = await fetch(`${apiBase}/api/notifications/settings`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+            const settings = data.success ? data.data : {};
+            main.innerHTML = this.renderNotificationSettings(settings, apiBase);
+        } catch (err) {
+            main.innerHTML = this.renderNotificationSettings({}, apiBase);
+        }
+    }
+
     showCancelModal() {
         console.log('showCancelModal called');
         const overlay = document.createElement('div');
@@ -3986,6 +4190,11 @@ class DashboardApp {
                     console.warn('Failed to prefetch payment config for plan view:', error);
                 });
             }
+        }
+
+        if (viewId === 'notifications') {
+            this.loadAndRenderNotificationSettings();
+            return;
         }
 
         const navMap = {

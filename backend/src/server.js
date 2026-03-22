@@ -16,6 +16,8 @@ const logger = require('./utils/logger');
 const crawlRoutes = require('./routes/crawl');
 const webhookRoutes = require('./routes/webhook');
 const signRoutes = require('./routes/sign');
+const notificationRoutes = require('./routes/notifications');
+const slackRoutes = require('./routes/slack');
 const cronService = require('./services/cronService');
 const { assertProductionEnv } = require('./config/env');
 
@@ -186,10 +188,18 @@ app.use('/contracts', authMiddleware, contractRoutes);
 app.use('/api/contracts', authMiddleware, contractRoutes);
 app.use('/invite', authMiddleware, inviteRoutes);
 app.use('/user', authMiddleware, userRoutes);
-app.use('/api', authMiddleware, userRoutes);
 app.use('/payment', authMiddleware, paymentRoutes);
-app.use('/api', authMiddleware, paymentRoutes);
 app.use('/crawl', authMiddleware, crawlRoutes);
+app.use('/api/notifications', authMiddleware, notificationRoutes);
+// Slack: callbackのみauth不要、それ以外はauth必要
+// NOTE: /api/slack は /api catch-all より必ず前に登録すること
+app.use('/api/slack', (req, res, next) => {
+    if (req.path === '/oauth/callback') return next(); // Slackからのコールバックはauth不要
+    return authMiddleware(req, res, next);
+}, slackRoutes);
+// /api catch-all は Slack より後に置く（/api/slack を先にキャッチさせるため）
+app.use('/api', authMiddleware, userRoutes);
+app.use('/api', authMiddleware, paymentRoutes);
 app.use('/api/sign', authMiddleware, signRoutes);
 app.use('/sign', authMiddleware, signRoutes); // Alias for convenience
 

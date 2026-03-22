@@ -724,6 +724,91 @@ class DBService {
         }
     }
 
+    /**
+     * Get all contracts that have URL monitoring enabled (for cron crawling)
+     * Returns contracts with source_url set, along with ownerUid and owner email
+     */
+    async getMonitoringContracts() {
+        if (this.useFirestore) {
+            try {
+                const snapshot = await firestore.collection('contracts')
+                    .where('source_url', '!=', null)
+                    .get();
+                if (!snapshot.empty) {
+                    return snapshot.docs
+                        .map(doc => ({ id: doc.id, ...doc.data() }))
+                        .filter(c => c.source_url && c.source_url.trim() !== '');
+                }
+            } catch (err) {
+                logger.warn(`getMonitoringContracts Firestore failed: ${err.message}`);
+            }
+        }
+        const contracts = await this.readData('contracts');
+        return contracts.filter(c => c.source_url && c.source_url.trim() !== '');
+    }
+
+    /**
+     * Get notification settings for a user
+     */
+    async getNotificationSettings(uid) {
+        const profile = await this.getUserProfile(uid);
+        return profile.notificationSettings || {
+            email: { crawlAlert: true },
+            slack: { enabled: false, webhookUrl: '' }
+        };
+    }
+
+    /**
+     * Update notification settings for a user
+     */
+    async updateNotificationSettings(uid, settings) {
+        logger.info(`updateNotificationSettings: uid=${uid}`);
+        const payload = { notificationSettings: settings };
+        await this._firestoreSetUser(uid, payload);
+
+        // Sync to file
+        const users = await this.readData('users');
+        const index = users.findIndex(u => u.uid === uid);
+        if (index > -1) {
+            users[index].notificationSettings = settings;
+            await this.writeData('users', users);
+        }
+    }
+
+    /**
+     * Slack OAuth state の一時保存（10分TTL想定）
+     */
+    async saveSlackOAuthState(state, uid) {
+        if (this.useFirestore) {
+            await firestore.collection('slack_oauth_states').doc(state).set({
+                uid,
+                createdAt: new Date().toISOString()
+            });
+        }
+        // ファイルフォールバック（メモリでも可だがシンプルにスキップ）
+    }
+
+    async getSlackOAuthState(state) {
+        if (this.useFirestore) {
+            const doc = await firestore.collection('slack_oauth_states').doc(state).get();
+            if (doc.exists) {
+                const data = doc.data();
+                // 10分以上経過していたら無効
+                const createdAt = new Date(data.createdAt);
+                if (Date.now() - createdAt.getTime() < 10 * 60 * 1000) {
+                    return data.uid;
+                }
+            }
+        }
+        return null;
+    }
+
+    async deleteSlackOAuthState(state) {
+        if (this.useFirestore) {
+            await firestore.collection('slack_oauth_states').doc(state).delete();
+        }
+    }
+
     async updateSignRequest(id, updates, ownerUid = null) {
         const requestId = String(id || '').trim();
 
