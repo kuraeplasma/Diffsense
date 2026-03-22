@@ -4,17 +4,24 @@ const logger = require('../utils/logger');
 const { db: firestore, firebaseInitialized } = require('../firebase');
 
 const PLAN_LIMITS = {
-    'trial': 1,      // Legacy, but kept for compatibility during migration if needed
+    'trial': 1,      // Team member limits
     'starter': 1,
     'business': 3,
     'pro': 5
 };
 
 const AI_USAGE_LIMITS = {
-    'trial': 5,      // Legacy/Fallback
+    'trial': 5,
     'starter': 15,
     'business': 120,
     'pro': 400
+};
+
+const SIGN_USAGE_LIMITS = {
+    'trial': 3,
+    'starter': 10,
+    'business': 50,
+    'pro': 999999 // Unlimited for now, handled in code
 };
 
 const TRIAL_AI_LIMIT = 5;
@@ -41,6 +48,10 @@ class DBService {
 
     getOriginalPlanLimit(plan) {
         return AI_USAGE_LIMITS[plan] || 0;
+    }
+
+    getSignUsageLimit(plan) {
+        return SIGN_USAGE_LIMITS[plan] || 0;
     }
 
     // --- Firestore helpers for user profiles ---

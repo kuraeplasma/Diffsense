@@ -1099,13 +1099,13 @@ const Views = {
                 id: 'business',
                 name: 'Business',
                 prices: { monthly: 4980, annual: 49800 },
-                features: ['AI解析 120回/月', 'AI詳細解説', 'ステータス管理', 'チーム3人']
+                features: ['AI解析 120回/月', '電子署名 50件/月', 'AI詳細解説', 'チーム3人']
             },
             {
                 id: 'pro',
                 name: 'Pro / Legal',
                 prices: { monthly: 9800, annual: 98000 },
-                features: ['AI解析 400回/月', '定期URL監視', 'PDFエクスポート', 'チーム5人']
+                features: ['AI解析 400回/月', '電子署名 無制限', '定期URL監視', 'PDFエクスポート']
             }
         ];
 
@@ -3645,11 +3645,12 @@ class DashboardApp {
         return isTrialExpired && hasNoPayment;
     }
 
-    isTrialSignLimitReached() {
+    isSignLimitReached() {
         const sub = this.subscription;
-        if (!sub?.isInTrial) return false;
-        const count = Number(sub?.signUsageCount || 0);
-        const limit = Number(sub?.signUsageLimit || 3);
+        if (!sub) return false;
+        if (sub.plan === 'pro' && !sub.isInTrial) return false; // Pro is unlimited for paid
+        const count = Number(sub.signUsageCount || 0);
+        const limit = Number(sub.signUsageLimit || 3);
         return count >= limit;
     }
 
@@ -3669,6 +3670,7 @@ class DashboardApp {
     }
 
     showCancelModal() {
+        console.log('showCancelModal called');
         const overlay = document.createElement('div');
         overlay.className = 'modal-overlay active';
         overlay.id = 'cancel-modal-overlay';
@@ -3768,13 +3770,13 @@ class DashboardApp {
             <div class="plan-info-text">
                 ${sub.isInTrial ? `残り期間: <strong>${sub.daysRemaining}日間</strong><br>` : ''}
                 AI解析: <strong>${sub.usageCount}</strong> / ${sub.usageLimit}回
+                <br>電子署名: <strong>${sub.signUsageCount || 0}</strong> / ${sub.plan === 'pro' && !sub.isInTrial ? '無制限' : `${sub.signUsageLimit || 0}回`}
                 ${(!sub.isInTrial && sub.renewalDate) ? `<br><span style="font-size:0.75rem; opacity:0.8;">次回更新: <strong>${new Date(sub.renewalDate).toLocaleDateString('ja-JP')}</strong></span>` : ''}
-                ${sub.isInTrial ? `<br>署名: <strong>${sub.signUsageCount || 0}</strong> / ${sub.signUsageLimit || 3}回<br><small style="font-size: 0.75rem; opacity: 0.7;">通常枠: ${sub.planLimit}回</small>` : ''}
             </div>
             ${upgradeAdvice}
-            ${this.isTrialSignLimitReached() ? `
+            ${this.isSignLimitReached() ? `
                 <div style="margin-top:10px; padding:8px 10px; background:rgba(234,67,53,0.08); border:1px solid rgba(234,67,53,0.2); border-radius:6px; font-size:0.72rem; color:#c2410c;">
-                    署名依頼のトライアル上限に達しました。継続利用にはプラン登録が必要です。
+                    ${sub.isInTrial ? '署名依頼のトライアル上限に達しました。継続利用にはプラン登録が必要です。' : '今月の電子署名上限に達しました。翌月までお待ちいただくか、上位プランへのアップグレードをご検討ください。'}
                 </div>
             ` : ''}
             ${sub.isInTrial ? `

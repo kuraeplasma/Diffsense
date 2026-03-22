@@ -31,17 +31,31 @@ router.get('/subscription', async (req, res) => {
         
         const trialStartedAt = userProfile.trialStartedAt || null;
         const renewalDate = userProfile.currentPeriodEnd || userProfile.nextBillingDate || null;
-        const signUsageLimit = localUnlimited ? Number.MAX_SAFE_INTEGER : 3;
+        const signUsageLimit = localUnlimited ? Number.MAX_SAFE_INTEGER : dbService.getSignUsageLimit(plan);
 
-        const trialStartTime = new Date(trialStartedAt || 0).getTime();
+        // Calculate count since trial start OR current billing month start
+        let countBaselineTime = 0;
+        if (isInTrial) {
+            countBaselineTime = new Date(trialStartedAt || 0).getTime();
+        } else {
+            // Paid user: count within current billing period
+            // Try to find a billing start date in profile, fallback to the 1st of this month
+            const billingStart = userProfile.currentPeriodStart || userProfile.lastPaymentDate;
+            if (billingStart) {
+                countBaselineTime = new Date(billingStart).getTime();
+            } else {
+                const now = new Date();
+                countBaselineTime = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+            }
+        }
+
         const signUsageCount = localUnlimited
             ? 0
             : (Array.isArray(signRequests) ? signRequests : []).filter((request) => {
                 const createdTime = new Date(request?.created_at || 0).getTime();
-                if (!isInTrial) return false;
-                if (Number.isNaN(trialStartTime) || trialStartTime <= 0) return true;
+                if (Number.isNaN(countBaselineTime) || countBaselineTime <= 0) return true;
                 if (Number.isNaN(createdTime) || createdTime <= 0) return true;
-                return createdTime >= trialStartTime;
+                return createdTime >= countBaselineTime;
             }).length;
 
         let daysRemaining = null;
