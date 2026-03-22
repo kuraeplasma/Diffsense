@@ -93,37 +93,68 @@ class CronService {
     }
 
     /**
-     * Crawl a single contract, check for changes, and update DB
+     * Crawl a single contract, check for changes, and update DB.
+     * First crawl: save as baseline, no notification.
+     * Subsequent crawl with change: AI summary + notification.
      */
     async processContract(contract) {
         logger.info(`Processing contract ${contract.id}: ${contract.source_url}`);
 
         const result = await crawlService.fetchAndExtract(contract.source_url);
-        const changed = crawlService.hasChanged(result.hash, contract.last_hash);
+        const isFirstCrawl = !contract.last_hash;
 
         const updates = {
             last_checked_at: new Date().toISOString(),
-            last_hash: result.hash
+            last_hash: result.hash,
+            original_content: result.text
         };
 
-        if (changed) {
+        if (isFirstCrawl) {
+            // First crawl: save baseline only, no notification
+            logger.info(`First crawl baseline saved for contract ${contract.id}`);
+            updates.stable_count = 0;
+        } else if (crawlService.hasChanged(result.hash, contract.last_hash)) {
+            // Real change from existing baseline
             logger.info(`Change detected in contract ${contract.id}`);
             updates.status = 'リスク要確認';
-            updates.original_content = result.text;
             updates.stable_count = 0;
 
-            // 通知を送信
+            // Get AI-generated change summary
+            const changeSummary = await this.getChangeSummary(contract.original_content, result.text);
+
+            // Send notifications
             try {
-                await this.sendChangeNotifications(contract, result);
+                await this.sendChangeNotifications(contract, { ...result, summary: changeSummary });
             } catch (notifyErr) {
                 logger.error(`Notification failed for contract ${contract.id}: ${notifyErr.message}`);
             }
         } else {
+            // No change
             logger.info(`No change in contract ${contract.id}`);
             updates.stable_count = (contract.stable_count || 0) + 1;
+            // Keep existing original_content unchanged
+            delete updates.original_content;
         }
 
         await dbService.updateContract(contract.id, updates);
+    }
+
+    /**
+     * Use Gemini AI to summarize what changed between two text versions
+     */
+    async getChangeSummary(oldText, newText) {
+        try {
+            const geminiService = require('./gemini');
+            const maxLen = 3000;
+            const oldSnip = (oldText || '').slice(0, maxLen);
+            const newSnip = (newText || '').slice(0, maxLen);
+            const prompt = `以下はWebページの変更前後のテキストです。何が変わったか100文字程度で日本語で端的にまとめてください。\n\n【変更前】\n${oldSnip}\n\n【変更後】\n${newSnip}`;
+            const summary = await geminiService.generateText(prompt);
+            return (summary || '').trim().slice(0, 200);
+        } catch (err) {
+            logger.warn(`AI change summary failed: ${err.message}`);
+            return '';
+        }
     }
 
     /**

@@ -738,6 +738,27 @@ ${truncatedText}
         }
     }
 
+    /**
+     * Generate a free-form text response from Gemini (non-JSON)
+     * @param {string} prompt
+     * @returns {Promise<string>}
+     */
+    async generateText(prompt) {
+        if (!GEMINI_API_KEY) {
+            throw new Error('Gemini API key is not configured');
+        }
+        const body = {
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.2, maxOutputTokens: 512 }
+        };
+        const response = await axios.post(
+            `${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`,
+            body,
+            { timeout: 30000, headers: { 'Content-Type': 'application/json' } }
+        );
+        return extractCandidateText(response?.data);
+    }
+
     sleep(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }

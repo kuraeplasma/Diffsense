@@ -52,6 +52,14 @@ router.post('/', async (req, res, next) => {
         };
         const saved = await dbService.saveContract(ownerUid, contract);
         res.status(201).json({ success: true, data: saved });
+
+        // If URL-based contract, trigger background crawl to save baseline immediately
+        if (saved.source_url && !saved.last_hash) {
+            const cronService = require('../services/cronService');
+            cronService.processContract({ ...saved, ownerUid }).catch(err => {
+                logger.warn(`Background baseline crawl failed for contract ${saved.id}: ${err.message}`);
+            });
+        }
     } catch (error) {
         logger.error('Contracts create error:', error);
         next(error);

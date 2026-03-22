@@ -4156,6 +4156,16 @@ class DashboardApp {
                 return;
             }
             renderParams = normalizedDiffId;
+            // Auto-switch to 'original' tab when opening a URL contract with content but no AI analysis
+            const isNewContract = normalizedDiffId !== this.currentViewParams;
+            if (isNewContract && !this.historyComparisonContext) {
+                const _c = dbService.getContractById(normalizedDiffId);
+                if (_c && _c.source_url && _c.original_content && !_c.last_analyzed_at) {
+                    this.activeDetailTab = 'original';
+                } else if (isNewContract) {
+                    this.activeDetailTab = 'diff';
+                }
+            }
             this.currentViewParams = normalizedDiffId;
         }
         if (viewId === 'diff' && this.activeDetailTab === 'diff') {
