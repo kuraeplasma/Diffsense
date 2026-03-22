@@ -45,9 +45,26 @@ router.post('/test-notification', async (req, res) => {
         return res.status(401).json({ success: false, error: 'Unauthorized' });
     }
 
-    const { email, webhookUrl } = req.body;
-    if (!email && !webhookUrl) {
-        return res.status(400).json({ success: false, error: 'email or webhookUrl required' });
+    let { email, webhookUrl, uid } = req.body;
+    if (!email && !webhookUrl && !uid) {
+        return res.status(400).json({ success: false, error: 'email, webhookUrl, or uid required' });
+    }
+
+    // UID指定の場合はFirestoreからメール・Slack設定を自動取得
+    if (uid && (!email || !webhookUrl)) {
+        try {
+            const dbService = require('../services/db');
+            const [userProfile, notifSettings] = await Promise.all([
+                dbService.getUserProfile(uid),
+                dbService.getNotificationSettings(uid)
+            ]);
+            if (!email && userProfile?.email) email = userProfile.email;
+            if (!webhookUrl && notifSettings?.slack?.enabled && notifSettings?.slack?.webhookUrl) {
+                webhookUrl = notifSettings.slack.webhookUrl;
+            }
+        } catch (err) {
+            logger.error('Failed to fetch user settings for test:', err.message);
+        }
     }
 
     const testData = {
