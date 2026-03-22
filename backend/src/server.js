@@ -185,6 +185,7 @@ app.use('/contracts', authMiddleware, contractRoutes);
 app.use('/api/contracts', authMiddleware, contractRoutes);
 app.use('/invite', authMiddleware, inviteRoutes);
 app.use('/user', authMiddleware, userRoutes);
+app.use('/api', authMiddleware, userRoutes);
 app.use('/payment', authMiddleware, paymentRoutes);
 app.use('/api', authMiddleware, paymentRoutes);
 app.use('/crawl', authMiddleware, crawlRoutes);
