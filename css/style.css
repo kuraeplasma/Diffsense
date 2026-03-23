@@ -65,7 +65,7 @@ body {
     color: var(--color-text);
     line-height: 1.8;
     overflow-x: hidden;
-    letter-spacing: 0.02em;
+    letter-spacing: -0.01em;
     display: flex;
     flex-direction: column;
     min-height: 100vh;
@@ -1021,6 +1021,7 @@ ul {
     align-items: stretch;
     max-width: 1320px;
     margin: 0 auto;
+    padding-top: 28px;
 }
 
 .pricing-billing-toggle-wrap {
@@ -1088,7 +1089,7 @@ ul {
 
 .pricing-badge {
     position: absolute;
-    top: -12px;
+    top: -20px;
     left: 50%;
     transform: translateX(-50%);
     background: #fdf8e6;
@@ -1468,9 +1469,8 @@ ul {
 .final-cta {
     text-align: center;
     padding: 84px 20px 74px;
-    background:
-        radial-gradient(120% 100% at 50% 0%, rgba(197, 160, 89, 0.16) 0%, rgba(31, 20, 8, 0.95) 48%, #140e08 100%);
-    border-top: 1px solid rgba(197, 160, 89, 0.26);
+    background: linear-gradient(160deg, #0a1628 0%, #1a2448 55%, #0d1b2e 100%);
+    border-top: 3px solid #EDD060;
 }
 
 .final-cta-inner {
@@ -1489,7 +1489,7 @@ ul {
 
 .final-cta-kicker {
     margin: 0 0 0.9rem;
-    color: #c8a65f;
+    color: #EDD060;
     font-size: 0.92rem;
     font-weight: 700;
     letter-spacing: 0.12em;
@@ -1505,7 +1505,7 @@ ul {
 
 .final-cta-highlight {
     margin: 0 auto 1.1rem;
-    color: #dfbf78;
+    color: #EDD060;
     font-size: 1.26rem;
     font-weight: 700;
     line-height: 1.7;
@@ -1516,11 +1516,11 @@ ul {
     margin: 0.2rem 0 1rem;
     padding: 0.55rem 1.6rem;
     border-radius: 999px;
-    border: 1px solid rgba(197, 160, 89, 0.55);
-    color: #fff;
+    border: 1px solid rgba(237, 208, 96, 0.6);
+    color: #EDD060;
     font-size: 1.15rem;
     font-weight: 700;
-    background: rgba(255, 255, 255, 0.02);
+    background: rgba(237, 208, 96, 0.06);
     white-space: nowrap;
 }
 
@@ -1551,7 +1551,7 @@ ul {
 
 .final-cta-trust li::before {
     content: '✓';
-    color: #d5b26a;
+    color: #EDD060;
     font-weight: 700;
 }
 
@@ -1591,12 +1591,12 @@ ul {
     flex-wrap: wrap;
     justify-content: center;
     gap: 0.65rem;
-    border-top: 1px solid rgba(197, 160, 89, 0.28);
+    border-top: 1px solid rgba(237, 208, 96, 0.25);
 }
 
 .final-cta-badges li {
-    border: 1px solid rgba(197, 160, 89, 0.4);
-    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(237, 208, 96, 0.35);
+    background: rgba(237, 208, 96, 0.05);
     color: rgba(255, 255, 255, 0.92);
     border-radius: 10px;
     padding: 0.5rem 1rem;
@@ -1610,33 +1610,72 @@ ul {
 }
 
 .site-footer {
-    background: #1f1b16;
+    background: #0d1b2e;
     color: #ddd;
-    padding: 40px 0 22px;
+    padding: 56px 0 0;
+    border-top: 3px solid #EDD060;
 }
 
 .footer-container {
     max-width: 1100px;
     margin: 0 auto;
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 40px;
+    grid-template-columns: 280px 1fr;
+    gap: 64px;
+    padding-bottom: 48px;
+}
+
+.footer-brand {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.footer-logo {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: #EDD060;
+    text-decoration: none;
+    letter-spacing: 0.02em;
+}
+
+.footer-logo i {
+    font-size: 1.1rem;
+}
+
+.footer-tagline {
+    color: rgba(255,255,255,0.6);
+    font-size: 0.9rem;
+    line-height: 1.8;
+    margin: 0;
+}
+
+.footer-links {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 32px;
 }
 
 .footer-column h3 {
     margin: 0 0 14px;
-    font-size: 15px;
-    font-weight: 600;
-    color: #f2e8d7;
+    font-size: 13px;
+    font-weight: 700;
+    color: #EDD060;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
 }
 
 .footer-column a {
     display: block;
     margin-bottom: 10px;
-    color: #ccc;
+    color: rgba(255,255,255,0.65);
     text-decoration: none;
     font-size: 14px;
     line-height: 1.6;
+    transition: color 0.2s;
 }
 
 .footer-column a:hover {
@@ -1644,32 +1683,33 @@ ul {
 }
 
 .footer-x {
-    display: inline-block;
-    margin-top: 10px;
-    color: #bbb;
-    font-size: 18px;
-    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
+    color: rgba(255,255,255,0.5);
+    font-size: 14px;
     text-decoration: none;
-    transition: opacity 0.2s ease, color 0.2s ease;
+    transition: color 0.2s;
 }
 
 .footer-x:hover {
-    color: #fff;
-    opacity: 0.8;
+    color: #EDD060;
 }
 
 .x-icon {
     display: inline-block;
-    width: 20px;
-    height: 20px;
-    text-align: center;
+    font-size: 16px;
 }
 
 .footer-copy {
-    margin-top: 26px;
-    text-align: center;
-    color: #a99b85;
-    font-size: 13px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    padding: 18px 20px;
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    color: rgba(255,255,255,0.3);
+    font-size: 12px;
 }
 
 /* Navigation Login Link */
@@ -3720,5 +3760,512 @@ ul {
         white-space: normal;
         word-break: keep-all;
         overflow-wrap: anywhere;
+    }
+}
+
+/* ========================================
+   ネイビーアクセント テーマ
+   ゴールド系 → ダークネイビー統一
+======================================== */
+
+/* CTAボタン統一（ダークネイビー） */
+.btn-primary,
+.pricing-cta .btn-secondary,
+.cta-button,
+.mid-cta-block .btn-primary,
+.lp-trust-cta .btn-primary-upgraded,
+.header .btn-primary.btn-sm.btn-start-now,
+.btn-onboarding {
+    background: linear-gradient(135deg, #243060 0%, #141c3a 100%);
+    color: #EDD060;
+    border-color: #3040a0;
+    border-radius: 8px;
+    font-weight: 700;
+    box-shadow: 0 6px 18px rgba(26, 35, 64, 0.5);
+}
+
+.btn-primary:hover,
+.cta-button:hover,
+.btn-onboarding:hover {
+    background: linear-gradient(135deg, #2e3c7a 0%, #1a2451 100%);
+    border-color: #4050c0;
+    color: #EDD060;
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px rgba(26, 35, 64, 0.65);
+}
+
+/* テキストアクセント → ネイビー */
+.text-accent,
+.text-gradient {
+    background: none;
+    -webkit-background-clip: unset;
+    -webkit-text-fill-color: #1a2448;
+    background-clip: unset;
+    color: #1a2448;
+}
+
+/* STEPバッジ → ネイビー地・ゴールドテキスト */
+.step-badge {
+    background: #1a2448;
+    color: #EDD060;
+}
+
+/* ステップ矢印 */
+.step-arrow,
+.steps-arrow {
+    color: #1a2448;
+}
+
+/* セクション内リンク */
+.section-inline-link {
+    color: #1a2448;
+    border-bottom-color: rgba(26, 36, 72, 0.35);
+}
+.section-inline-link:hover {
+    color: #0f1730;
+    border-bottom-color: rgba(26, 36, 72, 0.6);
+}
+
+/* アイコンボックス */
+.icon-box i,
+.security-item i,
+.lp-trust-badge-icon i {
+    color: #1a2448;
+}
+
+/* バッジ */
+.badge {
+    background: rgba(26, 36, 72, 0.08);
+    color: #1a2448;
+    border-color: #1a2448;
+}
+
+/* トラストセクション → ダークネイビー */
+.lp-trust-section {
+    background: #0d1b2e;
+}
+
+.lp-trust-section .security-item i,
+.lp-trust-section i,
+.lp-trust-section .icon-box i,
+.lp-trust-section [class*="icon"] i {
+    color: #EDD060;
+}
+
+.lp-trust-section h2,
+.lp-trust-section .section-title {
+    color: #ffffff;
+}
+
+.lp-trust-section .security-item,
+.lp-trust-section [class*="card"],
+.lp-trust-section [class*="item"] {
+    border-color: rgba(237, 208, 96, 0.15);
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.lp-trust-section .container {
+    text-align: center;
+}
+
+.lp-trust-section .container .lp-trust-badge,
+.lp-trust-badge {
+    text-align: left !important;
+}
+
+.lp-trust-badge-desc {
+    letter-spacing: -0.02em;
+    text-align: left !important;
+}
+
+.lp-trust-section .btn-primary-upgraded {
+    display: inline-block;
+    background: linear-gradient(135deg, #243060 0%, #141c3a 100%);
+    color: #EDD060;
+    border: none;
+    border-radius: 8px;
+    font-weight: 700;
+    box-shadow: 0 6px 18px rgba(26, 35, 64, 0.5);
+    padding: 0.85rem 2rem;
+}
+
+/* ========================================
+   中間CVボタン
+======================================== */
+.mid-cta-block {
+    text-align: center;
+    padding: 3rem 1rem;
+    background: #f8f6f1;
+    border-top: 1px solid rgba(26, 36, 72, 0.1);
+    border-bottom: 1px solid rgba(26, 36, 72, 0.1);
+}
+
+.mid-cta-block .cta-note {
+    margin-top: 0.75rem;
+    font-size: 0.82rem;
+    color: #888;
+}
+
+.lp-trust-cta .btn-primary-upgraded {
+    display: inline-block;
+    background: linear-gradient(135deg, #243060 0%, #141c3a 100%);
+    color: #EDD060;
+    border: none;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 1rem;
+    padding: 0.9rem 2.2rem;
+    text-decoration: none;
+    box-shadow: 0 6px 18px rgba(26, 35, 64, 0.5);
+    letter-spacing: 0.04em;
+    transition: opacity 0.2s;
+}
+
+.lp-trust-cta .btn-primary-upgraded:hover {
+    opacity: 0.85;
+}
+
+/* ========================================
+   料金プラン リデザイン
+   ネイビー反転 + インフォグリッド
+======================================== */
+
+/* セクション背景 */
+.pricing-section {
+    background: #ffffff;
+}
+
+/* トライアルバッジ */
+#pricing .badge.badge-primary {
+    background: #0d1b2e;
+    color: #EDD060;
+    border: 2px solid rgba(237, 208, 96, 0.4);
+    border-radius: 12px;
+    padding: 14px 32px;
+    display: inline-block;
+    text-align: center;
+    font-size: 1rem;
+    line-height: 1.4;
+    box-shadow: 0 4px 20px rgba(13, 27, 46, 0.2);
+    letter-spacing: normal;
+}
+
+/* プランラベル（個人・検証用 / 士業・専門職向け） */
+.pricing-badge {
+    background: #f0f0f0;
+    color: #555;
+    border: none;
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    padding: 0.3rem 1rem;
+    border-radius: 50px;
+    white-space: nowrap;
+}
+
+/* おすすめバッジ — グレー地・ネイビー文字で確実に視認 */
+.pricing-badge.recommended,
+.pricing-card.highlight-plan .pricing-badge.recommended,
+#pricing .pricing-card.highlight-plan > .pricing-badge.recommended {
+    background: #f0f0f0 !important;
+    color: #1a2448 !important;
+    border: 2px solid #1a2448 !important;
+    font-weight: 800;
+    font-size: 0.95rem;
+    padding: 0.35rem 1.4rem;
+    letter-spacing: 0.06em;
+    border-radius: 50px;
+}
+
+/* Businessカード（おすすめ）— ネイビー反転 */
+.pricing-card.highlight-plan {
+    background: #0d1b2e;
+    border-color: #0d1b2e;
+    box-shadow: 0 20px 60px rgba(13, 27, 46, 0.35);
+    transform: translateY(-8px);
+    padding-top: 52px;
+}
+
+.pricing-card.highlight-plan * {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.pricing-card.highlight-plan .pricing-header,
+.pricing-card.highlight-plan h3 {
+    color: #ffffff;
+}
+
+.pricing-card.highlight-plan .pricing-description,
+.pricing-card.highlight-plan [class*="description"],
+.pricing-card.highlight-plan > div {
+    background: transparent;
+    border-color: rgba(255, 255, 255, 0.15);
+    color: rgba(255, 255, 255, 0.75);
+}
+
+.pricing-card.highlight-plan .pricing-description p,
+.pricing-card.highlight-plan .pricing-description span {
+    color: rgba(255, 255, 255, 0.75);
+    background: transparent;
+}
+
+.pricing-card.highlight-plan strong {
+    color: #EDD060;
+    font-weight: 800;
+    font-size: 1.05em;
+}
+
+/* Business card: feature list text visible */
+.pricing-card.highlight-plan .pricing-features li {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+/* Businessカードのボタン */
+.pricing-card.highlight-plan .pricing-cta .btn-primary {
+    background: linear-gradient(135deg, #EDD060 0%, #c5a059 100%);
+    color: #0d1b2e;
+    border: none;
+}
+
+/* 他カード */
+.pricing-card:not(.highlight-plan) {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+.pricing-card:not(.highlight-plan) strong {
+    color: #1a2448;
+    font-weight: 800;
+    font-size: 1.05em;
+}
+
+/* 価格テキスト */
+.pricing-card .pricing-price .amount,
+.pricing-card [class*="price"] .amount {
+    font-size: 3.2rem;
+    font-weight: 800;
+}
+
+/* トグルボタン */
+.pricing-billing-toggle {
+    background: #f3f4f6;
+    border-radius: 8px;
+    padding: 4px;
+}
+
+.pricing-toggle-btn {
+    border-radius: 6px;
+    font-weight: 600;
+}
+
+.pricing-toggle-btn.active,
+.pricing-toggle-btn.is-active {
+    background: #0d1b2e;
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(13, 27, 46, 0.2);
+}
+
+/* 機能ハイライト（通常カード） */
+#pricing .pricing-features strong,
+#pricing strong {
+    color: #1a2448;
+    font-weight: 800;
+    font-size: 1.1em;
+    background: rgba(26, 36, 72, 0.07);
+    padding: 1px 6px;
+    border-radius: 4px;
+}
+
+/* Businessカード内のstrongはゴールドで上書き */
+#pricing .pricing-card.highlight-plan strong,
+#pricing .pricing-card.highlight-plan .pricing-features strong {
+    color: #EDD060;
+    font-weight: 800;
+    font-size: 1.1em;
+    background: rgba(237, 208, 96, 0.12);
+    padding: 1px 6px;
+    border-radius: 4px;
+}
+
+/* ===== INFO GRID リデザイン ===== */
+.pricing-info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-top: 2.5rem;
+}
+
+/* 両パネル共通: ネイビーベース */
+.pricing-annual-reasons,
+.pricing-trust-list {
+    background: #0d1b2e;
+    border: none;
+    border-radius: 16px;
+    padding: 2rem;
+    box-shadow: 0 12px 40px rgba(13, 27, 46, 0.3);
+    display: flex;
+    flex-direction: column;
+}
+
+/* 見出し */
+.pricing-annual-reasons h3,
+.pricing-trust-list h3 {
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(237, 208, 96, 0.7);
+    border-bottom: 1px solid rgba(237, 208, 96, 0.2);
+    padding-bottom: 0.85rem;
+    margin-bottom: 1.5rem;
+}
+
+/* リスト共通 */
+.pricing-annual-reasons ul,
+.pricing-trust-list ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+/* 年額: 縦並び */
+.pricing-annual-reasons ul {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+    justify-content: space-around;
+}
+
+/* 安心: 2カラム */
+.pricing-trust-list ul {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+/* 年額 li */
+.pricing-annual-reasons li {
+    display: flex;
+    align-items: center;
+    gap: 1.1rem;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 1.15rem;
+    font-weight: 600;
+}
+
+.pricing-annual-reasons .pricing-reason-icon {
+    width: 52px;
+    height: 52px;
+    min-width: 52px;
+    border-radius: 12px;
+    background: rgba(237, 208, 96, 0.12);
+    color: #EDD060;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+}
+
+/* 安心 li */
+.pricing-trust-list li {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    background: rgba(255, 255, 255, 0.07);
+    border: none;
+    border-radius: 12px;
+    padding: 0.9rem 1rem;
+    color: rgba(255, 255, 255, 0.88);
+    font-size: 0.97rem;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+.pricing-trust-list li:hover {
+    background: rgba(255, 255, 255, 0.11);
+}
+
+.pricing-trust-list li > i {
+    font-size: 1.05rem;
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    border-radius: 8px;
+    background: rgba(237, 208, 96, 0.12);
+    color: #EDD060;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pricing-trust-list li span small {
+    display: block;
+    font-size: 0.68rem;
+    color: rgba(255, 255, 255, 0.5);
+    margin-top: 2px;
+}
+
+/* 経済産業省アピールバッジ */
+.pricing-corporate-safety-note {
+    grid-column: 1 / -1;
+    margin-top: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    background: rgba(237, 208, 96, 0.1);
+    border: 1px solid rgba(237, 208, 96, 0.4);
+    border-radius: 10px;
+    padding: 0.85rem 1.4rem;
+    color: #EDD060;
+    font-size: 0.88rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    line-height: 1.4;
+}
+
+.pricing-corporate-safety-note::before {
+    content: "🏛️";
+    font-size: 1.1rem;
+    flex-shrink: 0;
+}
+
+/* 年額バッジ・節約表示 */
+#pricing [class*="save"],
+#pricing [class*="annual"] > span,
+.pricing-billing-note {
+    color: #1a2448;
+}
+
+.pricing-reason-icon {
+    color: #EDD060;
+}
+
+#pricing .pricing-trust-list li::before,
+#pricing .pricing-trust-list i {
+    color: #EDD060;
+}
+
+/* ========================================
+   モバイル修正: pricing-trust-list
+======================================== */
+@media (max-width: 768px) {
+    .pricing-trust-list ul {
+        grid-template-columns: 1fr !important;
+        gap: 0.65rem;
+    }
+
+    .pricing-trust-list li {
+        padding: 0.75rem 0.9rem;
+        font-size: 0.93rem;
+    }
+
+    .pricing-trust-list li > i {
+        width: 32px;
+        height: 32px;
+        min-width: 32px;
+        font-size: 0.9rem;
     }
 }
