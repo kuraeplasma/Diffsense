@@ -468,17 +468,8 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
         if (!skipAI && !localUnlimited) {
             // Trial Expiration Check - Only if trial was ever started
             if (userProfile.trialStartedAt && isInTrial === false) {
-                // Check if user has registered a payment method for auto-transition
-                if (!userProfile.hasPaymentMethod) {
-                    logger.warn(`Trial expired and no payment method for user ${uid}`);
-                    return res.status(403).json({
-                        success: false,
-                        error: "無料トライアル期間（7日間）が終了しました。継続して利用するには、お支払い方法（PayPal/クレジットカード）の登録が必要です。",
-                        code: "TRIAL_EXPIRED"
-                    });
-                } else {
-                    logger.info(`Trial expired but user ${uid} has payment method. Auto-continuing to paid plan.`);
-                }
+                // Freeプラン移行期なので警告のみとし、返却は個別の上限チェックに任せる
+                logger.info(`Trial expired for user ${uid}. Treating as Free user unless payment is found.`);
             }
 
             if (userProfile.usageCount >= limit) {
@@ -668,12 +659,25 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
         logger.info(`Response ready for contract ${contractId}`);
 
         // 4. Feature Gating (Business+ only for detailed analysis)
+        // 4. Feature Gating
         let gatedChanges = aiResult.changes || [];
-        if (userProfile.plan === 'starter' && !isInTrial) {
+        const plan = userProfile.plan || 'free';
+        const isFree = plan === 'free' && !isInTrial;
+        const isStarter = plan === 'starter' && !isInTrial;
+
+        if (isFree) {
+            // Freeプランは詳細解説なし（リスク度のみ）
             gatedChanges = gatedChanges.map(c => ({
                 ...c,
-                impact: "Businessプラン以上で閲覧可能です。",
-                concern: "Businessプラン以上で閲覧可能です。"
+                impact: "スタータープラン以上で閲覧可能です。",
+                concern: "スタータープラン以上で閲覧可能です。"
+            }));
+        } else if (isStarter) {
+            // Starterプランは一部制限（以前の仕様を維持）
+            gatedChanges = gatedChanges.map(c => ({
+                ...c,
+                impact: "ビジネスプラン以上で閲覧可能です。",
+                concern: "ビジネスプラン以上で閲覧可能です。"
             }));
         }
 
@@ -783,8 +787,25 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
             }
         }
 
-        const serialized = JSON.stringify(currentArticles);
-        const extractedTextHash = crypto.createHash('sha256').update(serialized).digest('hex');
+        // 4. Feature Gating
+        let gatedChanges = aiResult.changes || [];
+        const plan = userProfile.plan || 'free';
+        const isFree = plan === 'free' && !isInTrial;
+        const isStarter = plan === 'starter' && !isInTrial;
+
+        if (isFree) {
+            gatedChanges = gatedChanges.map(c => ({
+                ...c,
+                impact: "スタータープラン以上で閲覧可能です。",
+                concern: "スタータープラン以上で閲覧可能です。"
+            }));
+        } else if (isStarter) {
+            gatedChanges = gatedChanges.map(c => ({
+                ...c,
+                impact: "ビジネスプラン以上で閲覧可能です。",
+                concern: "ビジネスプラン以上で閲覧可能です。"
+            }));
+        }
 
         res.json({
             success: true,
@@ -793,7 +814,7 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
                 extractedText: currentArticles,
                 structuredContract,
                 previousArticles,
-                changes: aiResult.changes || [],
+                changes: gatedChanges,
                 riskLevel: aiResult.riskLevel,
                 riskReason: aiResult.riskReason,
                 summary: aiResult.summary,

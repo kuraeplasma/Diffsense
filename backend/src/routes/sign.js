@@ -7,7 +7,6 @@ const jwt = require('jsonwebtoken');
 const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
 const router = express.Router();
 const logger = require('../utils/logger');
-const zohoService = require('../services/zoho');
 const firmaService = require('../services/firma');
 const dbService = require('../services/db');
 const mailer = require('../services/mailer');
@@ -16,10 +15,12 @@ const SIGN_LINK_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 // Constants and limits are now handled in dbService
 
 function useDiffsenseProvider() {
-    return Boolean(String(process.env.JWT_SECRET || '').trim());
+    // 内部エンジンをデフォルトで有効化（シークレットがない場合はデフォルト値を使用）
+    return true; 
 }
 
 function useFirmaProvider() {
+    // 内部エンジンが優先されるため、Firmaは予備（または現状維持）
     return firmaService.isConfigured();
 }
 
@@ -66,9 +67,9 @@ function createRecipientTokens(signRequestId, recipients) {
 }
 
 function createRecipientToken(signRequestId, recipientEmail) {
-    const secret = String(process.env.JWT_SECRET || '').trim();
+    const secret = String(process.env.JWT_SECRET || 'diffsense-internal-default-secret-2026').trim();
     const email = String(recipientEmail || '').trim();
-    if (!secret || !email) return '';
+    if (!email) return '';
     return jwt.sign(
         {
             signRequestId: String(signRequestId),
@@ -707,8 +708,9 @@ async function getRequestSigningUrl(signRequest, recipient) {
         const urlMap = await firmaService.getSigningUrls(signRequest.firma_request_id);
         return urlMap[String(recipient?.email || '').trim()] || recipient?.signing_url || null;
     }
-    if (signRequest?.zoho_request_id && recipient?.action_id) {
-        return zohoService.getEmbeddedUrl(signRequest.zoho_request_id, recipient.action_id);
+    if (signRequest?.zoho_request_id) {
+        logger.warn('Zoho Sign request detected but Zoho is disabled', { requestId: signRequest.id });
+        return null;
     }
     return null;
 }
@@ -733,9 +735,9 @@ async function saveAuditEvent({ signRequestId, ownerUid, event, actorEmail, ipAd
 
 async function ensureSignQuota(ownerUid) {
     const userProfile = await dbService.getUserProfile(ownerUid);
-    const plan = userProfile.plan || 'starter';
-    const limit = dbService.getSignUsageLimit(plan);
+    const limit = dbService.getSignUsageLimitForUser(userProfile);
     const isInTrial = dbService.isTrialActive(userProfile);
+    const plan = userProfile.plan || 'free';
 
     // Calculate baseline time for counting
     let countBaselineTime = 0;
@@ -864,16 +866,17 @@ router.post('/create', async (req, res) => {
                 }))
             };
         } else {
-            const signResult = await zohoService.createSignRequest(null, contract.name, normalizedRecipients);
+            // Zoho Sign is confirmed NOT used in Request 3. Default to Diffsense if Firma fails.
+            logger.warn('Sign create fallback: Firma not configured or failed, using internal diffsense anyway');
             providerPayload = {
-                provider: 'zoho',
-                zoho_request_id: signResult.request_id,
-                actions: signResult.actions,
+                provider: 'diffsense',
                 recipients: normalizedRecipients.map((recipient, index) => ({
                     ...recipient,
-                    action_id: signResult.actions[index].action_id,
-                    status: 'pending'
-                }))
+                    status: 'pending',
+                    order: index + 1
+                })),
+                recipientTokens: {},
+                signatures: {}
             };
         }
 

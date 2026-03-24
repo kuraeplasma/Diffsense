@@ -4,13 +4,15 @@ const logger = require('../utils/logger');
 const { db: firestore, firebaseInitialized } = require('../firebase');
 
 const PLAN_LIMITS = {
-    'trial': 1,      // Team member limits
+    'free': 1,       // Team member limits
+    'trial': 1,
     'starter': 1,
     'business': 3,
     'pro': 5
 };
 
 const AI_USAGE_LIMITS = {
+    'free': 3,
     'trial': 5,
     'starter': 15,
     'business': 120,
@@ -18,6 +20,7 @@ const AI_USAGE_LIMITS = {
 };
 
 const SIGN_USAGE_LIMITS = {
+    'free': 1,
     'trial': 3,
     'starter': 10,
     'business': 50,
@@ -59,7 +62,17 @@ class DBService {
         if (this.isTrialActive(userProfile)) {
             return SIGN_USAGE_LIMITS['trial'];
         }
-        const plan = userProfile.plan || 'pro';
+        
+        // トライアル終了後にお支払いがない場合はFree上限を適用
+        const hasActivePayment = userProfile.subscriptionState === 'active' || 
+                                userProfile.stripeStatus === 'ACTIVE' || 
+                                userProfile.paypalStatus === 'ACTIVE' || 
+                                userProfile.hasPaymentMethod;
+        if (!hasActivePayment) {
+            return SIGN_USAGE_LIMITS['free'];
+        }
+
+        const plan = userProfile.plan || 'free';
         return SIGN_USAGE_LIMITS[plan] || 0;
     }
 
@@ -344,17 +357,23 @@ class DBService {
         return isActive;
     }
 
-    /**
-     * Get usage limit considering trial status
-     * @param {object} userProfile
-     */
     getUsageLimit(userProfile) {
         // If in trial, limit is always 5 checks (Trial limitation)
         if (this.isTrialActive(userProfile)) {
             return TRIAL_AI_LIMIT;
         }
+
+        // トライアル終了後にお支払いがない場合はFree上限を適用（フリーミアム移行）
+        const hasActivePayment = userProfile.subscriptionState === 'active' || 
+                                userProfile.stripeStatus === 'ACTIVE' || 
+                                userProfile.paypalStatus === 'ACTIVE' || 
+                                userProfile.hasPaymentMethod;
+        if (!hasActivePayment) {
+            return AI_USAGE_LIMITS['free'];
+        }
+
         // Otherwise, use plan-based limit
-        const plan = userProfile.plan || 'pro';
+        const plan = userProfile.plan || 'free';
         return AI_USAGE_LIMITS[plan] || 0;
     }
 
@@ -365,11 +384,24 @@ class DBService {
      */
     async getUserProfile(uid) {
         // 1. Try Firestore first (persistent, survives cold starts)
-        const firestoreUser = await this._firestoreGetUser(uid);
+        let firestoreUser = await this._firestoreGetUser(uid);
         if (firestoreUser) {
-            logger.info(`getUserProfile(${uid}): Found in Firestore (plan=${firestoreUser.plan}, trialStart=${firestoreUser.trialStartedAt})`);
+            logger.info(`getUserProfile(${uid}): Found in Firestore (plan=${firestoreUser.plan}, usage=${firestoreUser.usageCount})`);
+            
+            // Auto-monthly reset check
+            const now = new Date();
+            const lastReset = firestoreUser.lastResetDate ? new Date(firestoreUser.lastResetDate) : new Date(0);
+            if (now.getMonth() !== lastReset.getMonth() || now.getFullYear() !== lastReset.getFullYear()) {
+                logger.info(`getUserProfile(${uid}): Monthly reset triggered (last: ${firestoreUser.lastResetDate})`);
+                firestoreUser.usageCount = 0;
+                firestoreUser.lastResetDate = now.toISOString();
+                await this._firestoreSetUser(uid, { 
+                    usageCount: 0, 
+                    lastResetDate: firestoreUser.lastResetDate 
+                });
+            }
+
             firestoreUser.billingCycle = normalizeBillingCycle(firestoreUser.billingCycle);
-            logger.info(`getUserProfile(${uid}): Found in Firestore, plan=${firestoreUser.plan}`);
             // Also update local file cache
             const users = await this.readData('users');
             const index = users.findIndex(u => u.uid === uid);
@@ -395,13 +427,13 @@ class DBService {
             return user;
         }
 
-        // 3. New user: create with pro plan and trial
-        logger.info(`getUserProfile(${uid}): NOT FOUND anywhere, creating new pro profile`);
+        // 3. New user: create with free plan
+        logger.info(`getUserProfile(${uid}): NOT FOUND anywhere, creating new free profile`);
         user = {
             uid: uid,
-            plan: 'pro',
+            plan: 'free',
             billingCycle: 'monthly',
-            trialStartedAt: new Date().toISOString(),
+            trialStartedAt: null, // No trial for free plan by default
             hasPaymentMethod: false,
             usageCount: 0,
             lastResetDate: new Date().toISOString()
@@ -409,7 +441,7 @@ class DBService {
         users.push(user);
         await this.writeData('users', users);
         await this._firestoreSetUser(uid, user);
-        logger.info(`New user profile created: ${uid}, plan: pro`);
+        logger.info(`New user profile created: ${uid}, plan: free`);
 
         return user;
     }
