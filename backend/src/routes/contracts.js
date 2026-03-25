@@ -492,6 +492,7 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
             // Try to upload to Firebase Storage (optional - analysis continues even if this fails)
             if (bucket) {
                 // Delete old PDF from Storage before uploading new one (prevents unbounded storage growth)
+                // Safety check: do NOT delete if there are pending sign requests referencing this contract
                 try {
                     const existingContracts = await dbService.getContracts(uid);
                     const existingContract = Array.isArray(existingContracts)
@@ -499,9 +500,20 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                         : null;
                     const oldStoragePath = existingContract?.pdf_storage_path || existingContract?.pdfStoragePath;
                     if (oldStoragePath && oldStoragePath.startsWith('contracts/')) {
-                        const oldFile = bucket.file(oldStoragePath);
-                        await oldFile.delete().catch(e => logger.warn(`Old PDF delete failed (non-fatal): ${e.message}`));
-                        logger.info(`Old PDF deleted from Storage: ${oldStoragePath}`);
+                        // Check for pending sign requests (status: pending/sent/partially_signed)
+                        const signRequests = await dbService.getSignRequests(uid).catch(() => []);
+                        const pendingSignStatuses = ['pending', 'sent', 'partially_signed', 'in_progress'];
+                        const hasPendingSign = Array.isArray(signRequests) && signRequests.some(sr =>
+                            String(sr.contract_id) === String(contractId)
+                            && pendingSignStatuses.includes(sr.status)
+                        );
+                        if (hasPendingSign) {
+                            logger.info(`Old PDF NOT deleted: pending sign request exists for contract ${contractId}`);
+                        } else {
+                            const oldFile = bucket.file(oldStoragePath);
+                            await oldFile.delete().catch(e => logger.warn(`Old PDF delete failed (non-fatal): ${e.message}`));
+                            logger.info(`Old PDF deleted from Storage: ${oldStoragePath}`);
+                        }
                     }
                 } catch (cleanupError) {
                     logger.warn(`Old PDF cleanup failed (non-fatal): ${cleanupError.message}`);
