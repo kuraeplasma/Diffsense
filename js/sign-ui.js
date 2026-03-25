@@ -383,8 +383,7 @@ export const SignUI = {
         listBody.innerHTML = contracts.map(c => {
             const isAnalyzed = this.isContractDiffAnalyzed(c);
             const signable = this.hasSignablePdfSource(c);
-            const quotaLimited = this.getTrialSignQuotaMeta(window.app).isLimited;
-            const startDisabled = quotaLimited;
+            const startDisabled = false; // 上限はバックエンドで管理・ポップアップで通知
             const riskClass = !isAnalyzed
                 ? 'badge-neutral'
                 : (c.risk_level === 'High'
