@@ -3071,16 +3071,6 @@ class DashboardApp {
                     dbService.updateUserRole(user.email, this.userRole);
                 }
 
-                // Check if user just selected a plan from signup flow
-                const selectedPlan = localStorage.getItem('diffsense_selected_plan');
-                const selectedBillingCycle = localStorage.getItem('diffsense_selected_billing_cycle') || 'monthly';
-                const signupFlowFlag = localStorage.getItem('diffsense_signup_flow') === '1';
-                if (selectedPlan && signupFlowFlag) {
-                    await this.registerSelectedPlan(token, selectedPlan, selectedBillingCycle);
-                    localStorage.removeItem('diffsense_selected_plan');
-                    localStorage.removeItem('diffsense_selected_billing_cycle');
-                    localStorage.removeItem('diffsense_signup_flow');
-                }
 
                 this.setCachedItem(DASHBOARD_CACHE_KEYS.USER_META, {
                     role: this.userRole,
@@ -3101,6 +3091,27 @@ class DashboardApp {
                     this.fetchPaymentStatus(token),
                     this.fetchPaymentConfig()
                 ]);
+
+                // Check if user just selected a plan from signup flow
+                const selectedPlan = localStorage.getItem('diffsense_selected_plan');
+                const selectedBillingCycle = localStorage.getItem('diffsense_selected_billing_cycle') || 'monthly';
+                const signupFlowFlag = localStorage.getItem('diffsense_signup_flow') === '1';
+
+                if (selectedPlan && signupFlowFlag) {
+                    // Guard: Don't overwrite paid plan with free/starter if user already has a paid plan
+                    const currentPlan = (this.subscription?.plan || 'free').toLowerCase();
+                    const isDowngradeToFree = (selectedPlan === 'free' && currentPlan !== 'free' && currentPlan !== 'starter');
+                    
+                    if (isDowngradeToFree) {
+                        console.log('Signup flow detected for existing paid user - skipping plan overwrite');
+                    } else {
+                        await this.registerSelectedPlan(token, selectedPlan, selectedBillingCycle);
+                    }
+                    
+                    localStorage.removeItem('diffsense_selected_plan');
+                    localStorage.removeItem('diffsense_selected_billing_cycle');
+                    localStorage.removeItem('diffsense_signup_flow');
+                }
 
                 const urlParams = new URLSearchParams(window.location.search);
                 const paymentState = urlParams.get('payment');

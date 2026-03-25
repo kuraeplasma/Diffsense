@@ -191,7 +191,10 @@ app.use('/sign', (req, res, next) => {
 app.use('/contracts', authMiddleware, contractRoutes);
 app.use('/api/contracts', authMiddleware, contractRoutes);
 app.use('/invite', authMiddleware, inviteRoutes);
-app.use('/user', authMiddleware, userRoutes);
+app.use('/user', (req, res, next) => {
+    if (req.path === '/check-exists') return userRoutes(req, res, next);
+    return authMiddleware(req, res, next);
+}, userRoutes);
 app.use('/payment', authMiddleware, paymentRoutes);
 app.use('/crawl', authMiddleware, crawlRoutes);
 app.use('/api/notifications', authMiddleware, notificationRoutes);
@@ -202,7 +205,8 @@ app.use('/api/slack', (req, res, next) => {
     return authMiddleware(req, res, next);
 }, slackRoutes);
 // /api catch-all は Slack より後に置く（/api/slack を先にキャッチさせるため）
-app.use('/api', authMiddleware, userRoutes);
+app.use('/api/user/check-exists', userRoutes);
+app.use('/api/user', authMiddleware, userRoutes);
 app.use('/api', authMiddleware, paymentRoutes);
 app.use('/api/sign', authMiddleware, signRoutes);
 app.use('/sign', authMiddleware, signRoutes); // Alias for convenience
