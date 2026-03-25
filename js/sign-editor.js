@@ -1427,12 +1427,28 @@ export const SignEditor = {
         const shouldScroll = this._fields.length >= 2;
         container.classList.toggle('is-scrollable', shouldScroll);
 
+        const recipientOptions = this._recipients.map((rec, idx) => `
+            <option value="${idx}" ${Number(field.assigneeIndex ?? 0) === idx ? 'selected' : ''}>
+                ${this.escapeHtml(this.getRecipientFieldOptionLabel(rec, idx))}
+            </option>
+        `).join('');
+
         const signatureSettings = field.type === 'signature'
             ? `
-                <div style="font-size:12px; color:#6b7280; line-height:1.7;">署名の位置を決定してください。</div>
+                <div style="margin-top:12px;">
+                    <label style="display:block; font-weight:600; margin-bottom:6px; color:#444;">署名者の割り当て</label>
+                    <select onchange="window.SignEditor.updateSelectedField({ assigneeIndex: Number(this.value) })" style="width:100%; padding:10px 12px; border-radius:10px; border:1px solid #d9dde3; background:#fff;">
+                        ${recipientOptions}
+                    </select>
+                </div>
+                <div style="font-size:11px; color:#6b7280; line-height:1.7; margin-top:8px;">配置した枠に誰が署名するかを選択してください。</div>
             `
             : `
                 <div style="margin-top:12px;">
+                    <label style="display:block; font-weight:600; margin-bottom:6px; color:#444;">署名者の割り当て</label>
+                    <select onchange="window.SignEditor.updateSelectedField({ assigneeIndex: Number(this.value) })" style="width:100%; padding:10px 12px; border-radius:10px; border:1px solid #d9dde3; background:#fff; margin-bottom:12px;">
+                        ${recipientOptions}
+                    </select>
                     <label style="display:block; font-weight:600; margin-bottom:6px; color:#444;">日付書式</label>
                     <select onchange="window.SignEditor.updateSelectedField({ dateFormat: this.value })" style="width:100%; padding:10px 12px; border-radius:10px; border:1px solid #d9dde3; background:#fff;">
                         <option value="ja-JP" ${field.dateFormat === 'ja-JP' ? 'selected' : ''}>2026/03/19</option>

@@ -411,6 +411,37 @@
                 font-size: 0.68rem;
             }
         }
+        .tos-agreement {
+            margin: 1.2rem 0;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            font-size: 0.82rem;
+            color: #6e6254;
+            cursor: pointer;
+            user-select: none;
+            line-height: 1.5;
+            text-align: left;
+        }
+
+        .tos-agreement input {
+            margin-top: 3px;
+            cursor: pointer;
+            accent-color: #c5a059;
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+        }
+
+        .tos-agreement a {
+            color: #c5a059;
+            text-decoration: underline;
+            font-weight: 600;
+        }
+
+        .tos-agreement a:hover {
+            color: #8a6a2d;
+        }
     </style>
     <meta name="description" content="DIFFsenseにログインして、契約書・利用規約の変更をAIで自動検知。">
 
@@ -496,6 +527,12 @@
                     <button type="button" class="google-auth-btn" id="signup-google-btn">
                         <i class="fa-brands fa-google"></i> Googleで無料登録
                     </button>
+                    <div class="tos-agreement">
+                        <input type="checkbox" id="signup-tos" required>
+                        <label for="signup-tos">
+                            <a href="terms.html" target="_blank">利用規約</a> と <a href="privacy.html" target="_blank">プライバシーポリシー</a> に同意して、DIFFsenseを利用します。
+                        </label>
+                    </div>
                     <button type="submit" class="btn full-width" id="signup-btn"
                         style="margin-top: 0.7rem; border-radius: 8px; padding: 0.98rem 1rem; background: #c5a059; color: #fff; border: none; font-weight: 700;">無料で始める</button>
                     <p class="signup-trust-inline">ずっと無料 ・ カード不要 ・ いつでも解約可能 ・ AI学習不使用</p>
@@ -593,6 +630,16 @@
             const btn = document.getElementById('signup-btn');
             const email = document.getElementById('signup-email').value;
             const password = document.getElementById('signup-password').value;
+            const tosCheckbox = document.getElementById('signup-tos');
+
+            if (!tosCheckbox.checked) {
+                if (typeof Notify !== 'undefined') {
+                    Notify.error('利用規約とプライバシーポリシーへの同意が必要です');
+                } else {
+                    alert('利用規約とプライバシーポリシーに同意してください');
+                }
+                return;
+            }
 
             btn.classList.add('btn-loading');
             try {
@@ -607,6 +654,15 @@
         });
 
         document.getElementById('signup-google-btn').addEventListener('click', async () => {
+            const tosCheckbox = document.getElementById('signup-tos');
+            if (!tosCheckbox.checked) {
+                if (typeof Notify !== 'undefined') {
+                    Notify.error('利用規約とプライバシーポリシーへの同意が必要です');
+                } else {
+                    alert('利用規約とプライバシーポリシーに同意してください');
+                }
+                return;
+            }
             await handleGoogleLogin('signup');
         });
 

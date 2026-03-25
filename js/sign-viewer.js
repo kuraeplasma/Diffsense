@@ -177,7 +177,7 @@ export const SignViewer = {
                         <button class="btn-pdf-tool" onclick="window.signViewer.zoomIn()"><i class="fa-solid fa-plus"></i></button>
                     </div>
                 </div>
-                <div id="pdf-viewer-scroll" style="flex:1; width:100%; overflow:hidden; padding:20px 0;">
+                <div id="pdf-viewer-scroll" style="flex:1; width:100%; overflow-y:auto; padding:20px 0;">
                     <div id="pdf-pages-container" style="display:flex; flex-direction:column; align-items:center; gap:20px;">
                         <div class="loader-spinner"></div>
                     </div>

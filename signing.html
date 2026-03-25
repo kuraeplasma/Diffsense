@@ -232,6 +232,7 @@
       border-radius: 6px;
       box-shadow: 0 8px 30px rgba(0,0,0,0.15);
       overflow: visible;
+      text-align: left;
     }
 
     .fallback-head {
@@ -255,6 +256,14 @@
       white-space: normal;
       word-break: break-word;
     }
+    
+    .fallback-body .document-content-full.is-frameless {
+      padding: 0;
+    }
+
+    .fallback-body .is-structured {
+      display: block;
+    }
 
     .fallback-body .contract-structured-container,
     .fallback-body .clause-cards-container {
@@ -268,6 +277,7 @@
       border-radius: 14px;
       padding: 16px 18px;
       background: #fffdfa;
+      text-align: left;
     }
 
     .fallback-body .clause-card-header h3 {
@@ -1098,11 +1108,11 @@
 
     function buildDocumentPreviewHtml(content) {
       if (!content) {
-        return '<div class="document-content-full">表示できる本文データが見つかりません</div>';
+        return '<div class="document-content-full is-frameless">表示できる本文データが見つかりません</div>';
       }
 
       if (typeof content === 'string') {
-        return `<div class="document-content-full">${escapeHtml(content).replace(/\r?\n/g, '<br>')}</div>`;
+        return `<div class="document-content-full is-frameless">${escapeHtml(content).replace(/\r?\n/g, '<br>')}</div>`;
       }
 
       if (Array.isArray(content)) {
@@ -1122,7 +1132,7 @@
             </article>
           `;
         }).join('');
-        return `<div class="contract-structured-container"><div class="clause-cards-container">${clauses}</div></div>`;
+        return `<div class="is-structured"><div class="contract-structured-container"><div class="clause-cards-container">${clauses}</div></div></div>`;
       }
 
       if (typeof content === 'object' && Array.isArray(content.articles)) {
@@ -1147,45 +1157,160 @@
         const preambleHtml = preamble
           ? `<article class="clause-card"><div class="clause-card-header"><h3>前文</h3></div><div class="clause-card-body">${escapeHtml(preamble).replace(/\r?\n/g, '<br>')}</div></article>`
           : '';
-        return `<div class="contract-structured-container"><div class="clause-cards-container">${preambleHtml}${articles}</div></div>`;
+        return `<div class="is-structured"><div class="contract-structured-container"><div class="clause-cards-container">${preambleHtml}${articles}</div></div></div>`;
       }
 
-      return `<div class="document-content-full">${escapeHtml(String(content))}</div>`;
+      return `<div class="document-content-full is-frameless">${escapeHtml(String(content))}</div>`;
+    }
+
+    function chunkFallbackList(list, maxItems, maxWeight) {
+      const items = Array.isArray(list) ? list : [];
+      if (items.length === 0) return [];
+      const groups = [];
+      let bucket = [];
+      let bucketWeight = 0;
+      items.forEach((item) => {
+        const weight = measureFallbackItemWeight(item);
+        const shouldSplit = bucket.length >= maxItems || (bucketWeight + weight > maxWeight && bucket.length > 0);
+        if (shouldSplit) {
+          groups.push(bucket);
+          bucket = [];
+          bucketWeight = 0;
+        }
+        bucket.push(item);
+        bucketWeight += weight;
+      });
+      if (bucket.length > 0) {
+        groups.push(bucket);
+      }
+      return groups;
+    }
+
+    function measureFallbackItemWeight(item) {
+      if (!item) return 120;
+      if (typeof item === 'string') return Math.max(120, item.length + 80);
+      const title = String(item.article || item.articleNumber || item.title || item.header || '').length;
+      const body = Array.isArray(item.paragraphs)
+        ? item.paragraphs.map((line) => String(line || '')).join('\n').length
+        : String(item.body || item.content || '').length;
+      return Math.max(200, title + body + 120);
+    }
+
+    function buildFallbackContentPages(content) {
+      if (!content) return [];
+      const maxItems = 6;
+      const maxWeight = 4200;
+
+      if (Array.isArray(content)) {
+        const groups = chunkFallbackList(content, maxItems, maxWeight);
+        return groups.length > 0 ? groups : [content];
+      }
+
+      if (typeof content === 'object' && Array.isArray(content.articles)) {
+        const base = content || {};
+        const groups = chunkFallbackList(base.articles || [], maxItems, maxWeight);
+        if (groups.length <= 1) return [base];
+        return groups.map((articles, index) => ({
+          ...base,
+          preamble: index === 0 ? base.preamble : '',
+          articles
+        }));
+      }
+
+      if (typeof content === 'string') {
+        const blocks = String(content)
+          .split(/\r?\n{2,}/)
+          .map((line) => line.trim())
+          .filter(Boolean);
+        if (blocks.length <= 1) return [content];
+        const pages = [];
+        let bucket = [];
+        let bucketChars = 0;
+        blocks.forEach((block) => {
+          const weight = block.length + 80;
+          const shouldSplit = bucket.length >= 8 || (bucketChars + weight > maxWeight && bucket.length > 0);
+          if (shouldSplit) {
+            pages.push(bucket.join('\n\n'));
+            bucket = [];
+            bucketChars = 0;
+          }
+          bucket.push(block);
+          bucketChars += weight;
+        });
+        if (bucket.length > 0) {
+          pages.push(bucket.join('\n\n'));
+        }
+        return pages.length > 0 ? pages : [content];
+      }
+
+      return [content];
     }
 
     function renderFallbackDocument() {
       state.documentMode = 'fallback';
-      state.totalPages = 1;
-      state.currentPage = 1;
+      const pages = buildFallbackContentPages(state.originalContent);
+      state.totalPages = Math.max(1, pages.length);
+      state.currentPage = Math.min(state.currentPage || 1, state.totalPages);
+      
       document.getElementById('pdf-canvas').style.display = 'none';
       const fallback = document.getElementById('document-fallback');
       fallback.style.display = 'block';
-      fallback.innerHTML = `
-        <div id="document-fallback-page" class="fallback-page">
+      fallback.innerHTML = '';
+
+      pages.forEach((content, index) => {
+        const pageNum = index + 1;
+        const pageDiv = document.createElement('div');
+        pageDiv.id = `document-fallback-page-${pageNum}`;
+        pageDiv.className = 'fallback-page';
+        pageDiv.style.display = pageNum === state.currentPage ? 'block' : 'none';
+        pageDiv.innerHTML = `
           <div class="fallback-head">
             <strong style="color:#333;">抽出テキスト・プレビュー</strong>
+            ${state.totalPages > 1 ? ` <span style="margin-left:8px; color:#9ca3af;">${pageNum} / ${state.totalPages}</span>` : ''}
             ${state.sourceUrl ? ` <span style="margin-left:8px;"><a href="${escapeHtml(state.sourceUrl)}" target="_blank" style="color:#1a73e8; text-decoration:none;">元ソースを開く</a></span>` : ''}
           </div>
-          <div class="fallback-body">${buildDocumentPreviewHtml(state.originalContent)}</div>
-        </div>
-      `;
+          <div class="fallback-body">${buildDocumentPreviewHtml(content)}</div>
+        `;
+        fallback.appendChild(pageDiv);
+      });
 
-      const pageEl = document.getElementById('document-fallback-page');
+      updateFallbackLayout();
+      renderFieldMarkers();
+    }
+
+    function updateFallbackLayout() {
+      const pageEl = document.getElementById(`document-fallback-page-${state.currentPage}`);
+      if (!pageEl) return;
+      
       const pageWidth = 794;
       const pageHeight = Math.max(640, Math.ceil(pageEl.offsetHeight || 1123));
       const overlay = document.getElementById('fields-overlay');
+      
       overlay.style.width = `${pageWidth}px`;
       overlay.style.height = `${pageHeight}px`;
       overlay.style.left = '50%';
-      overlay.style.transform = 'translateX(-50%)';
+      overlay.style.transform = `translateX(-50%) scale(${state.zoom})`;
+      overlay.style.transformOrigin = 'top center';
       overlay.style.top = '0';
+      
       pageEl.style.minHeight = `${pageHeight}px`;
+      pageEl.style.transformOrigin = 'top center';
+      pageEl.style.transform = `scale(${state.zoom})`;
+      pageEl.style.marginBottom = `${Math.max(24, Math.round(140 * state.zoom))}px`;
+      pageEl.style.display = 'block';
 
-      document.getElementById('page-summary').textContent = '1 / 1';
+      // Hide other pages
+      for (let i = 1; i <= state.totalPages; i++) {
+        if (i !== state.currentPage) {
+          const other = document.getElementById(`document-fallback-page-${i}`);
+          if (other) other.style.display = 'none';
+        }
+      }
+
+      document.getElementById('page-summary').textContent = `${state.currentPage} / ${state.totalPages}`;
       document.getElementById('zoom-summary').textContent = `${Math.round(state.zoom * 100)}%`;
-      document.getElementById('prev-btn').disabled = true;
-      document.getElementById('next-btn').disabled = true;
-      renderFieldMarkers();
+      document.getElementById('prev-btn').disabled = state.currentPage <= 1;
+      document.getElementById('next-btn').disabled = state.currentPage >= state.totalPages;
     }
 
     async function renderPage(pageNumber) {
@@ -1213,7 +1338,12 @@
       const next = state.currentPage + delta;
       if (next < 1 || next > state.totalPages) return;
       state.currentPage = next;
-      renderPage(state.currentPage);
+      if (state.documentMode === 'fallback') {
+        updateFallbackLayout();
+        renderFieldMarkers();
+      } else {
+        renderPage(state.currentPage);
+      }
     }
 
     function changeZoom(delta) {
@@ -1223,12 +1353,7 @@
         return;
       }
       if (state.documentMode === 'fallback') {
-        const pageEl = document.getElementById('document-fallback-page');
-        if (pageEl) {
-          pageEl.style.transformOrigin = 'top center';
-          pageEl.style.transform = `scale(${state.zoom})`;
-          pageEl.style.marginBottom = `${Math.max(24, Math.round(140 * state.zoom))}px`;
-        }
+        updateFallbackLayout();
         document.getElementById('zoom-summary').textContent = `${Math.round(state.zoom * 100)}%`;
         return;
       }
@@ -1509,24 +1634,38 @@
       button.textContent = '送信中...';
 
       try {
-        let fallbackDocumentImageDataUrl = '';
+        const fallbackDocumentImageDataUrls = [];
         if (state.documentMode === 'fallback') {
-          const fallbackPage = document.getElementById('document-fallback-page');
-          if (!fallbackPage || typeof html2canvas !== 'function') {
-            throw new Error('署名対象の書類プレビューを作成できませんでした');
+          // Temporarily show and capture all pages
+          const originalPage = state.currentPage;
+          const originalZoom = state.zoom;
+          state.zoom = 1.0; // Reset zoom for consistent capture width (794px)
+
+          for (let i = 1; i <= state.totalPages; i++) {
+            state.currentPage = i;
+            updateFallbackLayout();
+            const pageEl = document.getElementById(`document-fallback-page-${i}`);
+            if (!pageEl || typeof html2canvas !== 'function') {
+              throw new Error(`ページ ${i} のプレビューを作成できませんでした`);
+            }
+            const canvas = await html2canvas(pageEl, {
+              backgroundColor: '#ffffff',
+              scale: 2,
+              useCORS: true,
+              logging: false
+            });
+            fallbackDocumentImageDataUrls.push(canvas.toDataURL('image/png'));
           }
-          const canvas = await html2canvas(fallbackPage, {
-            backgroundColor: '#ffffff',
-            scale: 2,
-            useCORS: true,
-            logging: false
-          });
-          fallbackDocumentImageDataUrl = canvas.toDataURL('image/png');
+          
+          state.currentPage = originalPage;
+          state.zoom = originalZoom;
+          updateFallbackLayout();
         }
+
         const payload = {
           token: state.token,
           signatures: Object.values(state.signatures),
-          fallbackDocumentImageDataUrl
+          fallbackDocumentImageDataUrls: fallbackDocumentImageDataUrls
         };
         const response = await fetch(`${API_BASE}/api/sign/submit`, {
           method: 'POST',
@@ -1537,7 +1676,7 @@
         if (!response.ok || !result.success) {
           throw new Error(result.error || '署名の送信に失敗しました');
         }
-        showComplete();
+        showComplete(result.completedDocumentUrl);
       } catch (error) {
         button.disabled = false;
         button.textContent = '署名して完了';
