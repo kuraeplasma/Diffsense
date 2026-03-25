@@ -5063,8 +5063,6 @@ class DashboardApp {
                         const hasHistory = updatedContract && updatedContract.history && updatedContract.history.length > 0;
                         this.activeDetailTab = hasHistory ? 'diff' : 'original';
                         this.syncLatestDocumentCompareState(id);
-                        // APIと同期してから描画（original_contentが確実に反映されるよう）
-                        await dbService.syncContractsFromApi();
                         this.navigate('diff', id);
 
                         if (isFirstUpload) {

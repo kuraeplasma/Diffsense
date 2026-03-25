@@ -249,8 +249,17 @@ export const dbService = {
     async syncContractsFromApi() {
         const apiData = await this._callApi('/api/contracts');
         if (Array.isArray(apiData)) {
-            localStorage.setItem(this.KEYS.CONTRACTS, JSON.stringify(apiData));
-            return apiData;
+            // ローカルキャッシュのoriginal_contentを保持（APIが返さない場合）
+            const local = this.getContracts();
+            const merged = apiData.map(remote => {
+                const cached = local.find(c => String(c.id) === String(remote.id));
+                if (cached && !remote.original_content && cached.original_content) {
+                    return { ...remote, original_content: cached.original_content };
+                }
+                return remote;
+            });
+            localStorage.setItem(this.KEYS.CONTRACTS, JSON.stringify(merged));
+            return merged;
         }
         return this.getContracts();
     },
