@@ -491,6 +491,22 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
 
             // Try to upload to Firebase Storage (optional - analysis continues even if this fails)
             if (bucket) {
+                // Delete old PDF from Storage before uploading new one (prevents unbounded storage growth)
+                try {
+                    const existingContracts = await dbService.getContracts(uid);
+                    const existingContract = Array.isArray(existingContracts)
+                        ? existingContracts.find(c => String(c.id) === String(contractId))
+                        : null;
+                    const oldStoragePath = existingContract?.pdf_storage_path || existingContract?.pdfStoragePath;
+                    if (oldStoragePath && oldStoragePath.startsWith('contracts/')) {
+                        const oldFile = bucket.file(oldStoragePath);
+                        await oldFile.delete().catch(e => logger.warn(`Old PDF delete failed (non-fatal): ${e.message}`));
+                        logger.info(`Old PDF deleted from Storage: ${oldStoragePath}`);
+                    }
+                } catch (cleanupError) {
+                    logger.warn(`Old PDF cleanup failed (non-fatal): ${cleanupError.message}`);
+                }
+
                 try {
                     pdfStoragePath = `contracts/${contractId}/${Date.now()}.pdf`;
                     const file = bucket.file(pdfStoragePath);
@@ -820,6 +836,49 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
         });
     } catch (error) {
         logger.error('DOCX upload error:', error);
+        next(error);
+    }
+});
+
+/**
+ * POST /api/contracts/storage/cleanup
+ * 各契約の最新PDF以外のStorageファイルを削除（ストレージ節約）
+ */
+router.post('/storage/cleanup', async (req, res, next) => {
+    try {
+        const uid = req.user.uid;
+        const { bucket } = require('../firebase');
+        if (!bucket) {
+            return res.json({ success: true, message: 'Storage not available', deleted: 0 });
+        }
+
+        // contracts/ プレフィックスのファイルを全件取得
+        const [allFiles] = await bucket.getFiles({ prefix: 'contracts/' });
+
+        // 現在のユーザーの契約を取得し、有効なpdf_storage_pathを収集
+        const contracts = await dbService.getContracts(uid);
+        const validPaths = new Set(
+            (Array.isArray(contracts) ? contracts : [])
+                .map(c => c.pdf_storage_path || c.pdfStoragePath)
+                .filter(Boolean)
+        );
+
+        // 有効なパスに含まれないファイルを削除
+        let deleted = 0;
+        for (const file of allFiles) {
+            const filePath = file.name;
+            // contracts/{contractId}/ パターンのみ対象
+            if (!validPaths.has(filePath)) {
+                await file.delete().catch(e => logger.warn(`Cleanup delete failed: ${filePath} ${e.message}`));
+                deleted++;
+                logger.info(`Storage cleanup deleted: ${filePath}`);
+            }
+        }
+
+        logger.info(`Storage cleanup complete: ${deleted} files deleted`);
+        res.json({ success: true, deleted, total: allFiles.length });
+    } catch (error) {
+        logger.error('Storage cleanup error:', error);
         next(error);
     }
 });
