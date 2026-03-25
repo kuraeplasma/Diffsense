@@ -5094,6 +5094,10 @@ class DashboardApp {
                     let friendlyMsg = error.message;
                     if (friendlyMsg.includes('ADM-ZIP') || friendlyMsg.includes('zip format')) {
                         friendlyMsg = 'Wordファイルの解析に失敗しました。正常なWordドキュメント(.docx)であることを確認してください。';
+                    } else if (friendlyMsg.includes('時間がかかりすぎ') || friendlyMsg.includes('timeout') || friendlyMsg.includes('Timeout') || friendlyMsg.includes('Failed to fetch')) {
+                        friendlyMsg = '取り込みに時間がかかりすぎました。もう一度お試しください。';
+                    } else if (friendlyMsg.includes('バックエンドAPI') || friendlyMsg.includes('接続できません')) {
+                        friendlyMsg = '取り込みに失敗しました。もう一度お試しください。';
                     }
                     if (await Notify.confirm(`エラーが発生しました:\n${friendlyMsg}\n\nもう一度試しますか？`, { title: '確認', type: 'error' })) {
                         await performAnalysis(retryCount + 1);
