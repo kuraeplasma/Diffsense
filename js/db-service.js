@@ -162,6 +162,7 @@ export const dbService = {
     },
 
     PLAN_LIMITS: {
+        'free': 1,
         'starter': 1,
         'business': 3,
         'pro': 5
@@ -343,7 +344,7 @@ export const dbService = {
 
     getContractById(id) {
         const contracts = this.getContracts();
-        return contracts.find(c => c.id === parseInt(id));
+        return contracts.find(c => String(c.id) === String(id));
     },
 
     getDocumentsByContractId(id) {
@@ -430,7 +431,7 @@ export const dbService = {
 
     updateContractStatus(id, status) {
         const contracts = this.getContracts();
-        const contract = contracts.find(c => c.id === parseInt(id));
+        const contract = contracts.find(c => String(c.id) === String(id));
         if (contract) {
             contract.status = status;
             contract.last_updated_at = this.nowIso();
@@ -550,6 +551,7 @@ export const dbService = {
         const now = Date.now();
 
         const retentionDays = {
+            'free': 30,
             'starter': 30,
             'business': 90,
             'pro': 365
@@ -647,7 +649,7 @@ export const dbService = {
      */
     updateContractText(id, data) {
         const contracts = this.getContracts();
-        const contract = contracts.find(c => c.id === parseInt(id));
+        const contract = contracts.find(c => String(c.id) === String(id));
         if (contract) {
             // 抽出されたテキストを保存
             if (data.extractedText !== undefined) {
@@ -680,7 +682,7 @@ export const dbService = {
      */
     updateContractAnalysis(id, analysisData) {
         const contracts = this.getContracts();
-        const contract = contracts.find(c => c.id === parseInt(id));
+        const contract = contracts.find(c => String(c.id) === String(id));
         if (contract) {
             const incomingContent = this.cloneContent(analysisData.extractedText);
             const hasIncomingContent = incomingContent !== undefined && incomingContent !== null && this.contentSignature(incomingContent).length > 0;
@@ -786,7 +788,7 @@ export const dbService = {
      */
     toggleMonitoring(id, enabled) {
         const contracts = this.getContracts();
-        const contract = contracts.find(c => c.id === parseInt(id));
+        const contract = contracts.find(c => String(c.id) === String(id));
         if (contract) {
             contract.monitoring_enabled = enabled;
             localStorage.setItem(this.KEYS.CONTRACTS, JSON.stringify(contracts));
@@ -801,7 +803,7 @@ export const dbService = {
      */
     updateCrawlResult(id, data) {
         const contracts = this.getContracts();
-        const contract = contracts.find(c => c.id === parseInt(id));
+        const contract = contracts.find(c => String(c.id) === String(id));
         if (contract) {
             contract.last_checked_at = data.checkedAt;
             contract.last_hash = data.newHash;
@@ -914,7 +916,7 @@ export const dbService = {
 
     deleteSignRequest(id) {
         let requests = JSON.parse(localStorage.getItem(this.KEYS.SIGN_REQUESTS) || '[]');
-        requests = requests.filter(r => r.id !== parseInt(id));
+        requests = requests.filter(r => String(r.id) !== String(id));
         localStorage.setItem(this.KEYS.SIGN_REQUESTS, JSON.stringify(requests));
         return true;
     },

@@ -125,8 +125,10 @@
             border: 1px solid #e8e0d4;
             border-radius: 10px;
             padding: 20px 24px;
-            margin-bottom: 32px;
+            margin: 0 auto 32px;
             text-align: left;
+            max-width: 340px;
+            width: 100%;
         }
 
         .thanks-info-row {
@@ -181,16 +183,240 @@
 </head>
 
 <body>
+
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=AW-17941578077"></script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZCBMSCE4C3"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
+
+        gtag('config', 'AW-17941578077');
+        gtag('config', 'G-ZCBMSCE4C3');
+
+        // Plan Selection Conversion
+        gtag('event', 'conversion', { 'send_to': 'AW-17941578077/plan_selected' });
+    </script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background: linear-gradient(135deg, #f8f6f3 0%, #eee8e0 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .thanks-container {
+            text-align: center;
+            max-width: 620px;
+            width: 92%;
+            padding: 60px 48px;
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 12px 48px rgba(0, 0, 0, 0.08);
+        }
+
+        .thanks-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #0a1628, #1a2448);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 28px;
+            animation: pop-in 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .thanks-icon i {
+            font-size: 2rem;
+            color: #fff;
+        }
+
+        @keyframes pop-in {
+            0% {
+                transform: scale(0);
+                opacity: 0;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .thanks-title {
+            font-size: 1.35rem;
+            font-weight: 700;
+            color: #24292E;
+            margin-bottom: 12px;
+            white-space: nowrap;
+        }
+
+        .thanks-subtitle {
+            font-size: 0.95rem;
+            color: #586069;
+            line-height: 1.8;
+            margin-bottom: 32px;
+        }
+
+        .plan-badge {
+            display: inline-block;
+            padding: 6px 20px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            margin-bottom: 24px;
+        }
+
+        .plan-badge.starter {
+            background: #f0f0f0;
+            color: #555;
+        }
+
+        .plan-badge.business {
+            background: rgba(197, 160, 89, 0.12);
+            color: #a17e1a;
+        }
+
+        .plan-badge.pro {
+            background: rgba(59, 130, 246, 0.1);
+            color: #2563eb;
+        }
+
+        .thanks-info {
+            background: #faf8f5;
+            border: 1px solid #e8e0d4;
+            border-radius: 10px;
+            padding: 20px 24px;
+            margin: 0 auto 32px;
+            text-align: left;
+            max-width: 340px;
+            width: 100%;
+        }
+
+        .thanks-info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            font-size: 0.88rem;
+            color: #444;
+        }
+
+        .thanks-info-row:not(:last-child) {
+            border-bottom: 1px solid #f0ece6;
+        }
+
+        .thanks-info-label {
+            color: #888;
+        }
+
+        .thanks-info-value {
+            font-weight: 600;
+            color: #24292E;
+        }
+
+        .thanks-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 14px 36px;
+            background: linear-gradient(135deg, #0a1628, #1a2448);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+
+        .thanks-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px rgba(197, 160, 89, 0.3);
+        }
+
+        .thanks-note {
+            margin-top: 24px;
+            font-size: 0.78rem;
+            color: #999;
+            white-space: nowrap;
+        }
+
+        .thanks-btn-payment {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 14px 36px;
+            background: linear-gradient(135deg, #0a1628, #1a2448);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s;
+            width: 100%;
+            max-width: 340px;
+        }
+
+        .thanks-btn-payment:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px rgba(10, 22, 40, 0.3);
+        }
+
+        .thanks-btn-payment:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .thanks-btn-skip {
+            display: block;
+            margin-top: 12px;
+            font-size: 0.82rem;
+            color: #aaa;
+            text-decoration: none;
+            text-align: center;
+        }
+
+        .thanks-btn-skip:hover { color: #c5a059; }
+
+        .thanks-payment-note {
+            margin: 0 auto 20px;
+            padding: 10px 14px;
+            background: #fff8e9;
+            border: 1px solid #ead9b0;
+            border-radius: 8px;
+            font-size: 0.82rem;
+            color: #7a6230;
+            text-align: center;
+            line-height: 1.6;
+            max-width: 340px;
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
     <div class="thanks-container">
         <div class="thanks-icon">
             <i class="fa-solid fa-circle-check"></i>
         </div>
-        <h1 class="thanks-title" id="thanks-title">プランが設定されました</h1>
+        <h1 class="thanks-title" id="thanks-title">プランを選択しました</h1>
         <div id="plan-badge"></div>
-        <p class="thanks-subtitle" id="thanks-subtitle">
-            無料トライアルが開始されました。<br>
-            ダッシュボードからAI契約書解析をお試しください。
-        </p>
+
 
         <div class="thanks-info">
             <div class="thanks-info-row">
@@ -198,65 +424,104 @@
                 <span class="thanks-info-value" id="plan-name">-</span>
             </div>
             <div class="thanks-info-row">
-                <span class="thanks-info-label">ステータス</span>
-                <span class="thanks-info-value" id="thanks-status" style="color:#22c55e;">無料トライアル中</span>
+                <span class="thanks-info-label">Word / PDF / URL 登録</span>
+                <span class="thanks-info-value">無制限</span>
             </div>
             <div class="thanks-info-row">
-                <span class="thanks-info-label" id="thanks-row3-label">トライアル期間</span>
-                <span class="thanks-info-value" id="thanks-row3-value">7日間</span>
+                <span class="thanks-info-label" id="thanks-row3-label">ご利用料金</span>
+                <span class="thanks-info-value" id="thanks-row3-value">-</span>
             </div>
             <div class="thanks-info-row">
-                <span class="thanks-info-label" id="thanks-row4-label">AI解析回数（トライアル中）</span>
-                <span class="thanks-info-value" id="thanks-row4-value">5回まで</span>
+                <span class="thanks-info-label" id="thanks-row4-label">月間AI解析回数</span>
+                <span class="thanks-info-value" id="thanks-row4-value">-</span>
+            </div>
+            <div class="thanks-info-row">
+                <span class="thanks-info-label" id="thanks-row5-label">月間電子署名</span>
+                <span class="thanks-info-value" id="thanks-row5-value">-</span>
             </div>
         </div>
 
-        <a href="dashboard.html" class="thanks-btn">
-            <i class="fa-solid fa-gauge-high"></i>
-            ダッシュボードへ
-        </a>
 
-        <p class="thanks-note" id="thanks-note">トライアル期間中は料金は発生しません。継続利用にはお支払い方法の登録が必要です。</p>
+        <button class="thanks-btn-payment" id="payment-btn" onclick="startPayment()">
+            <i class="fa-solid fa-credit-card"></i>
+            お支払いへ進む
+        </button>
+
     </div>
 
-    <script>
+    <script type="module">
+        import { auth } from './js/firebase-config.js';
+        import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import { getApiBaseUrl } from './js/api-base.js';
+
         const params = new URLSearchParams(window.location.search);
         const validPlans = ['starter', 'business', 'pro'];
         const rawPlan = (params.get('plan') || localStorage.getItem('diffsense_selected_plan') || '').toLowerCase();
         const plan = validPlans.includes(rawPlan) ? rawPlan : 'pro';
-        const isTrialExpiredFlow = params.get('reason') === 'trial_expired' || localStorage.getItem('diffsense_trial_expired_flow') === '1';
-        const planNames = { starter: 'Starter', business: 'Business', pro: 'Pro / Legal' };
+        const billing = params.get('billing') === 'annual' ? 'annual' : 'monthly';
+        const planNames = { starter: 'Starter', business: 'Business', pro: 'Pro' };
         const planPrices = { starter: '¥1,480', business: '¥4,980', pro: '¥9,800' };
-        const planLimits = { starter: '月15回', business: '月120回', pro: '月400回' };
+        const planLimits = { starter: '月50回', business: '月120回', pro: '月400回' };
+        const signLimits = { starter: '月25件', business: '月100件', pro: '無制限' };
 
         localStorage.setItem('diffsense_selected_plan', plan);
 
-        document.getElementById('plan-name').textContent = `${planNames[plan] || plan}`;
+        document.getElementById('plan-name').textContent = planNames[plan] || plan;
 
         const badge = document.getElementById('plan-badge');
         badge.innerHTML = `<span class="plan-badge ${plan}">${planNames[plan] || plan}</span>`;
 
-        if (isTrialExpiredFlow) {
-            document.getElementById('thanks-title').textContent = 'プラン変更が完了しました';
-            document.getElementById('thanks-subtitle').innerHTML = '選択したプランで継続利用できます。<br>ダッシュボードからご利用ください。';
+        document.getElementById('thanks-title').textContent = `${planNames[plan] || plan}プランを選択しました`;
 
-            const status = document.getElementById('thanks-status');
-            status.textContent = '有料プラン有効';
-            status.style.color = '#22c55e';
-
-            document.getElementById('thanks-row3-label').textContent = '月額料金';
-            document.getElementById('thanks-row3-value').textContent = `${planPrices[plan] || '-'} / 月`;
-            document.getElementById('thanks-row4-label').textContent = 'AI解析回数';
-            document.getElementById('thanks-row4-value').textContent = planLimits[plan] || '-';
-
-            document.getElementById('thanks-note').textContent = 'プランの変更・解約はダッシュボードのプラン管理から行えます。';
-            localStorage.removeItem('diffsense_trial_expired_flow');
-        } else {
-            document.getElementById('thanks-row3-value').textContent = '7日間';
-            document.getElementById('thanks-row4-value').textContent = '5回まで';
+        document.getElementById('thanks-row3-label').textContent = 'ご利用料金';
+        document.getElementById('thanks-row3-value').textContent = `${planPrices[plan] || '-'} / 月`;
+        document.getElementById('thanks-row4-label').textContent = '月間AI解析回数';
+        document.getElementById('thanks-row4-value').textContent = planLimits[plan] || '-';
+        if (document.getElementById('thanks-row5-value')) {
+            document.getElementById('thanks-row5-value').textContent = signLimits[plan] || '-';
         }
+
+        // Auth state - get token for Stripe
+        let currentToken = null;
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                currentToken = await user.getIdToken();
+            }
+        });
+
+        window.startPayment = async () => {
+            const btn = document.getElementById('payment-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 決済ページへ移動中...';
+            try {
+                const apiBase = getApiBaseUrl();
+                const headers = { 'Content-Type': 'application/json' };
+                if (currentToken) headers.Authorization = `Bearer ${currentToken}`;
+
+                const res = await fetch(`${apiBase}/api/createCheckoutSession`, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({
+                        plan,
+                        billingCycle: billing,
+                        cancelUrl: `${window.location.origin}/thanks-plan.html?plan=${plan}&billing=${billing}`
+                    })
+                });
+                const result = await res.json();
+                if (result.success && result.data?.url) {
+                    sessionStorage.setItem('stripe_checkout_started', 'true');
+                    window.location.href = result.data.url;
+                } else {
+                    throw new Error(result.error || '決済ページを開けませんでした');
+                }
+            } catch (e) {
+                console.error('Payment error:', e);
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-credit-card"></i> お支払いへ進む';
+                alert('決済ページの読み込みに失敗しました。ダッシュボードのプラン管理から再度お試しください。');
+            }
+        };
     </script>
 </body>
 
 </html>
-

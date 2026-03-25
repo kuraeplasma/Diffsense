@@ -1,13 +1,6 @@
 import { getIdToken } from './auth.js';
 import { getApiBaseUrl } from './api-base.js';
 
-function redirectToTrialExpiredPlanPage() {
-    const billingRaw = localStorage.getItem('diffsense_selected_billing_cycle');
-    const billing = billingRaw === 'annual' ? 'annual' : 'monthly';
-    localStorage.setItem('diffsense_trial_expired', '1');
-    window.location.replace(`${window.location.origin}/select-plan-preview.html?reason=trial_expired&billing=${billing}`);
-}
-
 /**
  * AI Service - Backend API Communication
  * バックエンドAPIとの通信を担当
@@ -71,13 +64,11 @@ export const aiService = {
             }
 
             if (!response.ok) {
-                const apiError = new Error(result.error || `HTTP error! status: ${response.status}`);
-                if (result.code) {
-                    apiError.code = result.code;
-                }
-                if (apiError.code === 'TRIAL_EXPIRED') {
-                    redirectToTrialExpiredPlanPage();
-                }
+                const apiError = new Error(result.error || result.message || `HTTP error! status: ${response.status}`);
+                if (result.code) apiError.code = result.code;
+                if (result.currentUsage !== undefined) apiError.currentUsage = result.currentUsage;
+                if (result.limit !== undefined) apiError.limit = result.limit;
+                if (result.plan !== undefined) apiError.plan = result.plan;
                 throw apiError;
             }
 

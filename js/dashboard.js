@@ -1090,22 +1090,63 @@ const Views = {
 
         const plans = [
             {
+                id: 'free',
+                name: 'Free',
+                prices: { monthly: 0, annual: 0 },
+                features: [
+                    'Word / PDF / URL 登録：無制限',
+                    'AI差分チェック：月3回まで',
+                    '電子署名機能：月10回まで',
+                    'AI要約・リスク判定（High / Medium / Low）',
+                    '差分ハイライト表示',
+                    'チーム管理・1人'
+                ]
+            },
+            {
                 id: 'starter',
                 name: 'Starter',
                 prices: { monthly: 1480, annual: 14800 },
-                features: ['AI解析 15回/月', '履歴管理', '判定: High/Med/Low']
+                features: [
+                    'Word / PDF / URL 登録：無制限',
+                    'AI差分チェック：月50回まで',
+                    '電子署名機能：月25回まで',
+                    'AI要約・リスク判定',
+                    '差分ハイライト、履歴管理',
+                    '解析ログ・監査履歴の閲覧',
+                    'チーム管理・1人'
+                ]
             },
             {
                 id: 'business',
                 name: 'Business',
                 prices: { monthly: 4980, annual: 49800 },
-                features: ['AI解析 120回/月', '電子署名 50件/月', 'AI詳細解説', 'チーム3人']
+                features: [
+                    'Word / PDF / URL 登録：無制限',
+                    'AI差分チェック：月120回まで',
+                    '電子署名機能：月100件まで',
+                    'AI要約・リスク判定',
+                    '法的影響・懸念点の詳細解説',
+                    '差分ハイライト、分析ログ',
+                    'チーム管理・3人',
+                    'PDF エクスポート'
+                ]
             },
             {
                 id: 'pro',
-                name: 'Pro / Legal',
+                name: 'Pro',
                 prices: { monthly: 9800, annual: 98000 },
-                features: ['AI解析 400回/月', '電子署名 無制限', '定期URL監視', 'PDFエクスポート']
+                features: [
+                    'Word / PDF / URL 登録：無制限',
+                    'AI差分チェック：月400回まで',
+                    '電子署名機能：無制限',
+                    'AI要約・リスク判定',
+                    '法的影響・懸念点の詳細解説',
+                    '差分ハイライト表示、バージョン履歴管理',
+                    '解析ログ・監査履歴の閲覧',
+                    '定期URL監視・Slack／メール通知',
+                    'チーム管理・10人',
+                    'PDF エクスポート'
+                ]
             }
         ];
 
@@ -1116,20 +1157,25 @@ const Views = {
             const isCurrentPlan = sub.plan === p.id;
             const isCurrentSelection = isCurrentPlan && currentBillingCycle === selectedBillingCycle;
             const hideCurrentButtonInAnnual = selectedBillingCycle === 'annual' && isCurrentSelection;
+            const isFree = p.id === 'free';
             const selectedPrice = p.prices[selectedBillingCycle] || p.prices.monthly;
             const selectedUnit = selectedBillingCycle === 'annual' ? ' / 年' : ' / 月';
             const annualMonthlyEquivalent = Math.round(p.prices.annual / 12);
             const annualRegularPrice = p.prices.monthly * 12;
-            const canStartSelectedCycle = !planAvailability || Boolean(planAvailability[selectedBillingCycle]?.[p.id]);
-            const ctaDisabled = isCurrentSelection || !canStartSelectedCycle;
+            const canStartSelectedCycle = isFree || !planAvailability || Boolean(planAvailability[selectedBillingCycle]?.[p.id]);
+            const ctaDisabled = isCurrentSelection || (!isFree && !canStartSelectedCycle);
             const ctaLabel = isCurrentSelection
                 ? '現在利用中'
-                : canStartSelectedCycle
-                    ? (isBusiness ? 'このプランで始める' : 'プランを変更する')
-                    : `${selectedCycleLabel}は準備中`;
+                : isFree
+                    ? 'プランを変更する'
+                    : canStartSelectedCycle
+                        ? 'プランを変更する'
+                        : `${selectedCycleLabel}は準備中`;
             const ctaAction = ctaDisabled
                 ? 'disabled'
-                : `onclick="window.app.startSubscriptionCheckout('${p.id}', '${selectedBillingCycle}')"`;
+                : isFree
+                    ? `onclick="window.app.startSubscriptionCheckout('free', 'monthly')"`
+                    : `onclick="window.app.startSubscriptionCheckout('${p.id}', '${selectedBillingCycle}')"`;
             const ctaStyleClass = ctaDisabled
                 ? ''
                 : (isBusiness ? 'plan-cta-business' : 'plan-cta-outline');
@@ -1138,23 +1184,25 @@ const Views = {
                 <article class="plan-card ${isCurrentPlan ? 'is-current' : ''} ${isBusiness ? 'is-business' : 'is-muted'}">
                     <div class="plan-card-header">
                         ${isBusiness ? `<span class="plan-recommend-chip">おすすめ</span>` : ''}
-                        ${isCurrentPlan ? `<span class="plan-current-chip">現在の契約（${currentCycleLabel}）</span>` : ''}
+                        ${isCurrentPlan ? `<span class="plan-current-chip">現在の契約${isFree ? '' : `（${currentCycleLabel}）`}</span>` : ''}
                     </div>
                     <h3 class="plan-name">${p.name}</h3>
                     <div class="plan-pricing-block">
                         <div class="plan-price-line">
-                            <span class="plan-price">${formatYen(selectedPrice)}</span>
-                            <span class="plan-price-unit">${selectedUnit}</span>
+                            <span class="plan-price">${isFree ? '無料' : formatYen(selectedPrice)}</span>
+                            ${isFree ? '' : `<span class="plan-price-unit">${selectedUnit}</span>`}
                         </div>
-                        <div class="plan-meta-slot ${selectedBillingCycle === 'annual' ? 'is-annual' : 'is-monthly'}">
-                            <div class="plan-annual-meta">
-                                <p class="plan-effective">月あたり <strong>${formatYen(annualMonthlyEquivalent)}</strong> で利用</p>
-                                <p class="plan-compare">通常価格 <span class="plan-regular">${formatYen(annualRegularPrice)}</span> → 年額合計 <span>${formatYen(p.prices.annual)}</span></p>
-                                <p class="plan-discount">2ヶ月分お得</p>
-                            </div>
-                            <div class="plan-price-meta">
-                                年額なら ${formatYen(p.prices.annual)} / 年（2ヶ月分お得）
-                            </div>
+                        <div class="plan-meta-slot ${isFree ? 'is-free-spacer' : (selectedBillingCycle === 'annual' ? 'is-annual' : 'is-monthly')}">
+                            ${isFree ? '<div class="plan-annual-meta" style="visibility:hidden; height:54px;">spacer</div>' : `
+                                <div class="plan-annual-meta">
+                                    <p class="plan-effective">月あたり <strong>${formatYen(annualMonthlyEquivalent)}</strong> で利用</p>
+                                    <p class="plan-compare">通常価格 <span class="plan-regular">${formatYen(annualRegularPrice)}</span> → 年額合計 <span>${formatYen(p.prices.annual)}</span></p>
+                                    <p class="plan-discount">2ヶ月分お得</p>
+                                </div>
+                                <div class="plan-price-meta">
+                                    年額なら ${formatYen(p.prices.annual)} / 年（2ヶ月分お得）
+                                </div>
+                            `}
                         </div>
                     </div>
                     <ul class="plan-feature-list">
@@ -1167,14 +1215,13 @@ const Views = {
                         ${ctaLabel}
                     </button>
                     `}
-                    <p class="plan-trial-copy">トライアル終了後、このプランで継続できます</p>
                 </article>
             `;
         }).join('');
 
         let paymentSection = '';
         if (hasPayment) {
-            const renewalText = (sub && !sub.isInTrial && sub.renewalDate)
+            const renewalText = (sub && sub.renewalDate)
                 ? `<div style="margin-top:8px; font-size:13px; color:#555;">次回更新日: <strong>${new Date(sub.renewalDate).toLocaleDateString('ja-JP')}</strong></div>`
                 : '';
             paymentSection = `
@@ -1214,7 +1261,7 @@ const Views = {
                     <button class="plan-cycle-btn ${selectedBillingCycle === 'monthly' ? 'active' : ''}" onclick="window.app.setPlanBillingCycle('monthly')">月額</button>
                     <button class="plan-cycle-btn ${selectedBillingCycle === 'annual' ? 'active' : ''}" onclick="window.app.setPlanBillingCycle('annual')" ${annualKnownUnavailable ? 'disabled' : ''}>年額（2ヶ月分お得）</button>
                 </div>
-                <p class="plan-cycle-note">${annualKnownUnavailable ? '年額プランは現在準備中です。' : '年額は一括請求です（年間で安定運用する企業に選ばれています）。'}</p>
+                <p class="plan-cycle-note">${annualKnownUnavailable ? '年額プランは現在準備中です。' : ''}</p>
             </div>
             ${paymentSection}
             <div class="plan-grid">
@@ -1701,7 +1748,7 @@ const Views = {
                     </div>
                     <div class="flex gap-sm">
                         ${window.app.can('operate_contract') ? `<button class="btn-dashboard" onclick="window.app.shareReport(${contract.id})"><i class="fa-solid fa-share-nodes"></i> 共有</button>` : ''}
-                        ${(window.app.subscription?.plan === 'pro') ? `<button class="btn-dashboard" onclick="window.app.exportPDF(${contract.id})"><i class="fa-solid fa-file-pdf"></i> PDF出力</button>` : ''}
+                        ${(['pro', 'business'].includes(window.app.subscription?.plan)) ? `<button class="btn-dashboard" onclick="window.app.exportPDF(${contract.id})"><i class="fa-solid fa-file-pdf"></i> PDF出力</button>` : ''}
                         ${window.app.can('operate_contract') ? `<button class="btn-dashboard" onclick="window.app.showHistoryModal(${id})"><i class="fa-solid fa-note-sticky"></i> メモ</button>` : ''}
                         ${window.app.can('operate_contract')
                 ? (contract.status === '未処理'
@@ -1748,8 +1795,9 @@ const Views = {
                             </div>
                         </div>
                         
-                        ${contract.source_type === 'URL' && window.app.subscription?.plan === 'pro' ? `
+                        ${contract.source_type === 'URL' ? `
                         <div style="margin-top: 24px; padding: 20px; border-top: 1px solid #eee;">
+                            ${window.app.subscription?.plan === 'pro' ? `
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                                 <div style="display:flex; align-items:center; gap:10px;">
                                     <i class="fa-solid fa-satellite-dish" style="color:var(--accent-gold, #c19b4a); font-size:16px;"></i>
@@ -1777,6 +1825,19 @@ const Views = {
                                 <i class="fa-solid fa-arrows-rotate"></i> 今すぐ更新を確認
                             </button>
                             <p style="font-size:11px; color:#aaa; margin:8px 0 0; text-align:center;">※ 変更検出時にAI解析回数を1回消費します</p>
+                            ` : `
+                            <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+                                <i class="fa-solid fa-satellite-dish" style="color:#ccc; font-size:16px;"></i>
+                                <span style="font-weight:600; font-size:14px; color:#999;">定期監視・Slack／メール通知</span>
+                                <span style="background:#f3f0ea; color:#c5a059; border:1px solid #e8d9b8; border-radius:10px; padding:2px 10px; font-size:11px; font-weight:700;">Pro限定</span>
+                            </div>
+                            <p style="font-size:12px; color:#aaa; margin:0 0 16px; line-height:1.5;">
+                                URLの変更を自動チェックし、差分をSlack・メールで通知します。
+                            </p>
+                            <button class="btn-dashboard" style="width:100%; background:#c5a059; color:#fff; border:none; border-radius:8px; padding:10px; font-size:13px; font-weight:600; cursor:pointer;" onclick="window.app.showProFeatureModal('定期URL監視・Slack／メール通知はProプラン限定の機能です。')">
+                                <i class="fa-solid fa-lock" style="margin-right:6px;"></i> Proプランで使う
+                            </button>
+                            `}
                         </div>
                         ` : ''}
                     </div>
@@ -2083,6 +2144,7 @@ const Views = {
     // 5. Team
     team: () => {
         const users = dbService.getUsers();
+        const limit = dbService.PLAN_LIMITS[window.app.subscription?.plan] || 1;
         const rows = users.map(m => `
     <tr>
                 <td class="col-name" title="${m.name}">${m.name}</td>
@@ -2095,7 +2157,7 @@ const Views = {
 
         return `
     <div class="flex justify-between items-center mb-md">
-        <h2 class="page-title" style="margin-bottom:0;">チーム管理</h2>
+        <h2 class="page-title" style="margin-bottom:0;">チーム管理 <small style="font-size:14px; font-weight:normal; color:#666; margin-left:12px;">(${users.length} / ${limit} 名)</small></h2>
                 ${window.app.can('manage_team') ? `<button class="btn-dashboard btn-primary-action" onclick="window.app.showInviteModal()"><i class="fa-solid fa-user-plus"></i> メンバー招待</button>` : ''}
             </div>
     <div class="table-container">
@@ -2291,7 +2353,21 @@ class RegistrationFlow {
         }
 
         if (cardUrl) {
-            cardUrl.onclick = () => this.nextStep(2, { method: 'url' });
+            const isPro = window.app.subscription?.plan === 'pro';
+            if (!isPro) {
+                cardUrl.style.opacity = '0.55';
+                cardUrl.style.position = 'relative';
+                cardUrl.insertAdjacentHTML('beforeend',
+                    '<div style="position:absolute;top:8px;right:8px;background:#c5a059;color:#fff;border-radius:10px;padding:2px 8px;font-size:10px;font-weight:700;letter-spacing:0.03em;">Pro</div>'
+                );
+            }
+            cardUrl.onclick = () => {
+                if (!isPro) {
+                    window.app.showProFeatureModal('URLを登録して定期的に変更を監視し、差分をSlack・メールで通知する機能はProプラン限定です。');
+                    return;
+                }
+                this.nextStep(2, { method: 'url' });
+            };
         }
     }
 
@@ -2568,9 +2644,20 @@ class DashboardApp {
         this.stripeEnabled = false;
         this.stripePublishableKey = '';
 
-        // 初期表示をプロプランに設定
-        this.subscription = { plan: 'pro', billingCycle: 'monthly', usageCount: 0, usageLimit: 999999, daysRemaining: null, isInTrial: true, planLimit: 999999 };
-        this.userPlan = 'pro';
+        // 初期表示を無料プランに設定 (チェック用)
+        this.subscription = { plan: 'free', billingCycle: 'monthly', usageCount: 0, usageLimit: 3, daysRemaining: null, planLimit: 10 };
+        this.userPlan = 'free';
+
+        // URLパラメータによるプラン強制 (検証用: ?forcePlan=free)
+        const urlParams = new URLSearchParams(window.location.search);
+        const forcedPlan = urlParams.get('forcePlan');
+        if (forcedPlan === 'free') {
+            this.subscription = { plan: 'free', billingCycle: 'monthly', usageCount: 0, usageLimit: 3, daysRemaining: null, planLimit: 10 };
+            this.userPlan = 'free';
+            // キャッシュにも保存して一貫性を保つ
+            this.setCachedItem(DASHBOARD_CACHE_KEYS.SUBSCRIPTION, this.subscription);
+        }
+
         this.memoryCache = new Map();
         this.pendingPairAnalysisKeys = new Set();
         this.attemptedAutoPairAnalysisKeys = new Set();
@@ -2721,6 +2808,10 @@ class DashboardApp {
     }
 
     hydrateCachedState() {
+        // URLパラメータ優先
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('forcePlan') === 'free') return;
+
         const cachedSub = this.getCachedItem(DASHBOARD_CACHE_KEYS.SUBSCRIPTION, 10 * 60 * 1000);
         if (cachedSub && cachedSub.plan) {
             this.subscription = {
@@ -2866,8 +2957,6 @@ class DashboardApp {
             const shouldStartPayment = urlParams.get('start_payment') === '1';
             const paymentPlan = urlParams.get('plan');
             const paymentBilling = urlParams.get('billing');
-            const fromTrialExpired = urlParams.get('from') === 'trial_expired';
-
             // Critical UI first: route immediately, data bootstrap in background
             const hash = window.location.hash;
             if (hash && hash.startsWith('#diff/')) {
@@ -2974,19 +3063,15 @@ class DashboardApp {
                     dbService.updateUserRole(user.email, this.userRole);
                 }
 
-                const trialExpiredFlowFlag = localStorage.getItem('diffsense_trial_expired_flow') === '1';
-
                 // Check if user just selected a plan from signup flow
                 const selectedPlan = localStorage.getItem('diffsense_selected_plan');
                 const selectedBillingCycle = localStorage.getItem('diffsense_selected_billing_cycle') || 'monthly';
                 const signupFlowFlag = localStorage.getItem('diffsense_signup_flow') === '1';
                 if (selectedPlan && signupFlowFlag) {
-                    // 無料登録導線は常にPro開始に統一
-                    await this.registerSelectedPlan(token, 'pro', selectedBillingCycle, { startTrial: true });
+                    await this.registerSelectedPlan(token, selectedPlan, selectedBillingCycle);
                     localStorage.removeItem('diffsense_selected_plan');
                     localStorage.removeItem('diffsense_selected_billing_cycle');
                     localStorage.removeItem('diffsense_signup_flow');
-                    localStorage.removeItem('diffsense_trial_expired_flow');
                 }
 
                 this.setCachedItem(DASHBOARD_CACHE_KEYS.USER_META, {
@@ -3045,13 +3130,6 @@ class DashboardApp {
                     }
                 }
 
-                if (paymentState === 'cancelled' && trialExpiredFlowFlag) {
-                    const returnedBillingCycle = urlParams.get('billing') || this.subscription?.billingCycle || 'monthly';
-                    window.location.replace(`${window.location.origin}/select-plan-preview.html?reason=trial_expired&billing=${returnedBillingCycle}`);
-                    return;
-                }
-
-                // Check if trial expired and no payment method
                 this.checkTrialExpired();
 
                 // Clean payment URL params
@@ -3091,9 +3169,8 @@ class DashboardApp {
         }
     }
 
-    async registerSelectedPlan(token, plan, billingCycle = 'monthly', options = {}) {
+    async registerSelectedPlan(token, plan, billingCycle = 'monthly') {
         const selectedBillingCycle = billingCycle === 'annual' ? 'annual' : 'monthly';
-        const startTrial = options.startTrial === true;
         try {
             const apiUrl = `${aiService.API_BASE}/user/select-plan`;
 
@@ -3103,7 +3180,7 @@ class DashboardApp {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ plan, billingCycle: selectedBillingCycle, startTrial })
+                body: JSON.stringify({ plan, billingCycle: selectedBillingCycle })
             });
             console.log('Selected plan registered:', plan, selectedBillingCycle);
         } catch (error) {
@@ -3166,7 +3243,7 @@ class DashboardApp {
         } catch (error) {
             console.error('Failed to fetch subscription status:', error);
             // API接続失敗時：proをデフォルトにする
-            this.subscription = { plan: 'pro', billingCycle: 'monthly', usageCount: 0, usageLimit: 999999, daysRemaining: null, isInTrial: true, planLimit: 999999 };
+            this.subscription = { plan: 'pro', billingCycle: 'monthly', usageCount: 0, usageLimit: 999999, daysRemaining: null, planLimit: 999999 };
             this.userPlan = 'pro';
             this.setCachedItem(DASHBOARD_CACHE_KEYS.SUBSCRIPTION, this.subscription);
             if (!this.planViewBillingCycle) {
@@ -3283,11 +3360,10 @@ class DashboardApp {
     showStripeCheckoutModal(plan, billingCycle = this.subscription?.billingCycle || 'monthly', forcePayment = this.forceSubscriptionPayment) {
         const targetPlan = plan || this.subscription?.plan || 'starter';
         const cycle = billingCycle === 'annual' ? 'annual' : 'monthly';
-        const showTrialNote = !this.subscription?.trialStartedAt && !this.paymentStatus?.hasPaymentMethod;
         const existing = document.getElementById('stripe-modal-overlay');
         if (existing) existing.remove();
 
-        const planNames = { starter: 'Starter', business: 'Business', pro: 'Pro / Legal' };
+        const planNames = { starter: 'Starter', business: 'Business', pro: 'Pro' };
         const billingLabel = cycle === 'annual' ? '年額（一括）' : '月額';
         const planPrices = {
             monthly: { starter: '¥1,480 / 月（税込）', business: '¥4,980 / 月（税込）', pro: '¥9,800 / 月（税込）' },
@@ -3313,9 +3389,8 @@ class DashboardApp {
                     <div style="font-size:1.3rem; font-weight:700; color:#B8860B; margin-top:4px;">${planPrices[cycle]?.[targetPlan] || ''}</div>
                 </div>
                 <button class="btn-dashboard full-width" style="background:#B8860B; color:#fff; border:none; font-weight:700;" onclick="window.app.startStripeCheckout('${targetPlan}', '${cycle}', ${forcePayment ? 'true' : 'false'})">
-                    無料トライアルを開始する
+                    お支払いを登録する
                 </button>
-                <p style="margin-top:8px; font-size:0.8rem; color:#8b8b8b; text-align:center;">${showTrialNote ? '7日間は請求されません' : '追加の無料期間は付与されません'}</p>
             </div>
         </div>`;
         document.body.appendChild(overlay);
@@ -3356,7 +3431,7 @@ class DashboardApp {
             if (!result.success || !result.data?.url) {
                 Notify.error(result.error || 'Stripe決済ページの作成に失敗しました。');
                 if (forcePayment) {
-                    window.location.replace(`${window.location.origin}/select-plan-preview.html?reason=trial_expired&billing=${selectedBillingCycle}`);
+                    window.location.replace(`${window.location.origin}/select-plan-preview.html&billing=${selectedBillingCycle}`);
                 }
                 return;
             }
@@ -3366,7 +3441,7 @@ class DashboardApp {
             console.error('Stripe checkout error:', error);
             Notify.error('Stripe決済の開始に失敗しました。');
             if (forcePayment) {
-                window.location.replace(`${window.location.origin}/select-plan-preview.html?reason=trial_expired&billing=${selectedBillingCycle}`);
+                window.location.replace(`${window.location.origin}/select-plan-preview.html&billing=${selectedBillingCycle}`);
             }
         }
     }
@@ -3396,7 +3471,7 @@ class DashboardApp {
             const result = await response.json();
             if (result.success) {
                 this.forceSubscriptionPayment = false;
-                localStorage.removeItem('diffsense_trial_expired_flow');
+
                 await this.fetchSubscriptionStatus(token);
                 await this.fetchPaymentStatus(token);
                 if (redirectOnSuccess) {
@@ -3423,7 +3498,7 @@ class DashboardApp {
             if (!config) {
                 Notify.error('PayPal設定の取得に失敗しました。');
                 if (forcePayment) {
-                    window.location.replace(`${window.location.origin}/select-plan-preview.html?reason=trial_expired`);
+                    window.location.replace(`${window.location.origin}/select-plan-preview.html`);
                 }
                 return;
             }
@@ -3432,7 +3507,7 @@ class DashboardApp {
             if (!paypalPlanId) {
                 Notify.error(selectedBillingCycle === 'annual' ? '年額プランは現在準備中です。' : 'プランIDが見つかりません。');
                 if (forcePayment) {
-                    window.location.replace(`${window.location.origin}/select-plan-preview.html?reason=trial_expired&billing=${selectedBillingCycle}`);
+                    window.location.replace(`${window.location.origin}/select-plan-preview.html&billing=${selectedBillingCycle}`);
                 }
                 return;
             }
@@ -3483,7 +3558,7 @@ class DashboardApp {
                     const modal = document.getElementById('paypal-modal-overlay');
                     if (modal) modal.remove();
                     this.forceSubscriptionPayment = false;
-                    localStorage.removeItem('diffsense_trial_expired_flow');
+    
 
                     // Confirm with backend
                     await this.confirmPayPalSubscription(data.subscriptionID, targetPlan, selectedBillingCycle);
@@ -3514,7 +3589,7 @@ class DashboardApp {
             console.error('PayPal subscription error:', error);
             Notify.error('お支払い処理でエラーが発生しました。');
             if (forcePayment) {
-                window.location.replace(`${window.location.origin}/select-plan-preview.html?reason=trial_expired&billing=${selectedBillingCycle}`);
+                window.location.replace(`${window.location.origin}/select-plan-preview.html&billing=${selectedBillingCycle}`);
             }
         }
     }
@@ -3524,7 +3599,7 @@ class DashboardApp {
         const existing = document.getElementById('paypal-modal-overlay');
         if (existing) existing.remove();
 
-        const planNames = { starter: 'Starter', business: 'Business', pro: 'Pro / Legal' };
+        const planNames = { starter: 'Starter', business: 'Business', pro: 'Pro' };
         const cycle = billingCycle === 'annual' ? 'annual' : 'monthly';
         const billingLabel = cycle === 'annual' ? '年額（一括）' : '月額';
         const planPrices = {
@@ -3544,7 +3619,6 @@ class DashboardApp {
                 ${forcePayment ? '' : '<button class="btn-close" onclick="document.getElementById(\'paypal-modal-overlay\').remove()">&times;</button>'}
             </div>
             <div class="modal-body" style="padding:24px;">
-                ${forcePayment ? '<p style="font-size:0.8rem; color:#92400e; background:#fff8e9; border:1px solid #ead9b0; padding:8px 10px; border-radius:6px; text-align:center; margin:0 0 12px 0;">無料トライアルが終了しています。継続利用にはお支払い登録が必要です。</p>' : ''}
                 <div style="background:#faf8f5; border:1px solid #e8e0d4; border-radius:8px; padding:16px; margin-bottom:20px; text-align:center;">
                     <div style="font-size:0.8rem; color:#888; margin-bottom:4px;">選択プラン</div>
                     <div style="font-size:1.1rem; font-weight:700; color:#24292E;">${planNames[plan] || plan}</div>
@@ -3631,33 +3705,29 @@ class DashboardApp {
         const skipGateForPaymentFlow = urlParams.get('start_payment') === '1';
         if (skipGateForPaymentFlow) return;
 
-        // トライアル切れ + 決済未登録なら即プラン選択へ遷移
         if (this.requiresPaymentRegistration()) {
-            this.redirectToPlanSelection('trial_expired');
+            this.redirectToPlanSelection('payment_required');
         }
     }
 
     requiresPaymentRegistration() {
-        const sub = this.subscription;
-        if (!sub) return false;
-        const isTrialExpired = Boolean(sub.trialStartedAt) && !sub.isInTrial;
-        const hasNoPayment = !this.paymentStatus || !this.paymentStatus.hasPaymentMethod;
-        return isTrialExpired && hasNoPayment;
+        return false;
     }
 
     isSignLimitReached() {
         const sub = this.subscription;
         if (!sub) return false;
-        if (sub.plan === 'pro' && !sub.isInTrial) return false; // Pro is unlimited for paid
+        // Proプランなら無制限
+        if (sub.plan === 'pro') return false;
+        
         const count = Number(sub.signUsageCount || 0);
-        const limit = Number(sub.signUsageLimit || 3);
+        const limit = Number(sub.signUsageLimit || 1); // デフォルト1回
         return count >= limit;
     }
 
-    redirectToPlanSelection(reason = 'trial_expired') {
+    redirectToPlanSelection(reason = 'upgrade') {
         const billing = this.subscription?.billingCycle === 'annual' ? 'annual' : 'monthly';
-        localStorage.setItem('diffsense_trial_expired', '1');
-        window.location.replace(`${window.location.origin}/select-plan-preview.html?reason=${reason}&billing=${billing}`);
+        window.location.replace(`${window.location.origin}/select-plan-preview.html?billing=${billing}`);
     }
 
     ensurePaymentAccess(featureLabel = '機能') {
@@ -3665,7 +3735,7 @@ class DashboardApp {
             return true;
         }
         Notify.warning(`${featureLabel}を利用するには、お支払い方法の登録が必要です。プラン選択画面へ移動します。`);
-        this.redirectToPlanSelection('trial_expired');
+        this.redirectToPlanSelection('upgrade');
         return false;
     }
 
@@ -3891,7 +3961,7 @@ class DashboardApp {
                 <ul style="font-size:0.85rem; color:#666; margin-bottom:20px; padding-left:20px;">
                     <li style="margin-bottom:6px;">サブスクリプションが停止されます</li>
                     <li style="margin-bottom:6px;">Starterプラン（無料）に戻ります</li>
-                    <li style="margin-bottom:6px;">AI解析回数が月15回に制限されます</li>
+                    <li style="margin-bottom:6px;">AI解析回数が月50回に制限されます</li>
                 </ul>
                 <div style="display:flex; gap:12px; justify-content:flex-end;">
                     <button onclick="document.getElementById('cancel-modal-overlay').remove()" class="btn-dashboard" style="padding:8px 20px;">キャンセルしない</button>
@@ -3948,9 +4018,10 @@ class DashboardApp {
         if (!sub) return;
 
         const planNames = {
+            'free': 'Free',
             'starter': 'Starter',
             'business': 'Business',
-            'pro': 'Pro / Legal'
+            'pro': 'Pro'
         };
 
         const usagePercent = Math.min(100, (sub.usageCount / sub.usageLimit) * 100);
@@ -3959,7 +4030,9 @@ class DashboardApp {
 
         let upgradeAdvice = '';
         if (sub.usageCount >= sub.usageLimit) {
-            if (sub.plan === 'starter') {
+            if (sub.plan === 'free') {
+                upgradeAdvice = '<div class="upgrade-advice">月間上限に達しました。Starter以上のプランにすると解析回数が増えます。</div>';
+            } else if (sub.plan === 'starter') {
                 upgradeAdvice = '<div class="upgrade-advice">月間上限に達しました。翌月まで待つか、Business以上のプランにすると回数が増えます。</div>';
             } else if (sub.plan === 'business') {
                 upgradeAdvice = '<div class="upgrade-advice">月間上限に達しました。翌月まで待つか、Proプランにアップグレードすると回数が増えます。</div>';
@@ -3970,29 +4043,18 @@ class DashboardApp {
 
         let statusHtml = `
         <div class="plan-status-card">
-            <div class="plan-badge plan-badge-${sub.plan}">${planName}${sub.isInTrial ? '（トライアル）' : `（${billingCycleLabel}）`}</div>
+            <div class="plan-badge plan-badge-${sub.plan}">${planName}（${billingCycleLabel}）</div>
             <div class="plan-info-text">
-                ${sub.isInTrial ? `残り期間: <strong>${sub.daysRemaining}日間</strong><br>` : ''}
-                AI解析: <strong>${sub.usageCount}</strong> / ${sub.usageLimit}回
-                <br>電子署名: <strong>${sub.signUsageCount || 0}</strong> / ${sub.plan === 'pro' && !sub.isInTrial ? '無制限' : `${sub.signUsageLimit || 0}回`}
-                ${(!sub.isInTrial && sub.renewalDate) ? `<br><span style="font-size:0.75rem; opacity:0.8;">次回更新: <strong>${new Date(sub.renewalDate).toLocaleDateString('ja-JP')}</strong></span>` : ''}
+                AI解析: <strong style="${(({'free':3,'starter':50,'business':120,'pro':400}[sub.plan] || sub.usageLimit) - sub.usageCount) <= 1 ? 'color:#f59e0b;' : ''}">${sub.usageCount}</strong> / ${{'free':3,'starter':50,'business':120,'pro':400}[sub.plan] || sub.usageLimit}回
+                <br>電子署名: <strong>${sub.signUsageCount || 0}</strong> / ${sub.plan === 'pro' ? '無制限' : `${{'free':10,'starter':25,'business':100}[sub.plan] || sub.signUsageLimit || 0}回`}
+                ${sub.renewalDate ? `<br><span style="font-size:0.75rem; opacity:0.8;">次回更新: <strong>${new Date(sub.renewalDate).toLocaleDateString('ja-JP')}</strong></span>` : ''}
             </div>
             ${upgradeAdvice}
             ${this.isSignLimitReached() ? `
                 <div style="margin-top:10px; padding:8px 10px; background:rgba(234,67,53,0.08); border:1px solid rgba(234,67,53,0.2); border-radius:6px; font-size:0.72rem; color:#c2410c;">
-                    ${sub.isInTrial ? '署名依頼のトライアル上限に達しました。継続利用にはプラン登録が必要です。' : '今月の電子署名上限に達しました。翌月までお待ちいただくか、上位プランへのアップグレードをご検討ください。'}
+                    今月の電子署名上限に達しました。翌月までお待ちいただくか、上位プランへのアップグレードをご検討ください。
                 </div>
             ` : ''}
-            ${sub.isInTrial ? `
-                <div style="margin-top: 12px; font-size: 0.75rem; color: #a17e1a; border-top: 1px solid rgba(255, 255, 255, 0.05); padding-top: 8px;">
-                    <i class="fa-solid fa-circle-info"></i> トライアル終了後、継続には決済登録が必要です。
-                </div>
-                ` : ''}
-            ${(sub.isInTrial && this.paymentStatus && !this.paymentStatus.hasPaymentMethod) ? `
-                <div onclick="window.app.navigate('plan')" style="margin-top:10px; padding:8px 10px; background:rgba(251,191,36,0.15); border:1px solid rgba(251,191,36,0.3); border-radius:6px; cursor:pointer; font-size:0.72rem; color:#fbbf24; text-align:center;">
-                    <i class="fa-solid fa-credit-card" style="margin-right:4px;"></i>お支払い方法を登録
-                </div>
-                ` : ''}
         </div>
         `;
 
@@ -4003,12 +4065,10 @@ class DashboardApp {
     updateUIByPlan() {
         if (!this.subscription) return;
         const plan = this.subscription.plan;
-        const isInTrial = this.subscription.isInTrial;
-
         // --- Navigation Logic ---
-        // Team Management: Business+, trial allowed
+        // Team Management: Business+
         const navTeam = document.querySelector('.nav-item[onclick*="navigate(\'team\')"]');
-        if (plan === 'starter' && !isInTrial) {
+        if (plan === 'free' || plan === 'starter') {
             if (navTeam) navTeam.classList.add('feature-locked');
         } else {
             if (navTeam) {
@@ -4124,8 +4184,8 @@ class DashboardApp {
             return;
         }
 
-        // RBAC: Protect team view - Allow if Business+ OR Trial
-        if (viewId === 'team' && this.subscription?.plan === 'starter' && !this.subscription?.isInTrial) {
+        // RBAC: Protect team view - Business+のみ
+        if (viewId === 'team' && this.subscription?.plan === 'starter') {
             const upgradeModal = document.getElementById('upgrade-modal');
             if (upgradeModal) {
                 upgradeModal.classList.add('active');
@@ -4725,6 +4785,17 @@ class DashboardApp {
             Notify.warning('閲覧のみの権限ではAI解析を実行できません');
             return;
         }
+        const count = Number(this.subscription?.usageCount || 0);
+        const limit = Number(this.subscription?.usageLimit || 0);
+        if (count >= limit) {
+            const plan = this.subscription?.plan || 'free';
+            const confirmed = await Notify.confirm(
+                `今月のAI差分チェック回数（${count}/${limit}回）を使い切りました。<br><br>Starterプラン（¥1,480/月）にアップグレードすると月50回まで解析できます。`,
+                { title: '解析回数の上限に達しました', type: 'warning', okText: '今すぐアップグレード', cancelText: '閉じる', okStyle: 'primary' }
+            );
+            if (confirmed) window.location.href = '/select-plan.html';
+            return;
+        }
         if (!this.ensurePaymentAccess('差分解析')) {
             return;
         }
@@ -4800,7 +4871,17 @@ class DashboardApp {
 
         } catch (error) {
             console.error('AI解析エラー:', error);
-            Notify.error(`AI解析中にエラーが発生しました: ${error.message}`);
+            if (error.code === 'ANALYSIS_LIMIT_EXCEEDED') {
+                const cu = error.currentUsage ?? count;
+                const lim = error.limit ?? limit;
+                const confirmed = await Notify.confirm(
+                    `今月のAI差分チェック回数（${cu}/${lim}回）を使い切りました。<br><br>Starterプラン（¥1,480/月）にアップグレードすると月50回まで解析できます。`,
+                    { title: '解析回数の上限に達しました', type: 'warning', okText: '今すぐアップグレード', cancelText: '閉じる', okStyle: 'primary' }
+                );
+                if (confirmed) window.location.href = '/select-plan.html';
+            } else {
+                Notify.error(`AI解析中にエラーが発生しました: ${error.message}`);
+            }
         }
     }
 
@@ -5261,6 +5342,29 @@ class DashboardApp {
         document.getElementById('invite-member-modal').classList.add('active');
     }
 
+    showProFeatureModal(message) {
+        const existing = document.getElementById('pro-upgrade-modal');
+        if (existing) existing.remove();
+        const modal = document.createElement('div');
+        modal.id = 'pro-upgrade-modal';
+        modal.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:11000; animation: fadeIn 0.3s;';
+        modal.innerHTML = `
+            <div style="background:white; width:90%; max-width:420px; border-radius:12px; padding:32px; text-align:center; box-shadow:0 10px 40px rgba(0,0,0,0.2); animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);">
+                <div style="width:60px; height:60px; background:#f3f0ea; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 20px; color:#c5a059; font-size:28px;">
+                    <i class="fa-solid fa-satellite-dish"></i>
+                </div>
+                <div style="display:inline-block; background:#f3f0ea; color:#c5a059; border:1px solid #e8d9b8; border-radius:10px; padding:3px 12px; font-size:11px; font-weight:700; margin-bottom:12px;">Proプラン限定</div>
+                <h3 style="margin:0 0 12px; color:#24292E; font-size:18px; font-weight:700;">定期URL監視・Slack／メール通知</h3>
+                <p style="margin:0 0 24px; color:#586069; font-size:13px; line-height:1.7;">${message}</p>
+                <div style="display:flex; gap:10px;">
+                    <button style="flex:1; padding:10px; border:1px solid #ddd; border-radius:8px; background:#fff; color:#666; font-size:13px; cursor:pointer;" onclick="document.getElementById('pro-upgrade-modal').remove()">閉じる</button>
+                    <button style="flex:1; padding:10px; border:none; border-radius:8px; background:#c5a059; color:#fff; font-size:13px; font-weight:700; cursor:pointer;" onclick="document.getElementById('pro-upgrade-modal').remove(); window.app.registration?.close(); window.app.navigate('plan')">Proプランを見る</button>
+                </div>
+            </div>`;
+        document.body.appendChild(modal);
+        modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+    }
+
     showAlertModal(title, message, type = 'error') {
         const existing = document.getElementById('alert-modal');
         if (existing) existing.remove();
@@ -5404,6 +5508,10 @@ class DashboardApp {
             Notify.warning('閲覧のみの権限では監視設定を変更できません');
             return;
         }
+        if (enabled && this.subscription?.plan !== 'pro') {
+            this.showAlertModal('プラン制限', '定期URL監視（自動チェック）はProプラン限定の機能です。', 'warning');
+            return;
+        }
         dbService.toggleMonitoring(id, enabled);
         this.navigate('diff', id);
     }
@@ -5414,7 +5522,13 @@ class DashboardApp {
     async manualCrawl(id) {
         const contract = dbService.getContractById(id);
         if (!contract || !contract.source_url) return;
-
+        const count = Number(this.subscription?.usageCount || 0);
+        const limit = Number(this.subscription?.usageLimit || 0);
+        if (count >= limit) {
+            Notify.alert(`AI解析の使用上限（${limit}回）に達しました。URLの更新チェックを行うにはプランのアップグレードが必要です。`, { title: '使用上限', type: 'warning' });
+            this.navigate('plan');
+            return;
+        }
         try {
             Notify.info('URLをチェックしています...');
 
@@ -5724,6 +5838,25 @@ class DashboardApp {
         };
 
         try {
+            // Check Usage Limit (Only for manual, non-cached analysis)
+            if (!canReuseStoredAnalysis && !silent) {
+                const count = Number(this.subscription?.usageCount || 0);
+                const limit = Number(this.subscription?.usageLimit || 0);
+                if (count >= limit) {
+                    Notify.confirm(
+                        `AI解析の使用上限（${limit}回）に達しました。継続して解析を行うにはプランのアップグレードが必要です。`,
+                        {
+                            title: '使用上限に達しました',
+                            okText: 'プランを表示',
+                            cancelText: '閉じる',
+                            type: 'warning'
+                        }
+                    ).then(ok => {
+                        if (ok) this.navigate('plan');
+                    });
+                    return;
+                }
+            }
             if (!silent) {
                 Notify.info('AI差分解析を実行中...');
             }
@@ -6006,7 +6139,7 @@ class DashboardApp {
     }
 
     async exportPDF(contractId) {
-        if (this.subscription?.plan !== 'pro') return;
+        if (!['pro', 'business'].includes(this.subscription?.plan)) return;
         const contract = dbService.getContractById(contractId);
         if (!contract) return;
 

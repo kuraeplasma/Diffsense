@@ -40,43 +40,22 @@ function persistPlanIntentFromUrl(options = {}) {
     const markSignupFlow = options.markSignupFlow === true;
     const params = new URLSearchParams(window.location.search);
     const billing = normalizeBillingCycle(params.get('billing'));
+    const planFromUrl = params.get('plan');
 
-    // 無料登録導線はすべてProトライアルへ統一
-    localStorage.setItem('diffsense_selected_plan', 'pro');
+    // LP経由でプランが指定されている場合はそれを優先
+    if (planFromUrl && ['free', 'starter', 'business', 'pro'].includes(planFromUrl.toLowerCase())) {
+        localStorage.setItem('diffsense_selected_plan', planFromUrl.toLowerCase());
+    } else {
+        // 指定がない新規登録はデフォルトでFreeプランへ
+        const currentPlan = localStorage.getItem('diffsense_selected_plan');
+        if (!currentPlan || markSignupFlow) {
+            localStorage.setItem('diffsense_selected_plan', 'free');
+        }
+    }
+    
     localStorage.setItem('diffsense_selected_billing_cycle', billing);
     if (markSignupFlow) {
         localStorage.setItem('diffsense_signup_flow', '1');
-        localStorage.removeItem('diffsense_trial_expired_flow');
-        localStorage.removeItem('diffsense_trial_expired');
-    }
-}
-
-async function isTrialExpiredWithoutPayment(user) {
-    try {
-        if (!user) return false;
-        const token = await user.getIdToken();
-        if (!token) return false;
-
-        const apiBase = getApiBase();
-        const [subRes, paymentRes] = await Promise.all([
-            fetch(`${apiBase}/user/subscription`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            }),
-            fetch(`${apiBase}/payment/status`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            })
-        ]);
-
-        if (!subRes.ok || !paymentRes.ok) return false;
-        const subJson = await subRes.json();
-        const paymentJson = await paymentRes.json();
-
-        const sub = subJson?.data || {};
-        const payment = paymentJson?.data || {};
-        return !!sub.trialStartedAt && !sub.isInTrial && !payment.hasPaymentMethod;
-    } catch (error) {
-        console.warn('Trial expired check failed on login:', error);
-        return false;
     }
 }
 
@@ -91,14 +70,8 @@ export async function handleSignUp(email, password) {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
         console.log("Signed up user:", user);
-        // プランがLP経由で既に選択済みならサンクスページ経由でダッシュボードへ
-        const selectedPlan = localStorage.getItem('diffsense_selected_plan');
-        const selectedBillingCycle = normalizeBillingCycle(localStorage.getItem('diffsense_selected_billing_cycle'));
-        if (selectedPlan) {
-            window.location.replace(`thanks-signup.html?next=dashboard&billing=${selectedBillingCycle}`);
-        } else {
-            window.location.replace("thanks-signup.html");
-        }
+        
+        redirectToThanksSignup();
     } catch (error) {
         console.error("Error signing up:", error);
         let msg = "エラーが発生しました。\n詳細: " + error.code;
@@ -124,15 +97,6 @@ export async function handleLogin(email, password) {
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
         console.log("Logged in user:", user);
-
-        // 無料期間が切れており決済未登録なら、ログイン直後にプラン選択画面へ
-        const mustShowPlanSelect = await isTrialExpiredWithoutPayment(user);
-        if (mustShowPlanSelect) {
-            localStorage.setItem('diffsense_trial_expired', '1');
-            const selectedBillingCycle = normalizeBillingCycle(localStorage.getItem('diffsense_selected_billing_cycle'));
-            window.location.replace(`${window.location.origin}/select-plan-preview.html?reason=trial_expired&billing=${selectedBillingCycle}`);
-            return;
-        }
 
         const params = new URLSearchParams(window.location.search);
         const next = params.get('next');
@@ -185,14 +149,6 @@ export async function handlePasswordReset(email) {
 }
 
 async function finalizePostLogin(user) {
-    const mustShowPlanSelect = await isTrialExpiredWithoutPayment(user);
-    if (mustShowPlanSelect) {
-        localStorage.setItem('diffsense_trial_expired', '1');
-        const selectedBillingCycle = normalizeBillingCycle(localStorage.getItem('diffsense_selected_billing_cycle'));
-        window.location.replace(`${window.location.origin}/select-plan-preview.html?reason=trial_expired&billing=${selectedBillingCycle}`);
-        return true;
-    }
-
     const params = new URLSearchParams(window.location.search);
     const next = params.get('next');
     window.location.replace(resolveSafeNextUrl(next, 'dashboard.html'));
@@ -201,12 +157,13 @@ async function finalizePostLogin(user) {
 
 function redirectToThanksSignup() {
     persistPlanIntentFromUrl({ markSignupFlow: true });
-    const selectedPlan = localStorage.getItem('diffsense_selected_plan');
+    const selectedPlan = (localStorage.getItem('diffsense_selected_plan') || 'free').toLowerCase();
     const selectedBillingCycle = normalizeBillingCycle(localStorage.getItem('diffsense_selected_billing_cycle'));
-    if (selectedPlan) {
+    
+    if (selectedPlan === 'free') {
         window.location.replace(`thanks-signup.html?next=dashboard&billing=${selectedBillingCycle}`);
     } else {
-        window.location.replace('thanks-signup.html');
+        window.location.replace(`thanks-plan.html?plan=${selectedPlan}&billing=${selectedBillingCycle}`);
     }
 }
 

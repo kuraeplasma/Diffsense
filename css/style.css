@@ -1006,7 +1006,8 @@ ul {
 }
 
 .pricing-section .container {
-    max-width: 1380px;
+    max-width: 1600px;
+    padding: 0 1rem;
 }
 
 /* Remove decorative blur/wave overlays in pricing area */
@@ -1019,10 +1020,10 @@ ul {
 /* Pricing Grid */
 .pricing-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 1.5rem;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1rem;
     align-items: stretch;
-    max-width: 1320px;
+    max-width: 1560px;
     margin: 0 auto;
     padding-top: 28px;
 }
@@ -1613,8 +1614,8 @@ ul {
 }
 
 .site-footer {
-    background: #0d1b2e;
-    color: #ddd;
+    background: #1a1512;
+    color: #c5a059;
     padding: 56px 0 0;
     border-top: 3px solid #EDD060;
 }
@@ -1650,7 +1651,7 @@ ul {
 }
 
 .footer-tagline {
-    color: rgba(255,255,255,0.6);
+    color: rgba(197,160,89,0.8);
     font-size: 0.9rem;
     line-height: 1.8;
     margin: 0;
@@ -1674,7 +1675,7 @@ ul {
 .footer-column a {
     display: block;
     margin-bottom: 10px;
-    color: rgba(255,255,255,0.65);
+    color: rgba(197,160,89,0.75);
     text-decoration: none;
     font-size: 14px;
     line-height: 1.6;
@@ -1682,7 +1683,7 @@ ul {
 }
 
 .footer-column a:hover {
-    color: #fff;
+    color: #EDD060;
 }
 
 .footer-x {
@@ -1690,7 +1691,7 @@ ul {
     align-items: center;
     gap: 6px;
     margin-top: 4px;
-    color: rgba(255,255,255,0.5);
+    color: rgba(197,160,89,0.65);
     font-size: 14px;
     text-decoration: none;
     transition: color 0.2s;
@@ -1706,12 +1707,12 @@ ul {
 }
 
 .footer-copy {
-    border-top: 1px solid rgba(255,255,255,0.08);
+    border-top: 1px solid rgba(197,160,89,0.15);
     padding: 18px 20px;
     display: flex;
     justify-content: center;
     gap: 16px;
-    color: rgba(255,255,255,0.3);
+    color: rgba(197,160,89,0.5);
     font-size: 12px;
 }
 
@@ -4385,11 +4386,11 @@ ul {
     }
 }
 
-/* Fix: pricing grid single-column for 769-1100px (tablets where 3-col is too narrow) */
+/* Fix: pricing grid 2-column for 769-1100px */
 @media (max-width: 1100px) and (min-width: 769px) {
     .pricing-grid {
-        grid-template-columns: 1fr !important;
-        max-width: 520px !important;
+        grid-template-columns: repeat(2, 1fr) !important;
+        max-width: 900px !important;
         margin-left: auto !important;
         margin-right: auto !important;
     }

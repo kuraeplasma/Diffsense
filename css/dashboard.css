@@ -457,7 +457,7 @@ ul {
 
 .plan-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 20px;
     margin-bottom: 30px;
 }
@@ -2009,7 +2009,7 @@ ul {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    background: #24292e;
+    background: linear-gradient(135deg, #0a1628, #1a2448);
     color: #fff;
     border: none;
     padding: 8px 16px;
@@ -2018,13 +2018,13 @@ ul {
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 5px rgba(10, 22, 40, 0.3);
 }
 
 .btn-upload-version:hover {
-    background: #444d56;
+    background: linear-gradient(135deg, #1a2448, #243060);
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 4px 12px rgba(10, 22, 40, 0.4);
 }
 
 /* Custom Loader - Kept for current loading UI */

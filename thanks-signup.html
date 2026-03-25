@@ -45,9 +45,9 @@
 
         .thanks-container {
             text-align: center;
-            max-width: 560px;
-            width: 90%;
-            padding: 60px 40px;
+            max-width: 620px;
+            width: 92%;
+            padding: 60px 48px;
             background: #fff;
             border-radius: 16px;
             box-shadow: 0 12px 48px rgba(0, 0, 0, 0.08);
@@ -57,7 +57,7 @@
             width: 80px;
             height: 80px;
             border-radius: 50%;
-            background: linear-gradient(135deg, #c5a059, #d4b46a);
+            background: linear-gradient(135deg, #243060 0%, #141c3a 100%);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -101,8 +101,10 @@
             border: 1px solid #e8e0d4;
             border-radius: 10px;
             padding: 20px 24px;
-            margin-bottom: 32px;
+            margin: 0 auto 32px;
             text-align: left;
+            max-width: 340px;
+            width: 100%;
         }
 
         .thanks-info-row {
@@ -122,29 +124,54 @@
         }
 
         .thanks-info-value {
-            font-weight: 600;
+            font-weight: 500;
             color: #24292E;
         }
 
         .thanks-btn {
-            display: inline-flex;
+            display: flex;
+            flex-direction: row;
             align-items: center;
+            justify-content: center;
             gap: 8px;
             padding: 14px 36px;
-            background: linear-gradient(135deg, #c5a059, #b08d45);
+            background: linear-gradient(135deg, #243060 0%, #141c3a 100%);
             color: #fff;
             border: none;
             border-radius: 8px;
             font-size: 0.95rem;
-            font-weight: 600;
+            font-weight: 700;
             cursor: pointer;
             text-decoration: none;
             transition: all 0.2s;
+            width: 100%;
+            max-width: 340px;
+            margin: 0 auto;
         }
 
         .thanks-btn:hover {
             transform: translateY(-1px);
-            box-shadow: 0 4px 16px rgba(197, 160, 89, 0.3);
+            background: linear-gradient(135deg, #2e3c7a 0%, #1a2451 100%);
+            box-shadow: 0 4px 16px rgba(26, 35, 64, 0.4);
+        }
+
+        .thanks-btn i {
+            align-self: center;
+            flex-shrink: 0;
+        }
+
+        .plan-badge {
+            display: inline-block;
+            padding: 6px 20px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            margin-bottom: 24px;
+        }
+
+        .plan-badge.free {
+            background: #f0f0f0;
+            color: #555;
         }
 
         .thanks-note {
@@ -195,34 +222,34 @@
         <div class="thanks-icon">
             <i class="fa-solid fa-circle-check"></i>
         </div>
-        <h1 class="thanks-title">アカウント登録が完了しました</h1>
-        <p class="thanks-subtitle">
-            DIFFsenseへようこそ。<br>
-            7日間の無料トライアルが開始されました。<br>
-            AI契約書解析をぜひお試しください。
-        </p>
+        <span class="plan-badge free">Free</span>
+        <h1 class="thanks-title">Freeプランの登録が完了しました</h1>
 
         <div class="thanks-info">
             <div class="thanks-info-row">
-                <span class="thanks-info-label">ステータス</span>
-                <span class="thanks-info-value" style="color:#22c55e;">無料トライアル中</span>
+                <span class="thanks-info-label">選択プラン</span>
+                <span class="thanks-info-value">Free</span>
             </div>
             <div class="thanks-info-row">
-                <span class="thanks-info-label">トライアル期間</span>
-                <span class="thanks-info-value">7日間</span>
+                <span class="thanks-info-label">Word / PDF / URL 登録</span>
+                <span class="thanks-info-value">無制限</span>
             </div>
             <div class="thanks-info-row">
                 <span class="thanks-info-label">AI解析回数</span>
-                <span class="thanks-info-value">5回まで</span>
+                <span class="thanks-info-value">月3回</span>
+            </div>
+            <div class="thanks-info-row">
+                <span class="thanks-info-label">電子署名</span>
+                <span class="thanks-info-value">月10件</span>
             </div>
         </div>
 
-        <a id="next-btn" href="select-plan.html" class="thanks-btn">
-            <i class="fa-solid fa-arrow-right"></i>
-            プランを選択する
+        <a id="next-btn" href="dashboard.html" class="thanks-btn">
+            <i class="fa-solid fa-gauge-high"></i>
+            ダッシュボードへ
         </a>
 
-        <p class="thanks-note">トライアル期間中は料金は発生しません</p>
+        <p class="thanks-note">※解析回数は毎月1日にリセットされます</p>
     </div>
 
     <script>

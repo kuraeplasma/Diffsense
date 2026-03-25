@@ -412,8 +412,8 @@
             <h2>ご利用プランを選択してください</h2>
         </div>
         <div class="plan-entry-notice">
-            無料トライアルが終了しました<br>
-            引き続き使うにはプランを選択してください。
+            有料プランにアップグレードする<br>
+            用途に合わせて最適なプランをお選びください。
         </div>
 
         <div class="billing-toggle-wrap">
@@ -439,7 +439,7 @@
                 <p class="plan-desc">個人向け・契約変更チェックの最小プラン</p>
                 <ul class="plan-features">
                     <li><i class="fa-solid fa-check"></i>PDF / URL 登録：無制限</li>
-                    <li><i class="fa-solid fa-check"></i>AI差分チェック：月15回</li>
+                    <li><i class="fa-solid fa-check"></i>AI差分チェック：月50回</li>
                     <li><i class="fa-solid fa-check"></i>差分ハイライト・バージョン履歴</li>
                     <li><i class="fa-solid fa-check"></i>リスク判定（AI理由なし）</li>
                     <li><i class="fa-solid fa-check"></i>チーム：1人</li>
@@ -474,7 +474,7 @@
             <div class="plan-card" data-plan="pro" data-monthly-price="9,800" data-annual-price="98,000"
                 data-annual-effective="8,166" data-annual-regular="117,600" onclick="selectPlan('pro')">
                 <div class="plan-badge">士業・専門職向け</div>
-                <h3>Pro / Legal</h3>
+                <h3>Pro</h3>
                 <div class="plan-price">¥<span data-plan-price-value>9,800</span><small data-plan-price-sub> / 月（税込）</small></div>
                 <div class="plan-price-annual-meta" data-plan-annual-meta>
                     <p class="plan-effective">実質 ¥<span data-plan-effective>8,166</span>/月</p>
@@ -521,7 +521,7 @@
         let selectedPlan = null;
         let selectedBillingCycle = params.get('billing') === 'annual' ? 'annual' : 'monthly';
         let canContinue = false;
-        const planNames = { starter: 'Starter', business: 'Business', pro: 'Pro / Legal' };
+        const planNames = { starter: 'Starter', business: 'Business', pro: 'Pro' };
         const billingLabels = { monthly: '月額', annual: '年額' };
         const annualCtaLabels = {
             starter: '年額で始める',
@@ -627,14 +627,6 @@
                 const paymentJson = await paymentRes.json();
                 const sub = subJson?.data || {};
                 const payment = paymentJson?.data || {};
-                const isTrialExpired = !!sub.trialStartedAt && !sub.isInTrial;
-                const hasNoPayment = !payment.hasPaymentMethod;
-
-                if (!(isTrialExpired && hasNoPayment)) {
-                    window.location.replace(`${window.location.origin}/dashboard.html`);
-                    return;
-                }
-
                 canContinue = true;
             } catch (error) {
                 console.warn('Failed to validate trial-expired user on preview page:', error);
@@ -667,8 +659,6 @@
                     throw new Error('ログイン情報を確認できませんでした。再度ログインしてください。');
                 }
 
-                localStorage.setItem('diffsense_trial_expired_flow', '1');
-
                 const response = await fetch(`${API_BASE}/api/createCheckoutSession`, {
                     method: 'POST',
                     headers: {
@@ -678,7 +668,7 @@
                     body: JSON.stringify({
                         plan: selectedPlan,
                         billingCycle: selectedBillingCycle,
-                        cancelUrl: `${window.location.origin}/select-plan-preview.html?reason=trial_expired&billing=${selectedBillingCycle}`
+                        cancelUrl: `${window.location.origin}/select-plan-preview.html`
                     })
                 });
                 const result = await response.json();

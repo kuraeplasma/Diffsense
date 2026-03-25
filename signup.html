@@ -17,10 +17,10 @@
     </script>
 
     <script>
-        // 無料登録導線は常にPro開始に固定
+        // 無料登録導線はFree開始に変更
         const params = new URLSearchParams(window.location.search);
         const billing = params.get('billing') === 'annual' ? 'annual' : 'monthly';
-        localStorage.setItem('diffsense_selected_plan', 'pro');
+        localStorage.setItem('diffsense_selected_plan', 'free');
         localStorage.setItem('diffsense_selected_billing_cycle', billing);
         localStorage.setItem('diffsense_signup_flow', '1');
         localStorage.removeItem('diffsense_trial_expired_flow');

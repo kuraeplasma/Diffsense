@@ -324,18 +324,36 @@
     <div class="plan-container">
         <h1 class="plan-logo">
             <a href="index.html">
+
+<body>
+    <div class="plan-container">
+        <h1 class="plan-logo">
+            <a href="index.html">
                 <i class="fa-solid fa-scale-balanced"></i>
                 <span>DIFFsense</span>
             </a>
         </h1>
 
-        <div class="plan-heading">
-            <h2>ご利用プランを選択してください</h2>
-        </div>
-        <p class="plan-subtitle">トライアル期間中はすべての機能をお試しいただけます</p>
-        <span class="plan-trial-badge">7日間無料（AI差分チェック5回まで）</span>
+        <p class="plan-subtitle">用途に合わせて最適なプランをお選びいただけます</p>
+        <span class="plan-trial-badge">ずっと無料のFreeプランもご用意しています</span>
 
         <div class="plan-grid">
+            <!-- Free -->
+            <div class="plan-card" data-plan="free" onclick="selectPlan('free')">
+                <div class="plan-badge">無料</div>
+                <h3>Free</h3>
+                <div class="plan-price">¥0<small> / 月</small></div>
+                <p class="plan-desc">まずは気軽に試したい方へ</p>
+                <ul class="plan-features">
+                    <li><i class="fa-solid fa-check"></i>Word / PDF / URL 登録：無制限</li>
+                    <li><i class="fa-solid fa-check"></i>AI差分チェック：月3回まで</li>
+                    <li><i class="fa-solid fa-check"></i>電子署名：月10回まで</li>
+                    <li><i class="fa-solid fa-check"></i>AI要約・リスク判定</li>
+                    <li><i class="fa-solid fa-check"></i>差分ハイライト・バージョン履歴</li>
+                </ul>
+                <div class="plan-select-indicator">選択する</div>
+            </div>
+
             <!-- Starter -->
             <div class="plan-card" data-plan="starter" onclick="selectPlan('starter')">
                 <div class="plan-badge">個人・検証用</div>
@@ -343,11 +361,11 @@
                 <div class="plan-price">¥1,480<small> / 月（税抜）</small></div>
                 <p class="plan-desc">個人向け・契約変更チェックの最小プラン</p>
                 <ul class="plan-features">
-                    <li><i class="fa-solid fa-check"></i>PDF / URL 登録：無制限</li>
-                    <li><i class="fa-solid fa-check"></i>AI差分チェック：月15回</li>
+                    <li><i class="fa-solid fa-check"></i>Word / PDF / URL 登録：無制限</li>
+                    <li><i class="fa-solid fa-check"></i>AI差分チェック：月50回まで</li>
+                    <li><i class="fa-solid fa-check"></i>電子署名：月25回まで</li>
+                    <li><i class="fa-solid fa-check"></i>AI要約・リスク判定</li>
                     <li><i class="fa-solid fa-check"></i>差分ハイライト・バージョン履歴</li>
-                    <li><i class="fa-solid fa-check"></i>リスク判定（AI理由なし）</li>
-                    <li><i class="fa-solid fa-check"></i>チーム：1人</li>
                 </ul>
                 <div class="plan-select-indicator">選択する</div>
             </div>
@@ -359,11 +377,12 @@
                 <div class="plan-price">¥4,980<small> / 月（税抜）</small></div>
                 <p class="plan-desc">社内実務での利用に最適</p>
                 <ul class="plan-features">
-                    <li><i class="fa-solid fa-check"></i>PDF / URL 登録：無制限</li>
-                    <li><i class="fa-solid fa-check"></i>AI差分チェック：月120回</li>
+                    <li><i class="fa-solid fa-check"></i>Word / PDF / URL 登録：無制限</li>
+                    <li><i class="fa-solid fa-check"></i>AI差分チェック：月120回まで</li>
+                    <li><i class="fa-solid fa-check"></i>電子署名：月100回まで</li>
+                    <li><i class="fa-solid fa-check"></i>AI要約・リスク判定</li>
+                    <li><i class="fa-solid fa-check"></i>法的影響・懸念点の詳細解説</li>
                     <li><i class="fa-solid fa-check"></i>差分ハイライト・バージョン履歴</li>
-                    <li><i class="fa-solid fa-check"></i>リスク判定：AI詳細コメント</li>
-                    <li><i class="fa-solid fa-check"></i>チーム：3人</li>
                 </ul>
                 <div class="plan-select-indicator">選択する</div>
             </div>
@@ -371,17 +390,17 @@
             <!-- Pro -->
             <div class="plan-card" data-plan="pro" onclick="selectPlan('pro')">
                 <div class="plan-badge">士業・専門職向け</div>
-                <h3>Pro / Legal</h3>
+                <h3>Pro</h3>
                 <div class="plan-price">¥9,800<small> / 月（税抜）</small></div>
                 <p class="plan-desc">外部確認・監査・継続監視まで</p>
                 <ul class="plan-features">
-                    <li><i class="fa-solid fa-check"></i>PDF / URL 登録：無制限</li>
-                    <li><i class="fa-solid fa-check"></i>AI差分チェック：月400回</li>
+                    <li><i class="fa-solid fa-check"></i>Word / PDF / URL 登録：無制限</li>
+                    <li><i class="fa-solid fa-check"></i>AI差分チェック：月400回まで</li>
+                    <li><i class="fa-solid fa-check"></i>電子署名：無制限</li>
+                    <li><i class="fa-solid fa-check"></i>AI要約・リスク判定</li>
+                    <li><i class="fa-solid fa-check"></i>法的影響・懸念点の詳細解説</li>
                     <li><i class="fa-solid fa-check"></i>差分ハイライト・バージョン履歴</li>
-                    <li><i class="fa-solid fa-check"></i>リスク判定：AI詳細コメント</li>
-                    <li><i class="fa-solid fa-check"></i>定期URL自動監視</li>
-                    <li><i class="fa-solid fa-check"></i>PDF エクスポート</li>
-                    <li><i class="fa-solid fa-check"></i>チーム：5人</li>
+                    <li><i class="fa-solid fa-check"></i>定期URL監視・Slack／メール通知</li>
                 </ul>
                 <div class="plan-select-indicator">選択する</div>
             </div>
@@ -391,8 +410,8 @@
             プランを選択してください
         </button>
         <p class="plan-note">
-            ※7日間の無料トライアル終了後、継続利用にはお支払い方法（PayPal/クレジットカード）の登録が必要です。<br>
-            ※トライアル期間中は料金は発生しません。
+            ※いつでも解約・プラン変更が可能です。<br>
+            ※お支払い方法（PayPal/クレジットカード）の登録後、すぐに有料機能をご利用いただけます。
         </p>
         <a href="dashboard.html" onclick="if(window.history.length > 1) { window.history.back(); return false; }" class="plan-back-link">← 戻る</a>
     </div>
@@ -403,47 +422,49 @@
 
         let selectedPlan = 'pro';
 
-        // Require auth - redirect to login if not authenticated
         onAuthStateChanged(auth, (user) => {
-            if (!user) {
-                const next = `${window.location.pathname}${window.location.search}`;
-                window.location.replace(`${window.location.origin}/login.html?next=${encodeURIComponent(next)}`);
-            }
+            // no auth required for plan selection page
         });
 
         window.selectPlan = (planId) => {
-            selectedPlan = 'pro';
+            selectedPlan = planId;
 
             // Update UI
             document.querySelectorAll('.plan-card').forEach(card => {
                 card.classList.remove('selected');
             });
-            const enforcedCard = document.querySelector('[data-plan="pro"]');
-            if (enforcedCard) enforcedCard.classList.add('selected');
+            const card = document.querySelector(`[data-plan="${planId}"]`);
+            if (card) card.classList.add('selected');
 
             // Update button
             const btn = document.getElementById('confirm-btn');
-            const planNames = { starter: 'Starter', business: 'Business', pro: 'Pro / Legal' };
-            btn.textContent = `${planNames.pro} で始める`;
+            const planNames = { free: 'Free', starter: 'Starter', business: 'Business', pro: 'Pro' };
+            btn.textContent = `${planNames[planId]} で始める`;
             btn.disabled = false;
         };
 
         window.confirmPlan = () => {
-            const enforcedPlan = 'pro';
-
             const btn = document.getElementById('confirm-btn');
             btn.classList.add('btn-loading');
 
-            // Save Pro plan to localStorage
-            localStorage.setItem('diffsense_selected_plan', enforcedPlan);
+            // Save plan to localStorage
+            localStorage.setItem('diffsense_selected_plan', selectedPlan);
 
-            // Redirect to thanks page
-            sessionStorage.setItem('stripe_checkout_started', 'true');
-            window.location.replace(`${window.location.origin}/thanks-plan.html?plan=${enforcedPlan}`);
+            if (selectedPlan === 'free') {
+                // Freeプランなら決済不要なのでサンクスへ
+                window.location.replace(`${window.location.origin}/thanks-signup.html?next=dashboard`);
+            } else {
+                // 有料プランならチェックアウト開始フラグを立てて決済誘導へ（既存ロジック）
+                sessionStorage.setItem('stripe_checkout_started', 'true');
+                window.location.replace(`${window.location.origin}/thanks-plan.html?plan=${selectedPlan}`);
+            }
         };
 
         window.addEventListener('DOMContentLoaded', () => {
-            window.selectPlan('pro');
+            // URLパラメータから初期選択プランを取得
+            const params = new URLSearchParams(window.location.search);
+            const initialPlan = params.get('plan') || 'business';
+            window.selectPlan(initialPlan);
         });
     </script>
 </body>

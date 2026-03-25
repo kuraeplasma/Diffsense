@@ -249,35 +249,8 @@ export const SignUI = {
         this.refreshList();
     },
 
-    getTrialSignQuotaMeta(app = window.app) {
-        const sub = app?.subscription || null;
-        if (!sub?.isInTrial) {
-            return { isLimited: false, count: 0, limit: 0 };
-        }
-
-        const count = Number(sub?.signUsageCount || 0);
-        const limit = Number(sub?.signUsageLimit || 3);
-        return {
-            isLimited: count >= limit,
-            count,
-            limit
-        };
-    },
-
-    redirectToBillingForSignLimit(app = window.app) {
-        Notify.warning('トライアル期間中の署名は3回までです。プラン選択画面へ移動します。');
-        if (app?.redirectToPlanSelection) {
-            app.redirectToPlanSelection('trial_sign_limit');
-            return;
-        }
-        window.location.replace(`${window.location.origin}/select-plan-preview.html?reason=trial_sign_limit&billing=monthly`);
-    },
-
     ensureSignQuota(app = window.app) {
-        const quota = this.getTrialSignQuotaMeta(app);
-        if (!quota.isLimited) return true;
-        this.redirectToBillingForSignLimit(app);
-        return false;
+        return true;
     },
 
     /**
@@ -285,7 +258,6 @@ export const SignUI = {
      */
     async renderSignView(app) {
         this.selectedDocIds.clear();
-        const quota = this.getTrialSignQuotaMeta(app);
         return `
             <div class="sign-container">
                 <div class="sign-header">
@@ -294,19 +266,6 @@ export const SignUI = {
                         <p>契約済み書類や未解析の書類から、電子署名の依頼を開始・管理できます</p>
                     </div>
                 </div>
-
-                ${app?.subscription?.isInTrial ? `
-                    <div class="sign-list-card" style="margin-bottom:16px; padding:16px 20px; border:1px solid ${quota.isLimited ? '#f3c2c2' : '#ead9b0'}; background:${quota.isLimited ? '#fff6f6' : '#fffbf0'};">
-                        <div style="font-size:13px; color:#6b7280;">
-                            トライアル中の署名: <strong style="color:#111827;">${quota.count} / ${quota.limit}回</strong>
-                            ${quota.isLimited ? `
-                                <button class="btn-dashboard btn-primary-action" style="margin-left:12px; font-size:12px;" onclick="window.signUI.redirectToBillingForSignLimit()">
-                                    プラン登録へ進む
-                                </button>
-                            ` : ''}
-                        </div>
-                    </div>
-                ` : ''}
 
                 <div class="sign-tabs">
                     <button class="sign-tab ${this.currentTab === 'new-request' ? 'active' : ''}" 
@@ -769,7 +728,10 @@ export const SignUI = {
         } catch (error) {
             console.error('Batch sign request failed:', error);
             if (error?.code === 'TRIAL_SIGN_LIMIT_REACHED') {
-                this.redirectToBillingForSignLimit();
+                await Notify.confirm(
+                    error.message || '今月の電子署名の上限に達しました。上位プランへのアップグレードをご検討ください。',
+                    { title: '電子署名の上限に達しました', type: 'warning', okText: '今すぐアップグレード', cancelText: '閉じる', okStyle: 'primary' }
+                ).then(confirmed => { if (confirmed) window.location.href = 'select-plan-preview.html'; });
                 return;
             }
             Notify.error('署名依頼の一部または全ての作成に失敗しました');
@@ -941,7 +903,10 @@ export const SignUI = {
                 return;
             } catch (error) {
                 if (error?.code === 'TRIAL_SIGN_LIMIT_REACHED') {
-                    this.redirectToBillingForSignLimit();
+                    await Notify.confirm(
+                        error.message || '今月の電子署名の上限に達しました。上位プランへのアップグレードをご検討ください。',
+                        { title: '電子署名の上限に達しました', type: 'warning', okText: '今すぐアップグレード', cancelText: '閉じる', okStyle: 'primary' }
+                    ).then(confirmed => { if (confirmed) window.location.href = 'select-plan-preview.html'; });
                     return;
                 }
                 Notify.error('署名依頼の作成に失敗しました');
