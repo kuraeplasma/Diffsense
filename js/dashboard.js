@@ -1768,6 +1768,7 @@ const Views = {
                             <span class="text-muted" style="font-weight:normal; font-size:11px;">最終解析: ${contract.last_analyzed_at || '-'}</span>
                         </div>
                         <div class="pane-scroll-area">
+                            ${hasComparableVersion ? `
                             <div class="analysis-section-title" style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
                                 <span><i class="fa-solid fa-robot text-primary"></i> AIリスク要約</span>
                                 ${canTriggerPairAnalysis && shouldAutoPairAnalysis ? `
@@ -1791,8 +1792,15 @@ const Views = {
                                 <i class="fa-solid fa-circle-exclamation text-warning"></i> 検知された重要な変更点
                             </div>
                             <div style="margin-bottom:32px;">
-                                ${changesHtml || `<div style="padding:20px; text-align:center; color:#999; font-size:13px;">${hasComparableVersion ? '変更点は検知されませんでした' : '比較対象の旧バージョンがありません（差分判定には2つ以上のバージョンが必要です）'}</div>`}
+                                ${changesHtml || `<div style="padding:20px; text-align:center; color:#999; font-size:13px;">変更点は検知されませんでした</div>`}
                             </div>
+                            ` : `
+                            <div style="padding:32px 20px; text-align:center; color:#999;">
+                                <i class="fa-solid fa-code-compare" style="font-size:32px; margin-bottom:12px; display:block; opacity:0.3;"></i>
+                                <div style="font-size:14px;">差分が取り込まれていません</div>
+                                <div style="font-size:12px; margin-top:6px;">バージョン2枚目をアップロードするとAI差分解析が実行されます</div>
+                            </div>
+                            `}
                         </div>
                         
                         ${contract.source_type === 'URL' ? `
@@ -5055,6 +5063,8 @@ class DashboardApp {
                         const hasHistory = updatedContract && updatedContract.history && updatedContract.history.length > 0;
                         this.activeDetailTab = hasHistory ? 'diff' : 'original';
                         this.syncLatestDocumentCompareState(id);
+                        // APIと同期してから描画（original_contentが確実に反映されるよう）
+                        await dbService.syncContractsFromApi();
                         this.navigate('diff', id);
 
                         if (isFirstUpload) {

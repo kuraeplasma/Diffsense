@@ -260,7 +260,13 @@ export const dbService = {
         const contracts = this.getContracts();
         const index = contracts.findIndex(c => String(c.id) === String(contract.id));
         if (index >= 0) {
-            contracts[index] = { ...contracts[index], ...contract };
+            const existing = contracts[index];
+            const merged = { ...existing, ...contract };
+            // APIレスポンスがoriginal_contentを返さない場合はローカルキャッシュを保持
+            if (!merged.original_content && existing.original_content) {
+                merged.original_content = existing.original_content;
+            }
+            contracts[index] = merged;
         } else {
             contracts.unshift(contract);
         }
