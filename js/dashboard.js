@@ -5003,13 +5003,15 @@ class DashboardApp {
 
                     // 旧バージョンのテキストを取得
                     const previousVersion = contract.original_content;
+                    const isFirstUpload = !previousVersion;
 
-                    // AI解析を実行（差分検出）
+                    // AI解析を実行（前バージョンなし＝初回取り込みはAIをスキップ）
                     const result = await aiService.analyzeContract(
                         id,
                         analysisMethod,
                         base64Data,
-                        previousVersion
+                        previousVersion,
+                        isFirstUpload ? { skipAI: true } : {}
                     );
 
                     // ローディング削除
@@ -5022,7 +5024,7 @@ class DashboardApp {
                             throw new Error('解析結果に本文データが含まれていません');
                         }
                         // 解析結果をDBに保存
-                        dbService.updateContractAnalysis(id, {
+                        const analysisPayload = {
                             extractedText: extractedContent,
                             rawExtractedText: result.data.rawExtractedText,
                             extractedTextHash: result.data.extractedTextHash,
@@ -5030,32 +5032,40 @@ class DashboardApp {
                             sourceType: result.data.sourceType,
                             pdfStoragePath: result.data.pdfStoragePath,
                             pdfUrl: result.data.pdfUrl,
-                            changes: result.data.changes,
-                            riskLevel: result.data.riskLevel,
-                            riskReason: result.data.riskReason,
-                            summary: result.data.summary,
-                            isFallback: result.data.isFallback === true,
-                            aiFailed: result.data.aiFailed === true,
                             status: '未確認',
                             originalFilename: file.name
-                        });
+                        };
+                        // 初回取り込みはAI結果なし、2回目以降は差分・リスク情報も保存
+                        if (!isFirstUpload) {
+                            analysisPayload.changes = result.data.changes;
+                            analysisPayload.riskLevel = result.data.riskLevel;
+                            analysisPayload.riskReason = result.data.riskReason;
+                            analysisPayload.summary = result.data.summary;
+                            analysisPayload.isFallback = result.data.isFallback === true;
+                            analysisPayload.aiFailed = result.data.aiFailed === true;
+                        }
+                        dbService.updateContractAnalysis(id, analysisPayload);
 
-                        // PDF更新時は「取り込んだまま」の見た目を優先して原本タブ表示
-                        this.activeDetailTab = isPdf ? 'original' : 'diff';
+                        // 初回取り込みは原本全文タブ、2回目以降（差分解析あり）は差分タブ
+                        this.activeDetailTab = isFirstUpload ? 'original' : 'diff';
                         this.syncLatestDocumentCompareState(id);
                         this.navigate('diff', id);
 
-                        // 部分的な失敗（AI解析のみ失敗）のチェック
-                        const aiFailed = result.data.aiFailed || (result.data.riskReason && result.data.riskReason.includes("AI解析サーバーからの応答がありませんでした"));
-                        if (aiFailed) {
-                            if (await Notify.confirm('AI解析に失敗しました。\n\nテキストデータの取り込みは完了しましたが、AIによるリスク判定ができませんでした。\n\n※ 解析失敗時は利用回数を消費しません。\nもう一度解析を試みますか？', { title: '確認', type: 'warning' })) {
-                                await performAnalysis(retryCount + 1);
-                                return;
-                            } else {
-                                this.showToast('⚠️ 解析は不完全ですが保存しました', 'warning', 5000);
-                            }
+                        if (isFirstUpload) {
+                            this.showToast('✅ 取り込みが完了しました', 'success', 5000);
                         } else {
-                            this.showToast(isPdf ? '✅ PDFの取り込みと解析が完了しました' : '✅ 差分解析が完了しました', 'success', 5000);
+                            // 部分的な失敗（AI解析のみ失敗）のチェック
+                            const aiFailed = result.data.aiFailed || (result.data.riskReason && result.data.riskReason.includes("AI解析サーバーからの応答がありませんでした"));
+                            if (aiFailed) {
+                                if (await Notify.confirm('AI解析に失敗しました。\n\nテキストデータの取り込みは完了しましたが、AIによるリスク判定ができませんでした。\n\n※ 解析失敗時は利用回数を消費しません。\nもう一度解析を試みますか？', { title: '確認', type: 'warning' })) {
+                                    await performAnalysis(retryCount + 1);
+                                    return;
+                                } else {
+                                    this.showToast('⚠️ 解析は不完全ですが保存しました', 'warning', 5000);
+                                }
+                            } else {
+                                this.showToast(isPdf ? '✅ PDFの取り込みと解析が完了しました' : '✅ 差分解析が完了しました', 'success', 5000);
+                            }
                         }
 
                     } else {
