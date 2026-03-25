@@ -321,36 +321,36 @@ async function resolveSignRequestPdfBuffer(signRequest, contract = null) {
     return null;
 }
 
-async function createPdfBufferFromFallbackImage(fallbackDocumentImageDataUrl, signRequest) {
-    const dataUrl = String(fallbackDocumentImageDataUrl || '').trim();
-    if (!dataUrl) return null;
+async function createPdfBufferFromFallbackImage(dataUrls, signRequest) {
+    const urls = Array.isArray(dataUrls) ? dataUrls : [dataUrls].filter(Boolean);
+    if (urls.length === 0) return null;
 
-    const pngMatch = dataUrl.match(/^data:image\/png;base64,(.+)$/);
-    const jpegMatch = dataUrl.match(/^data:image\/jpeg;base64,(.+)$/);
-    const jpgMatch = dataUrl.match(/^data:image\/jpg;base64,(.+)$/);
-    const imageBase64 = pngMatch?.[1] || jpegMatch?.[1] || jpgMatch?.[1] || '';
-    if (!imageBase64) {
-        throw new Error('署名対象のプレビュー画像を読み取れませんでした');
+    try {
+        const pdfDoc = await PDFDocument.create();
+        for (const dataUrl of urls) {
+            const currentUrl = String(dataUrl || '').trim();
+            if (!currentUrl) continue;
+
+            const pngMatch = currentUrl.match(/^data:image\/png;base64,(.+)$/);
+            const jpegMatch = currentUrl.match(/^data:image\/jpeg;base64,(.+)$/);
+            const jpgMatch = currentUrl.match(/^data:image\/jpg;base64,(.+)$/);
+            const imageBase64 = pngMatch?.[1] || jpegMatch?.[1] || jpgMatch?.[1] || '';
+            
+            if (imageBase64) {
+                const imageBytes = Buffer.from(imageBase64, 'base64');
+                const image = pngMatch
+                    ? await pdfDoc.embedPng(imageBytes)
+                    : await pdfDoc.embedJpg(imageBytes);
+                const { width, height } = image.scale(1.0);
+                const page = pdfDoc.addPage([width, height]);
+                page.drawImage(image, { x: 0, y: 0, width, height });
+            }
+        }
+        return Buffer.from(await pdfDoc.save());
+    } catch (error) {
+        console.error('Fallback PDF creation error:', error);
+        return null;
     }
-
-    const imageBytes = Buffer.from(imageBase64, 'base64');
-    const pdfDoc = await PDFDocument.create();
-    const image = pngMatch
-        ? await pdfDoc.embedPng(imageBytes)
-        : await pdfDoc.embedJpg(imageBytes);
-
-    const pageWidth = image.width;
-    const pageHeight = image.height;
-    const page = pdfDoc.addPage([pageWidth, pageHeight]);
-
-    page.drawImage(image, {
-        x: 0,
-        y: 0,
-        width: pageWidth,
-        height: pageHeight
-    });
-
-    return Buffer.from(await pdfDoc.save());
 }
 
 function buildFieldBox(field, signRequest, pageWidth, pageHeight) {
@@ -532,9 +532,9 @@ async function sendRecipientActionNotice(signRequest, recipient, actionLabel) {
     }
 }
 
-async function generateSignedPdf(signRequest, req, contract = null, fallbackDocumentImageDataUrl = '') {
+async function generateSignedPdf(signRequest, req, contract = null, fallbackDocumentImageDataUrls = []) {
     const pdfBuffer = await resolveSignRequestPdfBuffer(signRequest, contract)
-        || await createPdfBufferFromFallbackImage(fallbackDocumentImageDataUrl, signRequest);
+        || await createPdfBufferFromFallbackImage(fallbackDocumentImageDataUrls, signRequest);
     if (!pdfBuffer?.length) {
         throw new Error('署名対象の原本ファイルを取得できませんでした');
     }
@@ -1188,7 +1188,9 @@ router.post('/submit', async (req, res) => {
     try {
         const token = String(req.body?.token || '').trim();
         const signatures = Array.isArray(req.body?.signatures) ? req.body.signatures : [];
-        const fallbackDocumentImageDataUrl = String(req.body?.fallbackDocumentImageDataUrl || '').trim();
+        const fallbackDocumentImageDataUrls = Array.isArray(req.body?.fallbackDocumentImageDataUrls) 
+            ? req.body.fallbackDocumentImageDataUrls 
+            : (req.body?.fallbackDocumentImageDataUrl ? [req.body.fallbackDocumentImageDataUrl] : []);
         if (!token) {
             return res.status(400).json({ success: false, error: 'トークンがありません' });
         }
@@ -1294,7 +1296,7 @@ router.post('/submit', async (req, res) => {
         };
 
         if (allSigned) {
-            const completed = await generateSignedPdf(draftForPdf, req, contract, fallbackDocumentImageDataUrl);
+            const completed = await generateSignedPdf(draftForPdf, req, contract, fallbackDocumentImageDataUrls);
             Object.assign(updates, {
                 status: 'completed',
                 completedAt: completed.completedAt,

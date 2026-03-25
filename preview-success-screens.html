@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>登録完了画面 - 全プラン確認用</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background: #f0ece6;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            font-size: 1rem;
+            color: #888;
+            margin-bottom: 20px;
+            font-weight: 400;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .label {
+            text-align: center;
+            font-size: 0.75rem;
+            color: #999;
+            margin-bottom: 6px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .card {
+            background: #fff;
+            border-radius: 14px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+            padding: 32px 24px;
+            text-align: center;
+        }
+        .thanks-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #243060 0%, #141c3a 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+        }
+        .thanks-icon i { font-size: 1.5rem; color: #fff; }
+        .thanks-title {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: #24292E;
+            margin-bottom: 10px;
+            line-height: 1.5;
+            white-space: nowrap;
+        }
+        .thanks-subtitle {
+            font-size: 0.78rem;
+            color: #586069;
+            line-height: 1.8;
+            margin-bottom: 20px;
+        }
+        .thanks-info {
+            background: #faf8f5;
+            border: 1px solid #e8e0d4;
+            border-radius: 8px;
+            padding: 14px 16px;
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            font-size: 0.78rem;
+            color: #444;
+        }
+        .info-row:not(:last-child) { border-bottom: 1px solid #f0ece6; }
+        .info-label { color: #888; }
+        .info-value { font-weight: 600; color: #24292E; }
+        .info-value.gold { color: #c5a059; }
+        .info-value.green { color: #22c55e; }
+        .info-value.blue { color: #2563eb; }
+        .thanks-btn {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 10px 24px;
+            background: linear-gradient(135deg, #243060 0%, #141c3a 100%);
+            color: #EDD060;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-decoration: none;
+            margin-bottom: 12px;
+            width: 100%;
+        }
+        .thanks-note {
+            font-size: 0.7rem;
+            color: #aaa;
+        }
+
+        .thanks-btn i {
+            align-self: center;
+            flex-shrink: 0;
+        }
+        .plan-badge {
+            display: inline-block;
+            padding: 3px 12px;
+            border-radius: 20px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            margin-bottom: 14px;
+        }
+        .badge-free { background: rgba(197,160,89,0.12); color: #c5a059; }
+        .badge-starter { background: #f0f0f0; color: #555; }
+        .badge-business { background: rgba(197,160,89,0.12); color: #a17e1a; }
+        .badge-pro { background: rgba(59,130,246,0.1); color: #2563eb; }
+    </style>
+</head>
+<body>
+    <h1>登録完了画面 — 文言確認用プレビュー（全プラン）</h1>
+    <div class="grid">
+
+        <!-- FREE -->
+        <div>
+            <p class="label">Free</p>
+            <div class="card">
+                <div class="thanks-icon"><i class="fa-solid fa-circle-check"></i></div>
+                <span class="plan-badge badge-free">Free</span>
+                <h2 class="thanks-title">Freeプランの登録が完了しました</h2>
+
+                <div class="thanks-info">
+                    <div class="info-row">
+                        <span class="info-label">選択プラン</span>
+                        <span class="info-value">Free</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">AI解析回数</span>
+                        <span class="info-value">月 1回まで</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">電子署名</span>
+                        <span class="info-value">月 10件まで</span>
+                    </div>
+                </div>
+                <a href="#" class="thanks-btn"><i class="fa-solid fa-gauge-high"></i> ダッシュボードへ</a>
+                <p class="thanks-note">※解析回数は毎月1日にリセットされます</p>
+            </div>
+        </div>
+
+        <!-- STARTER -->
+        <div>
+            <p class="label">Starter</p>
+            <div class="card">
+                <div class="thanks-icon"><i class="fa-solid fa-circle-check"></i></div>
+                <span class="plan-badge badge-starter">Starter</span>
+                <h2 class="thanks-title">Starterプランの登録が完了しました</h2>
+
+                <div class="thanks-info">
+                    <div class="info-row">
+                        <span class="info-label">選択プラン</span>
+                        <span class="info-value">Starter</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">ご利用料金</span>
+                        <span class="info-value">¥1,480 / 月</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">月間AI解析回数</span>
+                        <span class="info-value">月50回</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">月間電子署名</span>
+                        <span class="info-value">月25件</span>
+                    </div>
+                </div>
+                <a href="#" class="thanks-btn"><i class="fa-solid fa-gauge-high"></i> ダッシュボードへ</a>
+                <p class="thanks-note">プランの変更・解約はダッシュボードのプラン管理からいつでも行えます。</p>
+            </div>
+        </div>
+
+        <!-- BUSINESS -->
+        <div>
+            <p class="label">Business</p>
+            <div class="card">
+                <div class="thanks-icon"><i class="fa-solid fa-circle-check"></i></div>
+                <span class="plan-badge badge-business">Business</span>
+                <h2 class="thanks-title">Businessプランの登録が完了しました</h2>
+
+                <div class="thanks-info">
+                    <div class="info-row">
+                        <span class="info-label">選択プラン</span>
+                        <span class="info-value">Business</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">ご利用料金</span>
+                        <span class="info-value">¥4,980 / 月</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">月間AI解析回数</span>
+                        <span class="info-value">月120回</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">月間電子署名</span>
+                        <span class="info-value">月100件</span>
+                    </div>
+                </div>
+                <a href="#" class="thanks-btn"><i class="fa-solid fa-gauge-high"></i> ダッシュボードへ</a>
+                <p class="thanks-note">プランの変更・解約はダッシュボードのプラン管理からいつでも行えます。</p>
+            </div>
+        </div>
+
+        <!-- PRO -->
+        <div>
+            <p class="label">Pro</p>
+            <div class="card">
+                <div class="thanks-icon"><i class="fa-solid fa-circle-check"></i></div>
+                <span class="plan-badge badge-pro">Pro</span>
+                <h2 class="thanks-title">Proプランの登録が完了しました</h2>
+
+                <div class="thanks-info">
+                    <div class="info-row">
+                        <span class="info-label">選択プラン</span>
+                        <span class="info-value">Pro</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">ご利用料金</span>
+                        <span class="info-value">¥9,800 / 月</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">月間AI解析回数</span>
+                        <span class="info-value">月400回</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">月間電子署名</span>
+                        <span class="info-value">無制限</span>
+                    </div>
+                </div>
+                <a href="#" class="thanks-btn"><i class="fa-solid fa-gauge-high"></i> ダッシュボードへ</a>
+                <p class="thanks-note">プランの変更・解約はダッシュボードのプラン管理からいつでも行えます。</p>
+            </div>
+        </div>
+
+    </div>
+</body>
+</html>

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>プランUI比較</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; overflow: hidden; }
+body { background: #1a1a2e; font-family: sans-serif; padding: 12px 16px; display: flex; flex-direction: column; }
+h1 { color: #fff; text-align: center; font-size: 0.78rem; margin-bottom: 8px; letter-spacing: 0.12em; opacity: 0.45; flex-shrink: 0; }
+.grid { display: flex; gap: 12px; justify-content: center; flex: 1; min-height: 0; }
+.col { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 1; max-width: 390px; min-height: 0; }
+.label { color: #aaa; font-size: 0.7rem; letter-spacing: 0.06em; flex-shrink: 0; }
+.iframe-wrap {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 12px;
+  position: relative;
+}
+iframe {
+  position: absolute;
+  top: 0; left: 0;
+  width: 620px;
+  height: 850px;
+  border: none;
+  background: #fff;
+  transform-origin: top left;
+}
+</style>
+</head>
+<body>
+<h1>PLAN UI COMPARE</h1>
+<div class="grid">
+  <div class="col">
+    <span class="label">Free</span>
+    <div class="iframe-wrap" id="w0">
+      <iframe src="thanks-signup.html?next=dashboard" id="f0"></iframe>
+    </div>
+  </div>
+  <div class="col">
+    <span class="label">Starter</span>
+    <div class="iframe-wrap" id="w1">
+      <iframe src="thanks-plan.html?plan=starter&billing=monthly" id="f1"></iframe>
+    </div>
+  </div>
+  <div class="col">
+    <span class="label">Business</span>
+    <div class="iframe-wrap" id="w2">
+      <iframe src="thanks-plan.html?plan=business&billing=monthly" id="f2"></iframe>
+    </div>
+  </div>
+  <div class="col">
+    <span class="label">Pro</span>
+    <div class="iframe-wrap" id="w3">
+      <iframe src="thanks-plan.html?plan=pro&billing=monthly" id="f3"></iframe>
+    </div>
+  </div>
+</div>
+<script>
+function scaleFrames() {
+  for (let i = 0; i < 4; i++) {
+    const wrap = document.getElementById('w' + i);
+    const frame = document.getElementById('f' + i);
+    const scale = wrap.clientWidth / 620;
+    frame.style.transform = `scale(${scale})`;
+    frame.style.width = '620px';
+    frame.style.height = (wrap.clientHeight / scale) + 'px';
+  }
+}
+function fixAlignment(frame) {
+  try {
+    const doc = frame.contentDocument;
+    if (!doc) return;
+    const style = doc.createElement('style');
+    style.textContent = 'body { align-items: flex-start !important; padding-top: 40px !important; }';
+    doc.head.appendChild(style);
+  } catch(e) {}
+}
+window.addEventListener('load', () => {
+  scaleFrames();
+  for (let i = 0; i < 4; i++) {
+    const frame = document.getElementById('f' + i);
+    fixAlignment(frame);
+    frame.addEventListener('load', () => { scaleFrames(); fixAlignment(frame); });
+  }
+});
+window.addEventListener('resize', scaleFrames);
+</script>
+</body>
+</html>

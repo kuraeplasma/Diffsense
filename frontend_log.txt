@@ -1,0 +1,935 @@
+ INFO  Accepting connections at http://localhost:3000
+ HTTP  2026/3/24 22:44:10 ::1 HEAD /dashboard.html
+ HTTP  2026/3/24 22:44:10 ::1 Returned 301 in 10 ms
+ HTTP  2026/3/24 22:44:41 ::1 GET /dashboard
+ HTTP  2026/3/24 22:44:41 ::1 Returned 200 in 8 ms
+ HTTP  2026/3/24 22:44:41 ::1 GET /css/dashboard.css?v=5
+ HTTP  2026/3/24 22:44:41 ::1 GET /js/dashboard.js?v=20260324_freemium3
+ HTTP  2026/3/24 22:44:41 ::1 GET /css/dashboard-structured-fix.css?v=20260310local1
+ HTTP  2026/3/24 22:44:41 ::1 GET /css/sign.css?v=premiumv51
+ HTTP  2026/3/24 22:44:41 ::1 Returned 200 in 5 ms
+ HTTP  2026/3/24 22:44:41 ::1 Returned 304 in 3 ms
+ HTTP  2026/3/24 22:44:41 ::1 Returned 304 in 5 ms
+ HTTP  2026/3/24 22:44:41 ::1 Returned 200 in 7 ms
+ HTTP  2026/3/24 22:44:41 ::1 GET /js/auth.js?v=20260311d
+ HTTP  2026/3/24 22:44:41 ::1 Returned 200 in 1 ms
+ HTTP  2026/3/24 22:44:41 ::1 GET /js/notify.js
+ HTTP  2026/3/24 22:44:41 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 22:44:41 ::1 GET /js/db-service.js?v=20260321f
+ HTTP  2026/3/24 22:44:41 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 22:44:41 ::1 GET /js/ai-service.js?v=20260309h2
+ HTTP  2026/3/24 22:44:41 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 22:44:41 ::1 GET /js/auth.js
+ HTTP  2026/3/24 22:44:41 ::1 GET /js/api-base.js?v=20260321f
+ HTTP  2026/3/24 22:44:41 ::1 Returned 200 in 2 ms
+ HTTP  2026/3/24 22:44:41 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 22:44:41 ::1 GET /favicon2.png?v=2
+ HTTP  2026/3/24 22:44:41 ::1 Returned 304 in 6 ms
+ HTTP  2026/3/24 23:14:15 ::1 GET /dashboard
+ HTTP  2026/3/24 23:14:15 ::1 Returned 200 in 3 ms
+ HTTP  2026/3/24 23:14:15 ::1 GET /css/dashboard.css?v=5
+ HTTP  2026/3/24 23:14:15 ::1 GET /js/dashboard.js?v=20260324_freemium_final
+ HTTP  2026/3/24 23:14:15 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:14:15 ::1 GET /css/dashboard-structured-fix.css?v=20260310local1
+ HTTP  2026/3/24 23:14:15 ::1 GET /css/sign.css?v=premiumv51
+ HTTP  2026/3/24 23:14:15 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:14:15 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:14:15 ::1 Returned 200 in 5 ms
+ HTTP  2026/3/24 23:14:15 ::1 GET /js/auth.js?v=20260311d
+ HTTP  2026/3/24 23:14:15 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:14:15 ::1 GET /js/notify.js
+ HTTP  2026/3/24 23:14:15 ::1 GET /js/db-service.js?v=20260321f
+ HTTP  2026/3/24 23:14:15 ::1 GET /js/ai-service.js?v=20260309h2
+ HTTP  2026/3/24 23:14:15 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:14:15 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/24 23:14:15 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:14:15 ::1 GET /js/auth.js
+ HTTP  2026/3/24 23:14:15 ::1 GET /js/api-base.js?v=20260321f
+ HTTP  2026/3/24 23:14:15 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:14:15 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/24 23:24:28 ::1 GET /dashboard
+ HTTP  2026/3/24 23:24:28 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/24 23:24:28 ::1 GET /css/sign.css?v=premiumv51
+ HTTP  2026/3/24 23:24:28 ::1 GET /js/dashboard.js?v=20260324_freemium_final
+ HTTP  2026/3/24 23:24:28 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:24:28 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/24 23:24:28 ::1 GET /css/dashboard.css?v=5
+ HTTP  2026/3/24 23:24:28 ::1 GET /css/dashboard-structured-fix.css?v=20260310local1
+ HTTP  2026/3/24 23:24:28 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/24 23:24:28 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:24:28 ::1 GET /js/notify.js
+ HTTP  2026/3/24 23:24:28 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:24:28 ::1 GET /js/auth.js?v=20260311d
+ HTTP  2026/3/24 23:24:28 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:24:28 ::1 GET /js/db-service.js?v=20260321f
+ HTTP  2026/3/24 23:24:28 ::1 GET /js/ai-service.js?v=20260309h2
+ HTTP  2026/3/24 23:24:28 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:24:28 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/24 23:24:28 ::1 GET /js/auth.js
+ HTTP  2026/3/24 23:24:28 ::1 GET /js/api-base.js?v=20260321f
+ HTTP  2026/3/24 23:24:28 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/24 23:24:28 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:27:56 ::1 GET /dashboard
+ HTTP  2026/3/24 23:27:56 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/24 23:27:56 ::1 GET /css/dashboard.css?v=5
+ HTTP  2026/3/24 23:27:56 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:27:56 ::1 GET /css/sign.css?v=premiumv51
+ HTTP  2026/3/24 23:27:56 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/24 23:27:56 ::1 GET /css/dashboard-structured-fix.css?v=20260310local1
+ HTTP  2026/3/24 23:27:56 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:27:56 ::1 GET /js/dashboard.js?v=20260324_freemium_final
+ HTTP  2026/3/24 23:27:56 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:27:56 ::1 GET /js/auth.js?v=20260311d
+ HTTP  2026/3/24 23:27:56 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/24 23:27:56 ::1 GET /js/notify.js
+ HTTP  2026/3/24 23:27:56 ::1 GET /js/db-service.js?v=20260321f
+ HTTP  2026/3/24 23:27:56 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:27:56 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:27:56 ::1 GET /js/ai-service.js?v=20260309h2
+ HTTP  2026/3/24 23:27:56 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/24 23:27:56 ::1 GET /js/auth.js
+ HTTP  2026/3/24 23:27:56 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/24 23:27:56 ::1 GET /js/api-base.js?v=20260321f
+ HTTP  2026/3/24 23:27:56 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/24 23:27:56 ::1 GET /favicon2.png?v=2
+ HTTP  2026/3/24 23:27:56 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:28:59 ::1 GET /dashboard
+ HTTP  2026/3/24 23:28:59 ::1 Returned 200 in 2 ms
+ HTTP  2026/3/24 23:28:59 ::1 GET /css/dashboard.css?v=5
+ HTTP  2026/3/24 23:28:59 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:28:59 ::1 GET /js/dashboard.js?v=20260324_freemium_v2_final
+ HTTP  2026/3/24 23:28:59 ::1 GET /css/sign.css?v=premiumv51
+ HTTP  2026/3/24 23:28:59 ::1 GET /css/dashboard-structured-fix.css?v=20260310local1
+ HTTP  2026/3/24 23:28:59 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/24 23:28:59 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:28:59 ::1 GET /js/auth.js?v=20260311d
+ HTTP  2026/3/24 23:28:59 ::1 Returned 200 in 4 ms
+ HTTP  2026/3/24 23:28:59 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:28:59 ::1 GET /js/notify.js
+ HTTP  2026/3/24 23:28:59 ::1 GET /js/db-service.js?v=20260321f
+ HTTP  2026/3/24 23:28:59 ::1 GET /js/ai-service.js?v=20260309h2
+ HTTP  2026/3/24 23:28:59 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:28:59 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/24 23:28:59 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:28:59 ::1 GET /js/auth.js
+ HTTP  2026/3/24 23:28:59 ::1 GET /js/api-base.js?v=20260321f
+ HTTP  2026/3/24 23:28:59 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:28:59 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:41:02 ::1 GET /dashboard
+ HTTP  2026/3/24 23:41:02 ::1 Returned 200 in 3 ms
+ HTTP  2026/3/24 23:41:02 ::1 GET /css/dashboard.css?v=5
+ HTTP  2026/3/24 23:41:02 ::1 GET /css/sign.css?v=premiumv51
+ HTTP  2026/3/24 23:41:02 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:41:02 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/24 23:41:02 ::1 GET /css/dashboard-structured-fix.css?v=20260310local1
+ HTTP  2026/3/24 23:41:02 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/24 23:41:02 ::1 GET /js/dashboard.js?v=20260324_freemium_v3_sidebar_fix
+ HTTP  2026/3/24 23:41:02 ::1 Returned 200 in 4 ms
+ HTTP  2026/3/24 23:41:02 ::1 GET /js/auth.js?v=20260311d
+ HTTP  2026/3/24 23:41:02 ::1 GET /js/notify.js
+ HTTP  2026/3/24 23:41:02 ::1 Returned 304 in 3 ms
+ HTTP  2026/3/24 23:41:02 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:41:02 ::1 GET /js/db-service.js?v=20260321f
+ HTTP  2026/3/24 23:41:02 ::1 GET /js/ai-service.js?v=20260309h2
+ HTTP  2026/3/24 23:41:02 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/24 23:41:02 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:41:02 ::1 GET /js/auth.js
+ HTTP  2026/3/24 23:41:02 ::1 GET /js/api-base.js?v=20260321f
+ HTTP  2026/3/24 23:41:02 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:41:02 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:47:18 ::1 GET /dashboard
+ HTTP  2026/3/24 23:47:18 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:47:18 ::1 GET /css/dashboard.css?v=5
+ HTTP  2026/3/24 23:47:18 ::1 GET /css/sign.css?v=premiumv51
+ HTTP  2026/3/24 23:47:18 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/24 23:47:18 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/24 23:47:18 ::1 GET /css/dashboard-structured-fix.css?v=20260310local1
+ HTTP  2026/3/24 23:47:18 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/24 23:47:18 ::1 GET /js/dashboard.js?v=20260324_freemium_v3_sidebar_fix
+ HTTP  2026/3/24 23:47:18 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:47:18 ::1 GET /js/auth.js?v=20260311d
+ HTTP  2026/3/24 23:47:18 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:47:18 ::1 GET /js/notify.js
+ HTTP  2026/3/24 23:47:18 ::1 GET /js/db-service.js?v=20260321f
+ HTTP  2026/3/24 23:47:18 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:47:18 ::1 GET /js/ai-service.js?v=20260309h2
+ HTTP  2026/3/24 23:47:18 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/24 23:47:18 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:47:18 ::1 GET /js/auth.js
+ HTTP  2026/3/24 23:47:18 ::1 GET /js/api-base.js?v=20260321f
+ HTTP  2026/3/24 23:47:18 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:47:18 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:51:05 ::1 GET /dashboard
+ HTTP  2026/3/24 23:51:05 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/24 23:51:05 ::1 GET /css/dashboard.css?v=5
+ HTTP  2026/3/24 23:51:05 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:51:05 ::1 GET /css/sign.css?v=premiumv51
+ HTTP  2026/3/24 23:51:05 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:51:05 ::1 GET /css/dashboard-structured-fix.css?v=20260310local1
+ HTTP  2026/3/24 23:51:05 ::1 GET /js/dashboard.js?v=20260324_freemium_v3_sidebar_fix
+ HTTP  2026/3/24 23:51:05 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:51:05 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/24 23:51:05 ::1 GET /js/notify.js
+ HTTP  2026/3/24 23:51:05 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:51:05 ::1 GET /js/db-service.js?v=20260321f
+ HTTP  2026/3/24 23:51:05 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:51:05 ::1 GET /js/ai-service.js?v=20260309h2
+ HTTP  2026/3/24 23:51:05 ::1 GET /js/auth.js?v=20260311d
+ HTTP  2026/3/24 23:51:05 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:51:05 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:51:05 ::1 GET /js/auth.js
+ HTTP  2026/3/24 23:51:05 ::1 GET /js/api-base.js?v=20260321f
+ HTTP  2026/3/24 23:51:05 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:51:05 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:52:31 ::1 GET /dashboard.html?plan=starter
+ HTTP  2026/3/24 23:52:31 ::1 Returned 301 in 0 ms
+ HTTP  2026/3/24 23:52:31 ::1 GET /dashboard
+ HTTP  2026/3/24 23:52:31 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:52:31 ::1 GET /css/dashboard.css?v=5
+ HTTP  2026/3/24 23:52:31 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:52:31 ::1 GET /css/sign.css?v=premiumv51
+ HTTP  2026/3/24 23:52:31 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:52:31 ::1 GET /css/dashboard-structured-fix.css?v=20260310local1
+ HTTP  2026/3/24 23:52:31 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:52:31 ::1 GET /js/dashboard.js?v=20260324_freemium_v3_sidebar_fix
+ HTTP  2026/3/24 23:52:31 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:52:31 ::1 GET /js/auth.js?v=20260311d
+ HTTP  2026/3/24 23:52:31 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:52:31 ::1 GET /js/notify.js
+ HTTP  2026/3/24 23:52:31 ::1 GET /js/db-service.js?v=20260321f
+ HTTP  2026/3/24 23:52:31 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:52:31 ::1 GET /js/ai-service.js?v=20260309h2
+ HTTP  2026/3/24 23:52:31 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:52:31 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:52:31 ::1 GET /js/auth.js
+ HTTP  2026/3/24 23:52:31 ::1 GET /js/api-base.js?v=20260321f
+ HTTP  2026/3/24 23:52:31 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:52:31 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/24 23:53:08 ::1 GET /js/dashboard.js
+ HTTP  2026/3/24 23:53:08 ::1 Returned 200 in 1 ms
+ HTTP  2026/3/24 23:53:09 ::1 GET /favicon.ico
+ HTTP  2026/3/24 23:53:09 ::1 Returned 404 in 2 ms
+ HTTP  2026/3/24 23:53:37 ::1 GET /dashboard
+ HTTP  2026/3/24 23:53:37 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:53:37 ::1 GET /css/dashboard.css?v=5
+ HTTP  2026/3/24 23:53:37 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/24 23:53:37 ::1 GET /css/sign.css?v=premiumv51
+ HTTP  2026/3/24 23:53:37 ::1 GET /css/dashboard-structured-fix.css?v=20260310local1
+ HTTP  2026/3/24 23:53:37 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:53:37 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:53:37 ::1 GET /js/dashboard.js?v=20260324_freemium_v3_sidebar_fix
+ HTTP  2026/3/24 23:53:37 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:53:37 ::1 GET /js/auth.js?v=20260311d
+ HTTP  2026/3/24 23:53:37 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:53:37 ::1 GET /js/notify.js
+ HTTP  2026/3/24 23:53:37 ::1 GET /js/db-service.js?v=20260321f
+ HTTP  2026/3/24 23:53:37 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:53:37 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/24 23:53:37 ::1 GET /js/ai-service.js?v=20260309h2
+ HTTP  2026/3/24 23:53:37 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/24 23:53:37 ::1 GET /js/auth.js
+ HTTP  2026/3/24 23:53:37 ::1 GET /js/api-base.js?v=20260321f
+ HTTP  2026/3/24 23:53:37 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:53:37 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:53:55 ::1 GET /login
+ HTTP  2026/3/24 23:53:55 ::1 Returned 200 in 2 ms
+ HTTP  2026/3/24 23:53:55 ::1 GET /css/style.css
+ HTTP  2026/3/24 23:53:55 ::1 Returned 200 in 3 ms
+ HTTP  2026/3/24 23:53:55 ::1 GET /js/auth.js?v=20260312a
+ HTTP  2026/3/24 23:53:55 ::1 Returned 200 in 2 ms
+ HTTP  2026/3/24 23:54:15 ::1 GET /dashboard
+ HTTP  2026/3/24 23:54:15 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:54:15 ::1 GET /css/dashboard.css?v=5
+ HTTP  2026/3/24 23:54:15 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/24 23:54:15 ::1 GET /css/sign.css?v=premiumv51
+ HTTP  2026/3/24 23:54:15 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/24 23:54:15 ::1 GET /css/dashboard-structured-fix.css?v=20260310local1
+ HTTP  2026/3/24 23:54:15 ::1 GET /js/dashboard.js?v=20260324_freemium_v3_sidebar_fix
+ HTTP  2026/3/24 23:54:15 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:54:15 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:54:15 ::1 GET /js/auth.js?v=20260311d
+ HTTP  2026/3/24 23:54:15 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:54:15 ::1 GET /js/notify.js
+ HTTP  2026/3/24 23:54:15 ::1 GET /js/db-service.js?v=20260321f
+ HTTP  2026/3/24 23:54:15 ::1 GET /js/ai-service.js?v=20260309h2
+ HTTP  2026/3/24 23:54:15 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/24 23:54:15 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:54:15 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/24 23:54:15 ::1 GET /js/auth.js
+ HTTP  2026/3/24 23:54:15 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:54:15 ::1 GET /js/api-base.js?v=20260321f
+ HTTP  2026/3/24 23:54:15 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/24 23:56:25 ::1 GET /preview_all.html
+ HTTP  2026/3/24 23:56:25 ::1 Returned 301 in 1 ms
+ HTTP  2026/3/24 23:56:25 ::1 GET /preview_all
+ HTTP  2026/3/24 23:56:25 ::1 Returned 404 in 2 ms
+ HTTP  2026/3/24 23:56:25 ::1 GET /css/style.css
+ HTTP  2026/3/24 23:56:25 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:57:21 ::1 GET /dashboard?plan=Free
+ HTTP  2026/3/24 23:57:21 ::1 Returned 200 in 1 ms
+ HTTP  2026/3/24 23:57:21 ::1 GET /css/dashboard.css?v=5
+ HTTP  2026/3/24 23:57:21 ::1 GET /css/sign.css?v=premiumv51
+ HTTP  2026/3/24 23:57:21 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/24 23:57:21 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:57:21 ::1 GET /css/dashboard-structured-fix.css?v=20260310local1
+ HTTP  2026/3/24 23:57:21 ::1 GET /js/dashboard.js?v=20260324_freemium_v3_sidebar_fix
+ HTTP  2026/3/24 23:57:21 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/24 23:57:21 ::1 GET /js/auth.js?v=20260311d
+ HTTP  2026/3/24 23:57:21 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:57:21 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:57:22 ::1 GET /js/notify.js
+ HTTP  2026/3/24 23:57:22 ::1 GET /js/db-service.js?v=20260321f
+ HTTP  2026/3/24 23:57:22 ::1 GET /js/ai-service.js?v=20260309h2
+ HTTP  2026/3/24 23:57:22 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/24 23:57:22 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/24 23:57:22 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/24 23:57:22 ::1 GET /js/auth.js
+ HTTP  2026/3/24 23:57:22 ::1 GET /js/api-base.js?v=20260321f
+ HTTP  2026/3/24 23:57:22 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/24 23:57:22 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/24 23:58:18 ::1 GET /preview_all
+ HTTP  2026/3/24 23:58:18 ::1 Returned 404 in 2 ms
+ HTTP  2026/3/24 23:58:18 ::1 GET /css/style.css
+ HTTP  2026/3/24 23:58:18 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/24 23:58:43 ::1 GET /preview-all.html
+ HTTP  2026/3/24 23:58:43 ::1 Returned 301 in 1 ms
+ HTTP  2026/3/24 23:58:43 ::1 GET /preview-all
+ HTTP  2026/3/24 23:58:43 ::1 Returned 404 in 2 ms
+ HTTP  2026/3/24 23:58:44 ::1 GET /css/style.css
+ HTTP  2026/3/24 23:58:44 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:00:44 ::1 GET /dashboard.html?preview=all
+ HTTP  2026/3/25 0:00:44 ::1 Returned 301 in 1 ms
+ HTTP  2026/3/25 0:00:44 ::1 GET /dashboard
+ HTTP  2026/3/25 0:00:44 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:00:44 ::1 GET /css/dashboard.css?v=5
+ HTTP  2026/3/25 0:00:44 ::1 GET /css/sign.css?v=premiumv51
+ HTTP  2026/3/25 0:00:44 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:00:44 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:00:44 ::1 GET /css/dashboard-structured-fix.css?v=20260310local1
+ HTTP  2026/3/25 0:00:44 ::1 GET /js/dashboard.js?v=20260324_freemium_v3_sidebar_fix
+ HTTP  2026/3/25 0:00:44 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:00:44 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:00:44 ::1 GET /js/auth.js?v=20260311d
+ HTTP  2026/3/25 0:00:44 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:00:44 ::1 GET /js/notify.js
+ HTTP  2026/3/25 0:00:44 ::1 GET /js/db-service.js?v=20260321f
+ HTTP  2026/3/25 0:00:44 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:00:44 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:00:44 ::1 GET /js/ai-service.js?v=20260309h2
+ HTTP  2026/3/25 0:00:44 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:00:44 ::1 GET /js/auth.js
+ HTTP  2026/3/25 0:00:44 ::1 GET /js/api-base.js?v=20260321f
+ HTTP  2026/3/25 0:00:44 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:00:44 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:03:19 ::1 GET /preview_comparison.html
+ HTTP  2026/3/25 0:03:19 ::1 Returned 301 in 0 ms
+ HTTP  2026/3/25 0:03:19 ::1 GET /preview_comparison
+ HTTP  2026/3/25 0:03:19 ::1 Returned 200 in 1 ms
+ HTTP  2026/3/25 0:28:20 ::1 GET /dashboard
+ HTTP  2026/3/25 0:28:20 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:28:20 ::1 GET /css/dashboard.css?v=5
+ HTTP  2026/3/25 0:28:20 ::1 GET /css/sign.css?v=premiumv51
+ HTTP  2026/3/25 0:28:20 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:28:20 ::1 GET /css/dashboard-structured-fix.css?v=20260310local1
+ HTTP  2026/3/25 0:28:20 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:28:20 ::1 GET /js/dashboard.js?v=20260324_freemium_v3_sidebar_fix
+ HTTP  2026/3/25 0:28:20 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:28:20 ::1 Returned 200 in 2 ms
+ HTTP  2026/3/25 0:28:20 ::1 GET /js/auth.js?v=20260311d
+ HTTP  2026/3/25 0:28:20 ::1 GET /js/notify.js
+ HTTP  2026/3/25 0:28:20 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:28:20 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:28:20 ::1 GET /js/db-service.js?v=20260321f
+ HTTP  2026/3/25 0:28:20 ::1 GET /js/ai-service.js?v=20260309h2
+ HTTP  2026/3/25 0:28:20 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:28:20 ::1 Returned 200 in 1 ms
+ HTTP  2026/3/25 0:28:20 ::1 GET /js/auth.js
+ HTTP  2026/3/25 0:28:20 ::1 GET /js/api-base.js?v=20260321f
+ HTTP  2026/3/25 0:28:20 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:28:20 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:39:02 ::1 GET /dashboard
+ HTTP  2026/3/25 0:39:02 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:39:02 ::1 GET /css/dashboard.css?v=5
+ HTTP  2026/3/25 0:39:02 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/25 0:39:02 ::1 GET /css/sign.css?v=premiumv51
+ HTTP  2026/3/25 0:39:02 ::1 GET /css/dashboard-structured-fix.css?v=20260310local1
+ HTTP  2026/3/25 0:39:02 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:39:02 ::1 GET /js/dashboard.js?v=20260324_freemium_v3_sidebar_fix
+ HTTP  2026/3/25 0:39:02 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/25 0:39:02 ::1 Returned 200 in 2 ms
+ HTTP  2026/3/25 0:39:02 ::1 GET /js/notify.js
+ HTTP  2026/3/25 0:39:02 ::1 GET /js/db-service.js?v=20260321f
+ HTTP  2026/3/25 0:39:02 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:39:02 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:39:02 ::1 GET /js/ai-service.js?v=20260309h2
+ HTTP  2026/3/25 0:39:02 ::1 GET /js/auth.js?v=20260311d
+ HTTP  2026/3/25 0:39:02 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:39:02 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:39:02 ::1 GET /js/auth.js
+ HTTP  2026/3/25 0:39:02 ::1 GET /js/api-base.js?v=20260321f
+ HTTP  2026/3/25 0:39:02 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:39:02 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:39:31 ::1 GET /dashboard
+ HTTP  2026/3/25 0:39:31 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/25 0:39:31 ::1 GET /css/dashboard.css?v=5
+ HTTP  2026/3/25 0:39:31 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:39:31 ::1 GET /css/sign.css?v=premiumv51
+ HTTP  2026/3/25 0:39:31 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:39:31 ::1 GET /css/dashboard-structured-fix.css?v=20260310local1
+ HTTP  2026/3/25 0:39:31 ::1 GET /js/dashboard.js?v=20260324_freemium_v3_sidebar_fix
+ HTTP  2026/3/25 0:39:31 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:39:31 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:39:31 ::1 GET /js/auth.js?v=20260311d
+ HTTP  2026/3/25 0:39:31 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:39:31 ::1 GET /js/notify.js
+ HTTP  2026/3/25 0:39:31 ::1 GET /js/db-service.js?v=20260321f
+ HTTP  2026/3/25 0:39:31 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:39:31 ::1 GET /js/ai-service.js?v=20260309h2
+ HTTP  2026/3/25 0:39:31 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/25 0:39:31 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:39:31 ::1 GET /js/auth.js
+ HTTP  2026/3/25 0:39:31 ::1 GET /js/api-base.js?v=20260321f
+ HTTP  2026/3/25 0:39:31 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:39:31 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:39:45 ::1 GET /dashboard?t=123456789
+ HTTP  2026/3/25 0:39:45 ::1 Returned 200 in 2 ms
+ HTTP  2026/3/25 0:39:45 ::1 GET /css/dashboard.css?v=5
+ HTTP  2026/3/25 0:39:45 ::1 GET /css/sign.css?v=premiumv51
+ HTTP  2026/3/25 0:39:45 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/25 0:39:45 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/25 0:39:45 ::1 GET /css/dashboard-structured-fix.css?v=20260310local1
+ HTTP  2026/3/25 0:39:45 ::1 GET /js/dashboard.js?v=20260324_freemium_v3_sidebar_fix
+ HTTP  2026/3/25 0:39:45 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:39:45 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:39:45 ::1 GET /js/auth.js?v=20260311d
+ HTTP  2026/3/25 0:39:45 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:39:45 ::1 GET /js/notify.js
+ HTTP  2026/3/25 0:39:45 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/25 0:39:45 ::1 GET /js/db-service.js?v=20260321f
+ HTTP  2026/3/25 0:39:45 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:39:45 ::1 GET /js/ai-service.js?v=20260309h2
+ HTTP  2026/3/25 0:39:45 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/25 0:39:45 ::1 GET /js/auth.js
+ HTTP  2026/3/25 0:39:45 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:39:45 ::1 GET /js/api-base.js?v=20260321f
+ HTTP  2026/3/25 0:39:45 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:40:15 ::1 GET /dashboard
+ HTTP  2026/3/25 0:40:15 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:40:15 ::1 GET /css/dashboard.css?v=5
+ HTTP  2026/3/25 0:40:15 ::1 GET /css/sign.css?v=premiumv51
+ HTTP  2026/3/25 0:40:15 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:40:15 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:40:15 ::1 GET /css/dashboard-structured-fix.css?v=20260310local1
+ HTTP  2026/3/25 0:40:15 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:40:15 ::1 GET /js/dashboard.js?v=20260324_freemium_v3_sidebar_fix
+ HTTP  2026/3/25 0:40:15 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:40:16 ::1 GET /js/auth.js?v=20260311d
+ HTTP  2026/3/25 0:40:16 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:40:16 ::1 GET /js/notify.js
+ HTTP  2026/3/25 0:40:16 ::1 GET /js/db-service.js?v=20260321f
+ HTTP  2026/3/25 0:40:16 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:40:16 ::1 GET /js/ai-service.js?v=20260309h2
+ HTTP  2026/3/25 0:40:16 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:40:16 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:40:16 ::1 GET /js/auth.js
+ HTTP  2026/3/25 0:40:16 ::1 GET /js/api-base.js?v=20260321f
+ HTTP  2026/3/25 0:40:16 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:40:16 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:40:37 ::1 GET /preview_comparison
+ HTTP  2026/3/25 0:40:37 ::1 Returned 404 in 1 ms
+ HTTP  2026/3/25 0:40:37 ::1 GET /css/style.css
+ HTTP  2026/3/25 0:40:37 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:40:43 ::1 GET /dashboard
+ HTTP  2026/3/25 0:40:43 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:40:43 ::1 GET /css/dashboard.css?v=5
+ HTTP  2026/3/25 0:40:43 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:40:43 ::1 GET /css/sign.css?v=premiumv51
+ HTTP  2026/3/25 0:40:43 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:40:43 ::1 GET /css/dashboard-structured-fix.css?v=20260310local1
+ HTTP  2026/3/25 0:40:43 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:40:43 ::1 GET /js/dashboard.js?v=20260324_freemium_v3_sidebar_fix
+ HTTP  2026/3/25 0:40:43 ::1 GET /js/auth.js?v=20260311d
+ HTTP  2026/3/25 0:40:43 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:40:43 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:40:43 ::1 GET /js/notify.js
+ HTTP  2026/3/25 0:40:43 ::1 GET /js/db-service.js?v=20260321f
+ HTTP  2026/3/25 0:40:43 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:40:43 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:40:43 ::1 GET /js/ai-service.js?v=20260309h2
+ HTTP  2026/3/25 0:40:43 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:40:43 ::1 GET /js/auth.js
+ HTTP  2026/3/25 0:40:43 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:40:43 ::1 GET /js/api-base.js?v=20260321f
+ HTTP  2026/3/25 0:40:43 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:40:47 ::1 GET /select-plan.html
+ HTTP  2026/3/25 0:40:47 ::1 Returned 301 in 1 ms
+ HTTP  2026/3/25 0:40:47 ::1 GET /select-plan
+ HTTP  2026/3/25 0:40:47 ::1 Returned 200 in 1 ms
+ HTTP  2026/3/25 0:40:47 ::1 GET /css/style.css
+ HTTP  2026/3/25 0:40:47 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:40:47 ::1 GET /login.html?next=%2Fselect-plan
+ HTTP  2026/3/25 0:40:47 ::1 Returned 301 in 0 ms
+ HTTP  2026/3/25 0:40:47 ::1 GET /login
+ HTTP  2026/3/25 0:40:47 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/25 0:40:47 ::1 GET /css/style.css
+ HTTP  2026/3/25 0:40:47 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:40:47 ::1 GET /js/auth.js?v=20260312a
+ HTTP  2026/3/25 0:40:47 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:40:59 ::1 GET /dashboard
+ HTTP  2026/3/25 0:40:59 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:40:59 ::1 GET /css/dashboard.css?v=5
+ HTTP  2026/3/25 0:40:59 ::1 GET /css/sign.css?v=premiumv51
+ HTTP  2026/3/25 0:40:59 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:40:59 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:40:59 ::1 GET /css/dashboard-structured-fix.css?v=20260310local1
+ HTTP  2026/3/25 0:40:59 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:40:59 ::1 GET /js/dashboard.js?v=20260324_freemium_v3_sidebar_fix
+ HTTP  2026/3/25 0:40:59 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:40:59 ::1 GET /js/auth.js?v=20260311d
+ HTTP  2026/3/25 0:40:59 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:40:59 ::1 GET /js/notify.js
+ HTTP  2026/3/25 0:40:59 ::1 GET /js/db-service.js?v=20260321f
+ HTTP  2026/3/25 0:40:59 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:40:59 ::1 GET /js/ai-service.js?v=20260309h2
+ HTTP  2026/3/25 0:40:59 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:40:59 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:41:00 ::1 GET /js/auth.js
+ HTTP  2026/3/25 0:41:00 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:41:00 ::1 GET /js/api-base.js?v=20260321f
+ HTTP  2026/3/25 0:41:00 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:41:13 ::1 GET /js/dashboard.js
+ HTTP  2026/3/25 0:41:13 ::1 Returned 200 in 1 ms
+ HTTP  2026/3/25 0:41:25 ::1 GET /dashboard?plan=free
+ HTTP  2026/3/25 0:41:25 ::1 Returned 200 in 2 ms
+ HTTP  2026/3/25 0:41:25 ::1 GET /css/dashboard.css?v=5
+ HTTP  2026/3/25 0:41:25 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:41:25 ::1 GET /css/sign.css?v=premiumv51
+ HTTP  2026/3/25 0:41:25 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:41:25 ::1 GET /css/dashboard-structured-fix.css?v=20260310local1
+ HTTP  2026/3/25 0:41:25 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:41:25 ::1 GET /js/dashboard.js?v=20260324_freemium_v3_sidebar_fix
+ HTTP  2026/3/25 0:41:25 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:41:25 ::1 GET /js/auth.js?v=20260311d
+ HTTP  2026/3/25 0:41:25 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:41:25 ::1 GET /js/notify.js
+ HTTP  2026/3/25 0:41:25 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:41:25 ::1 GET /js/db-service.js?v=20260321f
+ HTTP  2026/3/25 0:41:25 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:41:25 ::1 GET /js/ai-service.js?v=20260309h2
+ HTTP  2026/3/25 0:41:25 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:41:25 ::1 GET /js/auth.js
+ HTTP  2026/3/25 0:41:25 ::1 GET /js/api-base.js?v=20260321f
+ HTTP  2026/3/25 0:41:25 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:41:25 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:41:30 ::1 GET /js/dashboard.js
+ HTTP  2026/3/25 0:41:30 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:41:53 ::1 GET /dashboard
+ HTTP  2026/3/25 0:41:53 ::1 Returned 304 in 3 ms
+ HTTP  2026/3/25 0:41:54 ::1 GET /css/dashboard.css?v=5
+ HTTP  2026/3/25 0:41:54 ::1 GET /css/sign.css?v=premiumv51
+ HTTP  2026/3/25 0:41:54 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:41:54 ::1 GET /css/dashboard-structured-fix.css?v=20260310local1
+ HTTP  2026/3/25 0:41:54 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:41:54 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:41:54 ::1 GET /js/dashboard.js?v=20260324_freemium_v3_sidebar_fix
+ HTTP  2026/3/25 0:41:54 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:41:54 ::1 GET /js/notify.js
+ HTTP  2026/3/25 0:41:54 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:41:54 ::1 GET /js/db-service.js?v=20260321f
+ HTTP  2026/3/25 0:41:54 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:41:54 ::1 GET /js/ai-service.js?v=20260309h2
+ HTTP  2026/3/25 0:41:54 ::1 GET /js/auth.js?v=20260311d
+ HTTP  2026/3/25 0:41:54 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:41:54 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:41:54 ::1 GET /js/auth.js
+ HTTP  2026/3/25 0:41:54 ::1 GET /js/api-base.js?v=20260321f
+ HTTP  2026/3/25 0:41:54 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:41:54 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:42:23 ::1 GET /js/db-service.js
+ HTTP  2026/3/25 0:42:23 ::1 Returned 200 in 1 ms
+ HTTP  2026/3/25 0:42:50 ::1 GET /js/dashboard.js
+ HTTP  2026/3/25 0:42:50 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:42:58 ::1 GET /thanks-payment.html?plan=free&billing=monthly
+ HTTP  2026/3/25 0:42:58 ::1 Returned 301 in 1 ms
+ HTTP  2026/3/25 0:42:58 ::1 GET /thanks-payment
+ HTTP  2026/3/25 0:42:58 ::1 Returned 200 in 2 ms
+ HTTP  2026/3/25 0:43:07 ::1 GET /js/dashboard.js
+ HTTP  2026/3/25 0:43:07 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:43:22 ::1 GET /js/dashboard.js
+ HTTP  2026/3/25 0:43:22 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/25 0:43:46 ::1 GET /dashboard
+ HTTP  2026/3/25 0:43:46 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:43:46 ::1 GET /css/dashboard.css?v=5
+ HTTP  2026/3/25 0:43:46 ::1 GET /css/sign.css?v=premiumv51
+ HTTP  2026/3/25 0:43:46 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:43:46 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:43:46 ::1 GET /css/dashboard-structured-fix.css?v=20260310local1
+ HTTP  2026/3/25 0:43:46 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:43:46 ::1 GET /js/dashboard.js?v=20260324_freemium_v3_sidebar_fix
+ HTTP  2026/3/25 0:43:46 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:43:46 ::1 GET /js/auth.js?v=20260311d
+ HTTP  2026/3/25 0:43:46 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/25 0:43:46 ::1 GET /js/notify.js
+ HTTP  2026/3/25 0:43:46 ::1 GET /js/db-service.js?v=20260321f
+ HTTP  2026/3/25 0:43:46 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:43:46 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:43:46 ::1 GET /js/ai-service.js?v=20260309h2
+ HTTP  2026/3/25 0:43:46 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:43:46 ::1 GET /js/auth.js
+ HTTP  2026/3/25 0:43:46 ::1 GET /js/api-base.js?v=20260321f
+ HTTP  2026/3/25 0:43:46 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:43:46 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:43:54 ::1 GET /select-plan-preview.html
+ HTTP  2026/3/25 0:43:54 ::1 Returned 301 in 0 ms
+ HTTP  2026/3/25 0:43:54 ::1 GET /select-plan-preview
+ HTTP  2026/3/25 0:43:54 ::1 Returned 200 in 2 ms
+ HTTP  2026/3/25 0:43:54 ::1 GET /css/style.css
+ HTTP  2026/3/25 0:43:54 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/25 0:43:54 ::1 GET /js/auth.js
+ HTTP  2026/3/25 0:43:54 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:43:55 ::1 GET /login.html?next=%2Fselect-plan-preview
+ HTTP  2026/3/25 0:43:55 ::1 Returned 301 in 0 ms
+ HTTP  2026/3/25 0:43:55 ::1 GET /login
+ HTTP  2026/3/25 0:43:55 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:43:55 ::1 GET /css/style.css
+ HTTP  2026/3/25 0:43:55 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:43:55 ::1 GET /js/auth.js?v=20260312a
+ HTTP  2026/3/25 0:43:55 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:44:36 ::1 GET /js/dashboard.js
+ HTTP  2026/3/25 0:44:36 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/25 0:45:00 ::1 GET /js/dashboard.js
+ HTTP  2026/3/25 0:45:00 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:45:54 ::1 GET /dashboard
+ HTTP  2026/3/25 0:45:54 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/25 0:45:54 ::1 GET /css/sign.css?v=premiumv51
+ HTTP  2026/3/25 0:45:54 ::1 GET /css/dashboard.css?v=5
+ HTTP  2026/3/25 0:45:54 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/25 0:45:54 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:45:54 ::1 GET /css/dashboard-structured-fix.css?v=20260310local1
+ HTTP  2026/3/25 0:45:54 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:45:54 ::1 GET /js/dashboard.js?v=20260324_freemium_v3_sidebar_fix
+ HTTP  2026/3/25 0:45:54 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:45:54 ::1 GET /js/auth.js?v=20260311d
+ HTTP  2026/3/25 0:45:54 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:45:55 ::1 GET /js/notify.js
+ HTTP  2026/3/25 0:45:55 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:45:55 ::1 GET /js/ai-service.js?v=20260309h2
+ HTTP  2026/3/25 0:45:55 ::1 GET /js/db-service.js?v=20260321f
+ HTTP  2026/3/25 0:45:55 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:45:55 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:45:55 ::1 GET /js/api-base.js?v=20260321f
+ HTTP  2026/3/25 0:45:55 ::1 Returned 304 in 3 ms
+ HTTP  2026/3/25 0:45:55 ::1 GET /js/auth.js
+ HTTP  2026/3/25 0:45:55 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:46:47 ::1 GET /dashboard
+ HTTP  2026/3/25 0:46:47 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:46:47 ::1 GET /css/dashboard.css?v=5
+ HTTP  2026/3/25 0:46:47 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:46:47 ::1 GET /css/sign.css?v=premiumv51
+ HTTP  2026/3/25 0:46:47 ::1 GET /css/dashboard-structured-fix.css?v=20260310local1
+ HTTP  2026/3/25 0:46:47 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:46:47 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:46:47 ::1 GET /js/dashboard.js?v=20260324_freemium_v3_sidebar_fix
+ HTTP  2026/3/25 0:46:47 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:46:47 ::1 GET /js/auth.js?v=20260311d
+ HTTP  2026/3/25 0:46:47 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:46:47 ::1 GET /js/notify.js
+ HTTP  2026/3/25 0:46:47 ::1 GET /js/db-service.js?v=20260321f
+ HTTP  2026/3/25 0:46:47 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:46:47 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:46:47 ::1 GET /js/ai-service.js?v=20260309h2
+ HTTP  2026/3/25 0:46:47 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:46:47 ::1 GET /js/auth.js
+ HTTP  2026/3/25 0:46:47 ::1 GET /js/api-base.js?v=20260321f
+ HTTP  2026/3/25 0:46:47 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:46:47 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:46:55 ::1 GET /dashboard?plan=free
+ HTTP  2026/3/25 0:46:55 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/25 0:46:55 ::1 GET /css/dashboard.css?v=5
+ HTTP  2026/3/25 0:46:55 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:46:55 ::1 GET /css/sign.css?v=premiumv51
+ HTTP  2026/3/25 0:46:55 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:46:55 ::1 GET /css/dashboard-structured-fix.css?v=20260310local1
+ HTTP  2026/3/25 0:46:55 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:46:55 ::1 GET /js/dashboard.js?v=20260324_freemium_v3_sidebar_fix
+ HTTP  2026/3/25 0:46:55 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:46:55 ::1 GET /js/auth.js?v=20260311d
+ HTTP  2026/3/25 0:46:55 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:46:55 ::1 GET /js/notify.js
+ HTTP  2026/3/25 0:46:55 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:46:55 ::1 GET /js/db-service.js?v=20260321f
+ HTTP  2026/3/25 0:46:55 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:46:55 ::1 GET /js/ai-service.js?v=20260309h2
+ HTTP  2026/3/25 0:46:55 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:46:55 ::1 GET /js/auth.js
+ HTTP  2026/3/25 0:46:55 ::1 GET /js/api-base.js?v=20260321f
+ HTTP  2026/3/25 0:46:55 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:46:55 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:48:07 ::1 GET /preview_comparison
+ HTTP  2026/3/25 0:48:07 ::1 Returned 404 in 1 ms
+ HTTP  2026/3/25 0:48:07 ::1 GET /css/style.css
+ HTTP  2026/3/25 0:48:07 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:48:14 ::1 GET /dashboard.html?plan=free
+ HTTP  2026/3/25 0:48:14 ::1 Returned 301 in 1 ms
+ HTTP  2026/3/25 0:48:14 ::1 GET /dashboard
+ HTTP  2026/3/25 0:48:14 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:48:14 ::1 GET /css/dashboard.css?v=5
+ HTTP  2026/3/25 0:48:14 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:48:14 ::1 GET /css/sign.css?v=premiumv51
+ HTTP  2026/3/25 0:48:14 ::1 GET /css/dashboard-structured-fix.css?v=20260310local1
+ HTTP  2026/3/25 0:48:14 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:48:14 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:48:14 ::1 GET /js/dashboard.js?v=20260324_freemium_v3_sidebar_fix
+ HTTP  2026/3/25 0:48:14 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:48:14 ::1 GET /js/auth.js?v=20260311d
+ HTTP  2026/3/25 0:48:14 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:48:14 ::1 GET /js/notify.js
+ HTTP  2026/3/25 0:48:14 ::1 GET /js/db-service.js?v=20260321f
+ HTTP  2026/3/25 0:48:14 ::1 GET /js/ai-service.js?v=20260309h2
+ HTTP  2026/3/25 0:48:14 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:48:14 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:48:14 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:48:14 ::1 GET /js/auth.js
+ HTTP  2026/3/25 0:48:14 ::1 GET /js/api-base.js?v=20260321f
+ HTTP  2026/3/25 0:48:14 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:48:14 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:49:08 ::1 GET /dashboard_free.html
+ HTTP  2026/3/25 0:49:08 ::1 Returned 301 in 1 ms
+ HTTP  2026/3/25 0:49:08 ::1 GET /dashboard_free
+ HTTP  2026/3/25 0:49:08 ::1 Returned 404 in 2 ms
+ HTTP  2026/3/25 0:49:09 ::1 GET /css/style.css
+ HTTP  2026/3/25 0:49:09 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:50:08 ::1 GET /dashboard.html?mode=free
+ HTTP  2026/3/25 0:50:08 ::1 Returned 301 in 1 ms
+ HTTP  2026/3/25 0:50:08 ::1 GET /dashboard
+ HTTP  2026/3/25 0:50:08 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:50:08 ::1 GET /css/dashboard.css?v=5
+ HTTP  2026/3/25 0:50:08 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:50:08 ::1 GET /css/sign.css?v=premiumv51
+ HTTP  2026/3/25 0:50:08 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:50:08 ::1 GET /css/dashboard-structured-fix.css?v=20260310local1
+ HTTP  2026/3/25 0:50:08 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:50:08 ::1 GET /js/dashboard.js?v=20260324_freemium_v3_sidebar_fix
+ HTTP  2026/3/25 0:50:08 ::1 GET /js/auth.js?v=20260311d
+ HTTP  2026/3/25 0:50:08 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:50:08 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:50:08 ::1 GET /js/notify.js
+ HTTP  2026/3/25 0:50:08 ::1 GET /js/db-service.js?v=20260321f
+ HTTP  2026/3/25 0:50:08 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:50:08 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:50:08 ::1 GET /js/ai-service.js?v=20260309h2
+ HTTP  2026/3/25 0:50:08 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:50:08 ::1 GET /js/auth.js
+ HTTP  2026/3/25 0:50:08 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:50:08 ::1 GET /js/api-base.js?v=20260321f
+ HTTP  2026/3/25 0:50:08 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:50:17 ::1 GET /dashboard_preview.html
+ HTTP  2026/3/25 0:50:17 ::1 Returned 301 in 0 ms
+ HTTP  2026/3/25 0:50:17 ::1 GET /dashboard_preview
+ HTTP  2026/3/25 0:50:17 ::1 Returned 404 in 1 ms
+ HTTP  2026/3/25 0:50:17 ::1 GET /css/style.css
+ HTTP  2026/3/25 0:50:17 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:51:23 ::1 GET /dashboard.html?force=free
+ HTTP  2026/3/25 0:51:23 ::1 Returned 301 in 3 ms
+ HTTP  2026/3/25 0:51:23 ::1 GET /dashboard
+ HTTP  2026/3/25 0:51:23 ::1 Returned 304 in 3 ms
+ HTTP  2026/3/25 0:51:24 ::1 GET /css/dashboard.css?v=5
+ HTTP  2026/3/25 0:51:24 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:51:24 ::1 GET /css/sign.css?v=premiumv51
+ HTTP  2026/3/25 0:51:24 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/25 0:51:24 ::1 GET /css/dashboard-structured-fix.css?v=20260310local1
+ HTTP  2026/3/25 0:51:24 ::1 GET /js/dashboard.js?v=20260324_freemium_v3_sidebar_fix
+ HTTP  2026/3/25 0:51:24 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/25 0:51:24 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:51:24 ::1 GET /js/auth.js?v=20260311d
+ HTTP  2026/3/25 0:51:24 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:51:24 ::1 GET /js/notify.js
+ HTTP  2026/3/25 0:51:24 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:51:24 ::1 GET /js/db-service.js?v=20260321f
+ HTTP  2026/3/25 0:51:24 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:51:24 ::1 GET /js/ai-service.js?v=20260309h2
+ HTTP  2026/3/25 0:51:24 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:51:24 ::1 GET /js/auth.js
+ HTTP  2026/3/25 0:51:24 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:51:24 ::1 GET /js/api-base.js?v=20260321f
+ HTTP  2026/3/25 0:51:24 ::1 Returned 304 in 3 ms
+ HTTP  2026/3/25 0:51:43 ::1 GET /preview_all
+ HTTP  2026/3/25 0:51:43 ::1 Returned 404 in 2 ms
+ HTTP  2026/3/25 0:51:43 ::1 GET /css/style.css
+ HTTP  2026/3/25 0:51:43 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:52:13 ::1 GET /dashboard
+ HTTP  2026/3/25 0:52:13 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:52:13 ::1 GET /css/dashboard.css?v=5
+ HTTP  2026/3/25 0:52:13 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:52:13 ::1 GET /css/sign.css?v=premiumv51
+ HTTP  2026/3/25 0:52:13 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:52:13 ::1 GET /css/dashboard-structured-fix.css?v=20260310local1
+ HTTP  2026/3/25 0:52:13 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:52:13 ::1 GET /js/dashboard.js?v=20260324_freemium_v3_sidebar_fix
+ HTTP  2026/3/25 0:52:13 ::1 GET /js/auth.js?v=20260311d
+ HTTP  2026/3/25 0:52:13 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:52:13 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:52:13 ::1 GET /js/notify.js
+ HTTP  2026/3/25 0:52:13 ::1 GET /js/db-service.js?v=20260321f
+ HTTP  2026/3/25 0:52:13 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:52:13 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:52:13 ::1 GET /js/ai-service.js?v=20260309h2
+ HTTP  2026/3/25 0:52:13 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:52:13 ::1 GET /js/auth.js
+ HTTP  2026/3/25 0:52:13 ::1 GET /js/api-base.js?v=20260321f
+ HTTP  2026/3/25 0:52:13 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:52:13 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:52:28 ::1 GET /select-plan
+ HTTP  2026/3/25 0:52:28 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:52:28 ::1 GET /css/style.css
+ HTTP  2026/3/25 0:52:28 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:52:29 ::1 GET /login
+ HTTP  2026/3/25 0:52:29 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:52:29 ::1 GET /css/style.css
+ HTTP  2026/3/25 0:52:29 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:52:29 ::1 GET /js/auth.js?v=20260312a
+ HTTP  2026/3/25 0:52:29 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:55:01 ::1 GET /dashboard
+ HTTP  2026/3/25 0:55:01 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/25 0:55:01 ::1 GET /css/dashboard.css?v=5
+ HTTP  2026/3/25 0:55:01 ::1 GET /css/sign.css?v=premiumv51
+ HTTP  2026/3/25 0:55:01 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:55:01 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:55:01 ::1 GET /css/dashboard-structured-fix.css?v=20260310local1
+ HTTP  2026/3/25 0:55:01 ::1 GET /js/dashboard.js?v=20260324_freemium_v3_sidebar_fix
+ HTTP  2026/3/25 0:55:01 ::1 Returned 304 in 3 ms
+ HTTP  2026/3/25 0:55:01 ::1 Returned 304 in 3 ms
+ HTTP  2026/3/25 0:55:01 ::1 GET /js/auth.js?v=20260311d
+ HTTP  2026/3/25 0:55:01 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:55:01 ::1 GET /js/notify.js
+ HTTP  2026/3/25 0:55:01 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:55:01 ::1 GET /js/db-service.js?v=20260321f
+ HTTP  2026/3/25 0:55:01 ::1 GET /js/ai-service.js?v=20260309h2
+ HTTP  2026/3/25 0:55:01 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:55:01 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:55:01 ::1 GET /js/auth.js
+ HTTP  2026/3/25 0:55:01 ::1 GET /js/api-base.js?v=20260321f
+ HTTP  2026/3/25 0:55:01 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/25 0:55:01 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:55:02 ::1 GET /favicon2.png?v=2
+ HTTP  2026/3/25 0:55:02 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:55:40 ::1 GET /login
+ HTTP  2026/3/25 0:55:40 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:55:40 ::1 GET /css/style.css
+ HTTP  2026/3/25 0:55:40 ::1 Returned 304 in 3 ms
+ HTTP  2026/3/25 0:55:40 ::1 GET /js/auth.js?v=20260312a
+ HTTP  2026/3/25 0:55:40 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:55:40 ::1 GET /favicon2.png?v=2
+ HTTP  2026/3/25 0:55:40 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:59:54 ::1 GET /dashboard.html?forcePlan=free
+ HTTP  2026/3/25 0:59:54 ::1 Returned 301 in 0 ms
+ HTTP  2026/3/25 0:59:54 ::1 GET /dashboard
+ HTTP  2026/3/25 0:59:54 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:59:54 ::1 GET /css/dashboard.css?v=5
+ HTTP  2026/3/25 0:59:54 ::1 GET /css/sign.css?v=premiumv51
+ HTTP  2026/3/25 0:59:54 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 0:59:54 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:59:54 ::1 GET /css/dashboard-structured-fix.css?v=20260310local1
+ HTTP  2026/3/25 0:59:54 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:59:54 ::1 GET /js/dashboard.js?v=20260324_freemium_v3_sidebar_fix
+ HTTP  2026/3/25 0:59:54 ::1 Returned 200 in 3 ms
+ HTTP  2026/3/25 0:59:54 ::1 GET /js/notify.js
+ HTTP  2026/3/25 0:59:54 ::1 GET /js/db-service.js?v=20260321f
+ HTTP  2026/3/25 0:59:54 ::1 GET /js/ai-service.js?v=20260309h2
+ HTTP  2026/3/25 0:59:54 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/25 0:59:54 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:59:54 ::1 GET /js/auth.js?v=20260311d
+ HTTP  2026/3/25 0:59:54 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/25 0:59:54 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:59:54 ::1 GET /js/auth.js
+ HTTP  2026/3/25 0:59:54 ::1 GET /js/api-base.js?v=20260321f
+ HTTP  2026/3/25 0:59:54 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 0:59:54 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 1:00:11 ::1 GET /dashboard?forcePlan=free
+ HTTP  2026/3/25 1:00:11 ::1 Returned 200 in 1 ms
+ HTTP  2026/3/25 1:00:11 ::1 GET /css/dashboard.css?v=5
+ HTTP  2026/3/25 1:00:11 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 1:00:11 ::1 GET /css/sign.css?v=premiumv51
+ HTTP  2026/3/25 1:00:11 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 1:00:11 ::1 GET /css/dashboard-structured-fix.css?v=20260310local1
+ HTTP  2026/3/25 1:00:11 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 1:00:11 ::1 GET /js/dashboard.js?v=20260324_freemium_v3_sidebar_fix
+ HTTP  2026/3/25 1:00:11 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 1:00:11 ::1 GET /js/auth.js?v=20260311d
+ HTTP  2026/3/25 1:00:11 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 1:00:11 ::1 GET /js/notify.js
+ HTTP  2026/3/25 1:00:11 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 1:00:11 ::1 GET /js/db-service.js?v=20260321f
+ HTTP  2026/3/25 1:00:11 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 1:00:11 ::1 GET /js/ai-service.js?v=20260309h2
+ HTTP  2026/3/25 1:00:11 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 1:00:11 ::1 GET /js/auth.js
+ HTTP  2026/3/25 1:00:11 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 1:00:11 ::1 GET /js/api-base.js?v=20260321f
+ HTTP  2026/3/25 1:00:11 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 1:00:22 ::1 GET /dashboard
+ HTTP  2026/3/25 1:00:22 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 1:00:22 ::1 GET /css/dashboard.css?v=5
+ HTTP  2026/3/25 1:00:22 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 1:00:22 ::1 GET /css/sign.css?v=premiumv51
+ HTTP  2026/3/25 1:00:22 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 1:00:22 ::1 GET /css/dashboard-structured-fix.css?v=20260310local1
+ HTTP  2026/3/25 1:00:22 ::1 GET /js/dashboard.js?v=20260324_freemium_v3_sidebar_fix
+ HTTP  2026/3/25 1:00:22 ::1 Returned 304 in 2 ms
+ HTTP  2026/3/25 1:00:22 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 1:00:22 ::1 GET /js/auth.js?v=20260311d
+ HTTP  2026/3/25 1:00:22 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 1:00:22 ::1 GET /js/notify.js
+ HTTP  2026/3/25 1:00:22 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 1:00:22 ::1 GET /js/db-service.js?v=20260321f
+ HTTP  2026/3/25 1:00:22 ::1 GET /js/ai-service.js?v=20260309h2
+ HTTP  2026/3/25 1:00:22 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 1:00:22 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 1:00:22 ::1 GET /js/auth.js
+ HTTP  2026/3/25 1:00:22 ::1 GET /js/api-base.js?v=20260321f
+ HTTP  2026/3/25 1:00:22 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 1:00:22 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 1:01:04 ::1 GET /dashboard
+ HTTP  2026/3/25 1:01:04 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 1:01:04 ::1 GET /css/dashboard.css?v=5
+ HTTP  2026/3/25 1:01:04 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 1:01:04 ::1 GET /css/sign.css?v=premiumv51
+ HTTP  2026/3/25 1:01:04 ::1 GET /css/dashboard-structured-fix.css?v=20260310local1
+ HTTP  2026/3/25 1:01:04 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 1:01:04 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 1:01:04 ::1 GET /js/dashboard.js?v=20260324_freemium_v3_sidebar_fix
+ HTTP  2026/3/25 1:01:04 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 1:01:04 ::1 GET /js/auth.js?v=20260311d
+ HTTP  2026/3/25 1:01:04 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 1:01:04 ::1 GET /js/notify.js
+ HTTP  2026/3/25 1:01:04 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 1:01:04 ::1 GET /js/db-service.js?v=20260321f
+ HTTP  2026/3/25 1:01:04 ::1 GET /js/ai-service.js?v=20260309h2
+ HTTP  2026/3/25 1:01:04 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 1:01:04 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 1:01:04 ::1 GET /js/auth.js
+ HTTP  2026/3/25 1:01:04 ::1 GET /js/api-base.js?v=20260321f
+ HTTP  2026/3/25 1:01:04 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 1:01:04 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 1:01:18 ::1 GET /dashboard
+ HTTP  2026/3/25 1:01:18 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 1:01:18 ::1 GET /css/dashboard.css?v=5
+ HTTP  2026/3/25 1:01:18 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 1:01:18 ::1 GET /css/sign.css?v=premiumv51
+ HTTP  2026/3/25 1:01:18 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 1:01:18 ::1 GET /css/dashboard-structured-fix.css?v=20260310local1
+ HTTP  2026/3/25 1:01:18 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 1:01:18 ::1 GET /js/dashboard.js?v=20260324_freemium_v3_sidebar_fix
+ HTTP  2026/3/25 1:01:18 ::1 GET /js/auth.js?v=20260311d
+ HTTP  2026/3/25 1:01:18 ::1 Returned 304 in 3 ms
+ HTTP  2026/3/25 1:01:18 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 1:01:18 ::1 GET /js/notify.js
+ HTTP  2026/3/25 1:01:18 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 1:01:18 ::1 GET /js/db-service.js?v=20260321f
+ HTTP  2026/3/25 1:01:18 ::1 GET /js/ai-service.js?v=20260309h2
+ HTTP  2026/3/25 1:01:18 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 1:01:18 ::1 Returned 304 in 1 ms
+ HTTP  2026/3/25 1:01:18 ::1 GET /js/auth.js
+ HTTP  2026/3/25 1:01:18 ::1 Returned 304 in 0 ms
+ HTTP  2026/3/25 1:01:18 ::1 GET /js/api-base.js?v=20260321f
+ HTTP  2026/3/25 1:01:18 ::1 Returned 304 in 0 ms

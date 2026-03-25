@@ -1,32 +1,34 @@
 [
   {
-    "uid": "bypass-user-123",
-    "plan": "pro",
-    "trialStartedAt": "2026-02-01T12:00:00.000Z",
-    "usageCount": 5,
-    "lastResetDate": "2026-02-11T12:00:00.000Z",
-    "lastUsedAt": "2026-02-11T03:38:19.082Z"
-  },
-  {
-    "uid": "SsOSDObGPCUcdkHKrJP0ASFug103",
-    "plan": "starter",
-    "trialStartedAt": "2026-02-01T12:00:00.000Z",
-    "usageCount": 7,
-    "lastResetDate": "2026-02-10T02:27:04.336Z",
-    "lastUsedAt": "2026-02-11T05:12:38.980Z"
-  },
-  {
     "uid": "dev-user-001",
-    "plan": "pro",
+    "lastResetDate": "2026-03-18T13:09:55.696Z",
     "billingCycle": "monthly",
     "trialStartedAt": "2026-03-18T13:09:55.696Z",
-    "hasPaymentMethod": true,
-    "usageCount": 0,
-    "lastResetDate": "2026-03-18T13:09:55.696Z",
+    "plan": "pro",
     "email": "dev@localhost",
     "lastPaymentAt": "2026-03-22T03:58:27.044Z",
-    "stripeStatus": "active",
+    "stripeStatus": "",
     "currentPeriodEnd": "2026-04-21",
-    "subscriptionState": "active"
+    "hasPaymentMethod": false,
+    "subscriptionState": "inactive",
+    "lastUsedAt": "2026-03-22T12:54:02.375Z",
+    "usageCount": 0,
+    "notificationSettings": {
+      "slack": {
+        "teamName": "Spacegleam",
+        "connectedAt": "2026-03-22T15:40:24.564Z",
+        "channelName": "@contact",
+        "channelId": "D0ALGK2TWRH",
+        "enabled": true,
+        "webhookUrl": "https://hooks.slack.com/services/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"
+      },
+      "email": {
+        "crawlAlert": true
+      }
+    },
+    "pendingPlan": "starter",
+    "pendingBillingCycle": "monthly",
+    "stripeCheckoutSessionId": "cs_live_b1vojyHveFg0kRGf3FLko5izLCEaIL821PW79nQ23RKr27tJWkyd1PsB4Y",
+    "stripeCheckoutCreatedAt": "2026-03-25T12:53:58.984Z"
   }
 ]
