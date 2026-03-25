@@ -2621,7 +2621,7 @@ class DashboardApp {
         this.historyComparisonContext = null;
         this.documentCompareState = null;
         this.dashboardFilter = "pending";
-        this.activeDetailTab = 'diff';
+        this.activeDetailTab = 'original';
         this.filters = {
             query: "",
             risk: "all",
@@ -5046,8 +5046,10 @@ class DashboardApp {
                         }
                         dbService.updateContractAnalysis(id, analysisPayload);
 
-                        // 初回取り込みは原本全文タブ、2回目以降（差分解析あり）は差分タブ
-                        this.activeDetailTab = isFirstUpload ? 'original' : 'diff';
+                        // 初回取り込みは原本全文タブ、2回目以降（差分・履歴あり）は差分タブ
+                        const updatedContract = dbService.getContractById(id);
+                        const hasHistory = updatedContract && updatedContract.history && updatedContract.history.length > 0;
+                        this.activeDetailTab = hasHistory ? 'diff' : 'original';
                         this.syncLatestDocumentCompareState(id);
                         this.navigate('diff', id);
 
@@ -5169,8 +5171,10 @@ class DashboardApp {
                         if (token) await this.fetchSubscriptionStatus(token);
                     } catch (e) { console.warn('Failed to refresh subscription:', e); }
 
-                    // 画面を再読み込み (差分表示を優先)
-                    this.activeDetailTab = 'diff';
+                    // 画面を再読み込み (履歴があれば差分、初回なら原本)
+                    const updatedContract = dbService.getContractById(id);
+                    const hasHistory = updatedContract && updatedContract.history && updatedContract.history.length > 0;
+                    this.activeDetailTab = hasHistory ? 'diff' : 'original';
                     this.syncLatestDocumentCompareState(id);
                     this.navigate('diff', id);
 
