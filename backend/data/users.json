@@ -20,7 +20,7 @@
         "channelName": "@contact",
         "channelId": "D0ALGK2TWRH",
         "enabled": true,
-        "webhookUrl": "https://hooks.slack.com/services/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"
+        "webhookUrl": ""
       },
       "email": {
         "crawlAlert": true
