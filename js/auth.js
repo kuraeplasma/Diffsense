@@ -1,4 +1,6 @@
 import { auth } from './firebase-config.js?v=20260311c';
+import { Notify } from './notify.js';
+
 import {
     createUserWithEmailAndPassword,
     signInWithEmailAndPassword,
@@ -66,6 +68,22 @@ function persistPlanIntentFromUrl(options = {}) {
  */
 export async function handleSignUp(email, password) {
     try {
+        const normalizedEmail = (email || '').toLowerCase().trim();
+        
+        // 1. Check if user already exists in backend before creating in Firebase
+        try {
+            const apiBase = getApiBase();
+            const checkRes = await fetch(`${apiBase}/api/user/check-exists?email=${encodeURIComponent(normalizedEmail)}`);
+            const checkData = await checkRes.json();
+            
+            if (checkData.success && checkData.exists) {
+                Notify.warning('このメールアドレスは既に登録されています。ログインタブからログインしてください。', { title: '登録済み' });
+                return;
+            }
+        } catch (checkError) {
+            console.warn('Pre-signup check failed, proceeding anyway:', checkError);
+        }
+
         persistPlanIntentFromUrl({ markSignupFlow: true });
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
@@ -85,6 +103,7 @@ export async function handleSignUp(email, password) {
         Notify.error(msg);
     }
 }
+
 
 /**
  * Handle Login
@@ -183,11 +202,17 @@ export async function handleGoogleLogin(intent = 'auto') {
         const isNewUser = Boolean(userCredential?.additionalUserInfo?.isNewUser);
         console.log("Google signed in user:", user);
         localStorage.removeItem('diffsense_auth_intent');
-        if (normalizedIntent === 'signup' || isNewUser) {
+        if (normalizedIntent === 'signup' && isNewUser) {
             redirectToThanksSignup();
             return;
         }
+        
+        if (!isNewUser) {
+            Notify.info('既にご登録済みのため、ログインしました。', { title: 'ログイン完了' });
+        }
+        
         await finalizePostLogin(user);
+
     } catch (error) {
         console.error("Error with Google login:", error);
         const code = error?.code || 'unknown';
@@ -221,11 +246,18 @@ export async function handleGoogleRedirectResult() {
         const isNewUser = Boolean(result?.additionalUserInfo?.isNewUser);
         const authIntent = localStorage.getItem('diffsense_auth_intent');
         localStorage.removeItem('diffsense_auth_intent');
-        if (authIntent === 'signup' || isNewUser) {
+        
+        if (authIntent === 'signup' && isNewUser) {
             redirectToThanksSignup();
             return true;
         }
+
+        if (!isNewUser) {
+            Notify.info('既にご登録済みのため、ログインしました。', { title: 'ログイン完了' });
+        }
+
         await finalizePostLogin(result.user);
+
         return true;
     } catch (error) {
         console.error("Error handling Google redirect result:", error);

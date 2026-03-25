@@ -9,8 +9,8 @@ const { app } = require('./src/server');
 exports.api = onRequest(
     {
         region: 'asia-northeast1',  // 東京リージョン
-        timeoutSeconds: 120,
-        memory: '512MiB',
+        timeoutSeconds: 300,
+        memory: '1GiB',
     },
     app
 );

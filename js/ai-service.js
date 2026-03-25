@@ -93,9 +93,9 @@ export const aiService = {
         } catch (error) {
             console.error('AI Service Error:', error);
 
-            // ネットワークエラーの場合
-            if (error.message.includes('Failed to fetch')) {
-                throw new Error('バックエンドAPIに接続できません。サーバーが起動しているか確認してください。');
+            // ネットワークエラー・タイムアウトの場合
+            if (error.message.includes('Failed to fetch') || error.message.includes('timeout') || error.message.includes('Timeout')) {
+                throw new Error('取り込みに時間がかかりすぎました。もう一度お試しください。');
             }
 
             throw error;

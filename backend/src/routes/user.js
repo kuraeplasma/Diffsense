@@ -2,12 +2,55 @@ const express = require('express');
 const router = express.Router();
 const dbService = require('../services/db');
 const logger = require('../utils/logger');
+const { admin, firebaseInitialized } = require('../firebase');
 
 function isLocalUnlimitedMode(req) {
     const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').toLowerCase();
     const isLocalHost = host.includes('localhost') || host.includes('127.0.0.1');
     return process.env.NODE_ENV === 'development' && process.env.AUTH_BYPASS === 'true' && isLocalHost;
 }
+
+/**
+ * GET /api/user/check-exists
+ * Public endpoint to check if a user with given email already exists
+ */
+router.get('/check-exists', async (req, res) => {
+    try {
+        const email = req.query.email;
+        if (!email) {
+            return res.status(400).json({ success: false, error: 'Email query parameter is required' });
+        }
+
+        const normalizedEmail = String(email).toLowerCase().trim();
+        
+        // 1. Check our database
+        const userProfile = await dbService.findUserByEmail(normalizedEmail);
+        if (userProfile) {
+            return res.json({ success: true, exists: true, source: 'db' });
+        }
+
+        // 2. Check Firebase Admin (if available)
+        if (firebaseInitialized) {
+            try {
+                const userRecord = await admin.auth().getUserByEmail(normalizedEmail);
+                if (userRecord) {
+                    return res.json({ success: true, exists: true, source: 'firebase' });
+                }
+            } catch (authError) {
+                // auth/user-not-found is common and expected
+                if (authError.code !== 'auth/user-not-found') {
+                    logger.warn(`Firebase getUserByEmail error for ${normalizedEmail}: ${authError.message}`);
+                }
+            }
+        }
+
+        res.json({ success: true, exists: false });
+    } catch (error) {
+        logger.error('Error in check-exists:', error);
+        res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+});
+
 
 /**
  * GET /api/user/subscription

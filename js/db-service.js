@@ -249,8 +249,17 @@ export const dbService = {
     async syncContractsFromApi() {
         const apiData = await this._callApi('/api/contracts');
         if (Array.isArray(apiData)) {
-            localStorage.setItem(this.KEYS.CONTRACTS, JSON.stringify(apiData));
-            return apiData;
+            // ローカルキャッシュのoriginal_contentを保持（APIが返さない場合）
+            const local = this.getContracts();
+            const merged = apiData.map(remote => {
+                const cached = local.find(c => String(c.id) === String(remote.id));
+                if (cached && !remote.original_content && cached.original_content) {
+                    return { ...remote, original_content: cached.original_content };
+                }
+                return remote;
+            });
+            localStorage.setItem(this.KEYS.CONTRACTS, JSON.stringify(merged));
+            return merged;
         }
         return this.getContracts();
     },
@@ -260,7 +269,13 @@ export const dbService = {
         const contracts = this.getContracts();
         const index = contracts.findIndex(c => String(c.id) === String(contract.id));
         if (index >= 0) {
-            contracts[index] = { ...contracts[index], ...contract };
+            const existing = contracts[index];
+            const merged = { ...existing, ...contract };
+            // APIレスポンスがoriginal_contentを返さない場合はローカルキャッシュを保持
+            if (!merged.original_content && existing.original_content) {
+                merged.original_content = existing.original_content;
+            }
+            contracts[index] = merged;
         } else {
             contracts.unshift(contract);
         }

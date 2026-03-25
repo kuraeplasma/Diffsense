@@ -1768,6 +1768,7 @@ const Views = {
                             <span class="text-muted" style="font-weight:normal; font-size:11px;">最終解析: ${contract.last_analyzed_at || '-'}</span>
                         </div>
                         <div class="pane-scroll-area">
+                            ${hasComparableVersion ? `
                             <div class="analysis-section-title" style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
                                 <span><i class="fa-solid fa-robot text-primary"></i> AIリスク要約</span>
                                 ${canTriggerPairAnalysis && shouldAutoPairAnalysis ? `
@@ -1791,8 +1792,15 @@ const Views = {
                                 <i class="fa-solid fa-circle-exclamation text-warning"></i> 検知された重要な変更点
                             </div>
                             <div style="margin-bottom:32px;">
-                                ${changesHtml || `<div style="padding:20px; text-align:center; color:#999; font-size:13px;">${hasComparableVersion ? '変更点は検知されませんでした' : '比較対象の旧バージョンがありません（差分判定には2つ以上のバージョンが必要です）'}</div>`}
+                                ${changesHtml || `<div style="padding:20px; text-align:center; color:#999; font-size:13px;">変更点は検知されませんでした</div>`}
                             </div>
+                            ` : `
+                            <div style="padding:32px 20px; text-align:center; color:#999;">
+                                <i class="fa-solid fa-code-compare" style="font-size:32px; margin-bottom:12px; display:block; opacity:0.3;"></i>
+                                <div style="font-size:14px;">差分が取り込まれていません</div>
+                                <div style="font-size:12px; margin-top:6px;">バージョン2枚目をアップロードするとAI差分解析が実行されます</div>
+                            </div>
+                            `}
                         </div>
                         
                         ${contract.source_type === 'URL' ? `
@@ -3063,16 +3071,6 @@ class DashboardApp {
                     dbService.updateUserRole(user.email, this.userRole);
                 }
 
-                // Check if user just selected a plan from signup flow
-                const selectedPlan = localStorage.getItem('diffsense_selected_plan');
-                const selectedBillingCycle = localStorage.getItem('diffsense_selected_billing_cycle') || 'monthly';
-                const signupFlowFlag = localStorage.getItem('diffsense_signup_flow') === '1';
-                if (selectedPlan && signupFlowFlag) {
-                    await this.registerSelectedPlan(token, selectedPlan, selectedBillingCycle);
-                    localStorage.removeItem('diffsense_selected_plan');
-                    localStorage.removeItem('diffsense_selected_billing_cycle');
-                    localStorage.removeItem('diffsense_signup_flow');
-                }
 
                 this.setCachedItem(DASHBOARD_CACHE_KEYS.USER_META, {
                     role: this.userRole,
@@ -3093,6 +3091,27 @@ class DashboardApp {
                     this.fetchPaymentStatus(token),
                     this.fetchPaymentConfig()
                 ]);
+
+                // Check if user just selected a plan from signup flow
+                const selectedPlan = localStorage.getItem('diffsense_selected_plan');
+                const selectedBillingCycle = localStorage.getItem('diffsense_selected_billing_cycle') || 'monthly';
+                const signupFlowFlag = localStorage.getItem('diffsense_signup_flow') === '1';
+
+                if (selectedPlan && signupFlowFlag) {
+                    // Guard: Don't overwrite paid plan with free/starter if user already has a paid plan
+                    const currentPlan = (this.subscription?.plan || 'free').toLowerCase();
+                    const isDowngradeToFree = (selectedPlan === 'free' && currentPlan !== 'free' && currentPlan !== 'starter');
+                    
+                    if (isDowngradeToFree) {
+                        console.log('Signup flow detected for existing paid user - skipping plan overwrite');
+                    } else {
+                        await this.registerSelectedPlan(token, selectedPlan, selectedBillingCycle);
+                    }
+                    
+                    localStorage.removeItem('diffsense_selected_plan');
+                    localStorage.removeItem('diffsense_selected_billing_cycle');
+                    localStorage.removeItem('diffsense_signup_flow');
+                }
 
                 const urlParams = new URLSearchParams(window.location.search);
                 const paymentState = urlParams.get('payment');
@@ -5086,6 +5105,10 @@ class DashboardApp {
                     let friendlyMsg = error.message;
                     if (friendlyMsg.includes('ADM-ZIP') || friendlyMsg.includes('zip format')) {
                         friendlyMsg = 'Wordファイルの解析に失敗しました。正常なWordドキュメント(.docx)であることを確認してください。';
+                    } else if (friendlyMsg.includes('時間がかかりすぎ') || friendlyMsg.includes('timeout') || friendlyMsg.includes('Timeout') || friendlyMsg.includes('Failed to fetch')) {
+                        friendlyMsg = '取り込みに時間がかかりすぎました。もう一度お試しください。';
+                    } else if (friendlyMsg.includes('バックエンドAPI') || friendlyMsg.includes('接続できません')) {
+                        friendlyMsg = '取り込みに失敗しました。もう一度お試しください。';
                     }
                     if (await Notify.confirm(`エラーが発生しました:\n${friendlyMsg}\n\nもう一度試しますか？`, { title: '確認', type: 'error' })) {
                         await performAnalysis(retryCount + 1);

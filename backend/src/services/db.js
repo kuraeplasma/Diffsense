@@ -927,7 +927,42 @@ class DBService {
         }
         return null;
     }
+
+    /**
+     * Find a user by email address
+     * @param {string} email
+     * @returns {Promise<Object|null>}
+     */
+    async findUserByEmail(email) {
+        if (!email) return null;
+        const normalizedEmail = email.toLowerCase().trim();
+
+        if (this.useFirestore) {
+            try {
+                const snapshot = await firestore.collection('users')
+                    .where('email', '==', normalizedEmail)
+                    .limit(1)
+                    .get();
+                
+                if (!snapshot.empty) {
+                    return snapshot.docs[0].data();
+                }
+            } catch (error) {
+                logger.warn(`findUserByEmail Firestore error: ${error.message}`);
+            }
+        }
+
+        // File fallback / cache
+        try {
+            const users = await this.readData('users');
+            const found = users.find(u => (u.email || '').toLowerCase().trim() === normalizedEmail);
+            return found || null;
+        } catch (e) {
+            return null;
+        }
+    }
 }
+
 
 
 module.exports = new DBService();
