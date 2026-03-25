@@ -335,15 +335,13 @@ async function createPdfBufferFromFallbackImage(fallbackDocumentImageDataUrl, si
 
     const imageBytes = Buffer.from(imageBase64, 'base64');
     const pdfDoc = await PDFDocument.create();
-    const pageDims = signRequest?.page_dimensions?.[1]
-        || signRequest?.page_dimensions?.['1']
-        || { width: 794, height: 1123 };
-    const pageWidth = Math.max(320, Number(pageDims.width || 794));
-    const pageHeight = Math.max(420, Number(pageDims.height || 1123));
-    const page = pdfDoc.addPage([pageWidth, pageHeight]);
     const image = pngMatch
         ? await pdfDoc.embedPng(imageBytes)
         : await pdfDoc.embedJpg(imageBytes);
+
+    const pageWidth = image.width;
+    const pageHeight = image.height;
+    const page = pdfDoc.addPage([pageWidth, pageHeight]);
 
     page.drawImage(image, {
         x: 0,

@@ -4251,13 +4251,17 @@ class DashboardApp {
                 return;
             }
             renderParams = normalizedDiffId;
-            // Auto-switch to 'original' tab when opening a URL contract with content but no AI analysis
+            // Auto-switch to 'original' tab for new contracts (no history)
             const isNewContract = normalizedDiffId !== this.currentViewParams;
             if (isNewContract && !this.historyComparisonContext) {
                 const _c = dbService.getContractById(normalizedDiffId);
-                if (_c && _c.source_url && _c.original_content && !_c.last_analyzed_at) {
+                const historyCount = (_c && Array.isArray(_c.history)) ? _c.history.length : 0;
+                
+                // If no history exists, always show 'original' tab first
+                if (historyCount === 0) {
                     this.activeDetailTab = 'original';
-                } else if (isNewContract) {
+                } else if (!this.currentViewParams) {
+                    // Initial load with history -> show 'diff'
                     this.activeDetailTab = 'diff';
                 }
             }
