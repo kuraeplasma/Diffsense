@@ -110,7 +110,7 @@ class StripeService {
         const planLabelMap = {
             starter: 'Starter',
             business: 'Business',
-            pro: 'Pro / Legal'
+            pro: 'Pro'
         };
         const amount = unitAmountMap[cycle]?.[plan];
         if (!amount) return null;

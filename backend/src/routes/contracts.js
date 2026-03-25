@@ -26,6 +26,9 @@ router.get('/', async (req, res, next) => {
 router.post('/', async (req, res, next) => {
     try {
         const ownerUid = req.user.uid;
+        // 登録数は全プランで無制限のためチェック不要
+        const contracts = await dbService.getContracts(ownerUid);
+
         const payload = req.body || {};
         const nowIso = new Date().toISOString();
         const contract = {
@@ -453,34 +456,26 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
         const userProfile = await dbService.getUserProfile(uid);
         const localUnlimited = isLocalUnlimitedMode(req);
         const limit = localUnlimited ? Number.MAX_SAFE_INTEGER : dbService.getUsageLimit(userProfile);
-        const isInTrial = localUnlimited ? true : dbService.isTrialActive(userProfile);
 
         logger.info(`Usage check for ${uid}:`, {
             plan: userProfile.plan,
             usageCount: userProfile.usageCount,
             limit: limit,
-            isInTrial: isInTrial,
             skipAI: skipAI,
-            trialStartedAt: userProfile.trialStartedAt,
             hasPaymentMethod: userProfile.hasPaymentMethod
         });
 
         if (!skipAI && !localUnlimited) {
-            // Trial Expiration Check - Only if trial was ever started
-            if (userProfile.trialStartedAt && isInTrial === false) {
-                // Freeプラン移行期なので警告のみとし、返却は個別の上限チェックに任せる
-                logger.info(`Trial expired for user ${uid}. Treating as Free user unless payment is found.`);
-            }
-
             if (userProfile.usageCount >= limit) {
-                const limitMsg = isInTrial
-                    ? `無料トライアルの解析上限（${limit}回）に達しました。継続して利用するにはプランの契約が必要です。`
-                    : `プランの月間解析上限（${limit}回）に達しました。アップグレードをご検討ください。`;
-
                 logger.warn(`Usage limit reached for user ${uid}`, { plan: userProfile.plan, current: userProfile.usageCount });
                 return res.status(403).json({
                     success: false,
-                    error: limitMsg
+                    code: 'ANALYSIS_LIMIT_EXCEEDED',
+                    message: '今月のAI差分チェック回数の上限に達しました',
+                    error: '今月のAI差分チェック回数の上限に達しました',
+                    currentUsage: userProfile.usageCount,
+                    limit: limit,
+                    plan: userProfile.plan
                 });
             }
         }
@@ -662,8 +657,8 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
         // 4. Feature Gating
         let gatedChanges = aiResult.changes || [];
         const plan = userProfile.plan || 'free';
-        const isFree = plan === 'free' && !isInTrial;
-        const isStarter = plan === 'starter' && !isInTrial;
+        const isFree = plan === 'free';
+        const isStarter = plan === 'starter';
 
         if (isFree) {
             // Freeプランは詳細解説なし（リスク度のみ）
@@ -728,19 +723,18 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
         const userProfile = await dbService.getUserProfile(uid);
         const localUnlimited = isLocalUnlimitedMode(req);
         const limit = localUnlimited ? Number.MAX_SAFE_INTEGER : dbService.getUsageLimit(userProfile);
-        const isInTrial = localUnlimited ? true : dbService.isTrialActive(userProfile);
 
         if (!skipAI && !localUnlimited && userProfile.usageCount >= limit) {
-            const limitMsg = isInTrial
-                ? `無料トライアルの解析上限（${limit}回）に達しました。継続して利用するにはプランの契約が必要です。`
-                : `プランの月間解析上限（${limit}回）に達しました。アップグレードをご検討ください。`;
-            return res.status(403).json({ success: false, error: limitMsg });
+            return res.status(403).json({ success: false, error: `プランの月間解析上限（${limit}回）に達しました。アップグレードをご検討ください。` });
         }
 
         const currentBuffer = decodeBase64Payload(source);
         const currentArticles = await docxService.parseDocx(currentBuffer);
         const structuredContract = fromLegacyArticleArray(currentArticles);
         const previousArticles = await resolvePreviousDocxArticles(previousVersion);
+
+        const serialized = JSON.stringify(currentArticles);
+        const extractedTextHash = crypto.createHash('sha256').update(serialized).digest('hex');
 
         const diffChanges = previousArticles.length
             ? diffService.compare(previousArticles, currentArticles)
@@ -790,8 +784,8 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
         // 4. Feature Gating
         let gatedChanges = aiResult.changes || [];
         const plan = userProfile.plan || 'free';
-        const isFree = plan === 'free' && !isInTrial;
-        const isStarter = plan === 'starter' && !isInTrial;
+        const isFree = plan === 'free';
+        const isStarter = plan === 'starter';
 
         if (isFree) {
             gatedChanges = gatedChanges.map(c => ({

@@ -22,27 +22,17 @@ router.get('/subscription', async (req, res) => {
         const plan = userProfile.plan || 'pro';
         const billingCycle = userProfile.billingCycle || 'monthly';
         const limit = localUnlimited ? Number.MAX_SAFE_INTEGER : dbService.getUsageLimit(userProfile);
-        const isInTrial = localUnlimited
-            ? (!userProfile.hasPaymentMethod && dbService.isTrialActive(userProfile))
-            : dbService.isTrialActive(userProfile);
-
-        const trialStartedAt = userProfile.trialStartedAt || null;
         const renewalDate = userProfile.currentPeriodEnd || userProfile.nextBillingDate || null;
         const signUsageLimit = localUnlimited ? Number.MAX_SAFE_INTEGER : dbService.getSignUsageLimitForUser(userProfile);
-        
-        // Calculate count since trial start OR current billing month start
+
+        // Count within current billing period
         let countBaselineTime = 0;
-        if (isInTrial) {
-            countBaselineTime = new Date(trialStartedAt || 0).getTime();
+        const billingStart = userProfile.currentPeriodStart || userProfile.lastPaymentDate;
+        if (billingStart) {
+            countBaselineTime = new Date(billingStart).getTime();
         } else {
-            // Paid user: count within current billing period
-            const billingStart = userProfile.currentPeriodStart || userProfile.lastPaymentDate;
-            if (billingStart) {
-                countBaselineTime = new Date(billingStart).getTime();
-            } else {
-                const now = new Date();
-                countBaselineTime = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-            }
+            const now = new Date();
+            countBaselineTime = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
         }
 
         const signRequests = await dbService.getSignRequests(uid);
@@ -55,15 +45,7 @@ router.get('/subscription', async (req, res) => {
                 return createdTime >= countBaselineTime;
             }).length;
 
-        logger.info(`GET /subscription: uid=${uid}, plan=${plan}, isInTrial=${isInTrial}, AI=${userProfile.usageCount}/${limit}, Sign=${signUsageCount}/${signUsageLimit}`);
-
-        let daysRemaining = null;
-        if (isInTrial && trialStartedAt) {
-            const trialStart = new Date(trialStartedAt);
-            const now = new Date();
-            const elapsed = Math.floor((now - trialStart) / (1000 * 60 * 60 * 24));
-            daysRemaining = Math.max(0, 7 - elapsed);
-        }
+        logger.info(`GET /subscription: uid=${uid}, plan=${plan}, AI=${userProfile.usageCount}/${limit}, Sign=${signUsageCount}/${signUsageLimit}`);
 
         res.json({
             success: true,
@@ -72,10 +54,7 @@ router.get('/subscription', async (req, res) => {
                 billingCycle: billingCycle,
                 usageCount: localUnlimited ? 0 : (userProfile.usageCount || 0),
                 usageLimit: limit,
-                daysRemaining: daysRemaining,
-                trialStartedAt: trialStartedAt,
                 renewalDate: renewalDate,
-                isInTrial: isInTrial,
                 planLimit: localUnlimited ? Number.MAX_SAFE_INTEGER : dbService.getOriginalPlanLimit(plan),
                 signUsageCount,
                 signUsageLimit
@@ -106,8 +85,7 @@ router.post('/select-plan', async (req, res) => {
             ? billingCycle
             : 'monthly';
 
-        const shouldStartTrial = startTrial === true && plan === 'pro';
-        await dbService.setUserPlan(uid, plan, selectedBillingCycle, { forceTrialStart: shouldStartTrial });
+        await dbService.setUserPlan(uid, plan, selectedBillingCycle);
         logger.info(`User ${uid} selected plan: ${plan}, billingCycle: ${selectedBillingCycle}`);
 
         res.json({ success: true, data: { plan, billingCycle: selectedBillingCycle } });

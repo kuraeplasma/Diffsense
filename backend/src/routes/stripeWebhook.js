@@ -65,11 +65,11 @@ async function handleCheckoutCompleted(session) {
     await dbService.updatePaymentInfo(uid, {
         hasPaymentMethod: true,
         paymentRegisteredAt: new Date().toISOString(),
-        trialStartedAt: null,
+
         pendingPlan: null,
         pendingBillingCycle: null,
         stripeStatus,
-        subscriptionState: stripeStatus === 'TRIALING' ? 'trial' : 'active',
+        subscriptionState: 'active',
         trialEndsAt,
         currentPeriodEnd,
         stripePaymentFailed: false,

@@ -12,23 +12,29 @@ const PLAN_LIMITS = {
 };
 
 const AI_USAGE_LIMITS = {
-    'free': 3,
+    'free': 3,       // 登録無制限・差分チェック回数で課金動機
     'trial': 5,
-    'starter': 15,
+    'starter': 50,
     'business': 120,
     'pro': 400
 };
 
 const SIGN_USAGE_LIMITS = {
-    'free': 1,
+    'free': 10,      // Marketing hook (Best-in-class)
     'trial': 3,
-    'starter': 10,
-    'business': 50,
-    'pro': 999999 // Unlimited for now, handled in code
+    'starter': 25,
+    'business': 100,
+    'pro': 999999    // Unlimited
 };
 
-const TRIAL_AI_LIMIT = 5;
-const TRIAL_DURATION_DAYS = 7;
+const CONTRACT_LIMITS = {
+    'free': 999999,  // 登録無制限
+    'trial': 999999,
+    'starter': 999999,
+    'business': 999999,
+    'pro': 999999
+};
+
 const VALID_BILLING_CYCLES = ['monthly', 'annual'];
 
 function normalizeBillingCycle(value) {
@@ -57,14 +63,17 @@ class DBService {
         return SIGN_USAGE_LIMITS[plan] || 0;
     }
 
+    getContractLimit(plan) {
+        return CONTRACT_LIMITS[plan] || 0;
+    }
+
+    getContractLimitForUser(userProfile) {
+        const plan = userProfile.plan || 'free';
+        return CONTRACT_LIMITS[plan] || 0;
+    }
+
     getSignUsageLimitForUser(userProfile) {
-        // トライアル中はトライアル上限を適用（getUsageLimitと同様の挙動）
-        if (this.isTrialActive(userProfile)) {
-            return SIGN_USAGE_LIMITS['trial'];
-        }
-        
-        // トライアル終了後にお支払いがない場合はFree上限を適用
-        const hasActivePayment = userProfile.subscriptionState === 'active' || 
+        const hasActivePayment = userProfile.subscriptionState === 'active' ||
                                 userProfile.stripeStatus === 'ACTIVE' || 
                                 userProfile.paypalStatus === 'ACTIVE' || 
                                 userProfile.hasPaymentMethod;
@@ -74,6 +83,13 @@ class DBService {
 
         const plan = userProfile.plan || 'free';
         return SIGN_USAGE_LIMITS[plan] || 0;
+    }
+
+    // --- Helpers ---
+
+    _getCurrentYearMonth() {
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     }
 
     // --- Firestore helpers for user profiles ---
@@ -104,6 +120,31 @@ class DBService {
             await firestore.collection('users').doc(uid).set(data, { merge: true });
         } catch (error) {
             logger.error(`Firestore write error for user ${uid}: ${error.message}`);
+        }
+    }
+
+    async _firestoreGetMonthlyUsage(uid, yearMonth) {
+        if (!this.useFirestore) return null;
+        try {
+            const doc = await firestore.collection('users').doc(uid).collection('usage').doc(yearMonth).get();
+            return doc.exists ? doc.data() : { analysisCount: 0 };
+        } catch (error) {
+            logger.error(`Firestore monthly usage read error ${uid}/${yearMonth}: ${error.message}`);
+            return null;
+        }
+    }
+
+    async _firestoreIncrementMonthlyUsage(uid, yearMonth) {
+        if (!this.useFirestore) return null;
+        try {
+            const docRef = firestore.collection('users').doc(uid).collection('usage').doc(yearMonth);
+            const doc = await docRef.get();
+            const newCount = (doc.exists ? (doc.data().analysisCount || 0) : 0) + 1;
+            await docRef.set({ analysisCount: newCount });
+            return newCount;
+        } catch (error) {
+            logger.error(`Firestore monthly usage increment error ${uid}/${yearMonth}: ${error.message}`);
+            return null;
         }
     }
 
@@ -327,43 +368,8 @@ class DBService {
 
     // --- User Profile & Usage Tracking ---
 
-    /**
-     * Helper to check if a user is currently in the trial period
-     * @param {object} userProfile
-     */
-    isTrialActive(userProfile) {
-        if (!userProfile) return false;
-
-        // If user has a paid active subscription, they are NOT in trial
-        if (userProfile.subscriptionState === 'active' || 
-            userProfile.stripeStatus === 'ACTIVE' || 
-            userProfile.paypalStatus === 'ACTIVE') {
-            logger.info(`isTrialActive(${userProfile.uid}): false (Active paid status detected)`);
-            return false;
-        }
-
-        if (!userProfile.trialStartedAt) {
-            logger.info(`isTrialActive(${userProfile.uid}): false (No trialStartedAt)`);
-            return false;
-        }
-
-        const trialStart = new Date(userProfile.trialStartedAt);
-        const now = new Date();
-        const diffTime = now - trialStart;
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-        const isActive = diffDays <= TRIAL_DURATION_DAYS && diffDays >= 0;
-        logger.info(`isTrialActive(${userProfile.uid}): ${isActive} (diffDays=${diffDays}, started=${userProfile.trialStartedAt})`);
-        return isActive;
-    }
-
     getUsageLimit(userProfile) {
-        // If in trial, limit is always 5 checks (Trial limitation)
-        if (this.isTrialActive(userProfile)) {
-            return TRIAL_AI_LIMIT;
-        }
-
-        // トライアル終了後にお支払いがない場合はFree上限を適用（フリーミアム移行）
+        // お支払いがない場合はFree上限を適用
         const hasActivePayment = userProfile.subscriptionState === 'active' || 
                                 userProfile.stripeStatus === 'ACTIVE' || 
                                 userProfile.paypalStatus === 'ACTIVE' || 
@@ -386,19 +392,22 @@ class DBService {
         // 1. Try Firestore first (persistent, survives cold starts)
         let firestoreUser = await this._firestoreGetUser(uid);
         if (firestoreUser) {
-            logger.info(`getUserProfile(${uid}): Found in Firestore (plan=${firestoreUser.plan}, usage=${firestoreUser.usageCount})`);
-            
-            // Auto-monthly reset check
-            const now = new Date();
-            const lastReset = firestoreUser.lastResetDate ? new Date(firestoreUser.lastResetDate) : new Date(0);
-            if (now.getMonth() !== lastReset.getMonth() || now.getFullYear() !== lastReset.getFullYear()) {
-                logger.info(`getUserProfile(${uid}): Monthly reset triggered (last: ${firestoreUser.lastResetDate})`);
-                firestoreUser.usageCount = 0;
-                firestoreUser.lastResetDate = now.toISOString();
-                await this._firestoreSetUser(uid, { 
-                    usageCount: 0, 
-                    lastResetDate: firestoreUser.lastResetDate 
-                });
+            logger.info(`getUserProfile(${uid}): Found in Firestore (plan=${firestoreUser.plan})`);
+
+            // 当月の使用回数を usage/{YYYY-MM} サブコレクションから取得
+            const yearMonth = this._getCurrentYearMonth();
+            const monthlyUsage = await this._firestoreGetMonthlyUsage(uid, yearMonth);
+            if (monthlyUsage !== null) {
+                firestoreUser.usageCount = monthlyUsage.analysisCount || 0;
+                logger.info(`getUserProfile(${uid}): Monthly usage from subcollection (${yearMonth}): ${firestoreUser.usageCount}`);
+            } else {
+                // Firestoreサブコレクション読み取り失敗時は lastResetDate フォールバック
+                const now = new Date();
+                const lastReset = firestoreUser.lastResetDate ? new Date(firestoreUser.lastResetDate) : new Date(0);
+                if (now.getMonth() !== lastReset.getMonth() || now.getFullYear() !== lastReset.getFullYear()) {
+                    firestoreUser.usageCount = 0;
+                }
+                logger.warn(`getUserProfile(${uid}): Falling back to usageCount from user doc: ${firestoreUser.usageCount}`);
             }
 
             firestoreUser.billingCycle = normalizeBillingCycle(firestoreUser.billingCycle);
@@ -433,7 +442,6 @@ class DBService {
             uid: uid,
             plan: 'free',
             billingCycle: 'monthly',
-            trialStartedAt: null, // No trial for free plan by default
             hasPaymentMethod: false,
             usageCount: 0,
             lastResetDate: new Date().toISOString()
@@ -491,22 +499,14 @@ class DBService {
      */
     async setUserPlan(uid, plan, billingCycle = null, options = {}) {
         const normalizedBillingCycle = billingCycle ? normalizeBillingCycle(billingCycle) : null;
-        const forceTrialStart = options.forceTrialStart === true;
-        logger.info(`setUserPlan: uid=${uid}, plan=${plan}, billingCycle=${normalizedBillingCycle || 'keep'}, forceTrialStart=${forceTrialStart}`);
-
-        const existingProfile = await this.getUserProfile(uid);
-        let trialStartedAt = existingProfile?.trialStartedAt || null;
-
-        if (forceTrialStart) {
-            trialStartedAt = new Date().toISOString();
-        }
+        logger.info(`setUserPlan: uid=${uid}, plan=${plan}, billingCycle=${normalizedBillingCycle || 'keep'}`);
 
         const firestorePayload = normalizedBillingCycle
-            ? { uid, plan, billingCycle: normalizedBillingCycle, trialStartedAt }
-            : { uid, plan, trialStartedAt };
+            ? { uid, plan, billingCycle: normalizedBillingCycle }
+            : { uid, plan };
 
         // Always persist to Firestore first
-        logger.info(`setUserPlan(${uid}): Updating to plan=${plan}, billingCycle=${normalizedBillingCycle}, trialStart=${trialStartedAt}`);
+        logger.info(`setUserPlan(${uid}): Updating to plan=${plan}, billingCycle=${normalizedBillingCycle}`);
         await this._firestoreSetUser(uid, firestorePayload);
 
         const users = await this.readData('users');
@@ -514,7 +514,6 @@ class DBService {
 
         if (index > -1) {
             users[index].plan = plan;
-            users[index].trialStartedAt = trialStartedAt;
             if (normalizedBillingCycle) {
                 users[index].billingCycle = normalizedBillingCycle;
             } else {
@@ -528,7 +527,6 @@ class DBService {
                 uid: uid,
                 plan: plan,
                 billingCycle: normalizedBillingCycle || 'monthly',
-                trialStartedAt,
                 hasPaymentMethod: false,
                 usageCount: 0,
                 lastResetDate: new Date().toISOString()
@@ -545,21 +543,28 @@ class DBService {
      * @param {string} uid - Firebase UID
      */
     async incrementUsage(uid) {
+        const yearMonth = this._getCurrentYearMonth();
+
+        // Firestore サブコレクション users/{uid}/usage/{YYYY-MM} をインクリメント
+        const newCount = await this._firestoreIncrementMonthlyUsage(uid, yearMonth);
+        const lastUsedAt = new Date().toISOString();
+
+        // ファイルキャッシュを更新
         const users = await this.readData('users');
         const index = users.findIndex(u => u.uid === uid);
+        const count = newCount !== null ? newCount : ((index > -1 ? users[index].usageCount || 0 : 0) + 1);
 
         if (index > -1) {
-            users[index].usageCount = (users[index].usageCount || 0) + 1;
-            users[index].lastUsedAt = new Date().toISOString();
+            users[index].usageCount = count;
+            users[index].lastUsedAt = lastUsedAt;
             await this.writeData('users', users);
-            // Sync to Firestore
-            await this._firestoreSetUser(uid, {
-                usageCount: users[index].usageCount,
-                lastUsedAt: users[index].lastUsedAt
-            });
-            return users[index];
         }
-        return null;
+
+        // Firestore ユーザードキュメントにも反映（後方互換・ログ用）
+        await this._firestoreSetUser(uid, { usageCount: count, lastUsedAt });
+
+        logger.info(`incrementUsage(${uid}): ${yearMonth} count=${count}`);
+        return index > -1 ? users[index] : null;
     }
 
     /**

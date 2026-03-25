@@ -220,7 +220,7 @@ router.post('/paypal', express.json(), async (req, res) => {
                         hasPaymentMethod: true,
                         paypalStatus: 'ACTIVE',
                         paymentRegisteredAt: new Date().toISOString(),
-                        trialStartedAt: null,
+
                         nextBillingDate: resource.billing_info?.next_billing_time || null,
                         pendingPlan: null,
                         pendingBillingCycle: null

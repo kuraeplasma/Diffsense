@@ -24,16 +24,6 @@ class CronService {
             this.executeMonthlyReset();
         });
 
-        // Trial Reminder (New)
-        const trialCron = process.env.TRIAL_REMINDER_CRON || "0 10 * * *";
-        if (process.env.TRIAL_REMINDER_ENABLED === 'true') {
-            cron.schedule(trialCron, () => {
-                logger.info('Starting scheduled trial reminder task...');
-                this.executeTrialReminder();
-            });
-            logger.info(`Trial Reminder scheduled at ${trialCron}`);
-        }
-
         logger.info('Cron Service initialized');
     }
 
@@ -225,35 +215,6 @@ class CronService {
             logger.info(`Monthly usage reset completed: ${resetCount} users reset`);
         } catch (error) {
             logger.error('Monthly reset error:', error);
-        }
-    }
-    async executeTrialReminder() {
-        try {
-            const users = await dbService.readData('users');
-            const daysBefore = parseInt(process.env.TRIAL_REMINDER_DAYS_BEFORE || "3", 10);
-            const trialDuration = 7; // Matching db.js TRIAL_DURATION_DAYS
-
-            const emailService = require('./email');
-            let sentCount = 0;
-
-            for (const user of users) {
-                if (!user.trialStartedAt || user.hasPaymentMethod) continue;
-
-                const trialStart = new Date(user.trialStartedAt);
-                const now = new Date();
-                const diffTime = now - trialStart;
-                const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-                // If diffDays = 4, then 3 days left until day 7
-                if (diffDays === (trialDuration - daysBefore)) {
-                    logger.info(`Sending trial reminder to ${user.email} (${daysBefore} days left)`);
-                    await emailService.sendTrialReminderEmail(user.email, user.name || 'ユーザー', daysBefore);
-                    sentCount++;
-                }
-            }
-            logger.info(`Trial reminder check completed: ${sentCount} reminders sent`);
-        } catch (error) {
-            logger.error('Trial reminder execution error:', error);
         }
     }
 }

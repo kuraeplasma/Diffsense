@@ -736,21 +736,20 @@ async function saveAuditEvent({ signRequestId, ownerUid, event, actorEmail, ipAd
 async function ensureSignQuota(ownerUid) {
     const userProfile = await dbService.getUserProfile(ownerUid);
     const limit = dbService.getSignUsageLimitForUser(userProfile);
-    const isInTrial = dbService.isTrialActive(userProfile);
     const plan = userProfile.plan || 'free';
 
-    // Calculate baseline time for counting
+    if (plan === 'pro') {
+        return { limited: false, remaining: 999999 };
+    }
+
+    // Count within current billing month
     let countBaselineTime = 0;
-    if (isInTrial) {
-        countBaselineTime = new Date(userProfile.trialStartedAt || 0).getTime();
+    const billingStart = userProfile.currentPeriodStart || userProfile.lastPaymentDate;
+    if (billingStart) {
+        countBaselineTime = new Date(billingStart).getTime();
     } else {
-        const billingStart = userProfile.currentPeriodStart || userProfile.lastPaymentDate;
-        if (billingStart) {
-            countBaselineTime = new Date(billingStart).getTime();
-        } else {
-            const now = new Date();
-            countBaselineTime = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-        }
+        const now = new Date();
+        countBaselineTime = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
     }
 
     const requests = await dbService.getSignRequests(ownerUid);
@@ -764,20 +763,11 @@ async function ensureSignQuota(ownerUid) {
     }).length;
 
     if (count >= limit) {
-        let message = '';
-        if (isInTrial) {
-            message = `トライアル期間中の署名は${limit}回までです。継続して利用するにはプラン登録をお願いします。`;
-        } else if (plan === 'pro') {
-            // Pro is unlimited according to LP
-            return { limited: false, remaining: 999999 };
-        } else {
-            message = `今月の電子署名の上限（${limit}回）に達しました。翌月の更新までお待ちいただくか、上位プランへのアップグレードをご検討ください。`;
-        }
         return {
             limited: true,
             remaining: 0,
-            message,
-            code: isInTrial ? 'TRIAL_SIGN_LIMIT_REACHED' : 'SIGN_LIMIT_REACHED'
+            message: `今月の電子署名の上限（${limit}回）に達しました。翌月の更新までお待ちいただくか、上位プランへのアップグレードをご検討ください。`,
+            code: 'SIGN_LIMIT_REACHED'
         };
     }
 

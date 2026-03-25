@@ -158,7 +158,7 @@ router.post('/confirm-subscription', async (req, res) => {
                 paypalSubscriptionId: subscriptionId,
                 paypalStatus: 'ACTIVE',
                 paymentRegisteredAt: new Date().toISOString(),
-                trialStartedAt: null,
+
                 pendingPlan: null,
                 pendingBillingCycle: null
             });
@@ -401,7 +401,6 @@ router.post('/confirm-stripe-session', async (req, res) => {
         await dbService.updatePaymentInfo(uid, {
             hasPaymentMethod: true,
             paymentRegisteredAt: new Date().toISOString(),
-            trialStartedAt: null,
             pendingPlan: null,
             pendingBillingCycle: null,
             stripeCheckoutSessionId: session.id,
