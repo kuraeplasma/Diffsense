@@ -3902,6 +3902,39 @@ class DashboardApp {
     }
 
     async loadAndRenderNotificationSettings() {
+        const main = this.mainContent;
+        if (!main) return;
+
+        // Pro プラン以外はアップグレード画面を表示
+        const plan = this.subscription?.plan || 'free';
+        if (plan !== 'pro' && plan !== 'business') {
+            main.innerHTML = `
+                <div style="position:relative;min-height:80vh;">
+                    <div class="mask-content" style="pointer-events:none;user-select:none;">
+                        ${this.renderNotificationSettings({}, '')}
+                    </div>
+                    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(245,247,250,0.65);backdrop-filter:blur(3px);">
+                        <div class="modal-content" style="max-width:450px;width:90%;text-align:center;position:relative;">
+                            <div class="modal-body" style="padding:40px 32px;">
+                                <div style="font-size:3rem;color:#c19b4a;margin-bottom:20px;">
+                                    <i class="fa-solid fa-crown"></i>
+                                </div>
+                                <h3 style="margin-bottom:16px;font-size:1.4rem;">Proプラン限定機能</h3>
+                                <p style="color:#666;line-height:1.6;margin-bottom:32px;">
+                                    「通知設定」はProプラン以上の機能です。<br>
+                                    契約URLの変更をSlack・メールで通知します。
+                                </p>
+                                <button class="btn-dashboard btn-primary-action" style="width:100%;padding:12px;"
+                                    onclick="window.app.navigate('plan')">
+                                    プランをアップグレードする
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            return;
+        }
+
         // Slack OAuth結果をチェック
         const urlParams = new URLSearchParams(window.location.search);
         const slackConnected = urlParams.get('slack_connected');
@@ -3915,8 +3948,6 @@ class DashboardApp {
             history.replaceState(null, '', window.location.pathname);
         }
 
-        const main = this.mainContent;
-        if (!main) return;
         main.innerHTML = '<div style="padding:40px;color:#888;">読み込み中...</div>';
 
         let apiBase = '';
@@ -4068,13 +4099,17 @@ class DashboardApp {
         // --- Navigation Logic ---
         // Team Management: Business+
         const navTeam = document.querySelector('.nav-item[onclick*="navigate(\'team\')"]');
-        if (plan === 'free' || plan === 'starter') {
-            if (navTeam) navTeam.classList.add('feature-locked');
+        if (navTeam) {
+            navTeam.classList.remove('feature-locked');
+            navTeam.style.display = 'flex';
+        }
+
+        // Notification Settings: Pro only
+        const navNotif = document.getElementById('nav-notifications');
+        if (plan !== 'pro') {
+            if (navNotif) navNotif.classList.add('feature-locked');
         } else {
-            if (navTeam) {
-                navTeam.classList.remove('feature-locked');
-                navTeam.style.display = 'flex';
-            }
+            if (navNotif) navNotif.classList.remove('feature-locked');
         }
     }
 
