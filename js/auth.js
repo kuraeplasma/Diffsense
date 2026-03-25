@@ -9,6 +9,7 @@ import {
     signInWithPopup,
     signInWithRedirect,
     getRedirectResult,
+    getAdditionalUserInfo,
     signOut,
     onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -199,9 +200,28 @@ export async function handleGoogleLogin(intent = 'auto') {
 
         const userCredential = await signInWithPopup(auth, provider);
         const user = userCredential.user;
-        const isNewUser = Boolean(userCredential?.additionalUserInfo?.isNewUser);
-        console.log("Google signed in user:", user);
+        
+        // Correct way to get additional user info in Firebase v9+ Modular SDK
+        const addInfo = getAdditionalUserInfo(userCredential);
+        let isNewUser = Boolean(addInfo?.isNewUser);
+        
+        // Final guard: Even if Firebase says isNewUser, check our backend DB
+        if (isNewUser && user.email) {
+            try {
+                const checkRes = await fetch(`${getApiBaseUrl()}/api/user/check-exists?email=${encodeURIComponent(user.email)}`);
+                const checkData = await checkRes.json();
+                if (checkData.exists) {
+                    console.log("Backend confirmed user exists, overrides Firebase isNewUser: true");
+                    isNewUser = false;
+                }
+            } catch (e) {
+                console.warn("Backend check failed during Google login:", e);
+            }
+        }
+
+        console.log("Google signed in user:", user, "isNewUser:", isNewUser);
         localStorage.removeItem('diffsense_auth_intent');
+        
         if (normalizedIntent === 'signup' && isNewUser) {
             redirectToThanksSignup();
             return;
@@ -243,7 +263,24 @@ export async function handleGoogleRedirectResult() {
     try {
         const result = await getRedirectResult(auth);
         if (!result || !result.user) return false;
-        const isNewUser = Boolean(result?.additionalUserInfo?.isNewUser);
+        
+        const addInfo = getAdditionalUserInfo(result);
+        let isNewUser = Boolean(addInfo?.isNewUser);
+        const user = result.user;
+
+        // Final guard: Even if Firebase says isNewUser, check our backend DB
+        if (isNewUser && user.email) {
+            try {
+                const checkRes = await fetch(`${getApiBaseUrl()}/api/user/check-exists?email=${encodeURIComponent(user.email)}`);
+                const checkData = await checkRes.json();
+                if (checkData.exists) {
+                    isNewUser = false;
+                }
+            } catch (e) {
+                console.warn("Backend check failed during Google redirect:", e);
+            }
+        }
+
         const authIntent = localStorage.getItem('diffsense_auth_intent');
         localStorage.removeItem('diffsense_auth_intent');
         
@@ -251,7 +288,6 @@ export async function handleGoogleRedirectResult() {
             redirectToThanksSignup();
             return true;
         }
-
         if (!isNewUser) {
             Notify.info('既にご登録済みのため、ログインしました。', { title: 'ログイン完了' });
         }
