@@ -1243,7 +1243,8 @@ const Views = {
         }
 
         let cancelSection = '';
-        if (hasPayment) {
+        const isPaidPlan = sub.plan !== 'free' && sub.plan !== 'starter';
+        if (hasPayment || isPaidPlan) {
             cancelSection = `
                 <div class="plan-cancel-section">
                     <p>プランの解約をご希望の場合：</p>

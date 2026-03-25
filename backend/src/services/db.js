@@ -511,16 +511,28 @@ class DBService {
 
         const users = await this.readData('users');
         const index = users.findIndex(u => u.uid === uid);
+        const existingProfile = (index > -1) ? users[index] : (this.useFirestore ? await this.getUserProfile(uid) : null);
 
-        if (index > -1) {
-            users[index].plan = plan;
-            if (normalizedBillingCycle) {
-                users[index].billingCycle = normalizedBillingCycle;
+        if (existingProfile) {
+            if (index > -1) {
+                users[index].plan = plan;
+                if (normalizedBillingCycle) {
+                    users[index].billingCycle = normalizedBillingCycle;
+                } else {
+                    users[index].billingCycle = normalizeBillingCycle(users[index].billingCycle);
+                }
             } else {
-                users[index].billingCycle = normalizeBillingCycle(users[index].billingCycle);
+                // Not in file but exists in Firestore (or elsewhere)
+                // Just let firestore update happen via firestorePayload above, 
+                // and we can optionally add to file here if we want sync
+                users.push({
+                    ...existingProfile,
+                    plan,
+                    billingCycle: normalizedBillingCycle || existingProfile.billingCycle
+                });
             }
             await this.writeData('users', users);
-            return users[index];
+            return (index > -1) ? users[index] : users[users.length - 1];
         } else {
             // New user with selected plan
             const user = {
