@@ -5082,7 +5082,14 @@ class DashboardApp {
                         }
 
                     } else {
-                        throw new Error(result.error || '解析に失敗しました');
+                        const err = new Error(result.error || '解析に失敗しました');
+                        if (result.error === 'ANALYSIS_LIMIT_EXCEEDED') {
+                            err.code = 'ANALYSIS_LIMIT_EXCEEDED';
+                            err.currentUsage = result.currentUsage;
+                            err.limit = result.limit;
+                            err.nextPlan = result.nextPlan;
+                        }
+                        throw err;
                     }
 
                 } catch (error) {
@@ -5201,7 +5208,14 @@ class DashboardApp {
                         Notify.success('最新バージョンの取り込みとAI解析が完了しました！');
                     }
                 } else {
-                    throw new Error(result.error || '解析に失敗しました');
+                    const err = new Error(result.error || '解析に失敗しました');
+                    if (result.error === 'ANALYSIS_LIMIT_EXCEEDED') {
+                        err.code = 'ANALYSIS_LIMIT_EXCEEDED';
+                        err.currentUsage = result.currentUsage;
+                        err.limit = result.limit;
+                        err.nextPlan = result.nextPlan;
+                    }
+                    throw err;
                 }
 
             } catch (error) {
@@ -5691,7 +5705,14 @@ class DashboardApp {
                 dbService.updateContractAnalysis(id, resData.data);
                 this.navigate('diff', id);
             } else {
-                throw new Error(resData.error || '解析に失敗しました');
+                const err = new Error(resData.error || '解析に失敗しました');
+                if (resData.error === 'ANALYSIS_LIMIT_EXCEEDED') {
+                    err.code = 'ANALYSIS_LIMIT_EXCEEDED';
+                    err.currentUsage = resData.currentUsage;
+                    err.limit = resData.limit;
+                    err.nextPlan = resData.nextPlan;
+                }
+                throw err;
             }
         } catch (error) {
             console.error('AI Analysis Error:', error);
