@@ -559,11 +559,14 @@ async function generateSignedPdf(signRequest, req, contract = null, fallbackDocu
             const pngBase64 = String(signatureValue.dataUrl).replace(/^data:image\/png;base64,/, '');
             const pngBytes = Buffer.from(pngBase64, 'base64');
             const image = await pdfDoc.embedPng(pngBytes);
+            const { width: imgW, height: imgH } = image.scale(1);
+            const drawHeight = (imgW > 0 && imgH > 0) ? (box.width * imgH / imgW) : box.height;
+            const yOffset = (box.height - drawHeight) / 2;
             page.drawImage(image, {
                 x: box.x,
-                y: box.y,
+                y: box.y + yOffset,
                 width: box.width,
-                height: box.height
+                height: drawHeight
             });
         } else if (field.type === 'signature' && signatureValue?.type === 'text' && signatureValue?.fontText) {
             const textValue = String(signatureValue.fontText || '').trim();
