@@ -1243,7 +1243,7 @@ const Views = {
         }
 
         let cancelSection = '';
-        const isPaidPlan = sub.plan !== 'free' && sub.plan !== 'starter';
+        const isPaidPlan = sub.plan !== 'free';
         if (hasPayment || isPaidPlan) {
             cancelSection = `
                 <div class="plan-cancel-section">
@@ -1348,11 +1348,9 @@ const Views = {
 
     // 2. Contract List
     contracts: (params) => {
-        const page = params?.page || 1;
-        const pageSize = 10;
         const appFilters = window.app ? window.app.filters : {};
 
-        const { items, totalPages, totalItems } = dbService.getPaginatedContracts(page, pageSize, params);
+        const { items, totalItems } = dbService.getPaginatedContracts(1, 99999, params);
 
         const rows = items.map(c => {
             let riskBadge = '';
@@ -4009,8 +4007,8 @@ class DashboardApp {
                 <p style="margin-bottom:16px; color:#333;">本当にプランをキャンセルしますか？</p>
                 <ul style="font-size:0.85rem; color:#666; margin-bottom:20px; padding-left:20px;">
                     <li style="margin-bottom:6px;">サブスクリプションが停止されます</li>
-                    <li style="margin-bottom:6px;">Starterプラン（無料）に戻ります</li>
-                    <li style="margin-bottom:6px;">AI解析回数が月50回に制限されます</li>
+                    <li style="margin-bottom:6px;">Freeプラン（無料）に戻ります</li>
+                    <li style="margin-bottom:6px;">AI解析回数が月3回に制限されます</li>
                 </ul>
                 <div style="display:flex; gap:12px; justify-content:flex-end;">
                     <button onclick="document.getElementById('cancel-modal-overlay').remove()" class="btn-dashboard" style="padding:8px 20px;">キャンセルしない</button>
@@ -4043,9 +4041,9 @@ class DashboardApp {
 
             if (result.success) {
                 this.paymentStatus = { hasPaymentMethod: false };
-                this.subscription.plan = 'starter';
+                this.subscription.plan = 'free';
                 this.subscription.billingCycle = 'monthly';
-                this.userPlan = 'starter';
+                this.userPlan = 'free';
                 this.planViewBillingCycle = 'monthly';
                 this.updateSubscriptionUI();
                 Notify.success('プランがキャンセルされました。Starterプランに移行しました。');
