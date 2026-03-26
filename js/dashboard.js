@@ -1348,9 +1348,11 @@ const Views = {
 
     // 2. Contract List
     contracts: (params) => {
+        const page = params?.page || 1;
+        const pageSize = 10;
         const appFilters = window.app ? window.app.filters : {};
 
-        const { items, totalItems } = dbService.getPaginatedContracts(1, 99999, params);
+        const { items, totalPages, totalItems } = dbService.getPaginatedContracts(page, pageSize, params);
 
         const rows = items.map(c => {
             let riskBadge = '';
