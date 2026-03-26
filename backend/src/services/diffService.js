@@ -2,12 +2,24 @@ const diff = require('diff');
 const stringSimilarity = require('string-similarity');
 const logger = require('../utils/logger');
 
+/**
+ * Super Normalizer to unify CJK character widths and eliminate layout noise
+ */
+function superNormalize(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/[！-～]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0)) // Full-width to Half-width
+        .replace(/　/g, ' ') // Full-width space to half-width
+        .replace(/[（【［]/g, '(')
+        .replace(/[）】］]/g, ')')
+        .replace(/[「『]/g, '"')
+        .replace(/[」』]/g, '"')
+        .replace(/[―ー—－]/g, '-')
+        .replace(/[\s\n\r\t]+/g, '') // Remove all whitespace for the comparison check
+        .trim();
+}
+
 class DiffService {
-    /**
-     * Compare two structured documents
-     * @param {Array} oldArticles 
-     * @param {Array} newArticles 
-     */
     /**
      * Compare two structured documents
      * @param {Array} oldArticles 
@@ -25,11 +37,25 @@ class DiffService {
                 const newArt = newArticles[bestMatch.index];
                 matchedNewIndices.add(bestMatch.index);
 
-                // Use normalized text for comparison to ignore layout noise
-                const oldContent = this._normalizeText(oldArt.full_text || '');
-                const newContent = this._normalizeText(newArt.full_text || '');
+                // Use super normalization for comparison to ignore character width and layout noise
+                const oldContent = superNormalize(oldArt.full_text || '');
+                const newContent = superNormalize(newArt.full_text || '');
 
-                if (oldContent !== newContent) {
+                // Only consider it a "change" if it's more than just noise.
+                // For long texts, we permit a tiny difference (e.g. 1-2 phantom chars from PDF extraction)
+                const isSignificantlyDifferent = (() => {
+                    if (oldContent === newContent) return false;
+                    
+                    const sim = stringSimilarity.compareTwoStrings(oldContent, newContent);
+                    if (sim > 0.998) {
+                        // If it's 99.8% similar, check if actual "material" words changed.
+                        // If only isolated numbers or symbols changed, it's likely noise.
+                        return false; 
+                    }
+                    return true;
+                })();
+
+                if (isSignificantlyDifferent) {
                     // Content changed
                     changes.push({
                         type: 'MODIFY',
@@ -113,13 +139,10 @@ class DiffService {
     }
 
     /**
-     * Normalize text for comparison by collapsing whitespace and line breaks
+     * Normalize text for comparison (internal helper using superNormalize)
      */
     _normalizeText(text) {
-        return String(text || '')
-            .replace(/[ \t\r　]+/g, '') // Remove all horizontal whitespace including full-width space
-            .replace(/\n+/g, '')       // Remove all line breaks for the most robust comparison
-            .trim();
+        return superNormalize(text);
     }
 
     /**

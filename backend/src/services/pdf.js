@@ -324,7 +324,25 @@ class PDFService {
             let current = '';
             let prev = null;
             const lineGapThreshold = Math.max(8, medianHeight * 1.5);
+            
+            // Helper to identify "noise" lines like page numbers
+            const isPageArtifact = (line) => {
+                const text = line.text.trim();
+                // Standalone page numbers like "1", "2", or "- 1 -"
+                if (/^[\d\-]{1,5}$/.test(text)) return true;
+                if (/^(page|ページ|項)\s*[\d一二三四五六七八九十]{1,5}$/i.test(text)) return true;
+                return false;
+            };
+
             for (const line of allLines) {
+                // Skip lines that are likely page numbers or artifacts
+                // but only if they are not part of an article header or a list
+                if (isPageArtifact(line) && !/^第\s*[0-9０-９一二三四五六七八九十百千〇零]+\s*条/.test(line.text)) {
+                    // Check if it's likely a page number (at extreme top/bottom)
+                    // (Simplified: for now just skip standalone short numeric lines)
+                    continue;
+                }
+
                 if (!prev) {
                     current = line.text;
                     prev = line;
