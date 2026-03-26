@@ -1,6 +1,9 @@
 import { Notify } from './notify.js';
 import { dbService } from './db-service.js?v=20260321f';
 import { aiService } from './ai-service.js?v=20260309h2';
+import { getApiBaseUrl } from './api-base.js';
+import { auth } from './firebase-config.js';
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 const LOCAL_UI_CACHE_VERSION = '20260310v3';
 const DASHBOARD_CACHE_KEYS = {
     USER_META: `diffsense_cache_user_meta_${LOCAL_UI_CACHE_VERSION}`,
@@ -6450,7 +6453,65 @@ class DashboardApp {
         });
 
         if (confirmed) {
-            window.location.href = '/select-plan.html' + (next ? `?plan=${String(next.name).toLowerCase()}&auto=true` : '');
+            const planId = next ? String(next.name).toLowerCase() : 'starter';
+            this.startStripeCheckout(planId);
+        }
+    }
+
+    async startStripeCheckout(planId) {
+        // Show loading toast or overlay if needed
+        const loadingNotify = Notify.info('決済ページへ移動中...', { duration: 0 });
+
+        try {
+            // Get ID Token
+            const user = auth.currentUser;
+            if (!user) {
+                // Wait a bit for auth state if not immediately available
+                await new Promise(resolve => {
+                    const unsubscribe = onAuthStateChanged(auth, (user) => {
+                        unsubscribe();
+                        resolve(user);
+                    });
+                    setTimeout(resolve, 3000); // Timeout fallback
+                });
+            }
+
+            const currentUser = auth.currentUser;
+            let token = null;
+            if (currentUser) {
+                token = await currentUser.getIdToken();
+            }
+
+            const apiBase = getApiBaseUrl();
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) headers.Authorization = `Bearer ${token}`;
+
+            const res = await fetch(`${apiBase}/api/createCheckoutSession`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                    plan: planId,
+                    billingCycle: 'monthly',
+                    cancelUrl: window.location.href
+                })
+            });
+
+            const result = await res.json();
+            if (result.success && result.data?.url) {
+                sessionStorage.setItem('stripe_checkout_started', 'true');
+                window.location.href = result.data.url;
+            } else {
+                throw new Error(result.error || '決済ページを開けませんでした');
+            }
+        } catch (error) {
+            console.error('Stripe Checkout Error:', error);
+            Notify.error(`決済ページの読み込みに失敗しました: ${error.message}`);
+            // Fallback to select-plan.html if API fails
+            setTimeout(() => {
+                window.location.href = `/select-plan.html?plan=${planId}`;
+            }, 2000);
+        } finally {
+            if (loadingNotify && loadingNotify.close) loadingNotify.close();
         }
     }
 

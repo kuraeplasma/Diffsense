@@ -278,7 +278,10 @@ const Notify = (() => {
             setTimeout(remove, duration);
         }
 
-        return el;
+        return {
+            el,
+            close: remove
+        };
     }
 
     /**
