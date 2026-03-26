@@ -849,10 +849,11 @@ ul {
     width: auto;
 }
 
-/* Name (Flex) */
+/* Date */
 .dashboard-table th:nth-child(3),
 .dashboard-table td:nth-child(3) {
-    width: 120px;
+    min-width: 160px;
+    white-space: nowrap;
 }
 
 /* Date */
@@ -881,10 +882,11 @@ ul {
     width: 120px;
 }
 
-/* Type */
+/* Last Updated */
 .contracts-table th:nth-child(3),
 .contracts-table td:nth-child(3) {
-    width: 120px;
+    min-width: 160px;
+    white-space: nowrap;
 }
 
 /* Last Updated */
