@@ -77,19 +77,22 @@ function shouldKeepSoftLineBreak(prevLine, nextLine) {
     const prev = String(prevLine || '').trim();
     const next = String(nextLine || '').trim();
     if (!prev || !next) return true;
+    
+    // Article headers are always standalone
     if (/^第\s*[0-9０-９一二三四五六七八九十百千〇零]+\s*条/.test(prev)) return true;
+    
+    // Explicit sentence endings in Japanese or English
     if (/[。．！？!?]$/.test(prev)) return true;
-    // Preserve line break for likely standalone heading lines such as "総則", "定義", "利用料金".
-    if (
-        prev.length <= 24 &&
-        !/[。．、，:：]/.test(prev) &&
-        /^[\u3040-\u30ff\u3400-\u9fffA-Za-z0-9\s　（）()【】\-]+$/.test(prev) &&
-        !/^[\d０-９]+\s*[\.．\)]/.test(prev)
-    ) return true;
-    if (/^[\d０-９]+\s*[\.．\)]/.test(next)) return true;
-    if (/^[・●○■□\-]/.test(next)) return true;
-    if (/^[（(]/.test(next)) return true;
-    if (/^[^\s　]{1,20}[：:]/.test(next)) return true;
+    
+    // Common bullet points at the start of next line
+    if (/^([0-9０-９]+[\.．\)]|[・●○■□\-]|\([0-9０-９a-zA-Z]+\))/.test(next)) return true;
+    
+    // Standalone headings (short, no punctuation)
+    if (prev.length <= 32 && !/[。．、，:：,;]/.test(prev) && !/[a-z]$/i.test(prev)) {
+        // If it looks like a title/heading, keep the break
+        return true;
+    }
+
     return false;
 }
 

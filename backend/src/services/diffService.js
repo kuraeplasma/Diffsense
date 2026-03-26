@@ -8,6 +8,11 @@ class DiffService {
      * @param {Array} oldArticles 
      * @param {Array} newArticles 
      */
+    /**
+     * Compare two structured documents
+     * @param {Array} oldArticles 
+     * @param {Array} newArticles 
+     */
     compare(oldArticles, newArticles) {
         const changes = [];
         const matchedNewIndices = new Set();
@@ -20,7 +25,11 @@ class DiffService {
                 const newArt = newArticles[bestMatch.index];
                 matchedNewIndices.add(bestMatch.index);
 
-                if (bestMatch.similarity < 1.0) {
+                // Use normalized text for comparison to ignore layout noise
+                const oldContent = this._normalizeText(oldArt.full_text || '');
+                const newContent = this._normalizeText(newArt.full_text || '');
+
+                if (oldContent !== newContent) {
                     // Content changed
                     changes.push({
                         type: 'MODIFY',
@@ -71,6 +80,8 @@ class DiffService {
         let bestScore = -1;
         let bestIndex = -1;
 
+        const oldClean = this._normalizeText(oldArt.full_text || '');
+
         for (let i = 0; i < newArticles.length; i++) {
             if (matchedIndices.has(i)) continue;
 
@@ -87,8 +98,9 @@ class DiffService {
                 score = Math.max(score, 0.9);
             }
 
-            // 3. Content similarity
-            const contentSim = stringSimilarity.compareTwoStrings(oldArt.full_text || '', newArt.full_text || '');
+            // 3. Content similarity (Normalized)
+            const newClean = this._normalizeText(newArt.full_text || '');
+            const contentSim = stringSimilarity.compareTwoStrings(oldClean, newClean);
             score = Math.max(score, contentSim);
 
             if (score > bestScore && score > 0.4) { // Threshold for a "match"
@@ -101,10 +113,30 @@ class DiffService {
     }
 
     /**
+     * Normalize text for comparison by collapsing whitespace and line breaks
+     */
+    _normalizeText(text) {
+        return String(text || '')
+            .replace(/[ \t\r　]+/g, '') // Remove all horizontal whitespace including full-width space
+            .replace(/\n+/g, '')       // Remove all line breaks for the most robust comparison
+            .trim();
+    }
+
+    /**
      * Generate inline character-level diffs
      */
     _generateCharDiff(oldStr, newStr) {
-        const changes = diff.diffChars(oldStr, newStr);
+        // For the visual diff, we want to keep some layout but normalize it to avoid noise
+        const visualNormalize = (s) => String(s || '')
+            .split('\n')
+            .map(line => line.replace(/[ \t\r　]+/g, ' ').trim())
+            .filter(line => line.length > 0)
+            .join('\n');
+
+        const vOld = visualNormalize(oldStr);
+        const vNew = visualNormalize(newStr);
+
+        const changes = diff.diffChars(vOld, vNew);
         return changes.map(part => {
             if (part.added) return `<span class="diff-add">${part.value}</span>`;
             if (part.removed) return `<span class="diff-del">${part.value}</span>`;
