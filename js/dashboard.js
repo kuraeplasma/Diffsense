@@ -1064,13 +1064,12 @@ const Views = {
     plan: () => {
         const sub = window.app ? window.app.subscription : null;
         const payment = window.app ? window.app.paymentStatus : null;
-        if (!sub) {
+        if (!sub || !sub.plan) {
             return `
-                <div class="text-center p-5">
-                    <p style="margin-bottom:14px;">利用状況を読み込んでいます...</p>
-                    <button class="btn-dashboard" onclick="window.app.reloadPlanData()" style="padding:8px 16px;">
-                        再読み込み
-                    </button>
+                <div class="page-title">プラン管理</div>
+                <div class="plan-loading" style="text-align:center; padding:50px;">
+                    <i class="fa-solid fa-spinner fa-spin" style="font-size:2rem; color:#c19b4a; margin-bottom:16px;"></i>
+                    <p>利用状況を確認しています...</p>
                 </div>
             `;
         }
@@ -1243,17 +1242,31 @@ const Views = {
         }
 
         let cancelSection = '';
-        const isPaidPlan = sub.plan !== 'free';
-        if (hasPayment || isPaidPlan) {
-            cancelSection = `
-                <div class="plan-cancel-section">
-                    <p>プランの解約をご希望の場合：</p>
-                    <button onclick="window.app.showCancelModal()" class="btn-dashboard plan-cancel-btn">
-                        <i class="fa-solid fa-xmark"></i> プランをキャンセル
-                    </button>
+        const currentPlanLower = (sub.plan || 'free').toLowerCase();
+        const isFreePlan = currentPlanLower === 'free';
+        
+        // Always show for compliance, but allow different UI if already Free
+        cancelSection = `
+            <div class="plan-cancel-section" style="margin-top: 60px; border-top: 1px solid #eee; padding-top: 32px;">
+                <div style="max-width: 600px; margin: 0 auto; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 24px; text-align: left;">
+                    <h3 style="font-size: 1.1rem; font-weight: 700; color: #111827; margin-bottom: 12px;">プランの解約（無料プランへの移行）</h3>
+                    <p style="color: #4b5563; font-size: 0.9rem; line-height: 1.6; margin-bottom: 20px;">
+                        有料プランから無料プランへの移行を希望される場合は、以下のボタンから手続きを行ってください。
+                        解約後も、それまでに登録されたデータは引き続き閲覧可能です。
+                    </p>
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px; background: #f9fafb; border-radius: 8px;">
+                        <span style="font-size: 0.85rem; color: #6b7280;">現在のプラン: <strong>${(sub.plan || 'Free').toUpperCase()}</strong></span>
+                        ${isFreePlan ? `
+                            <span style="font-size: 0.85rem; color: #10b981; font-weight: 600;"><i class="fa-solid fa-circle-check"></i> すでに無料プランです</span>
+                        ` : `
+                            <button onclick="window.app.showCancelModal()" class="btn-dashboard plan-cancel-btn" style="background:#fff; color:#dc2626; border:1px solid #dc2626; padding:8px 16px; font-weight:600;">
+                                <i class="fa-solid fa-xmark"></i> プランをキャンセルする
+                            </button>
+                        `}
+                    </div>
                 </div>
-            `;
-        }
+            </div>
+        `;
 
         return `
             <div class="page-title">プラン管理</div>
@@ -4048,7 +4061,7 @@ class DashboardApp {
                 this.userPlan = 'free';
                 this.planViewBillingCycle = 'monthly';
                 this.updateSubscriptionUI();
-                Notify.success('プランがキャンセルされました。Starterプランに移行しました。');
+                Notify.success('プランがキャンセルされました。無料プランに移行しました。');
                 this.navigate('plan');
             } else {
                 Notify.error('キャンセル処理でエラーが発生しました。');
