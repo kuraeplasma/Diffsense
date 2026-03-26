@@ -4845,12 +4845,7 @@ class DashboardApp {
         const count = Number(this.subscription?.usageCount || 0);
         const limit = Number(this.subscription?.usageLimit || 0);
         if (count >= limit) {
-            const plan = this.subscription?.plan || 'free';
-            const confirmed = await Notify.confirm(
-                `今月のAI差分チェック回数（${count}/${limit}回）を使い切りました。<br><br>Starterプラン（¥1,480/月）にアップグレードすると月50回まで解析できます。`,
-                { title: '解析回数の上限に達しました', type: 'warning', okText: '今すぐアップグレード', cancelText: '閉じる', okStyle: 'primary' }
-            );
-            if (confirmed) window.location.href = '/select-plan.html';
+            this.showAnalysisLimitError({ currentUsage: count, limit: limit });
             return;
         }
         if (!this.ensurePaymentAccess('差分解析')) {
@@ -5105,7 +5100,7 @@ class DashboardApp {
                     }
                     if (error.code === 'ANALYSIS_LIMIT_EXCEEDED') {
                         this.showAnalysisLimitError(error);
-                    } else if (await Notify.confirm(`エラーが発生しました:\n${friendlyMsg}\n\nもう一度試しますか？`, { title: '確認', type: 'error' })) {
+                    } else if (await Notify.confirm(`解析中に問題が発生しました:\n${friendlyMsg}\n\nもう一度試しますか？`, { title: '解析エラー', type: 'error' })) {
                         await performAnalysis(retryCount + 1);
                     }
                 }
@@ -5218,7 +5213,9 @@ class DashboardApp {
                 if (friendlyMsg.includes('ADM-ZIP') || friendlyMsg.includes('zip format')) {
                     friendlyMsg = 'Wordファイルの読み込みに失敗しました。ファイルが破損しているか、非対応の形式である可能性があります。';
                 }
-                if (await Notify.confirm(`解析中に問題が発生しました:\n${friendlyMsg}\n\nもう一度試しますか？`, { title: '解析エラー', type: 'error' })) {
+                if (error.code === 'ANALYSIS_LIMIT_EXCEEDED') {
+                    this.showAnalysisLimitError(error);
+                } else if (await Notify.confirm(`解析中に問題が発生しました:\n${friendlyMsg}\n\nもう一度試しますか？`, { title: '解析エラー', type: 'error' })) {
                     await performUrlAnalysis(retryCount + 1);
                 }
             }
@@ -5596,8 +5593,7 @@ class DashboardApp {
         const count = Number(this.subscription?.usageCount || 0);
         const limit = Number(this.subscription?.usageLimit || 0);
         if (count >= limit) {
-            Notify.alert(`AI解析の使用上限（${limit}回）に達しました。URLの更新チェックを行うにはプランのアップグレードが必要です。`, { title: '使用上限', type: 'warning' });
-            this.navigate('plan');
+            this.showAnalysisLimitError({ currentUsage: count, limit: limit });
             return;
         }
         try {
@@ -5660,6 +5656,13 @@ class DashboardApp {
             return;
         }
 
+        const count = Number(this.subscription?.usageCount || 0);
+        const limit = Number(this.subscription?.usageLimit || 0);
+        if (count >= limit) {
+            this.showAnalysisLimitError({ currentUsage: count, limit: limit });
+            return;
+        }
+
         try {
             Notify.info('AI解析を実行中...');
             const idToken = await fbModule.auth.currentUser.getIdToken();
@@ -5691,9 +5694,12 @@ class DashboardApp {
                 throw new Error(resData.error || '解析に失敗しました');
             }
         } catch (error) {
-            // loading complete
             console.error('AI Analysis Error:', error);
-            Notify.error('解析エラー: ' + error.message);
+            if (error.code === 'ANALYSIS_LIMIT_EXCEEDED') {
+                this.showAnalysisLimitError(error);
+            } else {
+                Notify.error(`AI解析中にエラーが発生しました: ${error.message}`);
+            }
         }
     }
 
@@ -6003,8 +6009,10 @@ class DashboardApp {
             this.navigate('diff', contractId);
         } catch (error) {
             console.error('analyzeDocumentPair error:', error);
-            if (!silent) {
-                Notify.error(`AI差分解析に失敗しました: ${error.message}`);
+            if (error.code === 'ANALYSIS_LIMIT_EXCEEDED') {
+                this.showAnalysisLimitError(error);
+            } else if (!silent) {
+                Notify.error(`AI解析中にエラーが発生しました: ${error.message}`);
             }
         }
     }
@@ -6379,16 +6387,34 @@ class DashboardApp {
         }
     }
 
-    async showAnalysisLimitError(error) {
-        const cu = error.currentUsage || 0;
-        const lim = error.limit || 0;
-        const next = error.nextPlan;
+    async showAnalysisLimitError(error = {}) {
+        let cu = error.currentUsage;
+        let lim = error.limit;
+        let next = error.nextPlan;
+
+        // Preemptive check or missing fields fallback
+        if (cu === undefined || lim === undefined) {
+            cu = Number(this.subscription?.usageCount || 0);
+            lim = Number(this.subscription?.usageLimit || 0);
+        }
+
+        if (!next) {
+            const plan = this.subscription?.plan || 'free';
+            const nextPlanMap = {
+                'free': { name: 'Starter', limit: 50, price: '¥1,480' },
+                'trial': { name: 'Starter', limit: 50, price: '¥1,480' },
+                'starter': { name: 'Business', limit: 120, price: '¥4,980' },
+                'business': { name: 'Pro', limit: 400, price: '¥9,800' },
+                'pro': null
+            };
+            next = nextPlanMap[plan];
+        }
         
         let message = `今月のAI差分チェック回数の上限（${cu}/${lim}回）を使い切りました。`;
         let okText = 'プランを表示';
         
         if (next) {
-            message += `<br><br>${next.name}プラン（${next.price}/月）にアップグレードすると月${next.limit}回まで解析できます。`;
+            message += `<br><br>${next.name}プラン（${next.price}/月）にアップグレードすると、月${next.limit}回まで解析できます。`;
             okText = '今すぐアップグレード';
         } else {
             message += `<br><br>来月までお待ちいただくか、より上位のプランについてお問い合わせください。`;
