@@ -69,6 +69,7 @@ export const aiService = {
                 if (result.currentUsage !== undefined) apiError.currentUsage = result.currentUsage;
                 if (result.limit !== undefined) apiError.limit = result.limit;
                 if (result.plan !== undefined) apiError.plan = result.plan;
+                if (result.nextPlan !== undefined) apiError.nextPlan = result.nextPlan;
                 throw apiError;
             }
 
