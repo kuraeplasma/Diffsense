@@ -214,7 +214,7 @@ function extractUploadsRelativePath(value) {
 function buildFirebaseDownloadUrl(bucketName, objectPath, token) {
     return `https://firebasestorage.googleapis.com/v0/b/${encodeURIComponent(bucketName)}/o/${encodeURIComponent(objectPath)}?alt=media&token=${encodeURIComponent(token)}`;
 }
-function resolveSignRequestPdfUrl(signRequest, req, contract = null) {
+async function resolveSignRequestPdfUrl(signRequest, req, contract = null) {
     const backendBaseUrl = getBackendBaseUrl(req);
     const candidates = [
         signRequest?.document_snapshot?.pdf_url,
@@ -232,6 +232,17 @@ function resolveSignRequestPdfUrl(signRequest, req, contract = null) {
         const uploadsPath = extractUploadsRelativePath(value);
         if (uploadsPath) {
             return `${backendBaseUrl}${uploadsPath}`;
+        }
+        if (bucket && !value.includes('\\') && !value.startsWith('/')) {
+            try {
+                const [signedUrl] = await bucket.file(value).getSignedUrl({
+                    action: 'read',
+                    expires: Date.now() + 3600000
+                });
+                return signedUrl;
+            } catch (err) {
+                logger.warn('resolveSignRequestPdfUrl: signed URL failed for', value, err.message);
+            }
         }
     }
     return '';
@@ -327,23 +338,29 @@ async function createPdfBufferFromFallbackImage(dataUrls, signRequest) {
 
     try {
         const pdfDoc = await PDFDocument.create();
-        for (const dataUrl of urls) {
-            const currentUrl = String(dataUrl || '').trim();
+        for (let i = 0; i < urls.length; i++) {
+            const currentUrl = String(urls[i] || '').trim();
             if (!currentUrl) continue;
 
             const pngMatch = currentUrl.match(/^data:image\/png;base64,(.+)$/);
             const jpegMatch = currentUrl.match(/^data:image\/jpeg;base64,(.+)$/);
             const jpgMatch = currentUrl.match(/^data:image\/jpg;base64,(.+)$/);
             const imageBase64 = pngMatch?.[1] || jpegMatch?.[1] || jpgMatch?.[1] || '';
-            
+
             if (imageBase64) {
                 const imageBytes = Buffer.from(imageBase64, 'base64');
                 const image = pngMatch
                     ? await pdfDoc.embedPng(imageBytes)
                     : await pdfDoc.embedJpg(imageBytes);
-                const { width, height } = image.scale(1.0);
-                const page = pdfDoc.addPage([width, height]);
-                page.drawImage(image, { x: 0, y: 0, width, height });
+                const pageNum = i + 1;
+                const pageDim = signRequest?.page_dimensions?.[pageNum]
+                    || signRequest?.page_dimensions?.[String(pageNum)]
+                    || null;
+                const { width: imgW, height: imgH } = image.scale(1.0);
+                const pageW = pageDim?.width || imgW;
+                const pageH = imgW > 0 ? Math.round(imgH * pageW / imgW) : (pageDim?.height || imgH);
+                const page = pdfDoc.addPage([pageW, pageH]);
+                page.drawImage(image, { x: 0, y: 0, width: pageW, height: pageH });
             }
         }
         return Buffer.from(await pdfDoc.save());
@@ -980,7 +997,7 @@ router.get('/verify', async (req, res) => {
                 logger.warn(`Sign verify contract lookup failed requestId=${signRequest.id} contractId=${signRequest.contract_id} error=${contractError.message}`);
             }
         }
-        const pdfUrl = resolveSignRequestPdfUrl(signRequest, req, contract);
+        const pdfUrl = await resolveSignRequestPdfUrl(signRequest, req, contract);
         const originalContent = contract?.original_content || signRequest?.document_snapshot?.original_content || '';
         if (!pdfUrl && !originalContent) {
             return res.status(404).json({ success: false, error: '署名対象の原本ファイルが見つかりません。' });
