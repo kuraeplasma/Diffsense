@@ -123,24 +123,44 @@ class DiffService {
     }
 
     /**
-     * Generate inline character-level diffs
+     * Generate inline character-level diffs using a robust token-based approach
      */
     _generateCharDiff(oldStr, newStr) {
-        // For the visual diff, we want to keep some layout but normalize it to avoid noise
+        // Step 1: Normalize layout for comparison
+        // We trim every line and collapse horizontal whitespace, but keep single newlines as placeholders
         const visualNormalize = (s) => String(s || '')
             .split('\n')
-            .map(line => line.replace(/[ \t\r　]+/g, ' ').trim())
+            .map(line => line.replace(/[ \t\r　]+/g, '').trim())
             .filter(line => line.length > 0)
-            .join('\n');
+            .join(' \n '); // Add spaces around \n to treat it as a token
 
         const vOld = visualNormalize(oldStr);
         const vNew = visualNormalize(newStr);
 
-        const changes = diff.diffChars(vOld, vNew);
+        // Step 2: "Space Injection" for Japanese/CJK text
+        // We insert a zero-width space or regular space between every character 
+        // to force the word-diff engine to treat each character as a stable token.
+        // This is much more robust for long strings than character-diff.
+        const inject = (s) => s.split('').join(' ');
+        const iOld = inject(vOld);
+        const iNew = inject(vNew);
+
+        // Step 3: Perform word-level diff on the space-injected strings
+        const changes = diff.diffWords(iOld, iNew);
+
+        // Step 4: Reconstruct the diffed HTML, removing the injected spaces
         return changes.map(part => {
-            if (part.added) return `<span class="diff-add">${part.value}</span>`;
-            if (part.removed) return `<span class="diff-del">${part.value}</span>`;
-            return part.value;
+            let val = part.value.replace(/ /g, '');
+            
+            // Step 5: Noise suppression
+            // If the change is ONLY whitespace/newlines, we don't want to highlight it
+            if (!val.trim() && val.length > 0) {
+                return val;
+            }
+
+            if (part.added) return `<span class="diff-add">${val}</span>`;
+            if (part.removed) return `<span class="diff-del">${val}</span>`;
+            return val;
         }).join('');
     }
 }

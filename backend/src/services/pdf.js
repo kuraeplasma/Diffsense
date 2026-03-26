@@ -78,21 +78,20 @@ function shouldKeepSoftLineBreak(prevLine, nextLine) {
     const next = String(nextLine || '').trim();
     if (!prev || !next) return true;
     
-    // Article headers are always standalone
+    // Article headers are always standalone, e.g. "第1条"
     if (/^第\s*[0-9０-９一二三四五六七八九十百千〇零]+\s*条/.test(prev)) return true;
     
     // Explicit sentence endings in Japanese or English
     if (/[。．！？!?]$/.test(prev)) return true;
     
-    // Common bullet points at the start of next line
-    if (/^([0-9０-９]+[\.．\)]|[・●○■□\-]|\([0-9０-９a-zA-Z]+\))/.test(next)) return true;
+    // Clear list-like prefixes at the start of the next line
+    // e.g. "1.", "（1）", "・", "●"
+    if (/^([0-9０-９]+[\.．\)]|[・●○■□\-]|（[0-9０-９a-zA-Z]+）|\([0-9０-９a-zA-Z]+\))/.test(next)) return true;
     
-    // Standalone headings (short, no punctuation)
-    if (prev.length <= 32 && !/[。．、，:：,;]/.test(prev) && !/[a-z]$/i.test(prev)) {
-        // If it looks like a title/heading, keep the break
-        return true;
-    }
+    // If the previous line ends in a bracket or closing quote, it might be a heading or the end of a block
+    if (/[）)】」』]$/.test(prev) && prev.length <= 40) return true;
 
+    // Otherwise, assume it's a soft wrap if it was a continuation of text
     return false;
 }
 
