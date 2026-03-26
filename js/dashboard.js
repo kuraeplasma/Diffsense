@@ -1241,29 +1241,16 @@ const Views = {
             `;
         }
 
-        let cancelSection = '';
-        const currentPlanLower = (sub.plan || 'free').toLowerCase();
-        const isFreePlan = currentPlanLower === 'free';
-        
-        // Always show for compliance, but allow different UI if already Free
-        cancelSection = `
-            <div class="plan-cancel-section" style="margin-top: 60px; border-top: 1px solid #eee; padding-top: 32px;">
-                <div style="max-width: 600px; margin: 0 auto; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 24px; text-align: left;">
-                    <h3 style="font-size: 1.1rem; font-weight: 700; color: #111827; margin-bottom: 12px;">プランの解約（無料プランへの移行）</h3>
-                    <p style="color: #4b5563; font-size: 0.9rem; line-height: 1.6; margin-bottom: 20px;">
-                        有料プランから無料プランへの移行を希望される場合は、以下のボタンから手続きを行ってください。
-                        解約後も、それまでに登録されたデータは引き続き閲覧可能です。
-                    </p>
-                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px; background: #f9fafb; border-radius: 8px;">
-                        <span style="font-size: 0.85rem; color: #6b7280;">現在のプラン: <strong>${(sub.plan || 'Free').toUpperCase()}</strong></span>
-                        ${isFreePlan ? `
-                            <span style="font-size: 0.85rem; color: #10b981; font-weight: 600;"><i class="fa-solid fa-circle-check"></i> すでに無料プランです</span>
-                        ` : `
-                            <button onclick="window.app.showCancelModal()" class="btn-dashboard plan-cancel-btn" style="background:#fff; color:#dc2626; border:1px solid #dc2626; padding:8px 16px; font-weight:600;">
-                                <i class="fa-solid fa-xmark"></i> プランをキャンセルする
-                            </button>
-                        `}
+        const cancelSection = `
+            <div class="plan-cancel-section" style="margin: 20px 0 40px 0; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px; text-align: left; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
+                    <div>
+                        <h3 style="font-size: 1rem; font-weight: 700; color: #111827; margin: 0 0 4px 0;">プランの解約（無料プランへの移行）</h3>
+                        <p style="color: #6b7280; font-size: 0.85rem; margin: 0;">有料プランをご利用の場合は、こちらからいつでも解約手続きが可能です。</p>
                     </div>
+                    <button onclick="window.app.showCancelModal()" class="btn-dashboard plan-cancel-btn" style="background:#fff; color:#dc2626; border:1px solid #dc2626; padding:8px 16px; font-weight:600; border-radius:8px; white-space:nowrap;">
+                        <i class="fa-solid fa-xmark"></i> プランを解約する
+                    </button>
                 </div>
             </div>
         `;
@@ -1278,10 +1265,10 @@ const Views = {
                 <p class="plan-cycle-note">${annualKnownUnavailable ? '年額プランは現在準備中です。' : ''}</p>
             </div>
             ${paymentSection}
+            ${cancelSection}
             <div class="plan-grid">
                 ${cards}
             </div>
-            ${cancelSection}
         `;
     },
     // 1. Dashboard Overview

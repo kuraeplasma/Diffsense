@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+  }
+  body {
+    background: #0d1b2e;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 48px 80px;
+    font-family: 'Helvetica Neue', 'Noto Sans JP', sans-serif;
+    box-sizing: border-box;
+  }
+  .img-title {
+    color: #ffffff;
+    font-size: 22px;
+    font-weight: 800;
+    margin-bottom: 24px;
+    letter-spacing: 0.02em;
+    text-align: center;
+  }
+  .img-title span {
+    color: #EDD060;
+  }
+  .table-wrap {
+    width: 900px;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    border: 1px solid rgba(237,208,96,0.3);
+    background: #ffffff;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  thead tr {
+    background: #1a2448;
+  }
+  thead th {
+    padding: 20px 32px;
+    color: #EDD060;
+    font-size: 16px;
+    font-weight: 700;
+    text-align: center;
+    letter-spacing: 0.04em;
+  }
+  thead th:first-child {
+    text-align: left;
+    width: 40%;
+  }
+  tbody tr {
+    border-bottom: 1px solid #f0f0f0;
+  }
+  tbody tr:last-child {
+    border-bottom: none;
+  }
+  tbody tr:nth-child(even) {
+    background: #f0f2f8;
+  }
+  tbody td {
+    padding: 18px 32px;
+    font-size: 15px;
+    color: #333;
+    text-align: center;
+  }
+  tbody td:first-child {
+    text-align: left;
+    font-weight: 600;
+    color: #1a2448;
+    font-size: 15px;
+  }
+  .yes { color: #16a34a; font-size: 18px; font-weight: 700; }
+  .no  { color: #dc2626; font-size: 18px; font-weight: 700; }
+  .highlight-col {
+    background: rgba(237,208,96,0.08);
+    font-weight: 700;
+    color: #1a2448 !important;
+  }
+  .price { font-size: 13px; color: #555; }
+</style>
+</head>
+<body>
+<p class="img-title">電子署名ツール比較：クラウドサイン vs <span>DIFFsense</span></p>
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>機能</th>
+        <th>クラウドサイン</th>
+        <th>DIFFsense</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>電子署名</td>
+        <td><span class="yes">○</span></td>
+        <td class="highlight-col"><span class="yes">○</span></td>
+      </tr>
+      <tr>
+        <td>AI差分チェック</td>
+        <td><span class="no">×</span></td>
+        <td class="highlight-col"><span class="yes">○</span></td>
+      </tr>
+      <tr>
+        <td>AI要約</td>
+        <td><span class="no">×</span></td>
+        <td class="highlight-col"><span class="yes">○</span></td>
+      </tr>
+      <tr>
+        <td>URLクローリング</td>
+        <td><span class="no">×</span></td>
+        <td class="highlight-col"><span class="yes">○</span></td>
+      </tr>
+      <tr>
+        <td>国内サーバー運用</td>
+        <td><span class="yes">○</span></td>
+        <td class="highlight-col"><span class="yes">○</span></td>
+      </tr>
+      <tr>
+        <td>電子署名法準拠</td>
+        <td><span class="yes">○</span></td>
+        <td class="highlight-col"><span class="yes">○</span></td>
+      </tr>
+      <tr>
+        <td>月額料金</td>
+        <td><span class="price">要問合せ〜</span></td>
+        <td class="highlight-col"><span class="price">1,480円〜</span></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+</body>
+</html>

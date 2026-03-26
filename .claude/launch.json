@@ -1,0 +1,18 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "lp",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "3002"],
+      "port": 3002
+    },
+    {
+      "name": "frontend",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-c", "import http.server, os; os.chdir('D:/契約'); port=int(os.environ.get('PORT',3000)); http.server.test(HandlerClass=http.server.SimpleHTTPRequestHandler, port=port, bind='127.0.0.1')"],
+      "port": 3000,
+      "autoPort": true
+    }
+  ]
+}

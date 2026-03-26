@@ -243,7 +243,7 @@ router.post('/paypal', express.json(), async (req, res) => {
                         pendingPlan: null,
                         pendingBillingCycle: null
                     });
-                    await dbService.setUserPlan(user.uid, 'starter', 'monthly');
+                    await dbService.setUserPlan(user.uid, 'free', 'monthly');
                     logger.info(`Webhook: Subscription cancelled for user ${user.uid}`);
                 }
                 break;
@@ -273,7 +273,7 @@ router.post('/paypal', express.json(), async (req, res) => {
                         pendingPlan: null,
                         pendingBillingCycle: null
                     });
-                    await dbService.setUserPlan(user.uid, 'starter', 'monthly');
+                    await dbService.setUserPlan(user.uid, 'free', 'monthly');
                     logger.info(`Webhook: Subscription expired for user ${user.uid}`);
                 }
                 break;
