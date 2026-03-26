@@ -64,7 +64,7 @@ router.post('/create-subscription', async (req, res) => {
         const validBillingCycles = ['monthly', 'annual'];
         const plan = (requestedPlan && validPlans.includes(requestedPlan))
             ? requestedPlan
-            : (userProfile.plan || 'starter');
+            : (userProfile.plan || 'free');
         const billingCycle = (requestedBillingCycle && validBillingCycles.includes(requestedBillingCycle))
             ? requestedBillingCycle
             : (userProfile.billingCycle || 'monthly');
@@ -148,7 +148,7 @@ router.post('/confirm-subscription', async (req, res) => {
             const validBillingCycles = ['monthly', 'annual'];
             const targetPlan = (requestedPlan && validPlans.includes(requestedPlan))
                 ? requestedPlan
-                : (userProfile.pendingPlan || userProfile.plan || 'starter');
+                : (userProfile.pendingPlan || userProfile.plan || 'free');
             const targetBillingCycle = (requestedBillingCycle && validBillingCycles.includes(requestedBillingCycle))
                 ? requestedBillingCycle
                 : (userProfile.pendingBillingCycle || userProfile.billingCycle || 'monthly');
@@ -211,11 +211,11 @@ router.post('/cancel-subscription', async (req, res) => {
             pendingBillingCycle: null
         });
 
-        // Reset to starter monthly plan
-        await dbService.setUserPlan(uid, 'starter', 'monthly');
+        // Reset to free monthly plan
+        await dbService.setUserPlan(uid, 'free', 'monthly');
 
         logger.info(`User ${uid} subscription cancelled`);
-        res.json({ success: true, data: { plan: 'starter', status: 'CANCELLED' } });
+        res.json({ success: true, data: { plan: 'free', status: 'CANCELLED' } });
     } catch (error) {
         logger.error('Cancel subscription error:', error);
         res.status(500).json({ success: false, error: error.message });
@@ -288,7 +288,7 @@ async function createStripeCheckoutSessionHandler(req, res) {
         const validBillingCycles = ['monthly', 'annual'];
         let plan = (requestedPlan && validPlans.includes(requestedPlan))
             ? requestedPlan
-            : (userProfile.plan || 'starter');
+            : (userProfile.plan || 'free');
         let billingCycle = (requestedBillingCycle && validBillingCycles.includes(requestedBillingCycle))
             ? requestedBillingCycle
             : (userProfile.billingCycle || 'monthly');
@@ -393,7 +393,7 @@ router.post('/confirm-stripe-session', async (req, res) => {
         const validBillingCycles = ['monthly', 'annual'];
         const targetPlan = (requestedPlan && validPlans.includes(requestedPlan))
             ? requestedPlan
-            : (session?.metadata?.plan || userProfile.pendingPlan || userProfile.plan || 'starter');
+            : (session?.metadata?.plan || userProfile.pendingPlan || userProfile.plan || 'free');
         const targetBillingCycle = (requestedBillingCycle && validBillingCycles.includes(requestedBillingCycle))
             ? requestedBillingCycle
             : (session?.metadata?.billingCycle || userProfile.pendingBillingCycle || userProfile.billingCycle || 'monthly');

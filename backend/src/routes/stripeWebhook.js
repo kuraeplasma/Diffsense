@@ -124,7 +124,7 @@ async function handleSubscriptionDeleted(subscription) {
         pendingPlan: null,
         pendingBillingCycle: null
     });
-    await dbService.setUserPlan(uid, 'starter', 'monthly');
+    await dbService.setUserPlan(uid, 'free', 'monthly');
     logger.info(`Stripe webhook: subscription deleted, uid=${uid}`);
 }
 

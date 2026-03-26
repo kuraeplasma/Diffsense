@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -n \"dashboard-table\\\\|data-table\" D:/契約/css/*.css)"
+    ]
+  }
+}
