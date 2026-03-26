@@ -198,6 +198,23 @@ function hasKeywordDelta(oldText, newText) {
     return keywords.some((keyword) => oldNorm.includes(keyword) !== newNorm.includes(keyword));
 }
 
+/**
+ * Super Normalizer to unify CJK character widths and eliminate layout noise
+ */
+function superNormalize(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/[！-～]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0)) // Full-width to Half-width
+        .replace(/　/g, ' ') // Full-width space to half-width
+        .replace(/[（【［]/g, '(')
+        .replace(/[）】］]/g, ')')
+        .replace(/[「『]/g, '"')
+        .replace(/[」』]/g, '"')
+        .replace(/[―ー—－]/g, '-')
+        .replace(/[\s\n\r\t]+/g, '') // Remove all whitespace for the comparison check
+        .trim();
+}
+
 function isLikelyMaterialStructuredChange(change) {
     const type = String(change?.type || '').toUpperCase();
     const oldText = String(change?.old || '').trim();
@@ -205,6 +222,22 @@ function isLikelyMaterialStructuredChange(change) {
 
     if (!oldText && !newText) return false;
     if (type === 'ADD' || type === 'DELETE') return true;
+
+    // Use super-normalization for the material change check
+    const oldNorm = superNormalize(oldText);
+    const newNorm = superNormalize(newText);
+    
+    // If identical after super-normalization, it's definitely not material
+    if (oldNorm === newNorm) return false;
+
+    // Check similarity on normalized text
+    const similarity = stringSimilarity.compareTwoStrings(oldNorm, newNorm);
+    
+    // Safety check: if they are extremely similar, it's likely noise (e.g. phantom page numbers)
+    // unless it's a very short text where every character matters.
+    if (similarity > 0.997 && oldNorm.length > 200) {
+        return false;
+    }
 
     const oldTokens = extractMaterialValueTokens(oldText);
     const newTokens = extractMaterialValueTokens(newText);
@@ -216,9 +249,7 @@ function isLikelyMaterialStructuredChange(change) {
         return true;
     }
 
-    const similarity = Number(change?.similarity || 0);
-    const combined = `${oldText}\n${newText}`;
-    if (similarity > 0 && similarity < 0.88 && /(支払|譲渡|解除|責任|義務|保証|補償|対価|料金|費用|株式|新株予約権|期限|期間)/.test(combined)) {
+    if (similarity > 0 && similarity < 0.90 && /(支払|譲渡|解除|責任|義務|保証|補償|対価|料金|費用|株式|新株予約権|期限|期間|延滞|損害)/.test(oldText + newText)) {
         return true;
     }
 
@@ -468,14 +499,30 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
         if (!skipAI && !localUnlimited) {
             if (userProfile.usageCount >= limit) {
                 logger.warn(`Usage limit reached for user ${uid}`, { plan: userProfile.plan, current: userProfile.usageCount });
+                
+                const plan = userProfile.plan || 'free';
+                const nextPlanMap = {
+                    'free': { name: 'Starter', limit: 50, price: '¥1,480' },
+                    'trial': { name: 'Starter', limit: 50, price: '¥1,480' },
+                    'starter': { name: 'Business', limit: 120, price: '¥4,980' },
+                    'business': { name: 'Pro', limit: 400, price: '¥9,800' },
+                    'pro': null
+                };
+                const next = nextPlanMap[plan];
+                let suggestion = '来月までお待ちいただくか、プランのアップグレードをご検討ください。';
+                if (next) {
+                    suggestion = `${next.name}プラン（${next.price}/月）にアップグレードすると、月${next.limit}回までAI解析が可能です。`;
+                }
+
                 return res.status(403).json({
                     success: false,
                     code: 'ANALYSIS_LIMIT_EXCEEDED',
-                    message: '今月のAI差分チェック回数の上限に達しました',
+                    message: `今月のAI差分チェック回数の上限に達しました。\n\n${suggestion}`,
                     error: '今月のAI差分チェック回数の上限に達しました',
                     currentUsage: userProfile.usageCount,
                     limit: limit,
-                    plan: userProfile.plan
+                    plan: plan,
+                    nextPlan: next
                 });
             }
         }

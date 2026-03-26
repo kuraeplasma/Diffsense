@@ -4929,13 +4929,7 @@ class DashboardApp {
         } catch (error) {
             console.error('AI解析エラー:', error);
             if (error.code === 'ANALYSIS_LIMIT_EXCEEDED') {
-                const cu = error.currentUsage ?? count;
-                const lim = error.limit ?? limit;
-                const confirmed = await Notify.confirm(
-                    `今月のAI差分チェック回数（${cu}/${lim}回）を使い切りました。<br><br>Starterプラン（¥1,480/月）にアップグレードすると月50回まで解析できます。`,
-                    { title: '解析回数の上限に達しました', type: 'warning', okText: '今すぐアップグレード', cancelText: '閉じる', okStyle: 'primary' }
-                );
-                if (confirmed) window.location.href = '/select-plan.html';
+                this.showAnalysisLimitError(error);
             } else {
                 Notify.error(`AI解析中にエラーが発生しました: ${error.message}`);
             }
@@ -5109,7 +5103,9 @@ class DashboardApp {
                     } else if (friendlyMsg.includes('バックエンドAPI') || friendlyMsg.includes('接続できません')) {
                         friendlyMsg = '取り込みに失敗しました。もう一度お試しください。';
                     }
-                    if (await Notify.confirm(`エラーが発生しました:\n${friendlyMsg}\n\nもう一度試しますか？`, { title: '確認', type: 'error' })) {
+                    if (error.code === 'ANALYSIS_LIMIT_EXCEEDED') {
+                        this.showAnalysisLimitError(error);
+                    } else if (await Notify.confirm(`エラーが発生しました:\n${friendlyMsg}\n\nもう一度試しますか？`, { title: '確認', type: 'error' })) {
                         await performAnalysis(retryCount + 1);
                     }
                 }
@@ -5918,17 +5914,7 @@ class DashboardApp {
                 const count = Number(this.subscription?.usageCount || 0);
                 const limit = Number(this.subscription?.usageLimit || 0);
                 if (count >= limit) {
-                    Notify.confirm(
-                        `AI解析の使用上限（${limit}回）に達しました。継続して解析を行うにはプランのアップグレードが必要です。`,
-                        {
-                            title: '使用上限に達しました',
-                            okText: 'プランを表示',
-                            cancelText: '閉じる',
-                            type: 'warning'
-                        }
-                    ).then(ok => {
-                        if (ok) this.navigate('plan');
-                    });
+                    this.showAnalysisLimitError({ currentUsage: count, limit: limit });
                     return;
                 }
             }
@@ -6390,6 +6376,34 @@ class DashboardApp {
             // Clean up off-screen container
             const el = document.getElementById('pdf-export-container');
             if (el) el.remove();
+        }
+    }
+
+    async showAnalysisLimitError(error) {
+        const cu = error.currentUsage || 0;
+        const lim = error.limit || 0;
+        const next = error.nextPlan;
+        
+        let message = `今月のAI差分チェック回数の上限（${cu}/${lim}回）を使い切りました。`;
+        let okText = 'プランを表示';
+        
+        if (next) {
+            message += `<br><br>${next.name}プラン（${next.price}/月）にアップグレードすると月${next.limit}回まで解析できます。`;
+            okText = '今すぐアップグレード';
+        } else {
+            message += `<br><br>来月までお待ちいただくか、より上位のプランについてお問い合わせください。`;
+        }
+
+        const confirmed = await Notify.confirm(message, {
+            title: '解析回数の上限に達しました',
+            type: 'warning',
+            okText: okText,
+            cancelText: '閉じる',
+            okStyle: 'primary'
+        });
+
+        if (confirmed) {
+            window.location.href = '/select-plan.html' + (next ? `?plan=${String(next.name).toLowerCase()}` : '');
         }
     }
 
