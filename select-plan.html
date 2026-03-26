@@ -423,11 +423,20 @@
 
         let selectedPlan = 'pro';
         let currentToken = null;
+        let authResolved = false;
+        let authResolvePromise = null;
+        let authResolveFunc = null;
+
+        authResolvePromise = new Promise(resolve => {
+            authResolveFunc = resolve;
+        });
 
         onAuthStateChanged(auth, async (user) => {
             if (user) {
                 currentToken = await user.getIdToken();
             }
+            authResolved = true;
+            authResolveFunc();
         });
 
         window.selectPlan = (planId) => {
@@ -451,6 +460,12 @@
             const btn = document.getElementById('confirm-btn');
             btn.classList.add('btn-loading');
             btn.disabled = true;
+
+            // Wait for auth to resolve
+            if (!authResolved) {
+                console.log('Waiting for auth resolution...');
+                await authResolvePromise;
+            }
 
             // Save plan to localStorage
             localStorage.setItem('diffsense_selected_plan', selectedPlan);
