@@ -6450,7 +6450,7 @@ class DashboardApp {
         });
 
         if (confirmed) {
-            window.location.href = '/select-plan.html' + (next ? `?plan=${String(next.name).toLowerCase()}` : '');
+            window.location.href = '/select-plan.html' + (next ? `?plan=${String(next.name).toLowerCase()}&auto=true` : '');
         }
     }
 

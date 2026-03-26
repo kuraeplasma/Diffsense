@@ -494,6 +494,13 @@
             const params = new URLSearchParams(window.location.search);
             const initialPlan = params.get('plan') || 'business';
             window.selectPlan(initialPlan);
+
+            // auto=true があれば自動で決済画面へ
+            if (params.get('auto') === 'true') {
+                setTimeout(() => {
+                    window.confirmPlan();
+                }, 500); // UIの選択状態を少し見せてから遷移
+            }
         });
     </script>
 </body>
