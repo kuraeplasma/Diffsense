@@ -1417,9 +1417,7 @@ const Views = {
                         <span class="text-muted" style="font-size:12px;">種別:</span>
                         <select onchange="window.app.updateFilter('type', this.value)" style="padding:6px 8px; border:1px solid #ddd; border-radius:4px; font-size:13px;">
                             <option value="all" ${appFilters.type === 'all' ? 'selected' : ''}>すべて</option>
-                            <option value="利用規約" ${appFilters.type === '利用規約' ? 'selected' : ''}>利用規約</option>
-                            <option value="秘密保持契約書" ${appFilters.type === '秘密保持契約書' ? 'selected' : ''}>秘密保持契約書</option>
-                            <option value="業務委託契約書" ${appFilters.type === '業務委託契約書' ? 'selected' : ''}>業務委託契約書</option>
+                            ${[...new Set(['利用規約','NDA','業務委託契約','プライバシーポリシー','その他', ...dbService.getContracts().map(c => c.type).filter(Boolean)])].map(t => `<option value="${t}" ${appFilters.type === t ? 'selected' : ''}>${t}</option>`).join('')}
                         </select>
                     </div>
                 </div>
