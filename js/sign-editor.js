@@ -1118,7 +1118,9 @@ export const SignEditor = {
 
         if (typeof content === 'object' && Array.isArray(content.articles)) {
             const base = content || {};
-            const groups = this.chunkFallbackList(base.articles || [], 6, 4200);
+            const hasPreamble = Boolean(String(base.preamble || '').trim());
+            const maxPerPage = hasPreamble ? 5 : 6;
+            const groups = this.chunkFallbackList(base.articles || [], maxPerPage, 4200);
             if (groups.length <= 1) return [base];
             return groups.map((articles, index) => ({
                 ...base,
