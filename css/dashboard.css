@@ -852,7 +852,7 @@ ul {
 /* Date */
 .dashboard-table th:nth-child(3),
 .dashboard-table td:nth-child(3) {
-    min-width: 160px;
+    width: 160px;
     white-space: nowrap;
 }
 
@@ -885,7 +885,7 @@ ul {
 /* Last Updated */
 .contracts-table th:nth-child(3),
 .contracts-table td:nth-child(3) {
-    min-width: 160px;
+    width: 160px;
     white-space: nowrap;
 }
 
