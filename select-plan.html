@@ -419,11 +419,15 @@
     <script type="module">
         import { auth } from './js/firebase-config.js';
         import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getApiBaseUrl } from './js/api-base.js';
 
         let selectedPlan = 'pro';
+        let currentToken = null;
 
-        onAuthStateChanged(auth, (user) => {
-            // no auth required for plan selection page
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                currentToken = await user.getIdToken();
+            }
         });
 
         window.selectPlan = (planId) => {
@@ -443,9 +447,10 @@
             btn.disabled = false;
         };
 
-        window.confirmPlan = () => {
+        window.confirmPlan = async () => {
             const btn = document.getElementById('confirm-btn');
             btn.classList.add('btn-loading');
+            btn.disabled = true;
 
             // Save plan to localStorage
             localStorage.setItem('diffsense_selected_plan', selectedPlan);
@@ -454,9 +459,33 @@
                 // Freeプランなら決済不要なのでサンクスへ
                 window.location.replace(`${window.location.origin}/thanks-signup.html?next=dashboard`);
             } else {
-                // 有料プランならチェックアウト開始フラグを立てて決済誘導へ（既存ロジック）
-                sessionStorage.setItem('stripe_checkout_started', 'true');
-                window.location.replace(`${window.location.origin}/thanks-plan.html?plan=${selectedPlan}`);
+                try {
+                    const apiBase = getApiBaseUrl();
+                    const headers = { 'Content-Type': 'application/json' };
+                    if (currentToken) headers.Authorization = `Bearer ${currentToken}`;
+
+                    const res = await fetch(`${apiBase}/api/createCheckoutSession`, {
+                        method: 'POST',
+                        headers,
+                        body: JSON.stringify({
+                            plan: selectedPlan,
+                            billingCycle: 'monthly', // default
+                            cancelUrl: `${window.location.href}`
+                        })
+                    });
+                    const result = await res.json();
+                    if (result.success && result.data?.url) {
+                        sessionStorage.setItem('stripe_checkout_started', 'true');
+                        window.location.href = result.data.url;
+                    } else {
+                        throw new Error(result.error || '決済ページを開けませんでした');
+                    }
+                } catch (e) {
+                    console.error('Payment error:', e);
+                    btn.classList.remove('btn-loading');
+                    btn.disabled = false;
+                    alert('決済ページの読み込みに失敗しました。時間をおいて再度お試しいただくか、サポートまでお問い合わせください。');
+                }
             }
         };
 
