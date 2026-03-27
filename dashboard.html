@@ -80,6 +80,10 @@
                 <div class="nav-icon"><i class="fa-solid fa-bell"></i></div>
                 <span>通知設定</span>
             </div>
+            <div class="nav-item" id="nav-mcp" onclick="window.app.navigate('mcp')">
+                <div class="nav-icon"><i class="fa-solid fa-plug"></i></div>
+                <span>MCP連携</span>
+            </div>
         </div>
         <div class="user-profile">
             <div id="plan-status-container"></div>
@@ -283,7 +287,7 @@
     </div>
 
     <!-- App Logic -->
-    <script type="module" src="js/dashboard.js?v=20260326_limit_fix_v7"></script>
+    <script type="module" src="js/dashboard.js?v=20260327_premium_fix_v2"></script>
     <script type="module">
         import { requireAuth, handleLogout } from './js/auth.js?v=20260311d';
 

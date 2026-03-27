@@ -3,6 +3,7 @@ const router = express.Router();
 const dbService = require('../services/db');
 const logger = require('../utils/logger');
 const { admin, firebaseInitialized } = require('../firebase');
+const { generateApiKey } = require('../mcp-server/auth');
 
 function isLocalUnlimitedMode(req) {
     const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').toLowerCase();
@@ -201,6 +202,36 @@ router.post('/admin/set-plan', async (req, res) => {
         res.json({ success: true, data: { uid: uidToSet, plan: profile.plan } });
     } catch (error) {
         logger.error('Error in admin set-plan:', error);
+        res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+});
+
+/**
+ * GET /api/user/mcp-key
+ * Get current MCP API key for the user
+ */
+router.get('/mcp-key', async (req, res) => {
+    try {
+        const uid = req.user.uid;
+        const userProfile = await dbService.getUserProfile(uid);
+        res.json({ success: true, data: { mcpApiKey: userProfile.mcpApiKey || null } });
+    } catch (error) {
+        logger.error('Error fetching MCP key:', error);
+        res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+});
+
+/**
+ * POST /api/user/mcp-key
+ * Generate/Refresh MCP API key
+ */
+router.post('/mcp-key', async (req, res) => {
+    try {
+        const uid = req.user.uid;
+        const newKey = await generateApiKey(uid);
+        res.json({ success: true, data: { mcpApiKey: newKey } });
+    } catch (error) {
+        logger.error('Error generating MCP key:', error);
         res.status(500).json({ success: false, error: 'Internal server error' });
     }
 });

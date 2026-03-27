@@ -189,16 +189,28 @@ router.post('/cancel-subscription', async (req, res) => {
         const uid = req.user.uid;
         const userProfile = await dbService.getUserProfile(uid);
 
-        if (!userProfile.paypalSubscriptionId) {
+        const paypalId = userProfile.paypalSubscriptionId;
+        const stripeId = userProfile.stripeSubscriptionId;
+
+        if (!paypalId && !stripeId) {
             return res.status(400).json({ success: false, error: 'アクティブなサブスクリプションがありません' });
         }
 
-        // Cancel on PayPal if configured
-        if (paypalService.isConfigured()) {
+        // 1. Cancel on PayPal if exists
+        if (paypalId && paypalService.isConfigured()) {
             try {
-                await paypalService.cancelSubscription(userProfile.paypalSubscriptionId);
+                await paypalService.cancelSubscription(paypalId);
             } catch (e) {
                 logger.warn('PayPal cancel failed (may already be cancelled):', e.message);
+            }
+        }
+
+        // 2. Cancel on Stripe if exists
+        if (stripeId && stripeService.isConfigured()) {
+            try {
+                await stripeService.cancelSubscription(stripeId);
+            } catch (e) {
+                logger.warn('Stripe cancel failed (may already be cancelled):', e.message);
             }
         }
 
@@ -206,6 +218,7 @@ router.post('/cancel-subscription', async (req, res) => {
         await dbService.updatePaymentInfo(uid, {
             hasPaymentMethod: false,
             paypalStatus: 'CANCELLED',
+            stripeStatus: 'CANCELLED',
             cancelledAt: new Date().toISOString(),
             pendingPlan: null,
             pendingBillingCycle: null

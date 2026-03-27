@@ -216,6 +216,14 @@ const Notify = (() => {
         return c;
     }
 
+    // HTMLエスケープヘルパー
+    const esc = (str) => {
+        if (!str) return '';
+        return String(str).replace(/[&<>"']/g, m => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[m]));
+    };
+
     const ICONS = {
         success: '<i class="fa-solid fa-circle-check" style="color:#22c55e"></i>',
         error:   '<i class="fa-solid fa-circle-xmark" style="color:#ef4444"></i>',
@@ -251,8 +259,8 @@ const Notify = (() => {
         el.innerHTML = `
             <span class="ds-toast-icon">${iconHtml}</span>
             <div class="ds-toast-body">
-                <div class="ds-toast-title">${title}</div>
-                <div class="ds-toast-msg">${message}</div>
+                <div class="ds-toast-title">${esc(title)}</div>
+                <div class="ds-toast-msg">${esc(message)}</div>
             </div>
             <button class="ds-toast-close" aria-label="閉じる">&times;</button>
             ${duration > 0 ? `<div class="ds-toast-progress" style="animation-duration:${duration}ms; color:#d1d5db"></div>` : ''}
@@ -305,12 +313,12 @@ const Notify = (() => {
                 <div class="ds-modal">
                     <div class="ds-modal-header">
                         <span class="ds-modal-header-icon">${ICONS[type]}</span>
-                        <h3>${title}</h3>
+                        <h3>${esc(title)}</h3>
                     </div>
-                    <div class="ds-modal-body">${message}</div>
+                    <div class="ds-modal-body">${esc(message)}</div>
                     <div class="ds-modal-actions">
-                        <button class="ds-modal-btn cancel-btn">${cancelText}</button>
-                        <button class="ds-modal-btn ${okStyle} ok-btn">${okText}</button>
+                        <button class="ds-modal-btn cancel-btn">${esc(cancelText)}</button>
+                        <button class="ds-modal-btn ${okStyle} ok-btn">${esc(okText)}</button>
                     </div>
                 </div>
             `;
@@ -350,11 +358,11 @@ const Notify = (() => {
                 <div class="ds-modal">
                     <div class="ds-modal-header">
                         <span class="ds-modal-header-icon">${ICONS[type]}</span>
-                        <h3>${title}</h3>
+                        <h3>${esc(title)}</h3>
                     </div>
-                    <div class="ds-modal-body">${message}</div>
+                    <div class="ds-modal-body">${esc(message)}</div>
                     <div class="ds-modal-actions">
-                        <button class="ds-modal-btn ${okStyle} ok-btn">${okText}</button>
+                        <button class="ds-modal-btn ${okStyle} ok-btn">${esc(okText)}</button>
                     </div>
                 </div>
             `;

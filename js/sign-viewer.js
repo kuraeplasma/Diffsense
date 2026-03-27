@@ -94,8 +94,8 @@ export const SignViewer = {
                             </div>
                             <div>
                                 <span>${eventLabels[ev.event] || ev.event}</span>
-                                <span style="color:#888; margin-left:6px;">${ev.actorEmail || ''}</span>
-                                ${ev.ipAddress ? `<span style="color:#aaa; margin-left:6px;">IP: ${ev.ipAddress}</span>` : ''}
+                                <span style="color:#888; margin-left:6px;">${this.escapeHtml(ev.actorEmail || '')}</span>
+                                ${ev.ipAddress ? `<span style="color:#aaa; margin-left:6px;">IP: ${this.escapeHtml(ev.ipAddress)}</span>` : ''}
                             </div>
                         </div>
                     `).join('');
@@ -153,7 +153,7 @@ export const SignViewer = {
             iframeContainer.innerHTML = `
                 <div style="padding:40px; text-align:center; color:#ea4335;">
                     <i class="fa-solid fa-triangle-exclamation" style="font-size:48px; margin-bottom:16px;"></i>
-                    <p>${providerLabel}の読み込みに失敗しました<br><span style="font-size:12px;">${error.message}</span></p>
+                    <p>${providerLabel}の読み込みに失敗しました<br><span style="font-size:12px;">${this.escapeHtml(error.message)}</span></p>
                 </div>
             `;
         }

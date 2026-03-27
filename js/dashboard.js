@@ -1,5 +1,5 @@
 import { Notify } from './notify.js';
-import { dbService } from './db-service.js?v=20260321f';
+import { dbService } from './db-service.js?v=20260327_filter_fix';
 import { aiService } from './ai-service.js?v=20260309h2';
 import { getApiBaseUrl } from './api-base.js';
 import { auth } from './firebase-config.js';
@@ -1303,8 +1303,8 @@ const Views = {
 
             return `
                 <tr onclick="window.app.navigate('diff', ${c.id})">
-                    <td><span class="badge ${riskBadgeClass}">${c.risk_level === 'High' ? 'High' : (c.risk_level === 'Medium' ? 'Medium' : (c.risk_level === 'Low' ? 'Low' : c.risk_level))}</span></td>
-                    <td class="col-name" title="${c.name}">${c.name}</td>
+                    <td><span class="badge ${riskBadgeClass}">${c.risk_level === 'High' ? 'High' : (c.risk_level === 'Medium' ? 'Medium' : (c.risk_level === 'Low' ? 'Low' : escapeHtmlText(c.risk_level)))}</span></td>
+                    <td class="col-name" title="${escapeHtmlText(c.name)}">${escapeHtmlText(c.name)}</td>
                     <td>${formatDisplayTimestamp(c.last_updated_at || c.last_analyzed_at || c.created_at)}</td>
                     <td>${statusBadge}</td>
                     <td>${actionBtn}</td>
@@ -1317,19 +1317,19 @@ const Views = {
             <div class="stats-grid">
                 <div class="stat-card ${currentFilter === 'pending' ? 'active' : ''}" onclick="window.app.setDashboardFilter('pending')">
                     <div class="stat-label ${currentFilter === 'pending' ? 'text-warning' : ''}"><i class="fa-regular fa-square-check"></i> 未処理</div>
-                    <div class="stat-value">${stats.pending}件</div>
+                    <div class="stat-value">${escapeHtmlText(stats.pending)}件</div>
                 </div>
                 <div class="stat-card ${currentFilter === 'risk' ? 'active' : ''}" onclick="window.app.setDashboardFilter('risk')">
                     <div class="stat-label ${currentFilter === 'risk' ? 'text-danger' : ''}"><i class="fa-solid fa-triangle-exclamation"></i> リスク要判定</div>
-                    <div class="stat-value">${stats.highRisk}件</div>
+                    <div class="stat-value">${escapeHtmlText(stats.highRisk)}件</div>
                 </div>
                 <div class="stat-card ${currentFilter === 'total' ? 'active' : ''}" onclick="window.app.setDashboardFilter('total')">
                     <div class="stat-label"><i class="fa-solid fa-satellite-dish"></i> 監視中</div>
-                    <div class="stat-value text-muted">${stats.total}</div>
+                    <div class="stat-value text-muted">${escapeHtmlText(stats.total)}</div>
                 </div>
             </div>
 
-            <h3 id="dashboard-section-title" style="font-size:16px; margin-bottom:16px; font-weight:600;">${sectionTitle}</h3>
+            <h3 id="dashboard-section-title" style="font-size:16px; margin-bottom:16px; font-weight:600;">${escapeHtmlText(sectionTitle)}</h3>
             <div class="table-container">
                 <table class="data-table dashboard-table">
                     <thead>
@@ -1370,12 +1370,12 @@ const Views = {
 
             return `
                 <tr onclick="window.app.navigate('diff', ${c.id})">
-                    <td class="col-name" title="${c.name}">${c.name}</td>
-                    <td>${c.type}</td>
+                    <td class="col-name" title="${escapeHtmlText(c.name)}">${escapeHtmlText(c.name)}</td>
+                    <td>${escapeHtmlText(c.type)}</td>
                     <td>${formatDisplayTimestamp(c.last_updated_at || c.last_analyzed_at || c.created_at)}</td>
                     <td>${riskBadge}</td>
                     <td>${statusBadge}</td>
-                    <td>${c.assignee_name}</td>
+                    <td>${escapeHtmlText(c.assignee_name)}</td>
                 </tr>
             `;
         }).join('');
@@ -1392,7 +1392,7 @@ const Views = {
                     <div style="position:relative; flex:1; min-width:250px;">
                         <i class="fa-solid fa-magnifying-glass" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:#999;"></i>
                         <input type="text" id="contract-search" placeholder="契約名・種別・担当者で検索..." 
-                               value="${appFilters.query || ''}"
+                               value="${escapeHtmlText(appFilters.query || '')}"
                                style="padding:8px 12px 8px 36px; border:1px solid #ddd; border-radius:4px; width:100%; font-size:13px;"
                                oninput="window.app.updateFilter('query', this.value)">
                     </div>
@@ -2185,7 +2185,230 @@ const Views = {
         </table>
     </div>
 `;
+    },
+    // 6. MCP Integration (New)
+    mcp: () => {
+        const sub = window.app?.subscription || { plan: 'free' };
+        const isFree = sub.plan === 'free';
+        
+        const mcpKey = window.app.mcpKey || '未発行';
+        const isKeyHidden = window.app.isMcpKeyHidden !== false;
+        const displayKey = isKeyHidden ? '••••••••••••••••' : mcpKey;
+        const apiBase = (typeof getApiBaseUrl === 'function') ? getApiBaseUrl() : (aiService ? aiService.API_BASE : '');
+        const sseUrl = `${apiBase}/api/mcp/sse?apiKey=${mcpKey}`;
+        const activeTab = window.app.mcpActiveTab || 'cloud';
+
+        const tabs = [
+            { id: 'cloud', label: 'Cloud (Claude Web)', icon: 'fa-cloud' },
+            { id: 'desktop', label: 'Desktop (Claude)', icon: 'fa-desktop' },
+            { id: 'ide', label: 'Engineers (IDE)', icon: 'fa-code' }
+        ];
+
+        const mcpContent = `
+            <div class="page-title" style="display:flex; align-items:center; gap:12px;">
+                <span>MCP連携</span>
+                <div style="font-size:10px; background:#1e293b; color:#fff; padding:2px 8px; border-radius:4px; font-weight:800; text-transform:uppercase;">Connect</div>
+            </div>
+            
+            <div class="mcp-container" style="max-width: 960px; display: grid; grid-template-columns: 1fr 340px; gap: 24px;">
+                <div class="mcp-main-col">
+                    <!-- Setup Tabs -->
+                    <article class="dashboard-card" style="margin-bottom: 24px; padding: 0; background: #fff; border: 1px solid #f1f5f9; border-radius: 16px; overflow:hidden;">
+                        <div style="display:flex; background:#f8fafc; border-bottom:1px solid #f1f5f9;">
+                            ${tabs.map(tab => `
+                                <div onclick="window.app.switchMcpTab('${tab.id}')" 
+                                     style="flex:1; padding:16px; text-align:center; font-size:13px; font-weight:700; cursor:pointer; transition:all 0.2s; border-bottom:2px solid ${activeTab === tab.id ? '#c19b4a' : 'transparent'}; color: ${activeTab === tab.id ? '#0f172a' : '#64748b'}; background: ${activeTab === tab.id ? '#fff' : 'transparent'};">
+                                    <i class="fa-solid ${tab.icon}" style="margin-right:6px;"></i> ${tab.label}
+                                </div>
+                            `).join('')}
+                        </div>
+                        
+                        <div style="padding:32px;">
+                            ${activeTab === 'cloud' ? `
+                                <h3 style="margin:0 0 16px; font-size:17px; font-weight:800; color:#0f172a;">Claude.ai (Web版) と連携する</h3>
+                                <p style="font-size:14px; color:#475569; line-height:1.6; margin-bottom:24px;">
+                                    ブラウザ版の Claude に直接 DIFFsense の機能を追加します。
+                                </p>
+                                
+                                <div style="display:flex; flex-direction:column; gap:20px;">
+                                    <div style="display:flex; gap:16px;">
+                                        <div style="width:28px; height:28px; background:#1e293b; color:#fff; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; flex-shrink:0;">1</div>
+                                        <div style="flex:1;">
+                                            <div style="font-weight:700; font-size:14px; margin-bottom:8px;">連携用URLをコピー</div>
+                                            <div style="position:relative;">
+                                                <input type="text" value="${sseUrl}" readonly style="width:100%; padding:10px 40px 10px 12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; font-size:12px; font-family:monospace; color:#475569;" id="mcp-sse-url">
+                                                <button onclick="navigator.clipboard.writeText('${sseUrl}'); Notify.success('URLをコピーしました')" style="position:absolute; right:8px; top:50%; transform:translateY(-50%); background:none; border:none; color:#c19b4a; cursor:pointer; padding:6px;">
+                                                    <i class="fa-solid fa-copy"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div style="display:flex; gap:16px;">
+                                        <div style="width:28px; height:28px; background:#1e293b; color:#fff; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; flex-shrink:0;">2</div>
+                                        <div style="flex:1;">
+                                            <div style="font-weight:700; font-size:14px; margin-bottom:4px;">Claude.ai の設定を開く</div>
+                                            <p style="font-size:12px; color:#64748b; margin:0;">「Settings」→「Custom Connectors」を開き、「Add Connector」をクリックしてください。</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div style="display:flex; gap:16px;">
+                                        <div style="width:28px; height:28px; background:#1e293b; color:#fff; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; flex-shrink:0;">3</div>
+                                        <div style="flex:1;">
+                                            <div style="font-weight:700; font-size:14px; margin-bottom:4px;">名前とURLをペースト</div>
+                                            <p style="font-size:12px; color:#64748b; margin:0;">名前には「DIFFsense」、URLには上記でコピーしたURLを貼り付ければ完了です。</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            ` : activeTab === 'desktop' ? `
+                                <h3 style="margin:0 0 16px; font-size:17px; font-weight:800; color:#0f172a;">Claude Desktop (Mac/Win)</h3>
+                                <p style="font-size:14px; color:#475569; line-height:1.6; margin-bottom:24px;">
+                                    PC用の Claude アプリに設定を追加して、ローカルから連携します。
+                                </p>
+                                
+                                <div style="margin-bottom:24px;">
+                                    <p style="font-size:12px; font-weight:700; color:#1e293b; margin-bottom:12px;">構成ファイル (json) に追記</p>
+                                    <div style="position:relative;">
+                                        <pre style="background:#0f172a; color:#cbd5e1; padding:20px; border-radius:12px; font-size:12px; line-height:1.5; overflow-x:auto;"><code id="mcp-config-code">{
+  "mcpServers": {
+    "diffsense": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sse",
+        "${sseUrl}"
+      ]
     }
+  }
+}</code></pre>
+                                        <button class="btn-dashboard" style="position:absolute; top:12px; right:12px; background:rgba(255,255,255,0.05); color:#fff; border:1px solid rgba(255,255,255,0.1); padding: 8px 12px; border-radius:6px;" onclick="window.app.copyMcpConfigToClipboard()">
+                                            <i class="fa-solid fa-copy"></i> Copy
+                                        </button>
+                                    </div>
+                                </div>
+                            ` : `
+                                <h3 style="margin:0 0 16px; font-size:17px; font-weight:800; color:#0f172a;">Advanced (Cursor / VS Code)</h3>
+                                <p style="font-size:14px; color:#475569; line-height:1.6; margin-bottom:24px;">
+                                    Cursor や VS Code の MCP 設定画面で、上記の <strong>SSE URL</strong> を登録してください。
+                                </p>
+                                <div style="background:#f1f5f9; padding:16px; border-radius:12px;">
+                                    <div style="font-size:12px; font-weight:700; color:#475569; margin-bottom:8px;">Target Endpoint (SSE)</div>
+                                    <code style="word-break:break-all; font-size:11px; color:#334155;">${sseUrl}</code>
+                                    <button class="btn-dashboard" style="display:block; margin-top:12px; font-size:11px; padding:6px 12px;" onclick="navigator.clipboard.writeText('${sseUrl}'); Notify.success('URLをコピーしました')">
+                                        <i class="fa-solid fa-copy"></i> URLをコピー
+                                    </button>
+                                </div>
+                            `}
+                        </div>
+                    </article>
+
+                    <!-- Tool Grid -->
+                    <div style="margin-top:40px;">
+                        <h4 style="margin:0 0 20px; font-size:14px; font-weight:800; color: #0f172a; text-transform:uppercase; letter-spacing:0.05em;">利用可能なツール</h4>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                            ${[
+                                { id: 'list_contracts', desc: '保存済み契約書の一覧を取得', icon: 'fa-list-check' },
+                                { id: 'get_contract_text', desc: '契約書の全文（Markdown）を取得', icon: 'fa-file-signature' },
+                                { id: 'analyze_contract', desc: 'AIによるリスク解析（1回分消費）', icon: 'fa-brain' },
+                                { id: 'compare_contracts', desc: '2通の契約書を詳細比較（1回分消費）', icon: 'fa-layer-group' }
+                            ].map(tool => `
+                                <div style="padding: 20px; background: #fff; transition: all 0.2s; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                                        <i class="fa-solid ${tool.icon}" style="font-size:14px; color:#64748b;"></i>
+                                        <span style="font-family: 'JetBrains Mono', 'Fira Code', monospace; font-weight: 700; color: #1e293b; font-size: 13px;">${tool.id}</span>
+                                    </div>
+                                    <div style="font-size: 12px; color: #64748b; line-height: 1.5;">${tool.desc}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mcp-side-col">
+                    <!-- API Key Card -->
+                    <article class="dashboard-card" style="margin-bottom: 24px; padding: 24px; background: #1e293b; border-radius: 16px; color: #fff; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);">
+                        <h3 style="margin:0 0 16px; font-size:14px; font-weight:700; color: #cbd5e1; display:flex; align-items:center; gap:8px;">
+                            <i class="fa-solid fa-shield-halved"></i> API Authentication
+                        </h3>
+                        
+                        <div style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:10px; padding:16px; margin-bottom:16px;">
+                            <div style="font-size:11px; color:#94a3b8; margin-bottom:8px;">PRIVATE API KEY</div>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <code style="flex:1; font-family:monospace; font-size:13px; color:#fff; word-break:break-all;">${displayKey}</code>
+                            </div>
+                            <div style="display:flex; gap:8px; margin-top:12px;">
+                                <button class="btn-dashboard" style="flex:1; background:rgba(255,255,255,0.1); border:none; color:#fff; font-size:11px; padding:6px;" onclick="window.app.toggleMcpKeyVisibility()">
+                                    <i class="fa-solid ${isKeyHidden ? 'fa-eye' : 'fa-eye-slash'}"></i> ${isKeyHidden ? '表示' : '隠す'}
+                                </button>
+                                <button class="btn-dashboard" style="flex:1; background:rgba(255,255,255,0.1); border:none; color:#fff; font-size:11px; padding:6px;" onclick="navigator.clipboard.writeText('${mcpKey}'); Notify.success('キーをコピーしました')">
+                                    <i class="fa-solid fa-copy"></i> Copy
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <button class="btn-dashboard" style="width:100%; background:#c19b4a; border:none; color:#fff; font-weight:700; font-size:13px; padding:10px;" onclick="window.app.generateMcpKey()">
+                            <i class="fa-solid fa-rotate"></i> 新規キーを発行
+                        </button>
+                    </article>
+
+                    <!-- Connectivity Status -->
+                    <article class="dashboard-card" style="padding: 24px; background: #fff; border: 1px solid #f1f5f9; border-radius: 16px;">
+                        <h3 style="margin:0 0 16px; font-size:13px; font-weight:800; color: #0f172a; text-transform:uppercase; letter-spacing:0.05em;">AIモデル・ツール対応状況</h3>
+                        
+                        <div style="display:flex; flex-direction:column; gap:12px;">
+                            ${[
+                                { name: 'Claude (Web版)', status: '推奨 / Connectable', icon: 'fa-circle-check', color: '#10b981' },
+                                { name: 'Claude (Desktop)', status: 'Active', icon: 'fa-circle-check', color: '#10b981' },
+                                { name: 'Cursor / VS Code', status: 'Active', icon: 'fa-circle-check', color: '#10b981' },
+                                { name: 'ChatGPT App', status: '未対応 / Limited', icon: 'fa-circle-info', color: '#64748b' }
+                            ].map(item => `
+                                <div style="display:flex; justify-content:space-between; align-items:center; padding-bottom:8px; border-bottom:1px solid #f1f5f9;">
+                                    <span style="font-size:12px; color:#334155; font-weight:600;">${item.name}</span>
+                                    <div style="display:flex; align-items:center; gap:5px; font-size:9px; font-weight:800; color:${item.color}; text-transform:uppercase;">
+                                        <i class="fa-solid ${item.icon}"></i> ${item.status}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                        
+                        <div style="margin-top:16px; padding:12px; background:#f8fafc; border-radius:8px; font-size:11px; color:#64748b; line-height:1.5;">
+                            ※公式アプリがMCP未対応の場合は、Cursor等を経由して全モデルからご利用可能です。
+                        </div>
+                    </article>
+                </div>
+            </div>
+        `;
+
+        if (isFree) {
+            return `
+                <div style="position:relative; min-height:80vh;">
+                    <div class="mask-content" style="pointer-events:none; user-select:none; filter: blur(4px); opacity: 0.6;">
+                        ${mcpContent}
+                    </div>
+                    <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(245,247,250,0.65); backdrop-filter:blur(3px); z-index:10;">
+                        <div class="modal-content" style="max-width:450px; width:90%; text-align:center; position:relative;">
+                            <div class="modal-body" style="padding:40px 32px;">
+                                <div style="font-size:3rem; color:#c19b4a; margin-bottom:20px;">
+                                    <i class="fa-solid fa-crown"></i>
+                                </div>
+                                <h3 style="margin-bottom:16px; font-size:1.4rem; font-weight:800; color:#0f172a;">Starterプラン以上の機能</h3>
+                                <p style="color:#64748b; line-height:1.6; margin-bottom:32px; font-size:14px;">
+                                    「MCP連携」はStarterプラン以上の機能です。<br>
+                                    普段お使いのAI（ClaudeやCursor等）から直接DIFFsenseの高度な契約書解析を呼び出せます。
+                                </p>
+                                <button class="btn-dashboard btn-primary-action" style="width:100%; padding:14px; font-size:15px; font-weight:700;"
+                                    onclick="window.app.navigate('plan')">
+                                    プランをアップグレードする
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        return mcpContent;
+    },
 };
 
 // --- Registration Flow Logic ---
@@ -3995,6 +4218,68 @@ class DashboardApp {
         }
     }
 
+    async loadAndRenderMcpSettings() {
+        this.mainContent.innerHTML = '<div style="padding:40px;color:#888;">読み込み中...</div>';
+        try {
+            const data = await dbService.getMcpApiKey();
+            if (data && data.mcpApiKey) {
+                this.mcpKey = data.mcpApiKey;
+            } else {
+                this.mcpKey = '未発行';
+            }
+        } catch (error) {
+            console.error('Failed to load MCP settings:', error);
+            this.mcpKey = 'エラー';
+        }
+        this.mainContent.innerHTML = Views.mcp();
+    }
+
+    async generateMcpKey() {
+        if (!await Notify.confirm('MCP APIキーを生成しますか？\nすでに古いキーがある場合、即座に使えなくなります。', { title: '確認', type: 'warning' })) return;
+        
+        const loading = Notify.info('生成中...', { duration: 0 });
+        try {
+            const data = await dbService.generateMcpApiKey();
+            if (data && data.mcpApiKey) {
+                this.mcpKey = data.mcpApiKey;
+                this.isMcpKeyHidden = false; // Show it initially when generated
+                this.mainContent.innerHTML = Views.mcp();
+                Notify.success('APIキーを更新しました');
+            } else {
+                Notify.error('生成に失敗しました');
+            }
+        } finally {
+            if (loading && loading.close) loading.close();
+        }
+    }
+    
+    switchMcpTab(tabId) {
+        this.mcpActiveTab = tabId;
+        this.mainContent.innerHTML = Views.mcp();
+    }
+
+    toggleMcpKeyVisibility() {
+        this.isMcpKeyHidden = this.isMcpKeyHidden === false ? true : false;
+        this.mainContent.innerHTML = Views.mcp();
+    }
+
+    copyMcpKeyToClipboard() {
+        if (!this.mcpKey || this.mcpKey === '未発行' || this.mcpKey === 'エラー') {
+            Notify.warning('コピーできるキーがありません');
+            return;
+        }
+        navigator.clipboard.writeText(this.mcpKey);
+        Notify.success('APIキーをコピーしました');
+    }
+
+    copyMcpConfigToClipboard() {
+        const pre = document.getElementById('mcp-config-code');
+        if (pre) {
+            navigator.clipboard.writeText(pre.textContent);
+            Notify.success('設定内容をコピーしました');
+        }
+    }
+
     showCancelModal() {
         console.log('showCancelModal called');
         const overlay = document.createElement('div');
@@ -4127,10 +4412,18 @@ class DashboardApp {
 
         // Notification Settings: Pro only
         const navNotif = document.getElementById('nav-notifications');
-        if (plan !== 'pro') {
+        if (plan !== 'pro' && plan !== 'business') {
             if (navNotif) navNotif.classList.add('feature-locked');
         } else {
             if (navNotif) navNotif.classList.remove('feature-locked');
+        }
+
+        // MCP Integration: Starter+
+        const navMcp = document.getElementById('nav-mcp');
+        if (plan === 'free') {
+            if (navMcp) navMcp.classList.add('feature-locked');
+        } else {
+            if (navMcp) navMcp.classList.remove('feature-locked');
         }
     }
 
@@ -4324,6 +4617,11 @@ class DashboardApp {
 
         if (viewId === 'notifications') {
             this.loadAndRenderNotificationSettings();
+            return;
+        }
+
+        if (viewId === 'mcp') {
+            this.loadAndRenderMcpSettings();
             return;
         }
 

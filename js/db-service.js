@@ -325,7 +325,12 @@ export const dbService = {
             contracts = contracts.filter(c => c.risk_level === risk);
         }
         if (status !== "all") {
-            contracts = contracts.filter(c => c.status === status);
+            if (status === '未確認') {
+                // UI表示（dashboard.js）のバッジと合わせ、「確認済」以外はすべて「未確認」としてフィルタリングする
+                contracts = contracts.filter(c => c.status !== '確認済');
+            } else {
+                contracts = contracts.filter(c => c.status === status);
+            }
         }
         if (type !== "all") {
             contracts = contracts.filter(c => c.type === type);
@@ -655,6 +660,15 @@ export const dbService = {
             return true;
         }
         return false;
+    },
+
+    // --- MCP Methods ---
+    async getMcpApiKey() {
+        return await this._callApi('/api/user/mcp-key');
+    },
+
+    async generateMcpApiKey() {
+        return await this._callApi('/api/user/mcp-key', 'POST');
     },
 
     // --- AI Analysis Methods ---

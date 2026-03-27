@@ -551,6 +551,54 @@ class DBService {
     }
 
     /**
+     * Set or update MCP API key for a user
+     * @param {string} uid - Firebase UID
+     * @param {string} apiKey - Generated MCP API key
+     */
+    async setUserMcpApiKey(uid, apiKey) {
+        logger.info(`setUserMcpApiKey: uid=${uid}`);
+        const updateData = { mcpApiKey: apiKey };
+        
+        // Update Firestore
+        await this._firestoreSetUser(uid, updateData);
+
+        // Update file
+        const users = await this.readData('users');
+        const index = users.findIndex(u => u.uid === uid);
+        if (index > -1) {
+            users[index].mcpApiKey = apiKey;
+            await this.writeData('users', users);
+            return users[index];
+        }
+        return null;
+    }
+
+    /**
+     * Find a user by their MCP API key
+     * @param {string} apiKey 
+     */
+    async findUserByMcpApiKey(apiKey) {
+        if (!apiKey) return null;
+        
+        // Try Firestore first
+        if (this.useFirestore) {
+            try {
+                const snapshot = await firestore.collection('users')
+                    .where('mcpApiKey', '==', apiKey).limit(1).get();
+                if (!snapshot.empty) {
+                    return snapshot.docs[0].data();
+                }
+            } catch (error) {
+                logger.error(`Firestore query error: ${error.message}`);
+            }
+        }
+        
+        // Fallback to file
+        const users = await this.readData('users');
+        return users.find(u => u.mcpApiKey === apiKey) || null;
+    }
+
+    /**
      * Increment AI usage count for a user
      * @param {string} uid - Firebase UID
      */
@@ -674,15 +722,23 @@ class DBService {
 
     // --- Crawling Support ---
 
-    /**
-     * Get all contracts for Pro-plan users that have monitoring enabled
-     */
     async getContracts(ownerUid) {
         if (this.useFirestore && ownerUid) {
             const fsContracts = await this._firestoreGetContracts(ownerUid);
             if (fsContracts) return fsContracts;
         }
         return await this.readData('contracts');
+    }
+
+    /**
+     * Get a single contract by ID, verifying ownership
+     * @param {string|number} id 
+     * @param {string} ownerUid 
+     */
+    async getContractById(id, ownerUid) {
+        const contracts = await this.getContracts(ownerUid);
+        const normalizedId = String(id);
+        return contracts.find(c => String(c.id) === normalizedId) || null;
     }
 
     async saveContract(ownerUid, contract) {
@@ -736,9 +792,17 @@ class DBService {
         const index = contracts.findIndex(c => c.id === id);
 
         if (index > -1) {
+            // 所有権の検証 (IDOR対策)
+            // ownerUid が提供されている場合、既存データの ownerUid と一致するか厳格にチェックする
+            if (ownerUid && contracts[index].ownerUid && contracts[index].ownerUid !== ownerUid) {
+                logger.warn(`IDOR ATTEMPT DETECTED: User ${ownerUid} tried to update contract ${id} owned by ${contracts[index].ownerUid}`);
+                return null; // 不正なアクセスとして処理を中断
+            }
+
             contracts[index] = { ...contracts[index], ...updates };
-            if (this.useFirestore && ownerUid) {
-                await this._firestoreSaveContract(ownerUid, contracts[index]);
+            if (this.useFirestore && (ownerUid || contracts[index].ownerUid)) {
+                const targetUid = ownerUid || contracts[index].ownerUid;
+                await this._firestoreSaveContract(targetUid, contracts[index]);
             }
             await this.writeData('contracts', contracts);
             return contracts[index];
@@ -938,6 +1002,73 @@ class DBService {
             return requests[index];
         }
         return null;
+    }
+
+    /**
+     * Set MCP API key for a user
+     * @param {string} uid 
+     * @param {string} key 
+     */
+    async setUserMcpApiKey(uid, key) {
+        if (!uid || !key) return false;
+        
+        if (this.useFirestore) {
+            try {
+                await firestore.collection('users').doc(uid).set({
+                    mcpApiKey: key,
+                    mcp_updated_at: new Date().toISOString()
+                }, { merge: true });
+                return true;
+            } catch (error) {
+                logger.error(`setUserMcpApiKey Firestore error: ${error.message}`);
+                // Fallback to local file below
+            }
+        }
+
+        try {
+            const users = await this.readData('users');
+            const index = users.findIndex(u => String(u.uid) === String(uid));
+            if (index !== -1) {
+                users[index].mcpApiKey = key;
+                users[index].mcp_updated_at = new Date().toISOString();
+                await this.writeData('users', users);
+                return true;
+            }
+        } catch (e) {
+            logger.error(`setUserMcpApiKey File error: ${e.message}`);
+        }
+        return false;
+    }
+
+    /**
+     * Find a user by MCP API key
+     * @param {string} key 
+     * @returns {Promise<Object|null>}
+     */
+    async findUserByMcpApiKey(key) {
+        if (!key) return null;
+
+        if (this.useFirestore) {
+            try {
+                const snapshot = await firestore.collection('users')
+                    .where('mcpApiKey', '==', key)
+                    .limit(1)
+                    .get();
+                
+                if (!snapshot.empty) {
+                    return snapshot.docs[0].data();
+                }
+            } catch (error) {
+                logger.warn(`findUserByMcpApiKey Firestore error: ${error.message}`);
+            }
+        }
+
+        try {
+            const users = await this.readData('users');
+            return users.find(u => u.mcpApiKey === key) || null;
+        } catch (e) {
+            return null;
+        }
     }
 
     /**

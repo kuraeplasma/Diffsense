@@ -19,6 +19,7 @@ const signRoutes = require('./routes/sign');
 const notificationRoutes = require('./routes/notifications');
 const cronRoutes = require('./routes/cron');
 const slackRoutes = require('./routes/slack');
+const { createMcpRouter } = require('./mcp-server/mcpServer');
 const cronService = require('./services/cronService');
 const { assertProductionEnv } = require('./config/env');
 
@@ -80,7 +81,12 @@ const envOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',')
     : ['http://localhost:3000', 'http://localhost:8000'];
 // 本番ドメインを常に許可（環境変数の設定漏れ対策）
-const requiredOrigins = ['https://diffsense.spacegleam.co.jp', 'https://diffsense.netlify.app'];
+const requiredOrigins = [
+    'https://diffsense.spacegleam.co.jp', 
+    'https://diffsense.netlify.app',
+    'https://claude.ai',
+    'https://www.claude.ai'
+];
 const allowedOrigins = [...new Set([...envOrigins, ...requiredOrigins, configuredFrontendOrigin].filter(Boolean))];
 
 app.use(cors({
@@ -210,6 +216,9 @@ app.use('/api/user', authMiddleware, userRoutes);
 app.use('/api', authMiddleware, paymentRoutes);
 app.use('/api/sign', authMiddleware, signRoutes);
 app.use('/sign', authMiddleware, signRoutes); // Alias for convenience
+
+// MCP Server (SSE) - Auth handled within the router
+app.use('/api/mcp', createMcpRouter());
 
 
 // Static files (PDF Uploads)

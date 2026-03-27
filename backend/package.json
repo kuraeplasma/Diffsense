@@ -21,6 +21,7 @@
   "author": "SpaceGleam",
   "license": "ISC",
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.28.0",
     "@sendgrid/mail": "^8.1.6",
     "adm-zip": "^0.5.16",
     "axios": "^1.6.2",
@@ -44,6 +45,7 @@
     "resend": "^6.9.4",
     "string-similarity": "^4.0.4",
     "stripe": "^17.7.0",
+    "uuid": "^13.0.0",
     "winston": "^3.11.0"
   },
   "devDependencies": {
