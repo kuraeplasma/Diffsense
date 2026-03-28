@@ -140,17 +140,6 @@ function createServerForUser(user, baseUrl) {
                     inputSchema: { type: 'object', properties: {} }
                 },
                 {
-                    name: 'get_contract_text',
-                    description: '契約全文の直接取得は安全のため無効化されています。必要なら analyze_contract を使用してください',
-                    inputSchema: {
-                        type: 'object',
-                        properties: {
-                            contractId: { type: 'string', description: '契約書ID' }
-                        },
-                        required: ['contractId']
-                    }
-                },
-                {
                     name: 'analyze_contract',
                     description: '契約書をAIで解析し、リスクや要約を出力します（解析回数を消費します）。リスク表示は High / Medium / Low です',
                     inputSchema: {
@@ -184,10 +173,6 @@ function createServerForUser(user, baseUrl) {
             switch (name) {
                 case 'list_contracts': {
                     const result = await handlers.listContracts(user);
-                    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-                }
-                case 'get_contract_text': {
-                    const result = await handlers.getContractText(user, args.contractId);
                     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
                 }
                 case 'analyze_contract': {

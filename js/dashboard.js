@@ -2287,7 +2287,6 @@ const Views = {
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                             ${[
                                 { id: 'list_contracts', desc: '保存済み契約書の一覧を名前とIDで取得', icon: 'fa-list-check' },
-                                { id: 'get_contract_text', desc: '契約全文の直接取得は安全のため無効化中', icon: 'fa-file-signature' },
                                 { id: 'analyze_contract', desc: 'DIFFsense独自のAIでリスク解析を実行', icon: 'fa-brain' },
                                 { id: 'compare_contracts', desc: '2通の契約書を詳細比較して差分を抽出', icon: 'fa-layer-group' }
                             ].map(tool => `
@@ -2462,12 +2461,6 @@ const Views = {
                         </div>
                     </div>
 
-                    <div style="padding:16px; background:#fff9eb; border:1px solid #fde68a; border-radius:12px; display:flex; gap:12px; align-items:flex-start;">
-                        <i class="fa-solid fa-lightbulb" style="color:#b45309; margin-top:2px;"></i>
-                        <p style="font-size:11px; color:#92400e; margin:0; line-height:1.5;">
-                            契約全文の直接取得は安全のため無効化されます。解析は <code>analyze_contract</code> / <code>compare_contracts</code> を使ってください。
-                        </p>
-                    </div>
                 </div>
             `;
         } else {
