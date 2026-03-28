@@ -2240,10 +2240,9 @@ const Views = {
             <style>
                 /* Brute Force Stability: Force permanent scrollbar THUMB and fixed grid widths */
                 html, body { 
-                    overflow-y: scroll !important; 
-                    scrollbar-gutter: stable both-edges !important; 
+                    overflow-y: auto !important; 
+                    scrollbar-gutter: stable !important; 
                     width: 100% !important; 
-                    min-height: 2001px !important; /* Force thumb to prevent toggle jumps */
                 }
                 .mcp-container { 
                     width: 960px !important; 
