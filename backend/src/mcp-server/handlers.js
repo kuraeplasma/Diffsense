@@ -118,6 +118,10 @@ function buildDiffPreviewLines(changes, limit = 6) {
         .slice(0, limit)
         .map((change) => {
             const section = String(change?.section || '本文').trim() || '本文';
+            const diffText = String(change?.diffText || '').trim();
+            if (diffText) {
+                return `${section}\n${diffText}`;
+            }
             const oldText = truncatePreviewText(change?.old || '');
             const newText = truncatePreviewText(change?.new || '');
             if (String(change?.type || '').toUpperCase() === 'ADD') {
@@ -127,6 +131,65 @@ function buildDiffPreviewLines(changes, limit = 6) {
                 return `- ${section}: ${oldText || '削除内容あり'}`;
             }
             return `- ${section}: ${oldText || '変更前あり'}\n+ ${section}: ${newText || '変更後あり'}`;
+        });
+}
+
+function normalizeSearchText(value) {
+    return String(value || '')
+        .toLowerCase()
+        .replace(/\s+/g, '')
+        .trim();
+}
+
+function getSortableContractTimestamp(contract) {
+    const candidates = [
+        contract?.updated_at,
+        contract?.updatedAt,
+        contract?.created_at,
+        contract?.createdAt
+    ];
+
+    for (const candidate of candidates) {
+        if (candidate && typeof candidate.toDate === 'function') {
+            const date = candidate.toDate();
+            const parsed = date instanceof Date ? date.getTime() : NaN;
+            if (Number.isFinite(parsed)) {
+                return parsed;
+            }
+        }
+        if (typeof candidate === 'number' && Number.isFinite(candidate)) {
+            return candidate;
+        }
+        const numeric = Number(candidate);
+        if (Number.isFinite(numeric) && numeric > 0) {
+            return numeric;
+        }
+        const parsed = Date.parse(candidate);
+        if (Number.isFinite(parsed)) {
+            return parsed;
+        }
+    }
+
+    return 0;
+}
+
+function sortContractsForListing(contracts) {
+    return [...(Array.isArray(contracts) ? contracts : [])]
+        .sort((a, b) => getSortableContractTimestamp(b) - getSortableContractTimestamp(a));
+}
+
+function filterContractsByQuery(contracts, query) {
+    const needle = normalizeSearchText(query);
+    if (!needle) return sortContractsForListing(contracts);
+
+    return sortContractsForListing(contracts)
+        .filter((contract) => {
+            const haystack = normalizeSearchText([
+                contract?.name,
+                contract?.id,
+                contract?.status
+            ].filter(Boolean).join(' '));
+            return haystack.includes(needle);
         });
 }
 
@@ -164,14 +227,40 @@ function decorateAnalysisResult(result) {
     };
 }
 
+function buildSafeMcpRiskItems(result) {
+    return (Array.isArray(result?.risks) ? result.risks : [])
+        .map((item) => ({
+            section: String(item?.section || '本文').trim() || '本文',
+            level: String(item?.level || item?.risk || result?.riskLabel || 'LOW').trim() || 'LOW',
+            reason: String(item?.reason || '').trim(),
+            action: String(item?.action || '').trim()
+        }))
+        .filter((item) => item.reason)
+        .slice(0, 5);
+}
+
+function buildSafeMcpRecommendedActions(risks) {
+    return Array.from(new Set((Array.isArray(risks) ? risks : [])
+        .map((item) => String(item?.action || '').trim())
+        .filter(Boolean)))
+        .slice(0, 5);
+}
+
 /**
  * List all contracts for a user
  */
-async function listContracts(user) {
+async function listContracts(user, query = '') {
     try {
         const contracts = await db.getContracts(user.uid);
+        const normalizedQuery = String(query || '').trim();
+        const visibleContracts = normalizedQuery
+            ? filterContractsByQuery(contracts, normalizedQuery).slice(0, 10)
+            : sortContractsForListing(contracts).slice(0, 5);
+
         return {
-            contracts: contracts.map(c => ({
+            mode: normalizedQuery ? 'search' : 'recent',
+            query: normalizedQuery || null,
+            contracts: visibleContracts.map(c => ({
                 id: c.id,
                 name: c.name || '名称未設定',
                 status: c.status || '不明',
@@ -230,14 +319,18 @@ async function analyzeContract(user, contractId) {
         // Increment usage first (conservative)
         await db.incrementUsage(user.uid);
 
-        const result = decorateAnalysisResult(await gemini.analyzeContract(contractText));
+        const result = decorateAnalysisResult(await gemini.analyzeMcpContract(contractText));
+        const risks = buildSafeMcpRiskItems(result);
         
         return {
             id: contract.id,
             name: contract.name,
             risk_level: result.riskLabel,
             risk_display: result.riskDisplay,
-            analysis: result
+            summary: result.summary,
+            risk_reason: result.riskReason,
+            risks,
+            recommended_actions: buildSafeMcpRecommendedActions(risks)
         };
     } catch (error) {
         logger.error(`MCP analyzeContract error: ${error.message}`);
@@ -289,12 +382,14 @@ async function compareContracts(user, contractIdA, contractIdB) {
             }];
         }
 
-        const result = decorateAnalysisResult(await gemini.analyzeMcpDiff(diffChanges, {
+        const compactDiffChanges = diffService.compressChangesForMcp(diffChanges, { perSideLineLimit: 4 });
+
+        const result = decorateAnalysisResult(await gemini.analyzeMcpDiff(compactDiffChanges, {
             contractAName: contractA.name,
             contractBName: contractB.name
         }));
         const report = buildComparisonReport(result);
-        const diffPreview = buildDiffPreviewLines(diffChanges);
+        const diffPreview = buildDiffPreviewLines(compactDiffChanges);
 
         return {
             contractA: contractA.name,

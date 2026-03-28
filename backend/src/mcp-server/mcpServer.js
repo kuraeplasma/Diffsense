@@ -136,12 +136,20 @@ function createServerForUser(user, baseUrl) {
             tools: [
                 {
                     name: 'list_contracts',
-                    description: 'ユーザーが保存している契約書の一覧を取得します',
-                    inputSchema: { type: 'object', properties: {} }
+                    description: '契約書一覧を取得します。query 未指定時は直近5件のみ、query 指定時は契約名やIDで絞り込みます',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            query: {
+                                type: 'string',
+                                description: '契約名やIDの検索語。未指定時は直近5件のみ返します'
+                            }
+                        }
+                    }
                 },
                 {
                     name: 'analyze_contract',
-                    description: '契約書をAIで解析し、リスクや要約を出力します（解析回数を消費します）。リスク表示は High / Medium / Low です',
+                    description: '契約書をAIで解析し、要約と主要リスクだけを返します。原文引用は返しません（解析回数を消費します）。リスク表示は High / Medium / Low です',
                     inputSchema: {
                         type: 'object',
                         properties: {
@@ -152,7 +160,7 @@ function createServerForUser(user, baseUrl) {
                 },
                 {
                     name: 'compare_contracts',
-                    description: '2つの契約書の差分データだけを使って、変更点概要・リスク評価・法規制確認ポイント・推奨アクションを返します（Businessプラン以上）。リスク表示は High / Medium / Low です',
+                    description: '2つの契約書の最小差分データだけを使って、変更点概要・リスク評価・法規制確認ポイント・推奨アクションを返します（Businessプラン以上）。リスク表示は High / Medium / Low です',
                     inputSchema: {
                         type: 'object',
                         properties: {
@@ -172,7 +180,7 @@ function createServerForUser(user, baseUrl) {
         try {
             switch (name) {
                 case 'list_contracts': {
-                    const result = await handlers.listContracts(user);
+                    const result = await handlers.listContracts(user, args.query);
                     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
                 }
                 case 'analyze_contract': {

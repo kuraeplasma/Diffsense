@@ -100,6 +100,27 @@ class DiffService {
     }
 
     /**
+     * Compress article-level changes down to minimal +/- line snippets for MCP use.
+     * This keeps only changed lines, not full unchanged clause bodies.
+     * @param {Array} changes
+     * @param {object} options
+     */
+    compressChangesForMcp(changes, options = {}) {
+        const perSideLineLimit = Number(options.perSideLineLimit || 4);
+        return (Array.isArray(changes) ? changes : [])
+            .map((change) => {
+                const compact = this._buildCompactDiffForMcp(change, perSideLineLimit);
+                return {
+                    ...change,
+                    old: compact.old,
+                    new: compact.new,
+                    diffText: compact.diffText
+                };
+            })
+            .filter((change) => String(change.diffText || change.old || change.new || '').trim());
+    }
+
+    /**
      * Find the most likely match for an old article in the new set
      */
     _findBestMatch(oldArt, newArticles, matchedIndices) {
@@ -136,6 +157,72 @@ class DiffService {
         }
 
         return { index: bestIndex, similarity: Math.min(1.0, bestScore) };
+    }
+
+    _buildCompactDiffForMcp(change, perSideLineLimit = 4) {
+        const type = String(change?.type || 'MODIFY').toUpperCase();
+        if (type === 'ADD') {
+            return this._formatCompactDiff([], this._extractMeaningfulLines(change?.new || ''), perSideLineLimit);
+        }
+        if (type === 'DELETE') {
+            return this._formatCompactDiff(this._extractMeaningfulLines(change?.old || ''), [], perSideLineLimit);
+        }
+        return this._buildCompactModifyDiff(change?.old || '', change?.new || '', perSideLineLimit);
+    }
+
+    _buildCompactModifyDiff(oldText, newText, perSideLineLimit = 4) {
+        const removedLines = [];
+        const addedLines = [];
+        const chunks = diff.diffLines(String(oldText || ''), String(newText || ''), { ignoreWhitespace: false });
+
+        chunks.forEach((part) => {
+            const lines = this._extractMeaningfulLines(part.value || '');
+            if (part.removed) {
+                removedLines.push(...lines);
+            } else if (part.added) {
+                addedLines.push(...lines);
+            }
+        });
+
+        if (removedLines.length === 0 && addedLines.length === 0 && String(oldText || '').trim() !== String(newText || '').trim()) {
+            const oldFallback = String(oldText || '').replace(/\s+/g, ' ').trim();
+            const newFallback = String(newText || '').replace(/\s+/g, ' ').trim();
+            return this._formatCompactDiff(
+                oldFallback ? [oldFallback] : [],
+                newFallback ? [newFallback] : [],
+                perSideLineLimit
+            );
+        }
+
+        return this._formatCompactDiff(removedLines, addedLines, perSideLineLimit);
+    }
+
+    _extractMeaningfulLines(text) {
+        return String(text || '')
+            .split(/\r?\n/)
+            .map((line) => line.replace(/\s+/g, ' ').trim())
+            .filter(Boolean);
+    }
+
+    _limitCompactLines(lines, limit) {
+        const normalized = Array.from(new Set((Array.isArray(lines) ? lines : []).filter(Boolean)));
+        if (normalized.length <= limit) return normalized;
+        return [
+            ...normalized.slice(0, limit),
+            `...[他${normalized.length - limit}行]`
+        ];
+    }
+
+    _formatCompactDiff(removedLines, addedLines, perSideLineLimit = 4) {
+        const limitedRemoved = this._limitCompactLines(removedLines, perSideLineLimit);
+        const limitedAdded = this._limitCompactLines(addedLines, perSideLineLimit);
+        const oldText = limitedRemoved.map((line) => `- ${line}`).join('\n');
+        const newText = limitedAdded.map((line) => `+ ${line}`).join('\n');
+        return {
+            old: oldText,
+            new: newText,
+            diffText: [oldText, newText].filter(Boolean).join('\n')
+        };
     }
 
     /**
