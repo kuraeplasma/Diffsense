@@ -2283,15 +2283,12 @@ const Views = {
 
                     <!-- Tool Grid -->
                     <div style="margin-top:40px;">
-                        <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin-bottom:18px;">
+                        <div style="margin-bottom:18px;">
                             <div>
                                 <h4 style="margin:0 0 6px; font-size:14px; font-weight:800; color:#0f172a; text-transform:uppercase; letter-spacing:0.05em;">利用可能なツール（AIが実行可能）</h4>
                                 <p style="margin:0; font-size:12px; line-height:1.6; color:#64748b;">
                                     Claude や Cursor から呼ばれるのはこの3機能だけです。特に <strong style="color:#0f172a;">compare_contracts</strong> は全文ではなく差分だけをもとに比較します。
                                 </p>
-                            </div>
-                            <div style="flex-shrink:0; padding:8px 12px; border-radius:999px; background:linear-gradient(135deg,#fff7e6 0%,#fef3c7 100%); border:1px solid #f6d88d; font-size:11px; font-weight:800; color:#9a6700; letter-spacing:0.04em;">
-                                SAFE MCP FLOW
                             </div>
                         </div>
 
