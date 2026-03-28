@@ -12,10 +12,13 @@ const { loadSecrets, assertProductionEnv } = require('./config/env');
 const { sanitizeUrlForLogs } = require('./mcp-server/keys');
 
 const app = express();
+const sharedPrimaryConnectorIconPath = path.resolve(__dirname, '..', '..', 'favicon2.png');
 const sharedScaledFaviconPath = path.resolve(__dirname, '..', '..', 'images', 'scaled_favicon.png');
-const connectorIconPngPath = fs.existsSync(sharedScaledFaviconPath)
-    ? sharedScaledFaviconPath
-    : path.resolve(__dirname, '..', 'public', 'diffsense-icon.png');
+const connectorIconPngPath = fs.existsSync(sharedPrimaryConnectorIconPath)
+    ? sharedPrimaryConnectorIconPath
+    : (fs.existsSync(sharedScaledFaviconPath)
+        ? sharedScaledFaviconPath
+        : path.resolve(__dirname, '..', 'public', 'diffsense-icon.png'));
 const connectorIconIcoPath = path.resolve(__dirname, '..', 'public', 'favicon.ico');
 const connectorAppleTouchIconPath = path.resolve(__dirname, '..', 'public', 'apple-touch-icon.png');
 const connectorIconPngBuffer = fs.existsSync(connectorIconPngPath)

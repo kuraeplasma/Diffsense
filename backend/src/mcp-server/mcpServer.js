@@ -25,7 +25,7 @@ function getPublicConnectorIconUrl(baseUrl) {
     const requestBase = String(baseUrl || '').trim().replace(/\/$/, '');
     const canUseFrontendAsset = publicMcpOrigin.origin !== backendBaseUrl.origin;
     if (canUseFrontendAsset) {
-        return new URL('/images/scaled_favicon.png?v=20260329_mcpicon1', publicMcpOrigin).toString();
+        return new URL('/backend/public/apple-touch-icon.png?v=20260329_claudeicon2', publicMcpOrigin).toString();
     }
     return `${requestBase}${publicMcpPath}/icon.png`;
 }
@@ -119,7 +119,7 @@ function createServerForUser(user, baseUrl) {
                 {
                     src: iconUrl,
                     mimeType: 'image/png',
-                    sizes: ['64x64']
+                    sizes: ['180x180']
                 }
             ]
         },

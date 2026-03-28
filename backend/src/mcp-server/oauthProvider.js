@@ -17,7 +17,7 @@ function isExpired(expiresAt) {
 }
 
 function renderAuthorizePage({ client, error = '', maskedKey = '未発行', postUrl = '', hiddenFields = {} }) {
-    const connectorIconUrl = '/images/scaled_favicon.png?v=20260329_oauthicon1';
+    const connectorIconUrl = '/backend/public/apple-touch-icon.png?v=20260329_claudeicon2';
     const hiddenInputs = Object.entries(hiddenFields).map(([key, value]) => {
         const safeValue = String(value ?? '')
             .replace(/&/g, '&amp;')
