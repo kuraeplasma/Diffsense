@@ -83,6 +83,39 @@ function renderAuthorizePage({ client, error = '', maskedKey = '未発行', post
 </html>`;
 }
 
+function buildAuthorizePageCsp(redirectUri) {
+    const directives = [
+        "default-src 'self'",
+        "base-uri 'self'",
+        "font-src 'self' https: data:",
+        "img-src 'self' data: https:",
+        "object-src 'none'",
+        "script-src 'self'",
+        "script-src-attr 'none'",
+        "style-src 'self' https: 'unsafe-inline'",
+        "frame-ancestors 'self' http://localhost:3000 http://localhost:8000 https://diffsense.netlify.app https://diffsense.spacegleam.co.jp",
+        "upgrade-insecure-requests"
+    ];
+
+    const formActionOrigins = new Set(["'self'"]);
+    try {
+        const parsedRedirectUri = new URL(String(redirectUri || '').trim());
+        if (parsedRedirectUri.origin) {
+            formActionOrigins.add(parsedRedirectUri.origin);
+        }
+    } catch (_) {
+        // Ignore invalid redirect_uri here; the OAuth flow will validate it elsewhere.
+    }
+    directives.push(`form-action ${Array.from(formActionOrigins).join(' ')}`);
+
+    return directives.join(';');
+}
+
+function applyAuthorizePageHeaders(res, redirectUri) {
+    res.set('Cache-Control', 'no-store');
+    res.set('Content-Security-Policy', buildAuthorizePageCsp(redirectUri));
+}
+
 class DiffsenseOAuthProvider {
     constructor(resourceServerUrl) {
         this.resourceServerUrl = resourceServerUrl;
@@ -102,6 +135,7 @@ class DiffsenseOAuthProvider {
             state: params.state || '',
             resource: params.resource?.href || ''
         };
+        applyAuthorizePageHeaders(res, params.redirectUri);
 
         if (req.method !== 'POST') {
             return res.status(200).send(renderAuthorizePage({
