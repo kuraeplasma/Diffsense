@@ -2283,19 +2283,96 @@ const Views = {
 
                     <!-- Tool Grid -->
                     <div style="margin-top:40px;">
-                        <h4 style="margin:0 0 20px; font-size:14px; font-weight:800; color: #0f172a; text-transform:uppercase; letter-spacing:0.05em;">利用可能なツール（AIが実行可能）</h4>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-                            ${[
-                                { id: 'list_contracts', desc: '保存済み契約書の一覧を名前とIDで取得', icon: 'fa-list-check' },
-                                { id: 'analyze_contract', desc: 'DIFFsense独自のAIでリスク解析を実行', icon: 'fa-brain' },
-                                { id: 'compare_contracts', desc: '2通の契約書を詳細比較して差分を抽出', icon: 'fa-layer-group' }
-                            ].map(tool => `
-                                <div style="padding: 20px; background: #fff; transition: all 0.2s; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
-                                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-                                        <i class="fa-solid ${tool.icon}" style="font-size:14px; color:#64748b;"></i>
-                                        <span style="font-family: 'JetBrains Mono', 'Fira Code', monospace; font-weight: 700; color: #1e293b; font-size: 13px;">${tool.id}</span>
+                        <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin-bottom:18px;">
+                            <div>
+                                <h4 style="margin:0 0 6px; font-size:14px; font-weight:800; color:#0f172a; text-transform:uppercase; letter-spacing:0.05em;">利用可能なツール（AIが実行可能）</h4>
+                                <p style="margin:0; font-size:12px; line-height:1.6; color:#64748b;">
+                                    Claude や Cursor から呼ばれるのはこの3機能だけです。特に <strong style="color:#0f172a;">compare_contracts</strong> は全文ではなく差分だけをもとに比較します。
+                                </p>
+                            </div>
+                            <div style="flex-shrink:0; padding:8px 12px; border-radius:999px; background:linear-gradient(135deg,#fff7e6 0%,#fef3c7 100%); border:1px solid #f6d88d; font-size:11px; font-weight:800; color:#9a6700; letter-spacing:0.04em;">
+                                SAFE MCP FLOW
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom:18px; padding:14px 16px; border-radius:14px; background:linear-gradient(135deg,#f8fafc 0%,#ffffff 100%); border:1px solid #e2e8f0; box-shadow:0 8px 24px rgba(15,23,42,0.04);">
+                            <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:12px;">
+                                ${[
+                { step: '1', title: '一覧を取る', text: 'ID と契約名を確認' },
+                { step: '2', title: '単体解析', text: '1通だけのリスクを確認' },
+                { step: '3', title: '差分比較', text: '変更点と推奨対応を確認' }
+            ].map(item => `
+                                    <div style="display:flex; align-items:center; gap:10px; min-width:0;">
+                                        <div style="width:28px; height:28px; border-radius:50%; background:#1e293b; color:#fff; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; flex-shrink:0;">${item.step}</div>
+                                        <div style="min-width:0;">
+                                            <div style="font-size:12px; font-weight:800; color:#0f172a; margin-bottom:2px;">${item.title}</div>
+                                            <div style="font-size:11px; color:#64748b; line-height:1.4;">${item.text}</div>
+                                        </div>
                                     </div>
-                                    <div style="font-size: 12px; color: #64748b; line-height: 1.5;">${tool.desc}</div>
+                                `).join('')}
+                            </div>
+                        </div>
+
+                        <div style="display:grid; grid-template-columns:1fr; gap:14px;">
+                            ${[
+                                {
+                                    id: 'list_contracts',
+                                    icon: 'fa-list-check',
+                                    accent: '#2563eb',
+                                    soft: 'rgba(37,99,235,0.10)',
+                                    label: '入口',
+                                    title: '保存済み契約の候補を出す',
+                                    desc: '保存済み契約書を、名前・ID・状態つきで一覧表示します。',
+                                    output: '契約IDの特定に使います'
+                                },
+                                {
+                                    id: 'analyze_contract',
+                                    icon: 'fa-brain',
+                                    accent: '#0f766e',
+                                    soft: 'rgba(15,118,110,0.10)',
+                                    label: '単体解析',
+                                    title: '1通だけをリスク解析する',
+                                    desc: 'DIFFsense独自のAIで、要約・リスク・注意条項を返します。',
+                                    output: '要約 / リスク / 注意点'
+                                },
+                                {
+                                    id: 'compare_contracts',
+                                    icon: 'fa-layer-group',
+                                    accent: '#b45309',
+                                    soft: 'rgba(180,83,9,0.10)',
+                                    label: '差分比較',
+                                    title: '差分だけで2通を比較する',
+                                    desc: '追加・削除・変更の差分だけをもとに、法務観点で重要な変更を整理します。',
+                                    output: '変更点概要 / リスク評価 / 法規制整合性 / 推奨アクション'
+                                }
+                            ].map(tool => `
+                                <div style="padding:18px 20px; background:linear-gradient(135deg,#ffffff 0%,#fbfdff 100%); border-radius:16px; border:1px solid #e2e8f0; box-shadow:0 10px 24px rgba(15,23,42,0.05); transition:all 0.2s;">
+                                    <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:14px; margin-bottom:14px;">
+                                        <div style="display:flex; align-items:center; gap:12px; min-width:0;">
+                                            <div style="width:40px; height:40px; border-radius:12px; background:${tool.soft}; color:${tool.accent}; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                                                <i class="fa-solid ${tool.icon}" style="font-size:15px;"></i>
+                                            </div>
+                                            <div style="min-width:0;">
+                                                <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px; flex-wrap:wrap;">
+                                                    <span style="font-size:10px; font-weight:800; color:${tool.accent}; background:${tool.soft}; padding:4px 8px; border-radius:999px; letter-spacing:0.04em;">${tool.label}</span>
+                                                    <span style="font-family:'JetBrains Mono','Fira Code',monospace; font-weight:700; color:#0f172a; font-size:12px;">${tool.id}</span>
+                                                </div>
+                                                <div style="font-size:14px; font-weight:800; color:#0f172a; line-height:1.4;">${tool.title}</div>
+                                            </div>
+                                        </div>
+                                        <div style="flex-shrink:0; width:8px; align-self:stretch; border-radius:999px; background:linear-gradient(180deg, ${tool.accent} 0%, rgba(255,255,255,0) 100%); opacity:0.7;"></div>
+                                    </div>
+
+                                    <div style="font-size:12px; color:#475569; line-height:1.7; margin-bottom:14px;">
+                                        ${tool.desc}
+                                    </div>
+
+                                    <div style="display:flex; align-items:center; gap:8px; padding:10px 12px; border-radius:12px; background:#f8fafc; border:1px solid #e2e8f0;">
+                                        <i class="fa-solid fa-sparkles" style="font-size:12px; color:${tool.accent};"></i>
+                                        <div style="font-size:11px; color:#475569; line-height:1.5;">
+                                            <strong style="color:#0f172a;">返る内容:</strong> ${tool.output}
+                                        </div>
+                                    </div>
                                 </div>
                             `).join('')}
                         </div>
