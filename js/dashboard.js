@@ -4308,7 +4308,17 @@ class DashboardApp {
         const requestedView = 'mcp';
         if (!main) return;
 
-        main.innerHTML = '<div style="padding:40px;color:#888;">読み込み中...</div>';
+        main.innerHTML = Views.mcp();
+        if ((this.subscription?.plan || 'free') === 'free') {
+            this.showLockedFeatureModal({
+                title: 'Starterプラン以上の機能',
+                descriptionHtml: '「MCP連携」はStarterプラン以上の機能です。<br>普段お使いのAI（ClaudeやCursor等）から直接 DIFFsense の高度な契約書解析を呼び出せます。'
+            });
+        } else {
+            this.hideLockedFeatureModal();
+        }
+        this.scheduleMcpPaneStabilization();
+
         try {
             const data = await dbService.getMcpApiKey();
             if (this.currentView !== requestedView || this.mainContent !== main) return;
@@ -4323,16 +4333,7 @@ class DashboardApp {
             this.mcpHasKey = false;
         }
         if (this.currentView !== requestedView || this.mainContent !== main) return;
-        main.innerHTML = Views.mcp();
-        if ((this.subscription?.plan || 'free') === 'free') {
-            this.showLockedFeatureModal({
-                title: 'Starterプラン以上の機能',
-                descriptionHtml: '「MCP連携」はStarterプラン以上の機能です。<br>普段お使いのAI（ClaudeやCursor等）から直接 DIFFsense の高度な契約書解析を呼び出せます。'
-            });
-        } else {
-            this.hideLockedFeatureModal();
-        }
-        this.scheduleMcpPaneStabilization();
+        this.renderMcpKeyCard();
     }
 
     async generateMcpKey() {
@@ -4825,11 +4826,17 @@ class DashboardApp {
         }
 
         if (viewId === 'notifications') {
+            if (this.pageTitle) {
+                this.pageTitle.textContent = '通知設定';
+            }
             this.loadAndRenderNotificationSettings();
             return;
         }
 
         if (viewId === 'mcp') {
+            if (this.pageTitle) {
+                this.pageTitle.textContent = 'MCP連携';
+            }
             this.loadAndRenderMcpSettings();
             return;
         }
