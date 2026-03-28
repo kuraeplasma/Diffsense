@@ -34,7 +34,7 @@
     --space-xl: 32px;
 
     /* Components */
-    --sidebar-width: 240px;
+    --sidebar-width: 250px;
     --header-height: 60px;
     --radius-sm: 4px;
     --radius-md: 6px;
@@ -139,6 +139,7 @@ ul {
     min-height: 0;
     height: auto;
     overflow: hidden;
+    position: relative;
 }
 
 #app-header {
@@ -312,6 +313,126 @@ ul {
     filter: blur(5px);
     user-select: none;
     pointer-events: none;
+}
+
+.locked-feature-shell {
+    position: relative;
+    min-height: 80vh;
+    isolation: isolate;
+}
+
+.locked-feature-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(245, 247, 250, 0.72);
+    z-index: 10;
+    pointer-events: none;
+}
+
+.locked-feature-dialog {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    z-index: 11;
+    pointer-events: none;
+}
+
+.locked-feature-card {
+    width: min(100%, 450px);
+    background: #fff;
+    border: 1px solid rgba(226, 232, 240, 0.95);
+    border-radius: 16px;
+    box-shadow: 0 22px 60px rgba(15, 23, 42, 0.18), 0 8px 20px rgba(15, 23, 42, 0.08);
+    padding: 40px 32px;
+    position: relative;
+    text-align: center;
+    opacity: 1 !important;
+    filter: none !important;
+    transform: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    isolation: isolate;
+    pointer-events: auto;
+}
+
+.locked-feature-card-icon {
+    font-size: 3rem;
+    color: #c19b4a;
+    margin-bottom: 20px;
+}
+
+.locked-feature-card-title {
+    margin-bottom: 16px;
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: #0f172a;
+}
+
+.locked-feature-card-text {
+    color: #64748b;
+    line-height: 1.75;
+    margin-bottom: 32px;
+    font-size: 14px;
+}
+
+.locked-feature-card-button {
+    width: 100%;
+    padding: 14px;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.locked-feature-root {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: var(--sidebar-width);
+    z-index: 1200;
+    pointer-events: none;
+}
+
+.locked-feature-root-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(245, 247, 250, 0.22);
+}
+
+.locked-feature-root-dialog {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    pointer-events: none;
+}
+
+.locked-feature-root .locked-feature-card {
+    pointer-events: auto;
+}
+
+html.locked-feature-active,
+body.locked-feature-active {
+    overflow: hidden !important;
+    overflow-y: hidden !important;
+    min-height: 100vh !important;
+    height: 100vh !important;
+    scrollbar-gutter: auto !important;
+}
+
+body.locked-feature-active #app-main,
+body.locked-feature-active #app-content {
+    overflow: hidden !important;
+}
+
+@media (max-width: 768px) {
+    .locked-feature-root {
+        left: 0;
+    }
 }
 
 .upgrade-promo-box {
