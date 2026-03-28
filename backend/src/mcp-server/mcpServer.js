@@ -152,7 +152,7 @@ function createServerForUser(user, baseUrl) {
                 },
                 {
                     name: 'compare_contracts',
-                    description: '2つの契約書を比較し、差分とリスクを解析します（Businessプラン以上）。リスク表示は High / Medium / Low です',
+                    description: '2つの契約書の差分データだけを使って、変更点概要・リスク評価・法規制確認ポイント・推奨アクションを返します（Businessプラン以上）。リスク表示は High / Medium / Low です',
                     inputSchema: {
                         type: 'object',
                         properties: {
