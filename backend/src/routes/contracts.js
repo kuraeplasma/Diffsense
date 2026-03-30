@@ -704,6 +704,24 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                     const aiSucceeded = aiResult && aiResult.summary && !isAiFailureSummary(aiResult.summary) && aiResult.isFallback !== true;
                     if (aiSucceeded) {
                         await dbService.incrementUsage(uid);
+                        // 3.2 Save contract_meta (deadline info) if extracted
+                        const meta = aiResult.contract_meta;
+                        if (meta && contractId) {
+                            const metaUpdate = {
+                                expiry_date: meta.expiry_date || null,
+                                renewal_deadline: meta.renewal_deadline || null,
+                                contract_start: meta.contract_start || null,
+                                auto_renewal: meta.auto_renewal === true,
+                                notice_period_days: Number(meta.notice_period_days) || null,
+                                contract_category: meta.contract_category || null,
+                                date_confidence: meta.date_confidence || 'unknown',
+                                alert_sent_30d: false,
+                                alert_sent_7d: false,
+                                alert_sent_0d: false
+                            };
+                            await dbService.updateContract(contractId, metaUpdate, uid);
+                            logger.info(`contract_meta saved for contract ${contractId}: expiry=${meta.expiry_date}, confidence=${meta.date_confidence}`);
+                        }
                     } else {
                         logger.info(`AI analysis failed for user ${uid} - usage count NOT incremented`);
                     }
@@ -767,6 +785,7 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                 riskLevel: aiResult.riskLevel,
                 riskReason: aiResult.riskReason,
                 summary: aiResult.summary,
+                contract_meta: aiResult.contract_meta || null,
                 structuredContract,
                 rawExtractedText,
                 aiFailed: aiFailed,
@@ -852,6 +871,24 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
                 const aiSucceeded = aiResult && aiResult.summary && !isAiFailureSummary(aiResult.summary) && aiResult.isFallback !== true;
                 if (aiSucceeded) {
                     await dbService.incrementUsage(uid);
+                    // Save contract_meta (deadline info) if extracted
+                    const meta = aiResult.contract_meta;
+                    if (meta && contractId) {
+                        const metaUpdate = {
+                            expiry_date: meta.expiry_date || null,
+                            renewal_deadline: meta.renewal_deadline || null,
+                            contract_start: meta.contract_start || null,
+                            auto_renewal: meta.auto_renewal === true,
+                            notice_period_days: Number(meta.notice_period_days) || null,
+                            contract_category: meta.contract_category || null,
+                            date_confidence: meta.date_confidence || 'unknown',
+                            alert_sent_30d: false,
+                            alert_sent_7d: false,
+                            alert_sent_0d: false
+                        };
+                        await dbService.updateContract(contractId, metaUpdate, uid);
+                        logger.info(`contract_meta saved for DOCX contract ${contractId}: expiry=${meta.expiry_date}`);
+                    }
                 }
             }
         }
@@ -938,6 +975,85 @@ router.post('/storage/cleanup', async (req, res, next) => {
         res.json({ success: true, deleted, total: allFiles.length });
     } catch (error) {
         logger.error('Storage cleanup error:', error);
+        next(error);
+    }
+});
+
+/**
+ * POST /api/contracts/:id/reanalyze
+ * 既存の契約書テキストを使ってリスク解析＋期限解析を単体実行（差分なし）。
+ * 解析1回消費。
+ */
+router.post('/:id/reanalyze', rateLimit, async (req, res, next) => {
+    try {
+        const uid = req.user.uid;
+        const contractId = parseInt(req.params.id, 10);
+        if (isNaN(contractId)) {
+            return res.status(400).json({ success: false, error: '契約IDが不正です' });
+        }
+
+        const userProfile = await dbService.getUserProfile(uid);
+        const localUnlimited = process.env.LOCAL_UNLIMITED === 'true';
+        const limit = localUnlimited ? Number.MAX_SAFE_INTEGER : dbService.getUsageLimit(userProfile);
+
+        if (!localUnlimited && userProfile.usageCount >= limit) {
+            return res.status(403).json({
+                success: false,
+                error: `プランの月間解析上限（${limit}回）に達しました。`
+            });
+        }
+
+        // フロントから本文を受け取る（キャッシュ済みテキスト）
+        const { contractText } = req.body;
+        if (!contractText || contractText.trim().length < 10) {
+            return res.status(400).json({ success: false, error: '解析対象のテキストがありません' });
+        }
+
+        // 単体解析（previousVersion = null）
+        const aiResult = await geminiService.analyzeContract(contractText, null);
+        const aiSucceeded = aiResult && aiResult.summary && aiResult.isFallback !== true;
+
+        if (!aiSucceeded) {
+            return res.status(500).json({ success: false, error: 'AI解析に失敗しました。しばらく後に再試行してください。' });
+        }
+
+        await dbService.incrementUsage(uid);
+
+        // contract_meta を Firestore に保存
+        const meta = aiResult.contract_meta;
+        const metaUpdate = {
+            summary: aiResult.summary || null,
+            risk_level: aiResult.riskLevel || null,
+            risk_reason: aiResult.riskReason || null,
+            last_analyzed_at: new Date().toISOString(),
+            ...(meta ? {
+                expiry_date: meta.expiry_date || null,
+                renewal_deadline: meta.renewal_deadline || null,
+                contract_start: meta.contract_start || null,
+                auto_renewal: meta.auto_renewal === true,
+                notice_period_days: Number(meta.notice_period_days) || null,
+                contract_category: meta.contract_category || null,
+                date_confidence: meta.date_confidence || 'unknown',
+                alert_sent_30d: false,
+                alert_sent_7d: false,
+                alert_sent_0d: false,
+            } : {})
+        };
+        await dbService.updateContract(contractId, metaUpdate, uid);
+
+        logger.info(`Reanalysis complete for contract ${contractId}, risk=${aiResult.riskLevel}, expiry=${meta?.expiry_date}`);
+
+        res.json({
+            success: true,
+            data: {
+                summary: aiResult.summary,
+                riskLevel: aiResult.riskLevel,
+                riskReason: aiResult.riskReason,
+                contract_meta: meta || null,
+            }
+        });
+    } catch (error) {
+        logger.error('Reanalyze error:', error);
         next(error);
     }
 });

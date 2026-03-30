@@ -27,9 +27,9 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;700&family=Noto+Serif+JP:wght@400;700&display=swap"
         rel="stylesheet">
-    <style>html,body{margin:0;background:#fafafa;color:#222;font-family:Inter,"Noto Sans JP",sans-serif;overflow-y:auto !important;scrollbar-gutter:stable !important}#app-sidebar{width:250px;position:fixed;left:0;top:0;bottom:0;background:#111827;color:#fff;z-index:20}#app-main{margin-left:250px;min-height:100vh}#app-content{padding:24px;min-height:100vh}.shell-skeleton{display:grid;gap:14px}.skeleton-block{height:18px;background:linear-gradient(90deg,#eceff3,#f5f7fa,#eceff3);background-size:200% 100%;border-radius:6px;animation:skel 1.2s ease-in-out infinite}.skeleton-card{height:110px;border-radius:12px;background:#fff;border:1px solid #eceff3}.skeleton-row{height:46px;border-radius:8px;background:#fff;border:1px solid #eceff3}@keyframes skel{0%{background-position:200% 0}100%{background-position:-200% 0}}@media (max-width:900px){#app-main{margin-left:0}#app-content{padding:16px}}.toggle-switch{position:relative;display:inline-block;width:48px;height:26px}.toggle-switch input{opacity:0;width:0;height:0}.toggle-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#444;border-radius:26px;transition:.3s}.toggle-slider:before{position:absolute;content:"";height:20px;width:20px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s}input:checked+.toggle-slider{background:#4CAF50}input:checked+.toggle-slider:before{transform:translateX(22px)}</style>
-    <link rel="preload" as="style" href="css/dashboard.css?v=20260329_lockfix6" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="css/dashboard.css?v=20260329_lockfix6"></noscript>
+    <style>body{margin:0;background:#fafafa;color:#222;font-family:Inter,"Noto Sans JP",sans-serif}#app-sidebar{width:250px;position:fixed;left:0;top:0;bottom:0;background:#111827;color:#fff;z-index:20}#app-main{margin-left:250px;min-height:100vh}#app-content{padding:24px;min-height:100vh}.shell-skeleton{display:grid;gap:14px}.skeleton-block{height:18px;background:linear-gradient(90deg,#eceff3,#f5f7fa,#eceff3);background-size:200% 100%;border-radius:6px;animation:skel 1.2s ease-in-out infinite}.skeleton-card{height:110px;border-radius:12px;background:#fff;border:1px solid #eceff3}.skeleton-row{height:46px;border-radius:8px;background:#fff;border:1px solid #eceff3}@keyframes skel{0%{background-position:200% 0}100%{background-position:-200% 0}}@media (max-width:900px){#app-main{margin-left:0}#app-content{padding:16px}}.toggle-switch{position:relative;display:inline-block;width:48px;height:26px}.toggle-switch input{opacity:0;width:0;height:0}.toggle-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#444;border-radius:26px;transition:.3s}.toggle-slider:before{position:absolute;content:"";height:20px;width:20px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s}input:checked+.toggle-slider{background:#4CAF50}input:checked+.toggle-slider:before{transform:translateX(22px)}</style>
+    <link rel="preload" as="style" href="css/dashboard.css?v=5" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="css/dashboard.css?v=5"></noscript>
     <link rel="stylesheet" href="css/sign.css?v=premiumv51">
     <link rel="stylesheet" href="css/dashboard-structured-fix.css?v=20260310local1">
     <!-- FontAwesome for Icons (CDN) -->
@@ -58,6 +58,10 @@
                 <div class="nav-icon"><i class="fa-solid fa-file-contract"></i></div>
                 <span>契約・規約管理</span>
             </div>
+            <div class="nav-item" id="nav-deadlines" onclick="window.app.navigate('deadlines')">
+                <div class="nav-icon"><i class="fa-solid fa-calendar-days"></i></div>
+                <span>期限・アラート管理</span>
+            </div>
             <div class="nav-item" onclick="window.app.navigate('history')">
                 <div class="nav-icon"><i class="fa-solid fa-clock-rotate-left"></i></div>
                 <span>解析履歴</span>
@@ -79,10 +83,6 @@
             <div class="nav-item" id="nav-notifications" onclick="window.app.navigate('notifications')">
                 <div class="nav-icon"><i class="fa-solid fa-bell"></i></div>
                 <span>通知設定</span>
-            </div>
-            <div class="nav-item" id="nav-mcp" onclick="window.app.navigate('mcp')">
-                <div class="nav-icon"><i class="fa-solid fa-plug"></i></div>
-                <span>MCP連携</span>
             </div>
         </div>
         <div class="user-profile">
@@ -287,9 +287,9 @@
     </div>
 
     <!-- App Logic -->
-    <script type="module" src="js/dashboard.js?v=20260329_final_v21"></script>
+    <script type="module" src="js/dashboard.js?v=20260330_deadlines_v1"></script>
     <script type="module">
-        import { requireAuth, handleLogout } from './js/auth.js?v=20260328prod1';
+        import { requireAuth, handleLogout } from './js/auth.js?v=20260311d';
 
         // Protect Route
         requireAuth();
