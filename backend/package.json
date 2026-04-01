@@ -21,6 +21,7 @@
   "author": "SpaceGleam",
   "license": "ISC",
   "dependencies": {
+    "@google-cloud/secret-manager": "^6.1.1",
     "@modelcontextprotocol/sdk": "^1.28.0",
     "@sendgrid/mail": "^8.1.6",
     "adm-zip": "^0.5.16",
