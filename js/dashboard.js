@@ -4785,6 +4785,14 @@ class DashboardApp {
         } else {
             if (navNotif) navNotif.classList.remove('feature-locked');
         }
+
+        // Deadline Alert Management: Business+ only
+        const navDeadlines = document.getElementById('nav-deadlines');
+        if (!['business', 'pro'].includes(plan)) {
+            if (navDeadlines) navDeadlines.classList.add('feature-locked');
+        } else {
+            if (navDeadlines) navDeadlines.classList.remove('feature-locked');
+        }
     }
 
 
@@ -4903,6 +4911,11 @@ class DashboardApp {
         }
 
         if (viewId === 'deadlines') {
+            const plan = this.userPlan || this.subscription?.plan || 'free';
+            if (!['business', 'pro'].includes(plan)) {
+                this.showBusinessFeatureModal();
+                return;
+            }
             await dbService.syncContractsFromApi();
             this.mainContent.innerHTML = this.renderDeadlinesView(params && typeof params === 'object' ? params : {});
             this.updateDeadlinesBadge();
@@ -6097,6 +6110,29 @@ class DashboardApp {
         document.getElementById('invite-email').value = '';
         document.getElementById('invite-role').value = '閲覧のみ';
         document.getElementById('invite-member-modal').classList.add('active');
+    }
+
+    showBusinessFeatureModal() {
+        const existing = document.getElementById('business-upgrade-modal');
+        if (existing) existing.remove();
+        const modal = document.createElement('div');
+        modal.id = 'business-upgrade-modal';
+        modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:11000;animation:fadeIn 0.3s;';
+        modal.innerHTML = `
+            <div style="background:white;width:90%;max-width:420px;border-radius:12px;padding:32px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,0.2);animation:slideUp 0.3s cubic-bezier(0.16,1,0.3,1);">
+                <div style="width:60px;height:60px;background:#f3f0ea;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;color:#c5a059;font-size:28px;">
+                    <i class="fa-solid fa-crown"></i>
+                </div>
+                <div style="display:inline-block;background:#f3f0ea;color:#c5a059;border:1px solid #e8d9b8;border-radius:10px;padding:3px 12px;font-size:11px;font-weight:700;margin-bottom:12px;">Business / Proプラン限定</div>
+                <h3 style="margin:0 0 12px;color:#24292E;font-size:18px;font-weight:700;">期限・アラート管理</h3>
+                <p style="margin:0 0 24px;color:#586069;font-size:13px;line-height:1.7;">契約期限の自動抽出・アラート通知はBusinessプラン以上でご利用いただけます。</p>
+                <div style="display:flex;gap:10px;">
+                    <button style="flex:1;padding:10px;border:1px solid #ddd;border-radius:8px;background:#fff;color:#666;font-size:13px;cursor:pointer;" onclick="document.getElementById('business-upgrade-modal').remove()">閉じる</button>
+                    <button style="flex:1;padding:10px;border:none;border-radius:8px;background:#c5a059;color:#fff;font-size:13px;font-weight:700;cursor:pointer;" onclick="document.getElementById('business-upgrade-modal').remove();window.app.navigate('plan')">プランを見る</button>
+                </div>
+            </div>`;
+        document.body.appendChild(modal);
+        modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
     }
 
     showProFeatureModal(message) {
