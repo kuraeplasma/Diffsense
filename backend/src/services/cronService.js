@@ -132,7 +132,7 @@ class CronService {
             delete updates.original_content;
         }
 
-        await dbService.updateContract(contract.id, updates);
+        await dbService.updateContract(contract.id, updates, contract.ownerUid || null);
     }
 
     /**
@@ -296,7 +296,7 @@ class CronService {
         }
 
         // Mark alert as sent
-        await dbService.updateContract(contract.id, { [alertField]: true });
+        await dbService.updateContract(contract.id, { [alertField]: true }, contract.ownerUid || null);
         logger.info(`Deadline alert sent for contract ${contract.id}, field=${alertField}, daysRemaining=${daysRemaining}`);
     }
 
