@@ -2604,6 +2604,7 @@ class RegistrationFlow {
                     status: '未確認',
                     originalFilename: this.tempData.fileData?.name || ''
                 });
+                await this.app.refreshSubscriptionStatusSafe();
 
                 console.log('Word structured diff completed');
                 return true;
@@ -3139,6 +3140,7 @@ class DashboardApp {
                     localStorage.setItem(dbService.KEYS.CONTRACTS, JSON.stringify(allContracts));
                 }
             }
+            await this.refreshSubscriptionStatusSafe();
 
             // 期限情報の取得結果を通知
             const meta = data.data.contract_meta;
@@ -3269,6 +3271,7 @@ class DashboardApp {
                     localStorage.setItem(dbService.KEYS.CONTRACTS, JSON.stringify(allContracts));
                 }
             }
+            await this.refreshSubscriptionStatusSafe();
 
             const meta = data.data.contract_meta;
             const hasDeadline = meta && (meta.expiry_date || meta.renewal_deadline);
@@ -3849,6 +3852,18 @@ class DashboardApp {
             console.error('reloadPlanData error:', error);
             if (!silent) Notify.error('利用状況の再取得に失敗しました。');
             return false;
+        }
+    }
+
+    async refreshSubscriptionStatusSafe() {
+        try {
+            const authModule = await import('./auth.js');
+            const token = await authModule.getIdToken();
+            if (token) {
+                await this.fetchSubscriptionStatus(token);
+            }
+        } catch (error) {
+            console.warn('Failed to refresh subscription:', error);
         }
     }
 
@@ -5592,11 +5607,7 @@ class DashboardApp {
                 dbService.updateContractAnalysis(id, analysisPayloadAi);
 
                 // サブスクリプション情報を再取得（使用回数を更新）
-                try {
-                    const authModule = await import('./auth.js');
-                    const token = await authModule.getIdToken();
-                    if (token) await this.fetchSubscriptionStatus(token);
-                } catch (e) { console.warn('Failed to refresh subscription:', e); }
+                await this.refreshSubscriptionStatusSafe();
 
                 // 画面を再読み込み
                 this.navigate('diff', id);
@@ -5746,6 +5757,9 @@ class DashboardApp {
                             analysisPayload.aiFailed = result.data.aiFailed === true;
                         }
                         dbService.updateContractAnalysis(id, analysisPayload);
+                        if (!isFirstUpload) {
+                            await this.refreshSubscriptionStatusSafe();
+                        }
 
                         // 初回取り込みは原本全文タブ、2回目以降（差分・履歴あり）は差分タブ
                         const updatedContract = dbService.getContractById(id);
@@ -5879,11 +5893,7 @@ class DashboardApp {
                     });
 
                     // サブスクリプション情報を再取得（使用回数を更新）
-                    try {
-                        const authModule = await import('./auth.js');
-                        const token = await authModule.getIdToken();
-                        if (token) await this.fetchSubscriptionStatus(token);
-                    } catch (e) { console.warn('Failed to refresh subscription:', e); }
+                    await this.refreshSubscriptionStatusSafe();
 
                     // 画面を再読み込み (履歴があれば差分、初回なら原本)
                     const updatedContract = dbService.getContractById(id);
@@ -6416,6 +6426,7 @@ class DashboardApp {
 
             if (resData.success) {
                 dbService.updateContractAnalysis(id, resData.data);
+                await this.refreshSubscriptionStatusSafe();
                 this.navigate('diff', id);
             } else {
                 const err = new Error(resData.error || '解析に失敗しました');
@@ -6478,8 +6489,10 @@ class DashboardApp {
 
         try {
             Notify.info('比較解析を実行中...');
+            let requestedRemoteAnalysis = false;
 
             if (contract.source_url) {
+                requestedRemoteAnalysis = true;
                 const result = await aiService.analyzeContract(contractId, 'url', contract.source_url, historyItem.content);
                 if (!result.success) throw new Error(result.error || '比較解析に失敗しました');
                 comparisonContext.analysis = result.data;
@@ -6493,6 +6506,7 @@ class DashboardApp {
                     const blob = await response.blob();
                     const file = new File([blob], contract.original_filename || 'contract.pdf', { type: blob.type || 'application/pdf' });
                     const base64 = await aiService.convertFileToBase64(file);
+                    requestedRemoteAnalysis = true;
                     const result = await aiService.analyzeContract(contractId, 'pdf', base64, historyItem.content);
                     if (!result.success) throw new Error(result.error || '比較解析に失敗しました');
                     comparisonContext.analysis = result.data;
@@ -6503,6 +6517,9 @@ class DashboardApp {
                 comparisonContext.analysisNotice = 'この資料形式では再解析できないため、比較表示のみ行います。';
             }
 
+            if (requestedRemoteAnalysis) {
+                await this.refreshSubscriptionStatusSafe();
+            }
             this.setHistoryComparisonContext(comparisonContext);
             this.activeDetailTab = 'diff';
             await this.navigate('diff', contractId);
@@ -6647,6 +6664,7 @@ class DashboardApp {
             riskReason: '差分抽出済み',
             changes: []
         };
+        let requestedRemoteAnalysis = false;
 
         try {
             // Check Usage Limit (Only for manual, non-cached analysis)
@@ -6668,6 +6686,7 @@ class DashboardApp {
             if (canReuseStoredAnalysis) {
                 Object.assign(diffPayload, storedContractAnalysis);
             } else if (targetDoc.is_current && contract.source_url) {
+                requestedRemoteAnalysis = true;
                 const result = await aiService.analyzeContract(contractId, 'url', contract.source_url, sourceDoc.content);
                 if (!result.success) throw new Error(result.error || '差分解析に失敗しました');
                 Object.assign(diffPayload, result.data || {});
@@ -6682,6 +6701,7 @@ class DashboardApp {
                     const blob = await response.blob();
                     const file = new File([blob], targetDoc.document_name || contract.original_filename || 'contract.pdf', { type: blob.type || 'application/pdf' });
                     const base64 = await aiService.convertFileToBase64(file);
+                    requestedRemoteAnalysis = true;
                     const result = await aiService.analyzeContract(contractId, 'pdf', base64, sourceDoc.content);
                     if (!result.success) throw new Error(result.error || '差分解析に失敗しました');
                     Object.assign(diffPayload, result.data || {});
@@ -6690,6 +6710,7 @@ class DashboardApp {
                 const currentPayload = isStructuredDocumentContent(targetDoc.content)
                     ? targetDoc.content
                     : contentToComparableText(targetDoc.content);
+                requestedRemoteAnalysis = true;
                 const result = await aiService.analyzeContract(contractId, 'text', currentPayload, sourceDoc.content);
                 if (!result.success) throw new Error(result.error || '差分解析に失敗しました');
                 Object.assign(diffPayload, result.data || {});
@@ -6733,6 +6754,9 @@ class DashboardApp {
                     aiFailed: diffPayload.aiFailed === true,
                     status: '未確認'
                 });
+            }
+            if (requestedRemoteAnalysis) {
+                await this.refreshSubscriptionStatusSafe();
             }
             dbService.touchRecentDiff(sourceDoc.id, targetDoc.id);
             this.setDocumentCompareState({

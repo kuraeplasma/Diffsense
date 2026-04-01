@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const logger = require('../utils/logger');
-const { db: firestore, firebaseInitialized } = require('../firebase');
+const { admin, db: firestore, firebaseInitialized } = require('../firebase');
 
 const PLAN_LIMITS = {
     'free': 1,       // Team member limits
@@ -73,6 +73,10 @@ class DBService {
     }
 
     getSignUsageLimitForUser(userProfile) {
+        const plan = userProfile.plan || 'free';
+        if (plan === 'trial') {
+            return SIGN_USAGE_LIMITS.trial;
+        }
         const hasActivePayment = userProfile.subscriptionState === 'active' ||
                                 userProfile.stripeStatus === 'ACTIVE' || 
                                 userProfile.paypalStatus === 'ACTIVE' || 
@@ -81,7 +85,6 @@ class DBService {
             return SIGN_USAGE_LIMITS['free'];
         }
 
-        const plan = userProfile.plan || 'free';
         return SIGN_USAGE_LIMITS[plan] || 0;
     }
 
@@ -138,9 +141,16 @@ class DBService {
         if (!this.useFirestore) return null;
         try {
             const docRef = firestore.collection('users').doc(uid).collection('usage').doc(yearMonth);
-            const doc = await docRef.get();
-            const newCount = (doc.exists ? (doc.data().analysisCount || 0) : 0) + 1;
-            await docRef.set({ analysisCount: newCount });
+            const newCount = await firestore.runTransaction(async (transaction) => {
+                const doc = await transaction.get(docRef);
+                const currentCount = doc.exists ? (doc.data().analysisCount || 0) : 0;
+                const nextCount = currentCount + 1;
+                transaction.set(docRef, {
+                    analysisCount: nextCount,
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+                return nextCount;
+            });
             return newCount;
         } catch (error) {
             logger.error(`Firestore monthly usage increment error ${uid}/${yearMonth}: ${error.message}`);
@@ -369,6 +379,10 @@ class DBService {
     // --- User Profile & Usage Tracking ---
 
     getUsageLimit(userProfile) {
+        const plan = userProfile.plan || 'free';
+        if (plan === 'trial') {
+            return AI_USAGE_LIMITS.trial;
+        }
         // お支払いがない場合はFree上限を適用
         const hasActivePayment = userProfile.subscriptionState === 'active' || 
                                 userProfile.stripeStatus === 'ACTIVE' || 
@@ -379,7 +393,6 @@ class DBService {
         }
 
         // Otherwise, use plan-based limit
-        const plan = userProfile.plan || 'free';
         return AI_USAGE_LIMITS[plan] || 0;
     }
 
@@ -1109,3 +1122,4 @@ class DBService {
 
 
 module.exports = new DBService();
+

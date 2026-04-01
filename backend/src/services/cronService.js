@@ -116,7 +116,7 @@ class CronService {
             updates.stable_count = 0;
 
             // Get AI-generated change summary
-            const changeSummary = await this.getChangeSummary(contract.original_content, result.text);
+            const changeSummary = await this.getChangeSummary(contract.ownerUid || null, contract.original_content, result.text);
 
             // Send notifications
             try {
@@ -138,15 +138,27 @@ class CronService {
     /**
      * Use Gemini AI to summarize what changed between two text versions
      */
-    async getChangeSummary(oldText, newText) {
+    async getChangeSummary(ownerUid, oldText, newText) {
         try {
+            if (!ownerUid) return '';
+            const userProfile = await dbService.getUserProfile(ownerUid);
+            const limit = dbService.getUsageLimit(userProfile);
+            const currentUsage = Number(userProfile?.usageCount || 0);
+            if (currentUsage >= limit) {
+                logger.info(`Skipping monitored AI summary: usage limit reached for uid=${ownerUid} (${currentUsage}/${limit})`);
+                return '';
+            }
             const geminiService = require('./gemini');
             const maxLen = 3000;
             const oldSnip = (oldText || '').slice(0, maxLen);
             const newSnip = (newText || '').slice(0, maxLen);
             const prompt = `以下はWebページの変更前後のテキストです。何が変わったか100文字程度で日本語で端的にまとめてください。\n\n【変更前】\n${oldSnip}\n\n【変更後】\n${newSnip}`;
             const summary = await geminiService.generateText(prompt);
-            return (summary || '').trim().slice(0, 200);
+            const normalizedSummary = (summary || '').trim().slice(0, 200);
+            if (normalizedSummary) {
+                await dbService.incrementUsage(ownerUid);
+            }
+            return normalizedSummary;
         } catch (err) {
             logger.warn(`AI change summary failed: ${err.message}`);
             return '';
