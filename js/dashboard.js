@@ -2543,7 +2543,7 @@ class RegistrationFlow {
                 // 4. 詳細ページへ遷移（まずは原本を表示して安心させる）
                 this.app.activeDetailTab = 'original';
                 this.app.navigate('diff', newContract.id);
-                Notify.toast('取り込み完了', {
+                Notify.toast('読み込みが完了しました。', {
                     type: 'success',
                     duration: 2000,
                     closable: false,
@@ -2937,11 +2937,23 @@ class DashboardApp {
         const c = contracts.find(x => String(x.id) === String(contractId));
         if (!c) return;
 
-        // Build document content HTML (same as diff view original tab)
+        // Build document content HTML using inline styles only (no CSS class dependency)
         let contentHtml = '';
         if (c.original_content) {
-            contentHtml = `<div class="is-structured" style="height:100%;">${renderStructuredView(c.original_content, `deadline-modal-${contractId}`)}</div>`;
-        } else if (c.extracted_text) {
+            const clauses = parseContractIntoClauses(c.original_content);
+            if (clauses && clauses.length > 0) {
+                contentHtml = clauses.map(clause => {
+                    const titleHtml = clause.title
+                        ? `<div style="font-size:13px;font-weight:700;color:#c5a059;margin-bottom:4px;">${clause.title}${clause.header ? `　${clause.header}` : ''}</div>`
+                        : '';
+                    const bodyHtml = (clause.paragraphs || []).map(p =>
+                        `<p style="margin:0 0 8px;line-height:1.8;font-size:13px;color:#2b2623;">${String(p).replace(/\n/g, '<br>')}</p>`
+                    ).join('');
+                    return `<div style="margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid #f0ece8;">${titleHtml}${bodyHtml}</div>`;
+                }).join('');
+            }
+        }
+        if (!contentHtml && c.extracted_text) {
             const paragraphs = c.extracted_text.split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
             contentHtml = paragraphs.length > 0
                 ? `<div style="padding:4px 0;">${paragraphs.map(p => `<p style="margin:0 0 14px;line-height:1.8;font-size:13px;color:#2b2623;">${p.replace(/\n/g, '<br>')}</p>`).join('')}</div>`
@@ -2988,11 +3000,6 @@ class DashboardApp {
                         <div>
                             <label style="font-size:11px;font-weight:600;color:#5e544d;display:block;margin-bottom:5px;">契約終了日</label>
                             <input type="date" id="dl-expiry" value="${c.expiry_date || ''}"
-                                style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;box-sizing:border-box;">
-                        </div>
-                        <div>
-                            <label style="font-size:11px;font-weight:600;color:#5e544d;display:block;margin-bottom:5px;">更新拒絶期限 <span style="font-weight:400;color:#aaa;">任意</span></label>
-                            <input type="date" id="dl-renewal" value="${c.renewal_deadline || ''}"
                                 style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;box-sizing:border-box;">
                         </div>
                         <div style="flex:1;"></div>
@@ -3169,9 +3176,8 @@ class DashboardApp {
      */
     saveDeadlineInput(contractId) {
         const expiry = document.getElementById('dl-expiry')?.value || null;
-        const renewal = document.getElementById('dl-renewal')?.value || null;
-        if (!expiry && !renewal) {
-            Notify.warning('契約終了日または更新拒絶期限を入力してください');
+        if (!expiry) {
+            Notify.warning('契約終了日を入力してください');
             return;
         }
 
@@ -3181,8 +3187,7 @@ class DashboardApp {
 
         contracts[idx] = {
             ...contracts[idx],
-            expiry_date: expiry || null,
-            renewal_deadline: renewal || null,
+            expiry_date: expiry,
             date_confidence: 'high',
         };
         localStorage.setItem(dbService.KEYS.CONTRACTS, JSON.stringify(contracts));
@@ -3287,7 +3292,7 @@ class DashboardApp {
         if (!badge) return;
         const contracts = dbService.getContracts ? dbService.getContracts() : (dbService._localContracts || []);
         const urgentCount = contracts.filter(c => {
-            const days = this._daysUntil(c.renewal_deadline || c.expiry_date);
+            const days = this._daysUntil(c.expiry_date);
             return days !== null && days >= 0 && days <= 30;
         }).length;
         if (urgentCount > 0) {
@@ -3312,7 +3317,7 @@ class DashboardApp {
 
         // Annotate with days remaining
         const annotated = allContracts.map(c => {
-            const targetDate = c.renewal_deadline || c.expiry_date;
+            const targetDate = c.expiry_date;
             const days = this._daysUntil(targetDate);
             let range = 'nodate';
             if (days !== null) {
@@ -3351,8 +3356,8 @@ class DashboardApp {
                 va = (a.name || '').toLowerCase();
                 vb = (b.name || '').toLowerCase();
             } else if (sortKey === 'date') {
-                va = a.expiry_date || a.renewal_deadline || '9999';
-                vb = b.expiry_date || b.renewal_deadline || '9999';
+                va = a.expiry_date || '9999';
+                vb = b.expiry_date || '9999';
             }
             if (va < vb) return sortDir === 'asc' ? -1 : 1;
             if (va > vb) return sortDir === 'asc' ? 1 : -1;
@@ -3381,8 +3386,7 @@ class DashboardApp {
             const noDate = c._range === 'nodate';
             const badgeColor = days === null ? '#aaa' : days <= 7 ? '#e53935' : days <= 30 ? '#f57c00' : '#2e7d32';
             const daysLabel = days === null ? '未設定' : days === 0 ? '本日' : days < 0 ? '期限切れ' : `あと ${days} 日`;
-            const dateLabel = c.renewal_deadline ? '更新拒絶期限' : c.expiry_date ? '契約終了日' : '—';
-            const targetDate = c.renewal_deadline || c.expiry_date;
+            const targetDate = c.expiry_date;
             const notifyEnabled = c.deadline_notify !== false;
             const notifyToggle = `<label class="toggle-switch" style="flex-shrink:0;" onclick="event.stopPropagation()">
                 <input type="checkbox" ${notifyEnabled ? 'checked' : ''} onchange="window.app.toggleDeadlineNotify('${c.id}', this.checked)">
@@ -3406,9 +3410,8 @@ class DashboardApp {
             const rowClick = `onclick="window.app.showDeadlineInputModal('${c.id}')"`;
             return `<tr style="cursor:pointer;" ${rowClick}>
                 <td><div style="font-weight:600;color:#2b2623;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.name || '—'}</div>${categoryBadge ? `<div style="margin-top:4px;">${categoryBadge}</div>` : ''}</td>
-                <td style="font-size:13px;color:#5e544d;white-space:nowrap;width:90px;">${dateLabel}</td>
-                <td style="font-size:13px;color:#5e544d;white-space:nowrap;width:120px;">${targetDate ? this._formatDateJa(targetDate) : '—'}</td>
-                <td style="white-space:nowrap;width:130px;">${daysBadge}</td>
+                <td style="font-size:13px;color:#5e544d;white-space:nowrap;width:130px;">${targetDate ? this._formatDateJa(targetDate) : '—'}</td>
+                <td style="white-space:nowrap;width:140px;">${daysBadge}</td>
                 <td style="white-space:nowrap;width:90px;">${notifyToggle}</td>
             </tr>`;
         }).join('');
@@ -3451,19 +3454,18 @@ class DashboardApp {
                 <thead>
                     <tr>
                         ${sortBtn('name', '契約名')}
-                        <th style="padding:10px 12px;text-align:left;font-size:12px;color:#8a7a6a;font-weight:600;white-space:nowrap;width:90px;">期限種別</th>
-                        ${sortBtn('date', '期限日', 'white-space:nowrap;width:120px;')}
-                        ${sortBtn('days', '残り日数', 'white-space:nowrap;width:130px;')}
+                        ${sortBtn('date', '期限日', 'white-space:nowrap;width:130px;')}
+                        ${sortBtn('days', '残り日数', 'white-space:nowrap;width:140px;')}
                         <th style="padding:10px 12px;text-align:left;font-size:12px;color:#8a7a6a;font-weight:600;white-space:nowrap;width:90px;">通知</th>
                     </tr>
                 </thead>
                 <tbody>
-                    ${sorted.length > 0 ? rows : `<tr><td colspan="7" class="text-center text-muted" style="padding:40px;">該当する契約が見つかりませんでした</td></tr>`}
+                    ${sorted.length > 0 ? rows : `<tr><td colspan="4" class="text-center text-muted" style="padding:40px;">該当する契約が見つかりませんでした</td></tr>`}
                 </tbody>
             </table>
         </div>
         <div class="text-muted" style="font-size:13px;margin-top:12px;">全 ${counts.all} 件中 ${sorted.length} 件を表示
-            ${counts.nodate > 0 ? `<span style="margin-left:16px;"><i class="fa-solid fa-circle-info" style="color:#c5a059;margin-right:4px;"></i>期限未設定 ${counts.nodate} 件：契約書を解析するとAIが自動で期限を抽出します</span>` : ''}
+            ${counts.nodate > 0 ? `<span style="margin-left:16px;"><i class="fa-solid fa-circle-info" style="color:#c5a059;margin-right:4px;"></i>期限未設定 ${counts.nodate} 件：契約書を解析するとAIが自動で期限を抽出します。失敗した解析回数は消耗しません。</span>` : ''}
         </div>`;
     }
 
