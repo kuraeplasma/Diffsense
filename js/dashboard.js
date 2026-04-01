@@ -1567,7 +1567,7 @@ const Views = {
 
         // AI解析結果があればそれを使用、なければ静的コンテンツまたはデフォルト
         const hasComparableVersion = documentOptions.length >= 2;
-        const hasAIResults = Boolean(contract.ai_summary || (Array.isArray(contract.ai_changes) && contract.ai_changes.length > 0));
+        const hasAIResults = Boolean(contract.ai_summary || contract.summary || (Array.isArray(contract.ai_changes) && contract.ai_changes.length > 0));
         const canTriggerPairAnalysis = Boolean(selectedSourceDoc && selectedTargetDoc && window.app?.can('operate_contract'));
 
         let diffData;
@@ -1636,9 +1636,9 @@ const Views = {
             };
         } else if (hasAIResults) {
             const normalizedStored = sanitizeAnalysisPayload({
-                summary: contract.ai_summary || '',
+                summary: contract.ai_summary || contract.summary || '',
                 riskLevel: contract.risk_level === 'High' ? 3 : (contract.risk_level === 'Medium' ? 2 : 1),
-                riskReason: contract.ai_risk_reason || '',
+                riskReason: contract.ai_risk_reason || contract.risk_reason || '',
                 changes: contract.ai_changes || [],
                 isFallback: contract.ai_is_fallback === true
             });
@@ -1772,7 +1772,7 @@ const Views = {
                             </button>
                         </div>
                         <div class="pane-scroll-area">
-                            ${hasComparableVersion ? `
+                            ${hasAIResults ? `
                             <div class="analysis-section-title" style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
                                 <span><i class="fa-solid fa-robot text-primary"></i> AIリスク要約</span>
                                 ${canTriggerPairAnalysis && shouldAutoPairAnalysis ? `
@@ -1791,6 +1791,9 @@ const Views = {
                                 </div>
                                 <div style="font-size:13px; color:#333; line-height:1.7; white-space:pre-wrap;">${diffData.summary || 'AI解析結果がありません'}</div>
                             </div>
+                            ` : ''}
+
+                            ${hasComparableVersion ? `
 
                             ${(contract.expiry_date || contract.renewal_deadline || contract.contract_category) ? (() => {
                                 const fmtDate = (d) => {
@@ -1843,8 +1846,9 @@ const Views = {
                             ` : `
                             <div style="padding:32px 20px; text-align:center; color:#999;">
                                 <i class="fa-solid fa-code-compare" style="font-size:32px; margin-bottom:12px; display:block; opacity:0.3;"></i>
-                                <div style="font-size:14px;">差分が取り込まれていません</div>
-                                <div style="font-size:12px; margin-top:6px;">バージョン2枚目をアップロードするとAI差分解析が実行されます</div>
+                                <div style="font-size:14px;">差分はまだありません</div>
+                                <div style="font-size:12px; margin-top:6px;">新バージョンをアップロードすると差分解析とリスク解析と期限取得が開始されます</div>
+                                <div style="font-size:12px; margin-top:4px;">「リスク解析をする」をクリックでリスク解析と期限取得が開始されます</div>
                             </div>
                             `}
                         </div>
@@ -2539,11 +2543,10 @@ class RegistrationFlow {
                 // 4. 詳細ページへ遷移（まずは原本を表示して安心させる）
                 this.app.activeDetailTab = 'original';
                 this.app.navigate('diff', newContract.id);
-                Notify.toast('読み込み完了<br><small>※AI解析用テキストは「差分表示」で確認できます</small>', {
+                Notify.toast('取り込み完了', {
                     type: 'success',
-                    title: '完了',
-                    duration: 3500,
-                    neutral: true,
+                    duration: 2000,
+                    closable: false,
                     position: 'center'
                 });
             } else {
@@ -2929,34 +2932,28 @@ class DashboardApp {
     /**
      * Show modal with document viewer (paginated) + deadline input form.
      */
-    showDeadlineInputModal(contractId, page = 0) {
+    showDeadlineInputModal(contractId) {
         const contracts = dbService.getContracts();
         const c = contracts.find(x => String(x.id) === String(contractId));
         if (!c) return;
 
-        // Build pages from original_content or summary
-        const rawText = c.original_content || c.content || c.summary || '';
-        const paragraphs = rawText.split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
-        const PAGE_SIZE = 6;
-        const pages = [];
-        for (let i = 0; i < Math.max(paragraphs.length, 1); i += PAGE_SIZE) {
-            pages.push(paragraphs.slice(i, i + PAGE_SIZE));
+        // Build document content HTML (same as diff view original tab)
+        let contentHtml = '';
+        if (c.original_content) {
+            contentHtml = `<div class="is-structured" style="height:100%;">${renderStructuredView(c.original_content, `deadline-modal-${contractId}`)}</div>`;
+        } else if (c.extracted_text) {
+            const paragraphs = c.extracted_text.split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
+            contentHtml = paragraphs.length > 0
+                ? `<div style="padding:4px 0;">${paragraphs.map(p => `<p style="margin:0 0 14px;line-height:1.8;font-size:13px;color:#2b2623;">${p.replace(/\n/g, '<br>')}</p>`).join('')}</div>`
+                : '';
         }
-        if (pages.length === 0) pages.push([]);
-        const totalPages = pages.length;
-        const currentPage = Math.max(0, Math.min(page, totalPages - 1));
-        const pageContent = pages[currentPage] || [];
-
-        const contentHtml = rawText
-            ? pageContent.map(p => `<p style="margin:0 0 14px;line-height:1.7;font-size:13px;color:#2b2623;">${p.replace(/\n/g, '<br>')}</p>`).join('')
-            : `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#aaa;gap:12px;padding:40px 0;">
+        if (!contentHtml) {
+            contentHtml = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#aaa;gap:12px;padding:40px 0;">
                 <i class="fa-solid fa-file-lines" style="font-size:36px;"></i>
                 <div style="font-size:13px;">書類の本文が取得できませんでした</div>
                 <div style="font-size:12px;">下記フォームから期限を直接入力してください</div>
               </div>`;
-
-        const prevDisabled = currentPage === 0;
-        const nextDisabled = currentPage >= totalPages - 1;
+        }
 
         document.getElementById('deadline-input-overlay')?.remove();
 
@@ -2964,7 +2961,7 @@ class DashboardApp {
         overlay.id = 'deadline-input-overlay';
         overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;';
         overlay.innerHTML = `
-            <div style="background:#fff;border-radius:12px;width:100%;max-width:900px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,0.22);overflow:hidden;">
+            <div style="background:#fff;border-radius:12px;width:100%;max-width:1100px;height:88vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,0.22);overflow:hidden;">
 
                 <!-- Header -->
                 <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid #eee;flex-shrink:0;">
@@ -2978,24 +2975,10 @@ class DashboardApp {
                 <!-- Body: left=doc, right=form -->
                 <div style="display:flex;flex:1;overflow:hidden;min-height:0;">
 
-                    <!-- Document viewer -->
-                    <div style="flex:1;display:flex;flex-direction:column;border-right:1px solid #eee;min-width:0;">
-                        <div style="padding:20px 24px;flex:1;overflow:hidden;">
+                    <!-- Document viewer (scrollable) -->
+                    <div style="flex:1;overflow:hidden;min-width:0;border-right:1px solid #eee;">
+                        <div style="height:100%;overflow-y:auto;padding:20px 24px;box-sizing:border-box;">
                             ${contentHtml}
-                        </div>
-                        <!-- Page navigation -->
-                        <div style="display:flex;align-items:center;justify-content:center;gap:16px;padding:14px 24px;border-top:1px solid #f0ede8;flex-shrink:0;background:#fafaf8;">
-                            <button onclick="window.app.showDeadlineInputModal('${contractId}', ${currentPage - 1})"
-                                ${prevDisabled ? 'disabled' : ''}
-                                style="padding:6px 18px;border:1px solid #ddd;border-radius:6px;background:${prevDisabled ? '#f5f5f5' : '#fff'};color:${prevDisabled ? '#ccc' : '#5e544d'};font-size:13px;cursor:${prevDisabled ? 'default' : 'pointer'};">
-                                ← 前のページ
-                            </button>
-                            <span style="font-size:13px;color:#888;">${totalPages > 0 ? `${currentPage + 1} / ${totalPages} ページ` : '—'}</span>
-                            <button onclick="window.app.showDeadlineInputModal('${contractId}', ${currentPage + 1})"
-                                ${nextDisabled ? 'disabled' : ''}
-                                style="padding:6px 18px;border:1px solid #ddd;border-radius:6px;background:${nextDisabled ? '#f5f5f5' : '#fff'};color:${nextDisabled ? '#ccc' : '#5e544d'};font-size:13px;cursor:${nextDisabled ? 'default' : 'pointer'};">
-                                次のページ →
-                            </button>
                         </div>
                     </div>
 
@@ -3074,8 +3057,24 @@ class DashboardApp {
         const c = contracts.find(x => String(x.id) === String(contractId));
         if (!c) { Notify.error('契約が見つかりません'); return; }
 
-        const contractText = c.original_content || c.content || '';
-        if (!contractText || contractText.trim().length < 10) {
+        // original_content がオブジェクト（構造化JSON）の場合はテキストに変換
+        let contractText = '';
+        if (c.original_content && typeof c.original_content === 'object') {
+            const oc = c.original_content;
+            const parts = [];
+            if (oc.preamble) parts.push(oc.preamble);
+            if (Array.isArray(oc.articles)) {
+                for (const a of oc.articles) {
+                    if (a.articleNumber || a.title) parts.push(`${a.articleNumber || ''} ${a.title || ''}`.trim());
+                    if (a.content) parts.push(a.content);
+                }
+            }
+            contractText = parts.join('\n\n').trim();
+        }
+        if (!contractText) {
+            contractText = (typeof c.original_content === 'string' ? c.original_content : (c.extracted_text || '')).trim();
+        }
+        if (!contractText || contractText.length < 10) {
             Notify.warning('書類の本文データがありません。差分チェックで取り込んでください。');
             return;
         }
@@ -3108,29 +3107,43 @@ class DashboardApp {
                 return;
             }
 
-            // Update localStorage
-            const idx = contracts.findIndex(x => String(x.id) === String(contractId));
-            if (idx !== -1) {
-                contracts[idx] = {
-                    ...contracts[idx],
-                    summary: data.data.summary,
-                    riskLevel: data.data.riskLevel,
-                    risk_level: data.data.riskLevel,
-                    riskReason: data.data.riskReason,
-                    last_analyzed_at: new Date().toLocaleDateString('ja-JP'),
-                    ...(data.data.contract_meta ? {
-                        expiry_date: data.data.contract_meta.expiry_date || null,
-                        renewal_deadline: data.data.contract_meta.renewal_deadline || null,
-                        contract_start: data.data.contract_meta.contract_start || null,
-                        auto_renewal: data.data.contract_meta.auto_renewal,
-                        contract_category: data.data.contract_meta.contract_category || null,
-                        date_confidence: data.data.contract_meta.date_confidence || 'unknown',
-                    } : {})
-                };
-                localStorage.setItem(dbService.KEYS.CONTRACTS, JSON.stringify(contracts));
+            // updateContractAnalysis で ai_summary/ai_risk_reason/ai_changes を正しく保存
+            dbService.updateContractAnalysis(contractId, {
+                summary: data.data.summary,
+                riskLevel: data.data.riskLevel,
+                riskReason: data.data.riskReason,
+                changes: data.data.changes || [],
+                status: '未確認',
+            });
+            // contract_meta（期限情報）を追加保存
+            if (data.data.contract_meta) {
+                const meta = data.data.contract_meta;
+                const allContracts = dbService.getContracts();
+                const idx = allContracts.findIndex(x => String(x.id) === String(contractId));
+                if (idx !== -1) {
+                    Object.assign(allContracts[idx], {
+                        expiry_date: meta.expiry_date || null,
+                        renewal_deadline: meta.renewal_deadline || null,
+                        contract_start: meta.contract_start || null,
+                        auto_renewal: meta.auto_renewal,
+                        contract_category: meta.contract_category || null,
+                        date_confidence: meta.date_confidence || 'unknown',
+                    });
+                    localStorage.setItem(dbService.KEYS.CONTRACTS, JSON.stringify(allContracts));
+                }
             }
 
-            Notify.success('解析が完了しました');
+            // 期限情報の取得結果を通知
+            const meta = data.data.contract_meta;
+            const hasDeadline = meta && (meta.expiry_date || meta.renewal_deadline || meta.contract_start);
+            if (hasDeadline) {
+                Notify.success('解析完了。期限情報を期限・アラート管理に格納しました');
+            } else {
+                Notify.success('解析が完了しました');
+                setTimeout(() => {
+                    Notify.info('期限情報を取得できませんでした。「期限・アラート管理」から手動入力すると、スラック・メールで通知が届きます', { duration: 6000 });
+                }, 800);
+            }
             // Re-render detail view
             this.navigate('diff', contractId);
 
@@ -3180,6 +3193,93 @@ class DashboardApp {
     }
 
     /**
+     * Re-analyze a contract from the deadline alerts view to extract deadline info.
+     */
+    async runDeadlineReanalyze(contractId) {
+        const contracts = dbService.getContracts();
+        const c = contracts.find(x => String(x.id) === String(contractId));
+        if (!c) { Notify.error('契約が見つかりません'); return; }
+
+        let contractText = '';
+        if (c.original_content && typeof c.original_content === 'object') {
+            const oc = c.original_content;
+            const parts = [];
+            if (oc.preamble) parts.push(oc.preamble);
+            if (Array.isArray(oc.articles)) {
+                for (const a of oc.articles) {
+                    if (a.articleNumber || a.title) parts.push(`${a.articleNumber || ''} ${a.title || ''}`.trim());
+                    if (a.content) parts.push(a.content);
+                }
+            }
+            contractText = parts.join('\n\n').trim();
+        }
+        if (!contractText) {
+            contractText = (typeof c.original_content === 'string' ? c.original_content : (c.extracted_text || '')).trim();
+        }
+        if (!contractText || contractText.length < 10) {
+            Notify.warning('書類の本文データがありません。差分チェックから再取り込みしてください。');
+            return;
+        }
+
+        const btn = document.getElementById(`btn-deadline-reanalyze-${contractId}`);
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right:4px;font-size:10px;"></i>解析中...';
+        }
+
+        try {
+            const authModule = await import('./auth.js');
+            const token = await authModule.getIdToken();
+            const apiBase = (await import('./api-base.js')).getApiBaseUrl();
+
+            const res = await fetch(`${apiBase}/api/contracts/${contractId}/reanalyze`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ contractText })
+            });
+            const data = await res.json();
+
+            if (!data.success) {
+                Notify.error(data.error || '再解析に失敗しました');
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-rotate" style="margin-right:4px;font-size:10px;"></i>再解析'; }
+                return;
+            }
+
+            if (data.data.contract_meta) {
+                const meta = data.data.contract_meta;
+                const allContracts = dbService.getContracts();
+                const idx = allContracts.findIndex(x => String(x.id) === String(contractId));
+                if (idx !== -1) {
+                    Object.assign(allContracts[idx], {
+                        expiry_date: meta.expiry_date || null,
+                        renewal_deadline: meta.renewal_deadline || null,
+                        contract_start: meta.contract_start || null,
+                        auto_renewal: meta.auto_renewal,
+                        contract_category: meta.contract_category || null,
+                        date_confidence: meta.date_confidence || 'unknown',
+                    });
+                    localStorage.setItem(dbService.KEYS.CONTRACTS, JSON.stringify(allContracts));
+                }
+            }
+
+            const meta = data.data.contract_meta;
+            const hasDeadline = meta && (meta.expiry_date || meta.renewal_deadline);
+            if (hasDeadline) {
+                Notify.success('再解析完了。期限情報を取得しました');
+            } else {
+                Notify.warning('再解析しましたが期限情報を取得できませんでした。手動で入力してください。');
+            }
+            this.navigate('deadlines');
+        } catch (err) {
+            Notify.error('再解析エラー: ' + err.message);
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-rotate" style="margin-right:4px;font-size:10px;"></i>再解析'; }
+        }
+    }
+
+    /**
      * Update the sidebar badge for deadlines (urgent contracts count).
      */
     updateDeadlinesBadge() {
@@ -3204,10 +3304,11 @@ class DashboardApp {
     renderDeadlinesView(opts = {}) {
         const query = (opts.query || '').trim().toLowerCase();
         const filterRange = opts.filterRange || 'all'; // all | urgent | warning | upcoming | nodate
-        const sortKey = opts.sortKey || 'days'; // days | name | date
-        const sortDir = opts.sortDir || 'asc';
+        const sortKey = opts.sortKey || 'analyzed'; // analyzed | days | name | date
+        const sortDir = opts.sortDir || 'desc';
 
-        const allContracts = dbService.getContracts ? dbService.getContracts() : (dbService._localContracts || []);
+        const allContracts = (dbService.getContracts ? dbService.getContracts() : (dbService._localContracts || []))
+            .filter(c => c.last_analyzed_at); // リスク解析済みのみ表示
 
         // Annotate with days remaining
         const annotated = allContracts.map(c => {
@@ -3240,7 +3341,10 @@ class DashboardApp {
         // Sort
         const sorted = [...filtered].sort((a, b) => {
             let va, vb;
-            if (sortKey === 'days') {
+            if (sortKey === 'analyzed') {
+                va = a.last_analyzed_at || '0';
+                vb = b.last_analyzed_at || '0';
+            } else if (sortKey === 'days') {
                 va = a._daysRemaining ?? 99999;
                 vb = b._daysRemaining ?? 99999;
             } else if (sortKey === 'name') {
@@ -3287,23 +3391,24 @@ class DashboardApp {
             const categoryBadge = c.contract_category
                 ? `<span style="font-size:11px;background:#f0ede8;color:#7a6a5a;border-radius:4px;padding:2px 7px;">${c.contract_category}</span>`
                 : '';
-            const statusLabel = c.status === '確認済' ? '確認済' : '未確認';
-            const statusColor = c.status === '確認済' ? '#2e7d32' : '#888';
-            const statusBg = c.status === '確認済' ? '#e8f5e9' : '#f0f0f0';
-            const statusBadge = `<span style="font-size:11px;background:${statusBg};color:${statusColor};border-radius:4px;padding:2px 8px;font-weight:600;">${statusLabel}</span>`;
             const daysBadge = noDate
-                ? `<button onclick="event.stopPropagation();window.app.showDeadlineInputModal('${c.id}')"
-                    style="background:#fff;border:1.5px dashed #c5a059;color:#c5a059;border-radius:20px;padding:3px 12px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">
-                    <i class="fa-solid fa-plus" style="margin-right:4px;font-size:10px;"></i>期限を入力
-                  </button>`
+                ? `<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">
+                    <button onclick="event.stopPropagation();window.app.showDeadlineInputModal('${c.id}')"
+                        style="background:#fff;border:1.5px dashed #c5a059;color:#c5a059;border-radius:20px;padding:3px 0;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;width:90px;text-align:center;">
+                        <i class="fa-solid fa-plus" style="margin-right:4px;font-size:10px;"></i>期限を入力
+                    </button>
+                    <button id="btn-deadline-reanalyze-${c.id}" onclick="event.stopPropagation();window.app.runDeadlineReanalyze('${c.id}')"
+                        style="background:#fff;border:1.5px dashed #aaa;color:#666;border-radius:20px;padding:3px 0;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;width:90px;text-align:center;">
+                        <i class="fa-solid fa-rotate" style="margin-right:4px;font-size:10px;"></i>再解析
+                    </button>
+                  </div>`
                 : `<span style="display:inline-block;background:${badgeColor};color:#fff;border-radius:20px;padding:3px 12px;font-size:12px;font-weight:700;">${daysLabel}</span>`;
-            const rowClick = noDate ? `onclick="window.app.showDeadlineInputModal('${c.id}')"` : `onclick="window.app.navigate('diff', '${c.id}')"`;
+            const rowClick = `onclick="window.app.showDeadlineInputModal('${c.id}')"`;
             return `<tr style="cursor:pointer;" ${rowClick}>
                 <td><div style="font-weight:600;color:#2b2623;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.name || '—'}</div>${categoryBadge ? `<div style="margin-top:4px;">${categoryBadge}</div>` : ''}</td>
                 <td style="font-size:13px;color:#5e544d;white-space:nowrap;width:90px;">${dateLabel}</td>
                 <td style="font-size:13px;color:#5e544d;white-space:nowrap;width:120px;">${targetDate ? this._formatDateJa(targetDate) : '—'}</td>
                 <td style="white-space:nowrap;width:130px;">${daysBadge}</td>
-                <td style="white-space:nowrap;width:70px;">${statusBadge}</td>
                 <td style="white-space:nowrap;width:90px;">${notifyToggle}</td>
             </tr>`;
         }).join('');
@@ -3349,12 +3454,11 @@ class DashboardApp {
                         <th style="padding:10px 12px;text-align:left;font-size:12px;color:#8a7a6a;font-weight:600;white-space:nowrap;width:90px;">期限種別</th>
                         ${sortBtn('date', '期限日', 'white-space:nowrap;width:120px;')}
                         ${sortBtn('days', '残り日数', 'white-space:nowrap;width:130px;')}
-                        <th style="padding:10px 12px;text-align:left;font-size:12px;color:#8a7a6a;font-weight:600;white-space:nowrap;width:70px;">状態</th>
                         <th style="padding:10px 12px;text-align:left;font-size:12px;color:#8a7a6a;font-weight:600;white-space:nowrap;width:90px;">通知</th>
                     </tr>
                 </thead>
                 <tbody>
-                    ${sorted.length > 0 ? rows : `<tr><td colspan="6" class="text-center text-muted" style="padding:40px;">該当する契約が見つかりませんでした</td></tr>`}
+                    ${sorted.length > 0 ? rows : `<tr><td colspan="7" class="text-center text-muted" style="padding:40px;">該当する契約が見つかりませんでした</td></tr>`}
                 </tbody>
             </table>
         </div>
@@ -4261,7 +4365,7 @@ class DashboardApp {
         return false;
     }
 
-    renderNotificationSettings(settings, apiBase = '') {
+    renderNotificationSettings(settings, apiBase = '', plan = 'pro') {
         const emailEnabled = settings?.email?.crawlAlert !== false;
         const slack = settings?.slack || {};
         const slackEnabled = slack.enabled === true;
@@ -4270,6 +4374,10 @@ class DashboardApp {
         const teamName = slack.teamName || '';
         const deadlineEmailEnabled = settings?.email?.deadlineAlert !== false;
         const deadlineSlackEnabled = settings?.slack?.deadlineAlert !== false && slackConnected;
+        const crawlerLocked = plan !== 'pro';
+        const deadlineLocked = plan === 'free';
+        const lockOverlayCrawler = '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(245,247,250,0.82);backdrop-filter:blur(2px);border-radius:8px;z-index:1"><div style="background:#fff;border-radius:10px;padding:24px 32px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.1);max-width:280px"><i class=\'fa-solid fa-crown\' style=\'color:#c19b4a;font-size:1.8rem;margin-bottom:10px;display:block\'></i><div style=\'font-weight:700;font-size:15px;margin-bottom:8px\'>Proプラン限定</div><p style=\'font-size:12px;color:#888;line-height:1.6;margin-bottom:16px\'>クローラー通知はProプランの機能です</p><button class=\'btn-dashboard btn-primary-action\' style=\'width:100%;padding:10px;font-size:13px\' onclick=\'window.app.navigate("plan")\'>アップグレードする</button></div></div>';
+        const lockOverlayDeadline = '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(245,247,250,0.82);backdrop-filter:blur(2px);border-radius:8px;z-index:1"><div style="background:#fff;border-radius:10px;padding:24px 32px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.1);max-width:280px"><i class=\'fa-solid fa-crown\' style=\'color:#c19b4a;font-size:1.8rem;margin-bottom:10px;display:block\'></i><div style=\'font-weight:700;font-size:15px;margin-bottom:8px\'>Business / Proプラン限定</div><p style=\'font-size:12px;color:#888;line-height:1.6;margin-bottom:16px\'>期限アラート通知はBusinessプラン以上の機能です</p><button class=\'btn-dashboard btn-primary-action\' style=\'width:100%;padding:10px;font-size:13px\' onclick=\'window.app.navigate("plan")\'>アップグレードする</button></div></div>';
 
         const slackStatus = slackConnected
             ? `<div style="display:flex;align-items:center;gap:8px;margin-top:12px;padding:10px 14px;background:#f0faf4;border:1px solid #b7dfc7;border-radius:6px">
@@ -4287,8 +4395,9 @@ class DashboardApp {
 
         return `
             <div class="plan-section">
+                <div style="position:relative">
                 <div style="margin-bottom:28px">
-                    <h2 class="section-title" style="margin-bottom:6px">通知設定</h2>
+                    <h2 class="section-title" style="margin-bottom:6px">クローラー通知設定</h2>
                     <p style="color:var(--text-muted);font-size:13px;margin:0">URLクローリングで変更が検知された際の通知先を設定します</p>
                 </div>
 
@@ -4340,11 +4449,14 @@ class DashboardApp {
                     </div>
 
                 </div>
+                ${crawlerLocked ? lockOverlayCrawler : ''}
+                </div>
 
                 <!-- 期限アラート通知 -->
-                <div style="margin-top:36px;margin-bottom:12px;">
+                <div style="position:relative;margin-top:36px">
+                <div style="margin-bottom:12px">
                     <h2 class="section-title" style="margin-bottom:6px">期限アラート通知</h2>
-                    <p style="color:var(--text-muted);font-size:13px;margin:0">契約の期限（30日前・7日前・当日）に通知します。クローラー通知とは独立した設定です。</p>
+                    <p style="color:var(--text-muted);font-size:13px;margin:0">契約の期限（30日前・7日前・当日）に通知します</p>
                 </div>
 
                 <div style="display:flex;flex-direction:column;gap:12px;max-width:640px">
@@ -4368,23 +4480,34 @@ class DashboardApp {
                     </div>
 
                     <!-- 期限アラート: Slack -->
-                    <div style="background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:8px;padding:20px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px">
-                        <div style="display:flex;align-items:center;gap:14px">
-                            <div style="width:36px;height:36px;border-radius:8px;background:var(--color-primary-dim);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                                <i class="fa-brands fa-slack" style="color:var(--color-primary);font-size:16px"></i>
+                    <div style="background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:8px;padding:20px 24px">
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px">
+                            <div style="display:flex;align-items:center;gap:14px">
+                                <div style="width:36px;height:36px;border-radius:8px;background:var(--color-primary-dim);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                                    <i class="fa-brands fa-slack" style="color:var(--color-primary);font-size:16px"></i>
+                                </div>
+                                <div>
+                                    <div style="font-weight:600;font-size:14px;color:var(--text-main);margin-bottom:2px">Slack通知（期限アラート）</div>
+                                    <div style="font-size:12px;color:var(--text-muted)">${slackConnected ? `連携済チャンネル（${channelName}）へ期限アラートを送信` : '期限アラートをSlackへ通知します'}</div>
+                                </div>
                             </div>
-                            <div>
-                                <div style="font-weight:600;font-size:14px;color:var(--text-main);margin-bottom:2px">Slack通知（期限アラート）</div>
-                                <div style="font-size:12px;color:var(--text-muted)">${slackConnected ? `連携済チャンネル（${channelName}）へ期限アラートを送信` : 'Slack連携後に有効になります'}</div>
-                            </div>
+                            ${slackConnected
+                                ? `<label class="toggle-switch" style="flex-shrink:0">
+                                    <input type="checkbox" id="notif-deadline-slack-toggle" ${deadlineSlackEnabled ? 'checked' : ''}
+                                        onchange="window.app.saveNotificationSettings()">
+                                    <span class="toggle-slider"></span>
+                                </label>`
+                                : `<button onclick="window.app.connectSlack()"
+                                    style="display:inline-flex;align-items:center;gap:7px;padding:8px 16px;background:#4a154b;color:#fff;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:600;flex-shrink:0;transition:opacity .2s"
+                                    onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
+                                    <i class="fa-brands fa-slack"></i>連携する
+                                </button>`}
                         </div>
-                        <label class="toggle-switch" style="flex-shrink:0;${!slackConnected ? 'opacity:0.4;pointer-events:none;' : ''}">
-                            <input type="checkbox" id="notif-deadline-slack-toggle" ${deadlineSlackEnabled ? 'checked' : ''} ${!slackConnected ? 'disabled' : ''}
-                                onchange="window.app.saveNotificationSettings()">
-                            <span class="toggle-slider"></span>
-                        </label>
+                        ${slackConnected ? '' : ''}
                     </div>
 
+                </div>
+                ${deadlineLocked ? lockOverlayDeadline : ''}
                 </div>
             </div>
         `;
@@ -4478,33 +4601,9 @@ class DashboardApp {
         const main = this.mainContent;
         if (!main) return;
 
-        // Pro プラン以外はアップグレード画面を表示
         const plan = this.subscription?.plan || 'free';
-        if (plan !== 'pro' && plan !== 'business') {
-            main.innerHTML = `
-                <div style="position:relative;min-height:80vh;">
-                    <div class="mask-content" style="pointer-events:none;user-select:none;">
-                        ${this.renderNotificationSettings({}, '')}
-                    </div>
-                    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(245,247,250,0.65);backdrop-filter:blur(3px);">
-                        <div class="modal-content" style="max-width:450px;width:90%;text-align:center;position:relative;">
-                            <div class="modal-body" style="padding:40px 32px;">
-                                <div style="font-size:3rem;color:#c19b4a;margin-bottom:20px;">
-                                    <i class="fa-solid fa-crown"></i>
-                                </div>
-                                <h3 style="margin-bottom:16px;font-size:1.4rem;">Proプラン限定機能</h3>
-                                <p style="color:#666;line-height:1.6;margin-bottom:32px;">
-                                    「通知設定」はProプラン以上の機能です。<br>
-                                    契約URLの変更をSlack・メールで通知します。
-                                </p>
-                                <button class="btn-dashboard btn-primary-action" style="width:100%;padding:12px;"
-                                    onclick="window.app.navigate('plan')">
-                                    プランをアップグレードする
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>`;
+        if (plan === 'free') {
+            main.innerHTML = this.renderNotificationSettings({}, '', plan);
             return;
         }
 
@@ -4533,7 +4632,7 @@ class DashboardApp {
             const token = await authModule.getIdToken();
             if (!token) {
                 // ローカル開発環境などトークンなしの場合はデフォルト設定を表示
-                main.innerHTML = this.renderNotificationSettings({}, apiBase);
+                main.innerHTML = this.renderNotificationSettings({}, apiBase, plan);
                 return;
             }
             const res = await fetch(`${apiBase}/api/notifications/settings`, {
@@ -4541,9 +4640,9 @@ class DashboardApp {
             });
             const data = await res.json();
             const settings = data.success ? data.data : {};
-            main.innerHTML = this.renderNotificationSettings(settings, apiBase);
+            main.innerHTML = this.renderNotificationSettings(settings, apiBase, plan);
         } catch (err) {
-            main.innerHTML = this.renderNotificationSettings({}, apiBase);
+            main.innerHTML = this.renderNotificationSettings({}, apiBase, plan);
         }
     }
 
