@@ -1176,6 +1176,7 @@ router.get('/verify', async (req, res) => {
                 sourceUrl: contract?.source_url || signRequest?.document_snapshot?.source_url || '',
                 provider: signRequest.provider || 'diffsense',
                 fields,
+                pageDimensions: signRequest.page_dimensions || {},
                 fieldStyles: signRequest.fieldStyles || {},
                 signatures: signRequest.signatures?.[recipient.email] || {}
             }

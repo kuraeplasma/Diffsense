@@ -152,8 +152,22 @@ function shouldVirtualizeDocxPage(page, metrics, pageCount) {
     return metrics.totalHeight > (metrics.basePageHeight * 1.18);
 }
 
-function createVirtualDocxPageSlices(page, metrics) {
-    const totalPages = Math.max(1, Math.ceil(metrics.contentTotalHeight / metrics.contentPageHeight));
+function normalizeExpectedDocxPageCount(expectedPageCount) {
+    const numeric = Number(expectedPageCount);
+    return Number.isFinite(numeric) && numeric >= 1 ? Math.floor(numeric) : 0;
+}
+
+function resolveVirtualDocxPageCount(metrics, expectedPageCount) {
+    const actualPageCount = Math.max(1, Math.ceil(metrics.contentTotalHeight / metrics.contentPageHeight));
+    const normalizedExpected = normalizeExpectedDocxPageCount(expectedPageCount);
+    if (normalizedExpected && actualPageCount === normalizedExpected + 1) {
+        return normalizedExpected;
+    }
+    return actualPageCount;
+}
+
+function createVirtualDocxPageSlices(page, metrics, expectedPageCount = 0) {
+    const totalPages = resolveVirtualDocxPageCount(metrics, expectedPageCount);
     if (totalPages <= 1) return [page];
 
     const slices = [];
@@ -275,8 +289,9 @@ export async function loadDocxPreviewAssets() {
     );
 }
 
-export async function renderDocxPreviewPages(container, source) {
+export async function renderDocxPreviewPages(container, source, options = {}) {
     if (!container) return [];
+    const expectedPageCount = normalizeExpectedDocxPageCount(options?.expectedPageCount);
 
     // Word 原本の見た目を守るため、署名画面の主経路は docx-preview のネイティブ描画を維持する。
     // 別レイアウトへの自動変換を再導入すると、フォントや余白が変わって回帰しやすい。
@@ -341,7 +356,7 @@ export async function renderDocxPreviewPages(container, source) {
     rawPages.forEach((page) => {
         const metrics = getDocxPageMetrics(page);
         if (shouldVirtualizeDocxPage(page, metrics, rawPages.length)) {
-            const slices = createVirtualDocxPageSlices(page, metrics);
+            const slices = createVirtualDocxPageSlices(page, metrics, expectedPageCount);
             const parent = page.parentNode;
             if (parent) {
                 slices.forEach((slice) => parent.insertBefore(slice, page));
@@ -355,6 +370,11 @@ export async function renderDocxPreviewPages(container, source) {
         page.dataset.baseHeight = String(metrics.totalHeight);
         pages.push(page);
     });
+
+    if (expectedPageCount && pages.length === expectedPageCount + 1) {
+        const extras = pages.splice(expectedPageCount);
+        extras.forEach((page) => page?.parentNode?.removeChild(page));
+    }
 
     pages.forEach((page) => {
         page.style.background = page.style.background || '#fff';

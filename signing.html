@@ -1018,7 +1018,8 @@
       signatures: {},
       currentFieldId: null,
       activeTab: 'draw',
-      docxPreviewModulePromise: null
+      docxPreviewModulePromise: null,
+      pageDimensions: {}
     };
 
     let isDrawing = false;
@@ -1135,6 +1136,7 @@
         state.originalFileUrl = data.originalFileUrl || '';
         state.originalFilename = data.originalFilename || '';
         state.originalContent = data.originalContent || null;
+        state.pageDimensions = data.pageDimensions || {};
         state.sourceUrl = data.sourceUrl || '';
         state.documentMode = data.previewMode === 'docx' && state.originalFileUrl
           ? 'docx'
@@ -1272,9 +1274,17 @@
 
     async function ensureDocxPreviewModule() {
       if (!state.docxPreviewModulePromise) {
-        state.docxPreviewModulePromise = import('./js/sign-docx-preview.js?v=20260402_signdocxpreview20');
+        state.docxPreviewModulePromise = import('./js/sign-docx-preview.js?v=20260402_signdocxpreview21');
       }
       return state.docxPreviewModulePromise;
+    }
+
+    function getExpectedDocxPageCount() {
+      const dims = state.pageDimensions && typeof state.pageDimensions === 'object'
+        ? Object.keys(state.pageDimensions)
+        : [];
+      const count = dims.filter((key) => Number(key) >= 1).length;
+      return count > 0 ? count : 0;
     }
 
     function getDocxShells() {
@@ -1358,7 +1368,9 @@
 
       const { renderDocxPreviewPages } = await ensureDocxPreviewModule();
       const previewSource = await resolveDocxPreviewSource(source);
-      const pages = await renderDocxPreviewPages(fallback, previewSource);
+      const pages = await renderDocxPreviewPages(fallback, previewSource, {
+        expectedPageCount: getExpectedDocxPageCount()
+      });
       state.totalPages = Math.max(1, pages.length);
       state.currentPage = Math.min(state.currentPage || 1, state.totalPages);
       syncDocxPageVisibility();
