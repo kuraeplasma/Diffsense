@@ -248,12 +248,68 @@ async function resolveSignRequestPdfUrl(signRequest, req, contract = null) {
     return '';
 }
 
+async function resolveSignRequestOriginalFileUrl(signRequest, req, contract = null) {
+    const backendBaseUrl = getBackendBaseUrl(req);
+    const candidates = [
+        contract?.original_file_url,
+        contract?.original_file_path,
+        signRequest?.document_snapshot?.original_file_url,
+        signRequest?.document_snapshot?.original_file_path
+    ];
+    for (const candidate of candidates) {
+        const value = String(candidate || '').trim();
+        if (!value) continue;
+        if (/^https?:\/\//i.test(value)) {
+            return value;
+        }
+        const uploadsPath = extractUploadsRelativePath(value);
+        if (uploadsPath) {
+            return `${backendBaseUrl}${uploadsPath}`;
+        }
+        if (bucket && !value.includes('\\') && !value.startsWith('/')) {
+            try {
+                const [signedUrl] = await bucket.file(value).getSignedUrl({
+                    action: 'read',
+                    expires: Date.now() + 3600000
+                });
+                return signedUrl;
+            } catch (err) {
+                logger.warn('resolveSignRequestOriginalFileUrl: signed URL failed for', value, err.message);
+            }
+        }
+    }
+    return '';
+}
+
+function isDocxLikeSource(value, fileName = '') {
+    return /\.(docx?|dotx?)($|[?#])/i.test(String(fileName || '').trim())
+        || /\.(docx?|dotx?)($|[?#])/i.test(String(value || '').trim());
+}
+
 function hasSignablePdfSource(source) {
+    const originalSource = String(
+        source?.original_file_url
+        || source?.original_file_path
+        || source?.document_snapshot?.original_file_url
+        || source?.document_snapshot?.original_file_path
+        || source?.contract_snapshot?.original_file_url
+        || source?.contract_snapshot?.original_file_path
+        || ''
+    ).trim();
+    const originalName = String(
+        source?.original_filename
+        || source?.document_snapshot?.original_filename
+        || source?.contract_snapshot?.original_filename
+        || originalSource
+        || ''
+    ).trim();
+    const hasOriginalPdf = Boolean(originalSource) && !/\.(docx?|dotx?)($|[?#])/i.test(originalName);
     return Boolean(
         String(source?.pdf_url || '').trim()
         || String(source?.pdf_storage_path || '').trim()
         || String(source?.document_snapshot?.pdf_url || '').trim()
         || String(source?.document_snapshot?.pdf_storage_path || '').trim()
+        || hasOriginalPdf
     );
 }
 
@@ -643,6 +699,8 @@ function buildDocumentSnapshot(contract) {
         type: contract.type || '',
         pdf_url: contract.pdf_url || '',
         pdf_storage_path: contract.pdf_storage_path || '',
+        original_file_url: contract.original_file_url || '',
+        original_file_path: contract.original_file_path || '',
         original_content: contract.original_content || '',
         source_url: contract.source_url || '',
         original_filename: contract.original_filename || ''
@@ -665,6 +723,54 @@ function normalizeRecipients(recipients) {
             };
         })
         .filter((recipient) => recipient.email && recipient.name);
+}
+
+const BASIC_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function validateRecipientPayload(recipients) {
+    const source = Array.isArray(recipients) ? recipients : [];
+    if (source.length === 0) {
+        return {
+            ok: false,
+            normalized: [],
+            error: '署名者ごとに宛名とメールアドレスを入力してください'
+        };
+    }
+
+    const normalized = normalizeRecipients(source);
+    if (normalized.length !== source.length) {
+        return {
+            ok: false,
+            normalized,
+            error: '署名者ごとに宛名とメールアドレスを入力してください'
+        };
+    }
+
+    const seenEmails = new Set();
+    for (const recipient of normalized) {
+        const email = normalizeEmail(recipient.email);
+        if (!BASIC_EMAIL_RE.test(email)) {
+            return {
+                ok: false,
+                normalized,
+                error: 'メールアドレスの形式が正しくありません'
+            };
+        }
+        if (seenEmails.has(email)) {
+            return {
+                ok: false,
+                normalized,
+                error: '同じメールアドレスを重複して登録できません'
+            };
+        }
+        seenEmails.add(email);
+    }
+
+    return {
+        ok: true,
+        normalized,
+        error: ''
+    };
 }
 
 function resolveUploadsPath(value) {
@@ -731,6 +837,81 @@ async function getRequestSigningUrl(signRequest, recipient) {
         return null;
     }
     return null;
+}
+
+async function loadOriginalSourceBuffer(candidate, logLabel = 'sign-original') {
+    const value = String(candidate || '').trim();
+    if (!value) return null;
+
+    try {
+        if (fs.existsSync(value)) {
+            return fs.readFileSync(value);
+        }
+    } catch {}
+
+    const uploadsRelative = extractUploadsRelativePath(value);
+    if (uploadsRelative) {
+        const localPath = path.join(__dirname, '..', '..', uploadsRelative.replace(/^\//, ''));
+        try {
+            if (fs.existsSync(localPath)) {
+                return fs.readFileSync(localPath);
+            }
+        } catch {}
+    }
+
+    if (bucket && !/^https?:\/\//i.test(value) && !value.includes('\\') && !value.startsWith('/')) {
+        try {
+            const [downloaded] = await bucket.file(value).download();
+            return Buffer.from(downloaded);
+        } catch (error) {
+            logger.warn(`[${logLabel}] bucket original download failed`, {
+                source: value,
+                bucket: bucket?.name || null,
+                error: error.message
+            });
+        }
+    }
+
+    if (/^https?:\/\//i.test(value)) {
+        try {
+            const response = await axios.get(value, { responseType: 'arraybuffer' });
+            return Buffer.from(response.data);
+        } catch (error) {
+            logger.warn(`[${logLabel}] remote original fetch failed`, {
+                source: value,
+                error: error.message
+            });
+        }
+    }
+
+    return null;
+}
+
+function sanitizeStorageFileName(filename, fallbackName = 'document.bin') {
+    const cleaned = String(filename || '')
+        .replace(/[\\/:*?"<>|]+/g, '_')
+        .replace(/\s+/g, ' ')
+        .trim();
+    return cleaned || fallbackName;
+}
+
+function resolveOriginalSourceContentType(source = {}) {
+    const hint = String(
+        source?.original_filename
+        || source?.original_file_path
+        || source?.original_file_url
+        || ''
+    ).toLowerCase();
+    if (/\.(docx|dotx)(\?|#|$)/i.test(hint)) {
+        return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    }
+    if (/\.(doc|dot)(\?|#|$)/i.test(hint)) {
+        return 'application/msword';
+    }
+    if (/\.pdf(\?|#|$)/i.test(hint)) {
+        return 'application/pdf';
+    }
+    return 'application/octet-stream';
 }
 
 async function saveAuditEvent({ signRequestId, ownerUid, event, actorEmail, ipAddress, userAgent, meta = null }) {
@@ -804,10 +985,11 @@ router.post('/create', async (req, res) => {
             return res.status(400).json({ success: false, error: 'Missing parameters' });
         }
 
-        const normalizedRecipients = normalizeRecipients(recipients);
-        if (normalizedRecipients.length === 0) {
-            return res.status(400).json({ success: false, error: 'Recipient name and email are required' });
+        const recipientValidation = validateRecipientPayload(recipients);
+        if (!recipientValidation.ok) {
+            return res.status(400).json({ success: false, error: recipientValidation.error });
         }
+        const normalizedRecipients = recipientValidation.normalized;
 
         const quota = await ensureSignQuota(ownerUid);
         if (quota.limited) {
@@ -901,42 +1083,6 @@ router.post('/create', async (req, res) => {
             ...providerPayload
         });
 
-        if (!useFirmaProvider()) {
-            const mailResults = await Promise.allSettled(newRequest.recipients.map(async (recipient) => {
-                try {
-                    const signUrl = await getRequestSigningUrl(newRequest, recipient);
-                    await mailer.sendSigningRequestEmail({
-                        to: recipient.email,
-                        recipientName: recipient.name,
-                        fileName: contract.name,
-                        senderName: req.user.name || 'DIFFsense',
-                        signingUrl: signUrl
-                    });
-                } catch (mailError) {
-                    const failure = formatMailFailure(recipient, mailError);
-                    logger.error(`Signature email send failed email=${failure.email} error=${failure.error}`);
-                    throw mailError;
-                }
-            }));
-
-            const failedRecipients = mailResults
-                .map((result, index) => ({ result, recipient: newRequest.recipients[index] }))
-                .filter(({ result }) => result.status === 'rejected')
-                .map(({ result, recipient }) => formatMailFailure(recipient, result.reason));
-
-            if (failedRecipients.length > 0) {
-                return res.status(502).json({
-                    success: false,
-                    code: 'MAIL_SEND_FAILED',
-                    error: '署名依頼は作成されましたが、メール送信に失敗しました',
-                    data: {
-                        request: newRequest,
-                        failedRecipients
-                    }
-                });
-            }
-        }
-
         res.json({ success: true, data: newRequest });
     } catch (error) {
         logger.error('API Sign Create Error:', error.message);
@@ -998,8 +1144,20 @@ router.get('/verify', async (req, res) => {
             }
         }
         const pdfUrl = await resolveSignRequestPdfUrl(signRequest, req, contract);
+        const resolvedOriginalFileUrl = await resolveSignRequestOriginalFileUrl(signRequest, req, contract);
+        const originalFilename = String(
+            contract?.original_filename
+            || signRequest?.document_snapshot?.original_filename
+            || signRequest.document_name
+            || ''
+        ).trim();
         const originalContent = contract?.original_content || signRequest?.document_snapshot?.original_content || '';
-        if (!pdfUrl && !originalContent) {
+        const isDocxSource = Boolean(resolvedOriginalFileUrl) && isDocxLikeSource(resolvedOriginalFileUrl, originalFilename);
+        const requestOrigin = `${req.protocol}://${req.get('host') || 'localhost:3001'}`;
+        const originalFileUrl = resolvedOriginalFileUrl
+            ? `${requestOrigin}/api/sign/original-file?token=${encodeURIComponent(token)}`
+            : '';
+        if (!pdfUrl && !originalContent && !isDocxSource) {
             return res.status(404).json({ success: false, error: '署名対象の原本ファイルが見つかりません。' });
         }
 
@@ -1011,7 +1169,9 @@ router.get('/verify', async (req, res) => {
                 recipientName: recipient.name || recipient.email,
                 fileName: signRequest.document_name || '',
                 pdfUrl,
-                previewMode: pdfUrl ? 'pdf' : 'fallback',
+                originalFileUrl,
+                originalFilename,
+                previewMode: isDocxSource ? 'docx' : (pdfUrl ? 'pdf' : 'fallback'),
                 originalContent,
                 sourceUrl: contract?.source_url || signRequest?.document_snapshot?.source_url || '',
                 provider: signRequest.provider || 'diffsense',
@@ -1026,6 +1186,71 @@ router.get('/verify', async (req, res) => {
             return res.status(401).json({ success: false, error: '有効期限が切れましたので、再度発行依頼をしていただくようお願いいたします。' });
         }
         return res.status(401).json({ success: false, error: '無効な署名リンクです' });
+    }
+});
+
+router.get('/original-file', async (req, res) => {
+    try {
+        const token = String(req.query.token || '').trim();
+        if (!token) {
+            return res.status(400).json({ success: false, error: 'トークンがありません' });
+        }
+
+        const payload = jwt.verify(token, String(process.env.JWT_SECRET || '').trim());
+        const signRequest = await markSignRequestExpired(
+            await dbService.getSignRequestById(payload.signRequestId)
+        );
+        if (!signRequest) {
+            return res.status(404).json({ success: false, error: '署名依頼が見つかりません' });
+        }
+        if (signRequest.status === 'declined' || signRequest.status === 'expired') {
+            return res.status(410).json({ success: false, error: 'この署名依頼は利用できません' });
+        }
+        if (signRequest.status === 'completed') {
+            return res.status(410).json({ success: false, error: 'この署名依頼はすでに完了しています' });
+        }
+
+        const recipient = (signRequest.recipients || []).find((item) => String(item.email || '').trim() === String(payload.email || '').trim());
+        if (!recipient) {
+            return res.status(403).json({ success: false, error: '署名者として登録されていません' });
+        }
+
+        let contract = null;
+        const ownerUid = String(signRequest.ownerUid || signRequest.requestedBy || '').trim();
+        if (signRequest.contract_id && ownerUid) {
+            try {
+                const contracts = await dbService.getContracts(ownerUid);
+                contract = (Array.isArray(contracts) ? contracts : []).find((item) => String(item.id) === String(signRequest.contract_id)) || null;
+            } catch (contractError) {
+                logger.warn(`Sign original-file contract lookup failed requestId=${signRequest.id} contractId=${signRequest.contract_id} error=${contractError.message}`);
+            }
+        }
+
+        const sourceMeta = contract || signRequest.document_snapshot || {};
+        const candidates = [
+            contract?.original_file_path,
+            contract?.original_file_url,
+            signRequest?.document_snapshot?.original_file_path,
+            signRequest?.document_snapshot?.original_file_url
+        ].filter(Boolean);
+
+        let buffer = null;
+        for (const candidate of candidates) {
+            buffer = await loadOriginalSourceBuffer(candidate, `sign-original:${signRequest.id}`);
+            if (buffer?.length) break;
+        }
+        if (!buffer?.length) {
+            return res.status(404).json({ success: false, error: '署名対象の原本ファイルが見つかりません' });
+        }
+
+        const encodedFileName = encodeURIComponent(String(sourceMeta.original_filename || 'document.docx'));
+        res.set('Content-Type', resolveOriginalSourceContentType(sourceMeta));
+        res.set('Cache-Control', 'private, max-age=300');
+        res.set('Content-Disposition', `inline; filename="document.docx"; filename*=UTF-8''${encodedFileName}`);
+        return res.send(buffer);
+    } catch (error) {
+        logger.error('API Sign Original File Error:', error.message);
+        return res.status(500).json({ success: false, error: error.message });
     }
 });
 
@@ -1409,18 +1634,38 @@ router.patch('/:id', async (req, res) => {
             ? updates.fieldStyles
             : (existing.fieldStyles || {});
         const pageDimensions = updates.page_dimensions || existing.page_dimensions || {};
-        const annotatedFields = annotateFieldsWithRecipientEmail(mergedFields, mergedRecipients);
+        const mergedSource = {
+            ...existing,
+            ...updates,
+            document_snapshot: updates.document_snapshot || existing.document_snapshot || null,
+            contract_snapshot: updates.contract_snapshot || existing.contract_snapshot || null
+        };
+        let effectiveRecipients = mergedRecipients;
+        if (updates.status === 'sent') {
+            const recipientValidation = validateRecipientPayload(mergedRecipients);
+            if (!recipientValidation.ok) {
+                return res.status(400).json({ success: false, error: recipientValidation.error });
+            }
+            effectiveRecipients = recipientValidation.normalized;
+            if (!Array.isArray(mergedFields) || mergedFields.length === 0) {
+                return res.status(400).json({ success: false, error: '署名フィールドを1つ以上配置してください' });
+            }
+            if (!hasSignablePdfSource(mergedSource) && !hasFallbackDocumentContent(mergedSource)) {
+                return res.status(400).json({ success: false, error: 'PDF原本または本文プレビューがないため、署名依頼を送信できません' });
+            }
+        }
+        const annotatedFields = annotateFieldsWithRecipientEmail(mergedFields, effectiveRecipients);
 
         let providerAugments = {};
         if ((existing.provider === 'diffsense' || useDiffsenseProvider()) && updates.status === 'sent') {
-            const recipientTokens = createRecipientTokens(id, mergedRecipients);
+            const recipientTokens = createRecipientTokens(id, effectiveRecipients);
             providerAugments = {
                 provider: 'diffsense',
                 sent_at: new Date().toISOString(),
                 expiresAt: getSignRequestExpiryIso({ ...existing, recipientTokens }),
                 recipientTokens,
                 fields: annotatedFields,
-                recipients: mergedRecipients.map((recipient) => ({
+                recipients: effectiveRecipients.map((recipient) => ({
                     ...recipient,
                     status: recipient.status === 'signed' ? 'signed' : 'pending'
                 }))
@@ -1430,7 +1675,7 @@ router.patch('/:id', async (req, res) => {
                 await firmaService.updateFieldsWithRecipients({
                     firmaRequestId: existing.firma_request_id,
                     fields: mergedFields,
-                    recipients: mergedRecipients,
+                    recipients: effectiveRecipients,
                     recipientIdMap: existing.firma_recipient_id_map || {},
                     pageDimensions
                 });
@@ -1445,7 +1690,7 @@ router.patch('/:id', async (req, res) => {
             const signingUsers = await firmaService.getSigningUsers(existing.firma_request_id);
             providerAugments = {
                 sent_at: new Date().toISOString(),
-                recipients: mergedRecipients.map((recipient) => ({
+                recipients: effectiveRecipients.map((recipient) => ({
                     ...recipient,
                     action_id: recipient.email,
                     signing_url: signingUsers[String(recipient.email || '').trim()]?.signingUrl || recipient.signing_url || null,

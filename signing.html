@@ -522,6 +522,18 @@
       overflow: hidden;
     }
 
+    #signature-modal {
+      height: min(520px, calc(100vh - 28px));
+      max-height: calc(100vh - 28px);
+      flex-direction: column;
+    }
+
+    #signature-modal .modal-header,
+    #signature-modal .modal-tabs,
+    #signature-modal .modal-footer {
+      flex: 0 0 auto;
+    }
+
     .confirm-overlay {
       display: none;
       position: fixed;
@@ -647,6 +659,13 @@
       padding: 22px;
     }
 
+    #signature-modal .modal-body {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      overflow: hidden;
+    }
+
     .modal-note {
       margin: 0 0 12px;
       font-size: 12px;
@@ -654,9 +673,82 @@
       line-height: 1.7;
     }
 
+    .signature-tab-panel {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+    }
+
+    .signature-panel-actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: auto;
+      padding-top: 10px;
+    }
+
+    .signature-text-note {
+      font-size: 12px;
+      color: #888;
+      margin: 0 0 10px;
+      line-height: 1.7;
+    }
+
+    .signature-text-input {
+      width: 100%;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 16px;
+      color: #1a1a1a;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .signature-text-helper {
+      font-size: 11px;
+      color: #aaa;
+      margin: 8px 0 0;
+      line-height: 1.6;
+    }
+
+    .signature-text-preview-shell {
+      margin-top: 14px;
+      padding: 12px 16px;
+      background: #f9f9f7;
+      border-radius: 8px;
+      border: 0.5px solid #eee;
+      min-height: 92px;
+      visibility: hidden;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+    }
+
+    .signature-text-preview-shell.is-visible {
+      visibility: visible;
+      opacity: 1;
+    }
+
+    .signature-text-preview-label {
+      font-size: 10px;
+      color: #aaa;
+      margin: 0 0 6px;
+    }
+
+    .signature-text-preview-value {
+      font-size: 22px;
+      color: #00008b;
+      font-family: serif;
+      letter-spacing: 0.05em;
+      word-break: break-all;
+      min-height: 1.6em;
+    }
+
     #draw-canvas {
       width: 100%;
       height: auto;
+      flex: 0 0 auto;
       display: block;
       border-radius: 16px;
       border: 1px solid var(--line);
@@ -784,11 +876,6 @@
               <button id="next-btn" onclick="goPage(1)" aria-label="次のページ">›</button>
             </div>
           </div>
-          <div class="zoom-controls">
-            <button onclick="changeZoom(-0.15)" aria-label="縮小">−</button>
-            <span class="summary" id="zoom-summary">100%</span>
-            <button onclick="changeZoom(0.15)" aria-label="拡大">＋</button>
-          </div>
         </div>
         <div class="canvas-wrap">
           <canvas id="pdf-canvas"></canvas>
@@ -832,32 +919,32 @@
       <button id="tab-font" class="modal-tab" onclick="switchTab('font')">テキスト入力</button>
     </div>
     <div class="modal-body">
-      <div id="draw-panel">
+      <div id="draw-panel" class="signature-tab-panel">
         <p class="modal-note">枠内にマウスまたは指で署名してください。</p>
         <canvas id="draw-canvas" width="500" height="180"></canvas>
-        <div style="display:flex;justify-content:flex-end;margin-top:10px;">
+        <div class="signature-panel-actions">
           <button class="secondary-btn" onclick="clearCanvas()">クリア</button>
         </div>
       </div>
-      <div id="font-panel" style="display:none;">
-        <p style="font-size:12px;color:#888;margin-bottom:10px;">
+      <div id="font-panel" class="signature-tab-panel" style="display:none;">
+        <p class="signature-text-note">
           署名として使用するテキストを入力してください
         </p>
         <input
+          class="signature-text-input"
           id="sign-text-input"
           type="text"
           placeholder="例: 山田 太郎"
           maxlength="50"
-          style="width:100%;border:1px solid #ddd;border-radius:8px;padding:10px 14px;font-size:16px;color:#1a1a1a;outline:none;transition:border-color 0.15s;"
           onfocus="this.style.borderColor='#b8860b'"
           onblur="this.style.borderColor='#ddd'"
         />
-        <p style="font-size:11px;color:#aaa;margin-top:8px;">
+        <p class="signature-text-helper">
           入力したテキストが署名として書類に反映されます
         </p>
-        <div id="text-preview-wrap" style="margin-top:14px;padding:12px 16px;background:#f9f9f7;border-radius:8px;border:0.5px solid #eee;display:none;">
-          <p style="font-size:10px;color:#aaa;margin-bottom:6px;">プレビュー</p>
-          <div id="text-preview" style="font-size:22px;color:#00008b;font-family:serif;letter-spacing:0.05em;word-break:break-all;"></div>
+        <div id="text-preview-wrap" class="signature-text-preview-shell">
+          <p class="signature-text-preview-label">プレビュー</p>
+          <div id="text-preview" class="signature-text-preview-value"></div>
         </div>
       </div>
     </div>
@@ -914,13 +1001,16 @@
       recipientEmail: '',
       recipientName: '',
       fileName: '',
+      originalFileUrl: '',
+      originalFilename: '',
       originalContent: null,
       sourceUrl: '',
       fields: [],
       myFields: [],
       signatures: {},
       currentFieldId: null,
-      activeTab: 'draw'
+      activeTab: 'draw',
+      docxPreviewModulePromise: null
     };
 
     let isDrawing = false;
@@ -939,6 +1029,45 @@
       document.getElementById('error-view').style.display = 'none';
       document.getElementById('complete-view').style.display = 'none';
       document.getElementById('main-view').style.display = 'grid';
+    }
+
+    function nextPaint() {
+      return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    }
+
+    function isDocxScrollMode() {
+      return state.documentMode === 'docx';
+    }
+
+    function updateDocumentChrome() {
+      const pageSwitcher = document.querySelector('.page-switcher');
+      const toolbar = document.querySelector('.toolbar');
+      const canvasWrap = document.querySelector('.canvas-wrap');
+      const fallback = document.getElementById('document-fallback');
+
+      if (pageSwitcher) {
+        pageSwitcher.style.display = isDocxScrollMode() ? 'none' : 'inline-flex';
+      }
+      if (toolbar) {
+        toolbar.style.display = isDocxScrollMode() ? 'none' : 'flex';
+        toolbar.style.justifyContent = 'center';
+      }
+      if (canvasWrap) {
+        canvasWrap.style.width = isDocxScrollMode() ? '100%' : 'fit-content';
+        canvasWrap.style.maxWidth = isDocxScrollMode() ? '100%' : '';
+        canvasWrap.style.boxShadow = isDocxScrollMode() ? 'none' : '0 14px 36px rgba(0, 0, 0, 0.14)';
+        canvasWrap.style.borderRadius = isDocxScrollMode() ? '0' : '4px';
+        canvasWrap.style.overflow = isDocxScrollMode() ? 'visible' : 'hidden';
+        canvasWrap.style.background = isDocxScrollMode() ? 'transparent' : '#fff';
+        canvasWrap.style.padding = isDocxScrollMode() ? '10px 0 28px' : '0';
+      }
+      if (fallback) {
+        fallback.style.width = isDocxScrollMode() ? '100%' : '';
+        fallback.style.display = isDocxScrollMode() ? 'flex' : fallback.style.display;
+        fallback.style.flexDirection = isDocxScrollMode() ? 'column' : '';
+        fallback.style.alignItems = isDocxScrollMode() ? 'center' : '';
+        fallback.style.gap = isDocxScrollMode() ? '18px' : '';
+      }
     }
 
     function showComplete() {
@@ -995,18 +1124,36 @@
         state.signatures = data.signatures || {};
         state.myFields = state.fields.filter((field) => String(field.recipientEmail || '').trim() === state.recipientEmail);
         setFileName(data.fileName || '');
+        state.originalFileUrl = data.originalFileUrl || '';
+        state.originalFilename = data.originalFilename || '';
         state.originalContent = data.originalContent || null;
         state.sourceUrl = data.sourceUrl || '';
-        state.documentMode = data.previewMode === 'fallback' || !data.pdfUrl ? 'fallback' : 'pdf';
+        state.documentMode = data.previewMode === 'docx' && state.originalFileUrl
+          ? 'docx'
+          : (data.previewMode === 'fallback' || !data.pdfUrl ? 'fallback' : 'pdf');
 
-        if (state.documentMode === 'fallback') {
+        const requiresVisibleLayout = state.documentMode === 'docx';
+        if (requiresVisibleLayout) {
+          showMain();
+        }
+
+        if (state.documentMode === 'docx') {
+          await loadDocx(state.originalFileUrl);
+        } else if (state.documentMode === 'fallback') {
           renderFallbackDocument();
         } else {
           await loadPdf(data.pdfUrl);
         }
+        if (!requiresVisibleLayout) {
+          showMain();
+        }
+        if (state.documentMode === 'docx') {
+          await nextPaint();
+          fitDocxPages();
+          renderFieldMarkers();
+        }
         renderFieldStatus();
         updateFinishState();
-        showMain();
       } catch (error) {
         console.error(error);
         showError(error.message || '署名画面の読み込みに失敗しました。');
@@ -1014,6 +1161,21 @@
 
       const textInput = document.getElementById('sign-text-input');
       textInput.addEventListener('input', renderTextPreview);
+      window.addEventListener('resize', () => {
+        if (state.previewMode) {
+          renderPreviewPage();
+          return;
+        }
+        if (state.documentMode === 'docx') {
+          fitDocxPages();
+          renderFieldMarkers();
+          return;
+        }
+        if (state.documentMode === 'fallback') {
+          updateFallbackLayout();
+          renderFieldMarkers();
+        }
+      });
     }
 
     function initPreviewMode() {
@@ -1037,8 +1199,10 @@
 
     function renderPreviewPage() {
       state.documentMode = 'pdf';
+      updateDocumentChrome();
       document.getElementById('document-fallback').style.display = 'none';
       document.getElementById('pdf-canvas').style.display = 'block';
+      document.getElementById('fields-overlay').style.display = 'block';
       const canvas = document.getElementById('pdf-canvas');
       const context = canvas.getContext('2d');
       const width = Math.round(794 * state.zoom);
@@ -1076,7 +1240,6 @@
       overlay.style.height = `${height}px`;
 
       document.getElementById('page-summary').textContent = `1 / ${state.totalPages}`;
-      document.getElementById('zoom-summary').textContent = `${Math.round(state.zoom * 100)}%`;
       document.getElementById('prev-btn').disabled = true;
       document.getElementById('next-btn').disabled = true;
 
@@ -1085,8 +1248,10 @@
 
     async function loadPdf(url) {
       state.documentMode = 'pdf';
+      updateDocumentChrome();
       document.getElementById('document-fallback').style.display = 'none';
       document.getElementById('pdf-canvas').style.display = 'block';
+      document.getElementById('fields-overlay').style.display = 'block';
       state.pdfDoc = await pdfjsLib.getDocument({
         url,
         cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
@@ -1095,6 +1260,102 @@
       }).promise;
       state.totalPages = state.pdfDoc.numPages;
       await renderPage(state.currentPage);
+    }
+
+    async function ensureDocxPreviewModule() {
+      if (!state.docxPreviewModulePromise) {
+        state.docxPreviewModulePromise = import('./js/sign-docx-preview.js?v=20260402_signdocxpreview20');
+      }
+      return state.docxPreviewModulePromise;
+    }
+
+    function getDocxShells() {
+      return Array.from(document.querySelectorAll('#document-fallback .editor-page-shell'));
+    }
+
+    function getDocxWrappers() {
+      return Array.from(document.querySelectorAll('#document-fallback .editor-page-wrapper'));
+    }
+
+    function syncDocxPageVisibility() {
+      const shells = getDocxShells();
+      const wrappers = getDocxWrappers();
+      const isScrollMode = isDocxScrollMode();
+      shells.forEach((shell, index) => {
+        shell.style.display = isScrollMode || index + 1 === state.currentPage ? 'block' : 'none';
+      });
+      wrappers.forEach((wrapper, index) => {
+        wrapper.style.display = isScrollMode || index + 1 === state.currentPage ? 'block' : 'none';
+      });
+      document.getElementById('page-summary').textContent = isScrollMode
+        ? `全 ${state.totalPages} ページ`
+        : `${state.currentPage} / ${state.totalPages}`;
+      document.getElementById('prev-btn').disabled = isScrollMode || state.currentPage <= 1;
+      document.getElementById('next-btn').disabled = isScrollMode || state.currentPage >= state.totalPages;
+      updateDocumentChrome();
+    }
+
+    function fitDocxPages() {
+      const panel = document.querySelector('.pdf-panel');
+      const canvasWrap = document.querySelector('.canvas-wrap');
+      const fallback = document.getElementById('document-fallback');
+      if (!panel) return;
+      const widthHost = canvasWrap?.clientWidth || fallback?.clientWidth || panel.clientWidth;
+      const availableWidth = Math.max(320, widthHost - (isDocxScrollMode() ? 24 : 72));
+      getDocxWrappers().forEach((wrapper) => {
+        const baseWidth = Number(wrapper.dataset.baseWidth || wrapper.offsetWidth || 794);
+        const baseHeight = Number(wrapper.dataset.baseHeight || wrapper.offsetHeight || 1123);
+        const scale = Math.min(1, availableWidth / baseWidth) * state.zoom;
+        const shell = wrapper.parentElement && wrapper.parentElement.classList.contains('editor-page-shell')
+          ? wrapper.parentElement
+          : null;
+        const scaledWidth = Math.max(180, Math.round(baseWidth * scale));
+        const scaledHeight = Math.max(120, Math.round(baseHeight * scale));
+        const pageGap = Math.max(24, Math.round(baseHeight * scale * 0.035));
+        if (shell) {
+          shell.style.width = `${scaledWidth}px`;
+          shell.style.height = `${scaledHeight}px`;
+          shell.style.minHeight = `${scaledHeight}px`;
+          shell.style.margin = `0 auto ${isDocxScrollMode() ? Math.max(40, pageGap) : pageGap}px auto`;
+          shell.style.background = '#ffffff';
+          shell.style.borderRadius = isDocxScrollMode() ? '14px' : '0';
+          shell.style.border = isDocxScrollMode() ? '1px solid rgba(216, 209, 199, 0.9)' : '0';
+          shell.style.boxShadow = isDocxScrollMode() ? '0 18px 40px rgba(17, 24, 39, 0.10)' : 'none';
+        }
+        wrapper.style.transformOrigin = 'top left';
+        wrapper.style.transform = `scale(${scale})`;
+        wrapper.style.boxShadow = isDocxScrollMode() ? 'none' : '';
+        wrapper.style.borderRadius = isDocxScrollMode() ? '0' : '';
+      });
+    }
+
+    async function resolveDocxPreviewSource(source) {
+      if (source instanceof Blob) return source;
+      const response = await fetch(source);
+      if (!response.ok) {
+        throw new Error(`Word原本の取得に失敗しました: HTTP ${response.status}`);
+      }
+      return await response.blob();
+    }
+
+    async function loadDocx(source) {
+      state.documentMode = 'docx';
+      state.pdfDoc = null;
+      updateDocumentChrome();
+      document.getElementById('pdf-canvas').style.display = 'none';
+      document.getElementById('fields-overlay').style.display = 'none';
+      const fallback = document.getElementById('document-fallback');
+      fallback.style.display = 'block';
+      fallback.innerHTML = '';
+
+      const { renderDocxPreviewPages } = await ensureDocxPreviewModule();
+      const previewSource = await resolveDocxPreviewSource(source);
+      const pages = await renderDocxPreviewPages(fallback, previewSource);
+      state.totalPages = Math.max(1, pages.length);
+      state.currentPage = Math.min(state.currentPage || 1, state.totalPages);
+      syncDocxPageVisibility();
+      fitDocxPages();
+      renderFieldMarkers();
     }
 
     function escapeHtml(value) {
@@ -1106,61 +1367,72 @@
         .replace(/'/g, '&#39;');
     }
 
-    function buildDocumentPreviewHtml(content) {
-      if (!content) {
-        return '<div class="document-content-full is-frameless">表示できる本文データが見つかりません</div>';
-      }
+    function buildPlainPreviewTextFromItem(item, index = 0) {
+      if (!item) return '';
+      if (typeof item === 'string') return item.trim();
+
+      const fullText = String(item.full_text || item.fullText || '').trim();
+      if (fullText) return fullText;
+
+      const articleLabel = String(item.article || item.articleNumber || '').trim();
+      const heading = String(item.title || item.header || '').trim();
+      const titleLine = [articleLabel, heading]
+        .filter((part, partIndex, parts) => {
+          if (!part) return false;
+          if (partIndex === 1 && parts[0] && (parts[0].includes(part) || part.includes(parts[0]))) {
+            return false;
+          }
+          return true;
+        })
+        .join(' ')
+        .trim();
+
+      const paragraphText = Array.isArray(item.paragraphs)
+        ? item.paragraphs.map((p) => String(p || '').trim()).filter(Boolean).join('\n')
+        : String(item.body || item.content || '').trim();
+
+      const fallbackTitle = !titleLine && !paragraphText ? `第${index + 1}条` : '';
+      return [titleLine || fallbackTitle, paragraphText].filter(Boolean).join('\n').trim();
+    }
+
+    function buildPlainPreviewText(content) {
+      if (!content) return '';
 
       if (typeof content === 'string') {
-        return `<div class="document-content-full is-frameless">${escapeHtml(content).replace(/\r?\n/g, '<br>')}</div>`;
+        return String(content).trim();
       }
 
       if (Array.isArray(content)) {
-        const clauses = content.map((item, index) => {
-          const title = escapeHtml(item.article || item.articleNumber || item.title || `第${index + 1}条`);
-          const header = escapeHtml(item.header || '');
-          const paragraphs = Array.isArray(item.paragraphs)
-            ? item.paragraphs.map((p) => `<p>${escapeHtml(p)}</p>`).join('')
-            : `<p>${escapeHtml(item.body || item.content || '')}</p>`;
-          return `
-            <article class="clause-card">
-              <div class="clause-card-header">
-                <h3>${title}</h3>
-                ${header ? `<div class="clause-card-subtitle">${header}</div>` : ''}
-              </div>
-              <div class="clause-card-body">${paragraphs}</div>
-            </article>
-          `;
-        }).join('');
-        return `<div class="is-structured"><div class="contract-structured-container"><div class="clause-cards-container">${clauses}</div></div></div>`;
+        return content
+          .map((item, index) => buildPlainPreviewTextFromItem(item, index))
+          .filter(Boolean)
+          .join('\n\n')
+          .trim();
       }
 
       if (typeof content === 'object' && Array.isArray(content.articles)) {
         const preamble = String(content.preamble || '').trim();
-        const articles = content.articles.map((item, index) => {
-          const title = escapeHtml(item.articleNumber || item.article || `第${index + 1}条`);
-          const header = escapeHtml(item.title || item.header || '');
-          const bodySource = Array.isArray(item.paragraphs)
-            ? item.paragraphs
-            : String(item.content || '').split(/\r?\n/).filter(Boolean);
-          const paragraphs = bodySource.map((p) => `<p>${escapeHtml(p)}</p>`).join('');
-          return `
-            <article class="clause-card">
-              <div class="clause-card-header">
-                <h3>${title}</h3>
-                ${header ? `<div class="clause-card-subtitle">${header}</div>` : ''}
-              </div>
-              <div class="clause-card-body">${paragraphs}</div>
-            </article>
-          `;
-        }).join('');
-        const preambleHtml = preamble
-          ? `<article class="clause-card"><div class="clause-card-header"><h3>前文</h3></div><div class="clause-card-body">${escapeHtml(preamble).replace(/\r?\n/g, '<br>')}</div></article>`
-          : '';
-        return `<div class="is-structured"><div class="contract-structured-container"><div class="clause-cards-container">${preambleHtml}${articles}</div></div></div>`;
+        const articles = content.articles
+          .map((item, index) => buildPlainPreviewTextFromItem(item, index))
+          .filter(Boolean)
+          .join('\n\n')
+          .trim();
+        return [preamble, articles].filter(Boolean).join('\n\n').trim();
       }
 
-      return `<div class="document-content-full is-frameless">${escapeHtml(String(content))}</div>`;
+      return String(content).trim();
+    }
+
+    function buildDocumentPreviewHtml(content) {
+      const normalized = String(buildPlainPreviewText(content) || '').replace(/\r/g, '').trim();
+      if (!normalized) {
+        return '<div class="document-content-full is-frameless">表示できる本文データが見つかりません</div>';
+      }
+      return `
+        <div class="document-content-full is-frameless sign-plain-document" style="white-space:pre-wrap; word-break:break-word;">
+          ${escapeHtml(normalized)}
+        </div>
+      `;
     }
 
     function chunkFallbackList(list, maxItems, maxWeight) {
@@ -1208,7 +1480,9 @@
 
       if (typeof content === 'object' && Array.isArray(content.articles)) {
         const base = content || {};
-        const groups = chunkFallbackList(base.articles || [], maxItems, maxWeight);
+        const hasPreamble = Boolean(String(base.preamble || '').trim());
+        const maxPerPage = hasPreamble ? 5 : 6;
+        const groups = chunkFallbackList(base.articles || [], maxPerPage, maxWeight);
         if (groups.length <= 1) return [base];
         return groups.map((articles, index) => ({
           ...base,
@@ -1248,11 +1522,13 @@
 
     function renderFallbackDocument() {
       state.documentMode = 'fallback';
+      updateDocumentChrome();
       const pages = buildFallbackContentPages(state.originalContent);
       state.totalPages = Math.max(1, pages.length);
       state.currentPage = Math.min(state.currentPage || 1, state.totalPages);
       
       document.getElementById('pdf-canvas').style.display = 'none';
+      document.getElementById('fields-overlay').style.display = 'block';
       const fallback = document.getElementById('document-fallback');
       fallback.style.display = 'block';
       fallback.innerHTML = '';
@@ -1262,13 +1538,9 @@
         const pageDiv = document.createElement('div');
         pageDiv.id = `document-fallback-page-${pageNum}`;
         pageDiv.className = 'fallback-page';
+        pageDiv.style.minHeight = '1123px';
         pageDiv.style.display = pageNum === state.currentPage ? 'block' : 'none';
         pageDiv.innerHTML = `
-          <div class="fallback-head">
-            <strong style="color:#333;">抽出テキスト・プレビュー</strong>
-            ${state.totalPages > 1 ? ` <span style="margin-left:8px; color:#9ca3af;">${pageNum} / ${state.totalPages}</span>` : ''}
-            ${state.sourceUrl ? ` <span style="margin-left:8px;"><a href="${escapeHtml(state.sourceUrl)}" target="_blank" style="color:#1a73e8; text-decoration:none;">元ソースを開く</a></span>` : ''}
-          </div>
           <div class="fallback-body">${buildDocumentPreviewHtml(content)}</div>
         `;
         fallback.appendChild(pageDiv);
@@ -1283,7 +1555,7 @@
       if (!pageEl) return;
       
       const pageWidth = 794;
-      const pageHeight = Math.max(640, Math.ceil(pageEl.offsetHeight || 1123));
+      const pageHeight = Math.max(1123, Math.ceil(pageEl.offsetHeight || 1123));
       const overlay = document.getElementById('fields-overlay');
       
       overlay.style.width = `${pageWidth}px`;
@@ -1308,9 +1580,86 @@
       }
 
       document.getElementById('page-summary').textContent = `${state.currentPage} / ${state.totalPages}`;
-      document.getElementById('zoom-summary').textContent = `${Math.round(state.zoom * 100)}%`;
       document.getElementById('prev-btn').disabled = state.currentPage <= 1;
       document.getElementById('next-btn').disabled = state.currentPage >= state.totalPages;
+    }
+
+    async function captureDocxRenderedPageImages() {
+      if (typeof html2canvas !== 'function') {
+        throw new Error('プレビュー画像の生成に必要なライブラリを読み込めませんでした');
+      }
+
+      const shells = getDocxShells();
+      const wrappers = getDocxWrappers();
+      if (!wrappers.length) return [];
+
+      const shellStyles = shells.map((shell) => ({
+        display: shell.style.display,
+        width: shell.style.width,
+        height: shell.style.height,
+        minHeight: shell.style.minHeight,
+        margin: shell.style.margin
+      }));
+      const wrapperStyles = wrappers.map((wrapper) => ({
+        display: wrapper.style.display,
+        transform: wrapper.style.transform,
+        transformOrigin: wrapper.style.transformOrigin
+      }));
+      const originalPage = state.currentPage;
+
+      try {
+        wrappers.forEach((wrapper, index) => {
+          const baseWidth = Number(wrapper.dataset.baseWidth || wrapper.offsetWidth || 794);
+          const baseHeight = Number(wrapper.dataset.baseHeight || wrapper.offsetHeight || 1123);
+          wrapper.style.display = 'block';
+          wrapper.style.transformOrigin = 'top left';
+          wrapper.style.transform = 'scale(1)';
+          const shell = shells[index];
+          if (shell) {
+            shell.style.display = 'block';
+            shell.style.width = `${baseWidth}px`;
+            shell.style.height = `${baseHeight}px`;
+            shell.style.minHeight = `${baseHeight}px`;
+            shell.style.margin = '0 auto 24px auto';
+          }
+        });
+
+        const images = [];
+        for (let index = 0; index < wrappers.length; index += 1) {
+          state.currentPage = index + 1;
+          syncDocxPageVisibility();
+          renderFieldMarkers();
+          await nextPaint();
+          const target = shells[index] || wrappers[index];
+          const canvas = await html2canvas(target, {
+            backgroundColor: '#ffffff',
+            scale: 2,
+            useCORS: true,
+            logging: false
+          });
+          images.push(canvas.toDataURL('image/png'));
+        }
+        return images;
+      } finally {
+        state.currentPage = originalPage;
+        shells.forEach((shell, index) => {
+          const style = shellStyles[index] || {};
+          shell.style.display = style.display || '';
+          shell.style.width = style.width || '';
+          shell.style.height = style.height || '';
+          shell.style.minHeight = style.minHeight || '';
+          shell.style.margin = style.margin || '';
+        });
+        wrappers.forEach((wrapper, index) => {
+          const style = wrapperStyles[index] || {};
+          wrapper.style.display = style.display || '';
+          wrapper.style.transform = style.transform || '';
+          wrapper.style.transformOrigin = style.transformOrigin || '';
+        });
+        syncDocxPageVisibility();
+        fitDocxPages();
+        renderFieldMarkers();
+      }
     }
 
     async function renderPage(pageNumber) {
@@ -1338,7 +1687,11 @@
       const next = state.currentPage + delta;
       if (next < 1 || next > state.totalPages) return;
       state.currentPage = next;
-      if (state.documentMode === 'fallback') {
+      if (state.documentMode === 'docx') {
+        syncDocxPageVisibility();
+        fitDocxPages();
+        renderFieldMarkers();
+      } else if (state.documentMode === 'fallback') {
         updateFallbackLayout();
         renderFieldMarkers();
       } else {
@@ -1352,16 +1705,90 @@
         renderPreviewPage();
         return;
       }
+      if (state.documentMode === 'docx') {
+        fitDocxPages();
+        renderFieldMarkers();
+        return;
+      }
       if (state.documentMode === 'fallback') {
         updateFallbackLayout();
-        document.getElementById('zoom-summary').textContent = `${Math.round(state.zoom * 100)}%`;
         return;
       }
       renderPage(state.currentPage);
     }
 
+    function createFieldMarkerElement(field, options = {}) {
+      const isMine = String(field.recipientEmail || '').trim() === state.recipientEmail;
+      const isSigned = Boolean(state.signatures[String(field.id)]);
+      const marker = document.createElement('button');
+      marker.type = 'button';
+      marker.className = `field-marker signing-field-marker ${isMine ? 'mine' : 'others'}${isSigned ? ' signed' : ''}`;
+      marker.style.left = `${Number(field.x || 0)}%`;
+      marker.style.top = `${Number(field.y || 0)}%`;
+      marker.style.width = `${Number(field.width || (field.type === 'signature' ? 88 : 130)) * (options.scaleWithZoom ? state.zoom : 1)}px`;
+      marker.style.height = `${Number(field.height || (field.type === 'signature' ? 88 : 48)) * (options.scaleWithZoom ? state.zoom : 1)}px`;
+
+      if (field.type === 'signature' && isSigned && state.signatures[String(field.id)]?.type === 'text') {
+        const sig = state.signatures[String(field.id)];
+        marker.textContent = sig.fontText || '';
+        marker.style.fontSize = '16px';
+        marker.style.color = '#00008b';
+        marker.style.fontFamily = 'serif';
+        marker.style.letterSpacing = '0.05em';
+        marker.style.background = 'rgba(255,255,255,0.9)';
+        marker.style.border = '1px solid rgba(0,0,139,0.16)';
+        if (isMine) {
+          marker.onclick = () => openSignatureModal(field.id);
+        }
+      } else if (field.type === 'signature' && isSigned) {
+        const img = document.createElement('img');
+        img.src = state.signatures[String(field.id)].dataUrl;
+        img.alt = '署名';
+        marker.appendChild(img);
+        if (isMine) {
+          marker.onclick = () => openSignatureModal(field.id);
+        }
+      } else if (field.type === 'date' && isMine) {
+        marker.textContent = new Date().toLocaleDateString('ja-JP');
+        marker.disabled = true;
+      } else if (isMine && field.type === 'signature') {
+        marker.textContent = 'クリックして署名';
+        marker.onclick = () => openSignatureModal(field.id);
+      } else if (isMine) {
+        marker.textContent = '自動入力';
+        marker.disabled = true;
+      } else {
+        marker.textContent = '他の署名者の欄';
+        marker.disabled = true;
+      }
+
+      return marker;
+    }
+
     function renderFieldMarkers() {
+      document.querySelectorAll('.signing-field-marker').forEach((marker) => marker.remove());
       const overlay = document.getElementById('fields-overlay');
+
+      if (state.documentMode === 'docx') {
+        overlay.innerHTML = '';
+        overlay.style.display = 'none';
+        overlay.style.transform = '';
+        overlay.style.left = '';
+        overlay.style.width = '';
+        overlay.style.height = '';
+
+        const wrappers = getDocxWrappers();
+        state.fields
+          .filter((field) => Number(field.page || 1) >= 1)
+          .forEach((field) => {
+            const targetWrapper = wrappers[Math.max(0, Number(field.page || 1) - 1)];
+            if (!targetWrapper) return;
+            targetWrapper.appendChild(createFieldMarkerElement(field, { scaleWithZoom: false }));
+          });
+        return;
+      }
+
+      overlay.style.display = 'block';
       overlay.innerHTML = '';
       overlay.style.transform = state.documentMode === 'fallback' ? 'translateX(-50%)' : '';
       overlay.style.left = state.documentMode === 'fallback' ? '50%' : '';
@@ -1369,51 +1796,7 @@
       state.fields
         .filter((field) => Number(field.page || 1) === state.currentPage)
         .forEach((field) => {
-          const isMine = String(field.recipientEmail || '').trim() === state.recipientEmail;
-          const isSigned = Boolean(state.signatures[String(field.id)]);
-          const marker = document.createElement('button');
-          marker.type = 'button';
-          marker.className = `field-marker ${isMine ? 'mine' : 'others'}${isSigned ? ' signed' : ''}`;
-          marker.style.left = `${Number(field.x || 0)}%`;
-          marker.style.top = `${Number(field.y || 0)}%`;
-          marker.style.width = `${Number(field.width || (field.type === 'signature' ? 88 : 130)) * state.zoom}px`;
-          marker.style.height = `${Number(field.height || (field.type === 'signature' ? 88 : 48)) * state.zoom}px`;
-
-          if (field.type === 'signature' && isSigned && state.signatures[String(field.id)]?.type === 'text') {
-            const sig = state.signatures[String(field.id)];
-            marker.textContent = sig.fontText || '';
-            marker.style.fontSize = '16px';
-            marker.style.color = '#00008b';
-            marker.style.fontFamily = 'serif';
-            marker.style.letterSpacing = '0.05em';
-            marker.style.background = 'rgba(255,255,255,0.9)';
-            marker.style.border = '1px solid rgba(0,0,139,0.16)';
-            if (isMine) {
-              marker.onclick = () => openSignatureModal(field.id);
-            }
-          } else if (field.type === 'signature' && isSigned) {
-            const img = document.createElement('img');
-            img.src = state.signatures[String(field.id)].dataUrl;
-            img.alt = '署名';
-            marker.appendChild(img);
-            if (isMine) {
-              marker.onclick = () => openSignatureModal(field.id);
-            }
-          } else if (field.type === 'date' && isMine) {
-            marker.textContent = new Date().toLocaleDateString('ja-JP');
-            marker.disabled = true;
-          } else if (isMine && field.type === 'signature') {
-            marker.textContent = 'クリックして署名';
-            marker.onclick = () => openSignatureModal(field.id);
-          } else if (isMine) {
-            marker.textContent = '自動入力';
-            marker.disabled = true;
-          } else {
-            marker.textContent = '他の署名者の欄';
-            marker.disabled = true;
-          }
-
-          overlay.appendChild(marker);
+          overlay.appendChild(createFieldMarkerElement(field, { scaleWithZoom: true }));
         });
     }
 
@@ -1501,7 +1884,7 @@
     function openSignatureModal(fieldId) {
       state.currentFieldId = String(fieldId);
       document.getElementById('modal-overlay').style.display = 'block';
-      document.getElementById('signature-modal').style.display = 'block';
+      document.getElementById('signature-modal').style.display = 'flex';
       switchTab('draw');
       clearCanvas();
       hydrateSignatureInputs(fieldId);
@@ -1525,8 +1908,8 @@
 
     function switchTab(tab) {
       state.activeTab = tab;
-      document.getElementById('draw-panel').style.display = tab === 'draw' ? 'block' : 'none';
-      document.getElementById('font-panel').style.display = tab === 'font' ? 'block' : 'none';
+      document.getElementById('draw-panel').style.display = tab === 'draw' ? 'flex' : 'none';
+      document.getElementById('font-panel').style.display = tab === 'font' ? 'flex' : 'none';
       document.getElementById('tab-draw').classList.toggle('active', tab === 'draw');
       document.getElementById('tab-font').classList.toggle('active', tab === 'font');
     }
@@ -1538,10 +1921,10 @@
       const value = String(input.value || '').trim();
       if (value) {
         preview.textContent = value;
-        wrap.style.display = 'block';
+        wrap.classList.add('is-visible');
       } else {
         preview.textContent = '';
-        wrap.style.display = 'none';
+        wrap.classList.remove('is-visible');
       }
     }
 
@@ -1635,7 +2018,9 @@
 
       try {
         const fallbackDocumentImageDataUrls = [];
-        if (state.documentMode === 'fallback') {
+        if (state.documentMode === 'docx') {
+          fallbackDocumentImageDataUrls.push(...await captureDocxRenderedPageImages());
+        } else if (state.documentMode === 'fallback') {
           // Temporarily show and capture all pages
           const originalPage = state.currentPage;
           const originalZoom = state.zoom;
