@@ -4,107 +4,179 @@
 
 import { dbService } from './db-service.js';
 import { Notify } from './notify.js';
-import { buildSignDocumentPreviewHtml } from './sign-document-preview.js';
+import { buildSignDocumentPreviewHtml } from './sign-document-preview.js?v=20260402_signpreview_plain1';
+import { isDocxFileName, renderDocxPreviewPages } from './sign-docx-preview.js?v=20260402_signdocxpreview20';
 import { getIdToken } from './auth.js';
-import { resolveBackendAssetUrl, toApiUrl } from './api-base.js';
+import { resolveBackendAssetUrl, toApiUrl } from './api-base-safe.js?v=20260329_api_base_safe1';
 
 export const SignViewer = {
     _pdfjsLoaded: false,
     _activePage: 1,
     _totalPages: 1,
+    _objectUrls: [],
+    _initSeq: 0,
+    _inFlightRequestId: null,
+
+    formatJstDateTime(value, includeSeconds = false) {
+        const date = new Date(value || '');
+        if (Number.isNaN(date.getTime())) return '-';
+        return date.toLocaleString('ja-JP', {
+            timeZone: 'Asia/Tokyo',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            ...(includeSeconds ? { second: '2-digit' } : {})
+        });
+    },
 
     /**
      * Initialize the viewer for a specific request
      */
     async init(app, id) {
-        console.log('Initializing SignViewer for ID:', id);
-        
-        const requests = await dbService.getSignRequests();
-        const request = requests.find(r => String(r.id) === String(id));
-        
-        if (!request) {
+        const requestId = String(id ?? '').trim();
+        if (!requestId) {
             Notify.error('依頼が見つかりません');
             app.navigate('sign');
             return;
         }
-
-        const container = document.getElementById('sign-viewer-content');
-        if (!container) return;
-        this._currentRequest = request;
-
-        // 1. Check if provider embedding is needed
-        const actionId = this.findPendingActionId(request);
-
-        const providerRequestId = request.firma_request_id || request.zoho_request_id;
-        if (providerRequestId && actionId && request.status !== 'completed') {
-            await this.renderZohoSign(providerRequestId, actionId, container, request.firma_request_id ? 'Firma' : 'Zoho Sign');
-        } else {
-            // 2. Otherwise show the PDF using pdf.js
-            const contract = dbService.getContractById(request.contract_id);
-            const runtimeUrl = (typeof app.getRuntimePdfPreviewUrl === 'function') ? app.getRuntimePdfPreviewUrl(request.contract_id) : null;
-            const rawPdfUrl = request.completed_document_url || runtimeUrl || contract?.pdf_url || contract?.pdf_storage_path;
-            const pdfUrl = resolveBackendAssetUrl(rawPdfUrl);
-            
-            // Check if it's a real PDF file or just a reference
-            const normalizedPdfUrl = String(pdfUrl || '').trim().toLowerCase();
-            const isActuallyPdf = Boolean(pdfUrl) && (
-                normalizedPdfUrl.startsWith('blob:')
-                || /\.pdf($|[?#])/i.test(String(pdfUrl || ''))
-                || normalizedPdfUrl.includes('/uploads/')
-            );
-
-            if (isActuallyPdf) {
-                await this.renderPdf(pdfUrl, container);
-            } else if (contract && contract.original_content) {
-                // Fallback: Show original text for web/crawled contracts
-                this.renderTextFallback(contract, container);
-            } else {
-                container.innerHTML = `
-                    <div style="text-align:center; color:var(--text-muted); padding:60px;">
-                        <i class="fa-solid fa-file-circle-exclamation" style="font-size:64px; margin-bottom:16px;"></i>
-                        <p>ドキュメントファイルが見つかりません</p>
-                        ${contract?.source_url ? `<a href="${contract.source_url}" target="_blank" style="color:var(--color-primary); font-size:12px;">元のソースを開く <i class="fa-solid fa-external-link"></i></a>` : ''}
-                    </div>
-                `;
-            }
+        if (this._inFlightRequestId === requestId) {
+            console.debug('SignViewer init skipped duplicate request:', requestId);
+            return;
         }
-        
-        this.setupEventListeners(app, request);
+        const initSeq = ++this._initSeq;
+        this._inFlightRequestId = requestId;
+        console.log('Initializing SignViewer for ID:', requestId);
+        this.cleanupObjectUrls();
+        this._activePage = 1;
+        this._currentScale = 1.2;
+        this._currentPdfUrl = null;
+        this._currentDownloadUrl = null;
+        this._currentRequest = null;
 
-        const auditContainer = document.getElementById('audit-events-list');
-        if (auditContainer) {
-            try {
-                const token = await getIdToken();
-                const res = await fetch(toApiUrl(`/api/sign/${id}/audit-events`), {
-                    headers: { 'Authorization': token ? `Bearer ${token}` : '' }
-                });
-                const json = await res.json();
-                if (json.success && json.data.length > 0) {
-                    const eventLabels = {
-                        created: '📄 作成',
-                        signed: '✅ 署名',
-                        declined: '❌ 辞退',
-                        completed: '🎉 完了',
-                        viewed: '👁 閲覧'
-                    };
-                    auditContainer.innerHTML = json.data.map((ev) => `
-                        <div style="display:flex; gap:10px; padding:8px 0; border-bottom:1px solid #f0f0f0; font-size:12px;">
-                            <div style="white-space:nowrap; color:var(--text-muted);">
-                                ${new Date(ev.timestamp).toLocaleString('ja-JP')}
-                            </div>
-                            <div>
-                                <span>${eventLabels[ev.event] || ev.event}</span>
-                                <span style="color:#888; margin-left:6px;">${this.escapeHtml(ev.actorEmail || '')}</span>
-                                ${ev.ipAddress ? `<span style="color:#aaa; margin-left:6px;">IP: ${this.escapeHtml(ev.ipAddress)}</span>` : ''}
-                            </div>
-                        </div>
-                    `).join('');
+        try {
+            const request = await dbService.getSignRequestById(requestId);
+            if (initSeq !== this._initSeq) return;
+
+            if (!request) {
+                Notify.error('依頼が見つかりません');
+                app.navigate('sign');
+                return;
+            }
+
+            const container = document.getElementById('sign-viewer-content');
+            if (!container) return;
+            this._currentRequest = request;
+
+            // 1. Check if provider embedding is needed
+            const actionId = this.findPendingActionId(request);
+
+            const providerRequestId = request.firma_request_id || request.zoho_request_id;
+            if (providerRequestId && actionId && request.status !== 'completed') {
+                await this.renderZohoSign(providerRequestId, actionId, container, request.firma_request_id ? 'Firma' : 'Zoho Sign');
+            } else {
+                // 2. Otherwise show the PDF using pdf.js
+                const snapshot = request.document_snapshot || request.contract_snapshot || null;
+                const liveContract = dbService.getContractById(request.contract_id) || null;
+                const contract = liveContract ? { ...(snapshot || {}), ...liveContract } : snapshot;
+                const previewContract = {
+                    ...(contract || {}),
+                    original_content: contract?.original_content || snapshot?.original_content || '',
+                    source_url: contract?.source_url || snapshot?.source_url || ''
+                };
+                const runtimeUrl = (typeof app.getRuntimePdfPreviewUrl === 'function') ? app.getRuntimePdfPreviewUrl(request.contract_id) : null;
+                const persistedOriginalUrl = resolveBackendAssetUrl(previewContract?.original_file_url || previewContract?.original_file_path);
+                const completedDocumentUrl = this.getCompletedDocumentApiUrl(request);
+                const rawPdfUrl = completedDocumentUrl || runtimeUrl || previewContract?.pdf_url || previewContract?.pdf_storage_path || request.completed_document_url || persistedOriginalUrl;
+                const pdfUrl = resolveBackendAssetUrl(rawPdfUrl);
+                
+                // Check if it's a real PDF file or just a reference
+                const normalizedPdfUrl = String(pdfUrl || '').trim().toLowerCase();
+                const isActuallyPdf = Boolean(pdfUrl) && (
+                    normalizedPdfUrl.startsWith('blob:')
+                    || /\.pdf($|[?#])/i.test(String(pdfUrl || ''))
+                    || normalizedPdfUrl.includes('/uploads/')
+                    || this.isCompletedDocumentProxyUrl(pdfUrl)
+                );
+                const runtimeDoc = (typeof app.getRuntimeOriginalPreviewFile === 'function')
+                    ? app.getRuntimeOriginalPreviewFile(request.contract_id)
+                    : null;
+                const originalName = previewContract?.original_filename || persistedOriginalUrl || '';
+                const hasFallbackContent = Boolean(previewContract?.original_content);
+                const runtimeDocx = Boolean(runtimeDoc && isDocxFileName(runtimeDoc.name || originalName));
+                const persistedDocx = Boolean(persistedOriginalUrl && isDocxFileName(originalName));
+                const rawPdfLooksDocx = /\.docx?($|[?#])/i.test(String(rawPdfUrl || ''));
+                const selectedSourceIsPersistedDocx = Boolean(
+                    persistedDocx
+                    && pdfUrl
+                    && persistedOriginalUrl
+                    && String(pdfUrl) === String(persistedOriginalUrl)
+                );
+
+                if (isActuallyPdf && !rawPdfLooksDocx && !selectedSourceIsPersistedDocx) {
+                    await this.renderPdf(pdfUrl, container);
+                } else if (runtimeDocx) {
+                    await this.renderDocx(runtimeDoc, container);
+                } else if (persistedDocx) {
+                    await this.renderDocx(persistedOriginalUrl, container);
+                } else if (hasFallbackContent) {
+                    // Fallback: Show original text for web/crawled contracts
+                    this.renderTextFallback(previewContract, container);
                 } else {
-                    auditContainer.innerHTML = '<div style="font-size:12px; color:var(--text-muted);">記録なし</div>';
+                    container.innerHTML = `
+                        <div style="text-align:center; color:var(--text-muted); padding:60px;">
+                            <i class="fa-solid fa-file-circle-exclamation" style="font-size:64px; margin-bottom:16px;"></i>
+                            <p>ドキュメントファイルが見つかりません</p>
+                            ${previewContract?.source_url ? `<a href="${previewContract.source_url}" target="_blank" style="color:var(--color-primary); font-size:12px;">元のソースを開く <i class="fa-solid fa-external-link"></i></a>` : ''}
+                        </div>
+                    `;
                 }
-            } catch (e) {
-                console.error('監査証跡取得失敗:', e);
-                auditContainer.innerHTML = '<div style="font-size:12px; color:var(--text-muted);">取得失敗</div>';
+            }
+            
+            if (initSeq !== this._initSeq) return;
+            this.setupEventListeners(app, request);
+
+            const auditContainer = document.getElementById('audit-events-list');
+            if (auditContainer) {
+                try {
+                    const token = await getIdToken();
+                    if (initSeq !== this._initSeq) return;
+                    const res = await fetch(toApiUrl(`/api/sign/${requestId}/audit-events`), {
+                        headers: { 'Authorization': token ? `Bearer ${token}` : '' }
+                    });
+                    const json = await res.json();
+                    if (json.success && json.data.length > 0) {
+                        const eventLabels = {
+                            created: '📄 作成',
+                            signed: '✅ 署名',
+                            declined: '❌ 辞退',
+                            completed: '🎉 完了',
+                            viewed: '👁 閲覧'
+                        };
+                        auditContainer.innerHTML = json.data.map((ev) => `
+                            <div style="display:flex; gap:10px; padding:8px 0; border-bottom:1px solid #f0f0f0; font-size:12px;">
+                                <div style="white-space:nowrap; color:var(--text-muted);">
+                                    ${this.formatJstDateTime(ev.timestamp, true)}
+                                </div>
+                                <div>
+                                    <span>${eventLabels[ev.event] || ev.event}</span>
+                                    <span style="color:#888; margin-left:6px;">${this.escapeHtml(ev.actorEmail || '')}</span>
+                                    ${ev.ipAddress ? `<span style="color:#aaa; margin-left:6px;">IP: ${this.escapeHtml(ev.ipAddress)}</span>` : ''}
+                                </div>
+                            </div>
+                        `).join('');
+                    } else {
+                        auditContainer.innerHTML = '<div style="font-size:12px; color:var(--text-muted);">記録なし</div>';
+                    }
+                } catch (e) {
+                    console.error('監査証跡取得失敗:', e);
+                    auditContainer.innerHTML = '<div style="font-size:12px; color:var(--text-muted);">取得失敗</div>';
+                }
+            }
+        } finally {
+            if (this._inFlightRequestId === requestId) {
+                this._inFlightRequestId = null;
             }
         }
     },
@@ -163,15 +235,14 @@ export const SignViewer = {
      * Renders PDF using pdf.js with interactive controls
      */
     async renderPdf(url, container) {
-        this._currentPdfUrl = url;
+        this._currentPdfUrl = await this.resolvePdfViewerUrl(url);
+        this._currentDownloadUrl = this._currentDownloadUrl || this._currentPdfUrl;
         this._currentScale = this._currentScale || 1.2;
 
         container.innerHTML = `
             <div class="pdf-viewer-wrapper" style="display:flex; flex-direction:column; width:100%; height:100%; background:#525659; position:relative;">
-                <div style="display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:16px; padding:14px 18px; background:#2d3136; color:white; border-bottom:1px solid #444;">
-                    <div></div>
-                    <div id="sign-viewer-page-switcher" class="sign-page-switcher" style="max-width:240px; margin:0 auto;"></div>
-                    <div style="display:flex; align-items:center; gap:8px; justify-self:end;">
+                <div style="display:flex; align-items:center; justify-content:flex-end; gap:8px; padding:14px 18px; background:#2d3136; color:white; border-bottom:1px solid #444;">
+                    <div style="display:flex; align-items:center; gap:8px;">
                         <button class="btn-pdf-tool" onclick="window.signViewer.zoomOut()"><i class="fa-solid fa-minus"></i></button>
                         <span id="zoom-percent" style="font-size:13px; min-width:45px; text-align:center;">${Math.round(this._currentScale * 100)}%</span>
                         <button class="btn-pdf-tool" onclick="window.signViewer.zoomIn()"><i class="fa-solid fa-plus"></i></button>
@@ -265,6 +336,10 @@ export const SignViewer = {
         overlay.style.pointerEvents = 'none';
 
         const request = this._currentRequest || {};
+        const normalizedStatus = String(request?.status || '').toLowerCase();
+        if (normalizedStatus === 'completed') {
+            return overlay;
+        }
         const recipients = Array.isArray(request.recipients) ? request.recipients : [];
         const signatures = request.signatures || {};
         const fields = (Array.isArray(request.fields) ? request.fields : []).filter((field) => Number(field.page || 1) === Number(pageNum));
@@ -280,7 +355,10 @@ export const SignViewer = {
             const isDone = field.type === 'date'
                 ? Boolean(recipient?.signedAt || recipient?.signed_at || signedValue)
                 : Boolean(signedValue);
-            const isCompletedRequest = String(request?.status || '').toLowerCase() === 'completed';
+            const isCompletedRequest = normalizedStatus === 'completed';
+            if (isCompletedRequest && isDone) {
+                return;
+            }
 
             const pageDims = request?.page_dimensions?.[pageNum] || request?.page_dimensions?.[String(pageNum)] || null;
             const baseWidth = Math.max(1, Number(pageDims?.width || viewportWidth / Math.max(this._currentScale || 1, 0.01)));
@@ -351,9 +429,8 @@ export const SignViewer = {
     },
 
     updateVisiblePages() {
-        document.querySelectorAll('#pdf-pages-container > div[data-page]').forEach((pageShell, index) => {
-            const isActive = index + 1 === this._activePage;
-            pageShell.style.display = isActive ? 'inline-block' : 'none';
+        document.querySelectorAll('#pdf-pages-container > div[data-page]').forEach((pageShell) => {
+            pageShell.style.display = 'inline-block';
         });
     },
 
@@ -389,11 +466,12 @@ export const SignViewer = {
     },
 
     async downloadPdf() {
-        if (!this._currentPdfUrl) return;
+        const downloadUrl = this._currentDownloadUrl || this._currentPdfUrl;
+        if (!downloadUrl) return;
         
         try {
             const link = document.createElement('a');
-            link.href = this._currentPdfUrl;
+            link.href = downloadUrl;
             link.download = `contract_${Date.now()}.pdf`;
             document.body.appendChild(link);
             link.click();
@@ -407,22 +485,133 @@ export const SignViewer = {
     renderTextFallback(contract, container) {
         container.innerHTML = `
             <div class="text-fallback-wrapper" style="width:100%; height:100%; display:flex; flex-direction:column; background:#fff; border-radius:var(--radius-md); overflow:hidden; border:1px solid var(--border-subtle);">
-                <div style="padding:16px; background:#f8f9fa; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
-                    <span style="font-size:13px; font-weight:600; color:var(--text-main);">
-                        <i class="fa-solid fa-file-lines"></i> 抽出テキスト・プレビュー
-                    </span>
+                ${contract.source_url ? `
+                <div style="padding:16px; background:#f8f9fa; border-bottom:1px solid #eee; display:flex; justify-content:flex-end; align-items:center;">
                     <a href="${contract.source_url}" target="_blank" style="font-size:12px; color:var(--color-primary);">
                         元のソースを表示 <i class="fa-solid fa-external-link"></i>
                     </a>
                 </div>
+                ` : ''}
                 <div style="flex:1; padding:32px; overflow-y:auto; line-height:1.8; color:#333; font-family:'Noto Sans JP', sans-serif; font-size:14px;">
                     ${buildSignDocumentPreviewHtml(contract.original_content)}
                 </div>
                 <div style="padding:12px; background:#fff9e6; border-top:1px solid #ffeeba; font-size:11px; color:#856404; text-align:center;">
-                    <i class="fa-solid fa-circle-info"></i> このドキュメントはURLから取り込まれたため、PDF形式のプレビューは利用できません。
+                    <i class="fa-solid fa-circle-info"></i> このドキュメントはテキストプレビューで表示しています。原本と一部レイアウトが異なる場合があります。
                 </div>
             </div>
         `;
+    },
+
+    async renderDocx(source, container) {
+        container.innerHTML = `
+            <div style="width:100%; height:100%; overflow-y:auto; padding:20px 0; background:#dfe1e5;">
+                <div id="sign-viewer-docx-pages" style="display:flex; flex-direction:column; align-items:center;"></div>
+            </div>
+        `;
+        const mount = document.getElementById('sign-viewer-docx-pages');
+        if (!mount) return;
+        try {
+            const resolvedSource = await this.resolveDocxPreviewSource(source);
+            const pages = await renderDocxPreviewPages(mount, resolvedSource);
+            this._totalPages = pages.length || 1;
+        } catch (error) {
+            console.error('DOCX preview error:', error);
+            const snapshot = this._currentRequest?.document_snapshot || this._currentRequest?.contract_snapshot || {};
+            const liveContract = dbService.getContractById(this._currentRequest?.contract_id) || null;
+            const fallbackContract = liveContract ? { ...snapshot, ...liveContract } : snapshot;
+            this.renderUnavailableDocument(
+                fallbackContract || {},
+                container,
+                'Word原本のプレビューに失敗しました。見た目を変えないため、別レイアウトへの自動変換は行っていません。'
+            );
+        }
+    },
+
+    renderUnavailableDocument(contract, container, message = '取り込んだ原本ファイルを表示できませんでした。') {
+        const originalFileHref = resolveBackendAssetUrl(contract?.original_file_url || contract?.original_file_path);
+        const fallbackHref = originalFileHref || contract?.source_url || '';
+        container.innerHTML = `
+            <div style="width:min(760px, 100%); margin:40px auto; background:#fff; border:1px solid #e5e7eb; border-radius:18px; box-shadow:0 16px 40px rgba(15,23,42,0.08); padding:56px 40px; text-align:center;">
+                <div style="width:64px; height:64px; margin:0 auto 18px; border-radius:20px; background:#fef2f2; color:#c53030; display:flex; align-items:center; justify-content:center; font-size:28px;">
+                    <i class="fa-regular fa-file-pdf"></i>
+                </div>
+                <div style="font-size:18px; font-weight:700; color:#111827; margin-bottom:8px;">取り込んだ資料を表示できません</div>
+                <div style="font-size:13px; color:#6b7280; line-height:1.8;">${this.escapeHtml(message)}</div>
+                ${fallbackHref ? `<div style="margin-top:18px;"><a href="${this.escapeHtml(fallbackHref)}" target="_blank" rel="noopener noreferrer" style="color:var(--color-primary); font-weight:600; text-decoration:none;">元の資料を開く</a></div>` : ''}
+            </div>
+        `;
+        this._totalPages = 1;
+        this._activePage = 1;
+    },
+
+    async resolveDocxPreviewSource(source) {
+        if (source instanceof Blob) return source;
+        const contractId = this._currentRequest?.contract_id || this._currentRequest?.contractId;
+        if (!contractId) return source;
+
+        try {
+            const token = await getIdToken();
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            const response = await fetch(toApiUrl(`/contracts/${encodeURIComponent(contractId)}/original-file`), { headers });
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            return await response.blob();
+        } catch (error) {
+            console.warn('DOCX preview proxy failed, falling back to original source', error);
+            return source;
+        }
+    },
+
+    getCompletedDocumentApiUrl(request) {
+        if (String(request?.status || '').toLowerCase() !== 'completed') return '';
+        if (!request?.id) return '';
+        if (!request?.signedPdfPath && !request?.completed_document_url) return '';
+        return toApiUrl(`/api/sign/${encodeURIComponent(String(request.id))}/completed-document`);
+    },
+
+    isCompletedDocumentProxyUrl(value) {
+        try {
+            const parsed = new URL(String(value || ''), window.location.origin);
+            return /\/api\/sign\/[^/]+\/completed-document$/i.test(parsed.pathname);
+        } catch {
+            return false;
+        }
+    },
+
+    async resolvePdfViewerUrl(url) {
+        const raw = String(url || '').trim();
+        if (!raw) return '';
+        if (!this.isCompletedDocumentProxyUrl(raw)) {
+            this._currentDownloadUrl = raw;
+            return raw;
+        }
+        const objectUrl = await this.fetchAuthorizedBlobUrl(raw);
+        this._currentDownloadUrl = objectUrl;
+        return objectUrl;
+    },
+
+    async fetchAuthorizedBlobUrl(url) {
+        const token = await getIdToken();
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const response = await fetch(url, { headers });
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        this._objectUrls.push(objectUrl);
+        return objectUrl;
+    },
+
+    cleanupObjectUrls() {
+        const urls = Array.isArray(this._objectUrls) ? this._objectUrls : [];
+        urls.forEach((url) => {
+            try {
+                URL.revokeObjectURL(url);
+            } catch {}
+        });
+        this._objectUrls = [];
     },
 
     escapeHtml(str) {

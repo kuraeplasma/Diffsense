@@ -314,6 +314,12 @@
       border-radius: 16px;
       padding: 10px;
       pointer-events: none;
+      appearance: none;
+      -webkit-appearance: none;
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      outline: none;
     }
 
     .field-marker.mine {
@@ -331,6 +337,25 @@
       background: rgba(29, 158, 117, 0.1);
     }
 
+    .field-marker.clean-render {
+      padding: 0;
+      border: none !important;
+      background: transparent !important;
+      box-shadow: none !important;
+      outline: none !important;
+    }
+
+    .field-marker.date-render {
+      padding: 0 4px;
+      border: none !important;
+      border-radius: 0;
+      background: transparent !important;
+      box-shadow: none !important;
+      justify-content: flex-start;
+      color: #111827 !important;
+      font-weight: 600;
+    }
+
     .field-marker.others {
       border: 1px dashed rgba(107, 114, 128, 0.5);
       color: rgba(107, 114, 128, 0.8);
@@ -341,6 +366,8 @@
       width: 100%;
       height: 100%;
       object-fit: contain;
+      object-position: left center;
+      display: block;
     }
 
     .side {
@@ -738,8 +765,8 @@
 
     .signature-text-preview-value {
       font-size: 22px;
-      color: #00008b;
-      font-family: serif;
+      color: #c53030;
+      font-family: "Noto Serif JP", "Yu Mincho", serif;
       letter-spacing: 0.05em;
       word-break: break-all;
       min-height: 1.6em;
@@ -1019,7 +1046,8 @@
       currentFieldId: null,
       activeTab: 'draw',
       docxPreviewModulePromise: null,
-      pageDimensions: {}
+      pageDimensions: {},
+      exportCaptureMode: false
     };
 
     let isDrawing = false;
@@ -1604,6 +1632,59 @@
       document.getElementById('next-btn').disabled = state.currentPage >= state.totalPages;
     }
 
+    async function captureDocxShellImage(shell, wrapper) {
+      const baseWidth = Number(wrapper?.dataset.baseWidth || wrapper?.offsetWidth || 794);
+      const baseHeight = Number(wrapper?.dataset.baseHeight || wrapper?.offsetHeight || 1123);
+      const host = document.createElement('div');
+      host.style.position = 'fixed';
+      host.style.left = '-20000px';
+      host.style.top = '0';
+      host.style.width = `${baseWidth}px`;
+      host.style.height = `${baseHeight}px`;
+      host.style.pointerEvents = 'none';
+      host.style.background = '#ffffff';
+      host.style.overflow = 'hidden';
+      host.style.zIndex = '-1';
+
+      const targetClone = (shell || wrapper).cloneNode(true);
+      host.appendChild(targetClone);
+      document.body.appendChild(host);
+
+      try {
+        const cloneShell = targetClone.classList?.contains('editor-page-shell')
+          ? targetClone
+          : targetClone.querySelector?.('.editor-page-shell') || targetClone;
+        const cloneWrapper = cloneShell.querySelector?.('.editor-page-wrapper') || cloneShell;
+
+        cloneShell.style.display = 'block';
+        cloneShell.style.width = `${baseWidth}px`;
+        cloneShell.style.height = `${baseHeight}px`;
+        cloneShell.style.minHeight = `${baseHeight}px`;
+        cloneShell.style.margin = '0';
+        cloneShell.style.padding = '0';
+        cloneShell.style.overflow = 'hidden';
+        cloneShell.style.background = '#ffffff';
+
+        cloneWrapper.style.display = 'block';
+        cloneWrapper.style.transformOrigin = 'top left';
+        cloneWrapper.style.transform = 'scale(1)';
+        cloneWrapper.style.width = `${baseWidth}px`;
+        cloneWrapper.style.minHeight = `${baseHeight}px`;
+        cloneWrapper.querySelectorAll('.signing-field-marker').forEach((marker) => marker.remove());
+
+        await nextPaint();
+        const canvas = await html2canvas(cloneShell, {
+          backgroundColor: '#ffffff',
+          scale: 2,
+          useCORS: true,
+          logging: false
+        });
+        return canvas.toDataURL('image/png');
+      } finally {
+        host.remove();
+      }
+    }
+
     async function captureDocxRenderedPageImages() {
       if (typeof html2canvas !== 'function') {
         throw new Error('プレビュー画像の生成に必要なライブラリを読み込めませんでした');
@@ -1613,73 +1694,11 @@
       const wrappers = getDocxWrappers();
       if (!wrappers.length) return [];
 
-      const shellStyles = shells.map((shell) => ({
-        display: shell.style.display,
-        width: shell.style.width,
-        height: shell.style.height,
-        minHeight: shell.style.minHeight,
-        margin: shell.style.margin
-      }));
-      const wrapperStyles = wrappers.map((wrapper) => ({
-        display: wrapper.style.display,
-        transform: wrapper.style.transform,
-        transformOrigin: wrapper.style.transformOrigin
-      }));
-      const originalPage = state.currentPage;
-
-      try {
-        wrappers.forEach((wrapper, index) => {
-          const baseWidth = Number(wrapper.dataset.baseWidth || wrapper.offsetWidth || 794);
-          const baseHeight = Number(wrapper.dataset.baseHeight || wrapper.offsetHeight || 1123);
-          wrapper.style.display = 'block';
-          wrapper.style.transformOrigin = 'top left';
-          wrapper.style.transform = 'scale(1)';
-          const shell = shells[index];
-          if (shell) {
-            shell.style.display = 'block';
-            shell.style.width = `${baseWidth}px`;
-            shell.style.height = `${baseHeight}px`;
-            shell.style.minHeight = `${baseHeight}px`;
-            shell.style.margin = '0 auto 24px auto';
-          }
-        });
-
-        const images = [];
-        for (let index = 0; index < wrappers.length; index += 1) {
-          state.currentPage = index + 1;
-          syncDocxPageVisibility();
-          renderFieldMarkers();
-          await nextPaint();
-          const target = shells[index] || wrappers[index];
-          const canvas = await html2canvas(target, {
-            backgroundColor: '#ffffff',
-            scale: 2,
-            useCORS: true,
-            logging: false
-          });
-          images.push(canvas.toDataURL('image/png'));
-        }
-        return images;
-      } finally {
-        state.currentPage = originalPage;
-        shells.forEach((shell, index) => {
-          const style = shellStyles[index] || {};
-          shell.style.display = style.display || '';
-          shell.style.width = style.width || '';
-          shell.style.height = style.height || '';
-          shell.style.minHeight = style.minHeight || '';
-          shell.style.margin = style.margin || '';
-        });
-        wrappers.forEach((wrapper, index) => {
-          const style = wrapperStyles[index] || {};
-          wrapper.style.display = style.display || '';
-          wrapper.style.transform = style.transform || '';
-          wrapper.style.transformOrigin = style.transformOrigin || '';
-        });
-        syncDocxPageVisibility();
-        fitDocxPages();
-        renderFieldMarkers();
+      const images = [];
+      for (let index = 0; index < wrappers.length; index += 1) {
+        images.push(await captureDocxShellImage(shells[index], wrappers[index]));
       }
+      return images;
     }
 
     async function renderPage(pageNumber) {
@@ -1737,9 +1756,46 @@
       renderPage(state.currentPage);
     }
 
+    function formatTokyoDateForSigning(value = null) {
+      const date = value ? new Date(value) : new Date();
+      if (Number.isNaN(date.getTime())) return '';
+      return new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo' }).format(date);
+    }
+
+    function getLatestSignatureTimestamp() {
+      const signedAtValues = Object.values(state.signatures || {})
+        .map((signature) => String(signature?.signedAt || '').trim())
+        .filter(Boolean)
+        .sort();
+      return signedAtValues[signedAtValues.length - 1] || null;
+    }
+
+    function createMarkerImage(dataUrl, alt = '署名') {
+      if (!dataUrl) return null;
+      const img = document.createElement('img');
+      img.src = dataUrl;
+      img.alt = alt;
+      img.draggable = false;
+      return img;
+    }
+
+    function applyCleanMarkerChrome(marker, extraClass = '') {
+      marker.classList.add('clean-render');
+      if (extraClass) {
+        marker.classList.add(extraClass);
+      }
+      marker.style.background = 'transparent';
+      marker.style.border = 'none';
+      marker.style.padding = '0';
+      marker.style.boxShadow = 'none';
+      marker.style.outline = 'none';
+    }
+
     function createFieldMarkerElement(field, options = {}) {
       const isMine = String(field.recipientEmail || '').trim() === state.recipientEmail;
-      const isSigned = Boolean(state.signatures[String(field.id)]);
+      const signatureValue = state.signatures[String(field.id)] || null;
+      const isDateField = field.type === 'date' && isMine;
+      const isSigned = Boolean(signatureValue) || isDateField;
       const marker = document.createElement('button');
       marker.type = 'button';
       marker.className = `field-marker signing-field-marker ${isMine ? 'mine' : 'others'}${isSigned ? ' signed' : ''}`;
@@ -1748,28 +1804,35 @@
       marker.style.width = `${Number(field.width || (field.type === 'signature' ? 88 : 130)) * (options.scaleWithZoom ? state.zoom : 1)}px`;
       marker.style.height = `${Number(field.height || (field.type === 'signature' ? 88 : 48)) * (options.scaleWithZoom ? state.zoom : 1)}px`;
 
-      if (field.type === 'signature' && isSigned && state.signatures[String(field.id)]?.type === 'text') {
-        const sig = state.signatures[String(field.id)];
-        marker.textContent = sig.fontText || '';
-        marker.style.fontSize = '16px';
-        marker.style.color = '#00008b';
-        marker.style.fontFamily = 'serif';
-        marker.style.letterSpacing = '0.05em';
-        marker.style.background = 'rgba(255,255,255,0.9)';
-        marker.style.border = '1px solid rgba(0,0,139,0.16)';
+      if (field.type === 'signature' && signatureValue?.type === 'text') {
+        const sig = signatureValue;
+        const generatedDataUrl = sig.dataUrl || renderTextSignatureDataUrl(sig.fontText || '', field.id);
+        if (generatedDataUrl && generatedDataUrl !== sig.dataUrl) {
+          state.signatures[String(field.id)] = { ...sig, dataUrl: generatedDataUrl };
+        }
+        applyCleanMarkerChrome(marker);
+        if (generatedDataUrl) {
+          marker.appendChild(createMarkerImage(generatedDataUrl));
+        } else {
+          marker.textContent = sig.fontText || '';
+          marker.style.fontSize = '16px';
+          marker.style.color = '#111827';
+          marker.style.fontFamily = '"Noto Serif JP", "Yu Mincho", serif';
+          marker.style.letterSpacing = '0.05em';
+        }
         if (isMine) {
           marker.onclick = () => openSignatureModal(field.id);
         }
-      } else if (field.type === 'signature' && isSigned) {
-        const img = document.createElement('img');
-        img.src = state.signatures[String(field.id)].dataUrl;
-        img.alt = '署名';
-        marker.appendChild(img);
+      } else if (field.type === 'signature' && signatureValue?.dataUrl) {
+        applyCleanMarkerChrome(marker);
+        marker.appendChild(createMarkerImage(signatureValue.dataUrl));
         if (isMine) {
           marker.onclick = () => openSignatureModal(field.id);
         }
-      } else if (field.type === 'date' && isMine) {
-        marker.textContent = new Date().toLocaleDateString('ja-JP');
+      } else if (isDateField) {
+        applyCleanMarkerChrome(marker, 'date-render');
+        marker.textContent = formatTokyoDateForSigning(getLatestSignatureTimestamp());
+        marker.style.fontSize = `${Math.max(12, Math.min(18, Number(field.height || 48) * 0.42))}px`;
         marker.disabled = true;
       } else if (isMine && field.type === 'signature') {
         marker.textContent = 'クリックして署名';
@@ -1788,6 +1851,16 @@
     function renderFieldMarkers() {
       document.querySelectorAll('.signing-field-marker').forEach((marker) => marker.remove());
       const overlay = document.getElementById('fields-overlay');
+
+      if (state.exportCaptureMode) {
+        overlay.innerHTML = '';
+        overlay.style.display = 'none';
+        overlay.style.transform = '';
+        overlay.style.left = '';
+        overlay.style.width = '';
+        overlay.style.height = '';
+        return;
+      }
 
       if (state.documentMode === 'docx') {
         overlay.innerHTML = '';
@@ -1962,22 +2035,27 @@
 
       ctx.clearRect(0, 0, width, height);
       let fontSize = Math.max(28, Math.min(78, Math.round(height * 0.48)));
-      ctx.textBaseline = 'middle';
+      ctx.textBaseline = 'alphabetic';
       ctx.textAlign = 'left';
-      ctx.fillStyle = '#00008b';
+      ctx.fillStyle = '#111827';
 
       const applyFont = () => {
-        ctx.font = `${fontSize}px serif`;
+        ctx.font = `${fontSize}px "Noto Serif JP", "Yu Mincho", serif`;
       };
       applyFont();
 
-      const maxWidth = width * 0.9;
+      const paddingX = Math.max(18, Math.round(width * 0.08));
+      const maxWidth = width - (paddingX * 2);
       while (fontSize > 18 && ctx.measureText(value).width > maxWidth) {
         fontSize -= 2;
         applyFont();
       }
 
-      ctx.fillText(value, Math.round(width * 0.05), Math.round(height / 2));
+      const metrics = ctx.measureText(value);
+      const ascent = metrics.actualBoundingBoxAscent || fontSize * 0.78;
+      const descent = metrics.actualBoundingBoxDescent || fontSize * 0.22;
+      const baselineY = Math.round((height + ascent - descent) / 2);
+      ctx.fillText(value, paddingX, baselineY);
       return canvas.toDataURL('image/png');
     }
 
@@ -2003,7 +2081,8 @@
         state.signatures[fieldId] = {
           fieldId,
           type: 'draw',
-          dataUrl: canvas.toDataURL('image/png')
+          dataUrl: canvas.toDataURL('image/png'),
+          signedAt: new Date().toISOString()
         };
       } else {
         const input = document.getElementById('sign-text-input');
@@ -2016,7 +2095,8 @@
           fieldId,
           type: 'text',
           fontText,
-          dataUrl: renderTextSignatureDataUrl(fontText, fieldId)
+          dataUrl: renderTextSignatureDataUrl(fontText, fieldId),
+          signedAt: new Date().toISOString()
         };
       }
 
@@ -2035,20 +2115,28 @@
       const button = document.getElementById('finish-btn');
       button.disabled = true;
       button.textContent = '送信中...';
+      const originalExportCaptureMode = state.exportCaptureMode;
+      const originalPage = state.currentPage;
+      const originalZoom = state.zoom;
+      let captureStateApplied = false;
 
       try {
         const fallbackDocumentImageDataUrls = [];
         if (state.documentMode === 'docx') {
+          state.exportCaptureMode = true;
+          captureStateApplied = true;
+          renderFieldMarkers();
+          await nextPaint();
           fallbackDocumentImageDataUrls.push(...await captureDocxRenderedPageImages());
         } else if (state.documentMode === 'fallback') {
-          // Temporarily show and capture all pages
-          const originalPage = state.currentPage;
-          const originalZoom = state.zoom;
           state.zoom = 1.0; // Reset zoom for consistent capture width (794px)
+          state.exportCaptureMode = true;
+          captureStateApplied = true;
 
           for (let i = 1; i <= state.totalPages; i++) {
             state.currentPage = i;
             updateFallbackLayout();
+            renderFieldMarkers();
             const pageEl = document.getElementById(`document-fallback-page-${i}`);
             if (!pageEl || typeof html2canvas !== 'function') {
               throw new Error(`ページ ${i} のプレビューを作成できませんでした`);
@@ -2061,10 +2149,6 @@
             });
             fallbackDocumentImageDataUrls.push(canvas.toDataURL('image/png'));
           }
-          
-          state.currentPage = originalPage;
-          state.zoom = originalZoom;
-          updateFallbackLayout();
         }
 
         const payload = {
@@ -2081,8 +2165,16 @@
         if (!response.ok || !result.success) {
           throw new Error(result.error || '署名の送信に失敗しました');
         }
-        showComplete(result.completedDocumentUrl);
+        const completedDocumentUrl = result.completedDocumentUrl || result.data?.completedDocumentUrl || result.data?.request?.completed_document_url || '';
+        showComplete(completedDocumentUrl);
       } catch (error) {
+        if (captureStateApplied) {
+          state.currentPage = originalPage;
+          state.zoom = originalZoom;
+          state.exportCaptureMode = originalExportCaptureMode;
+          updateFallbackLayout();
+          renderFieldMarkers();
+        }
         button.disabled = false;
         button.textContent = '署名して完了';
         alert(error.message || '署名の送信に失敗しました');

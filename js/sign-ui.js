@@ -5,6 +5,8 @@
 
 import { dbService } from './db-service.js';
 import { Notify } from './notify.js';
+import { getIdToken } from './auth.js';
+import { toApiUrl } from './api-base-safe.js?v=20260329_api_base_safe1';
 
 export const SignUI = {
     currentTab: 'new-request', // 'new-request' | 'sent-requests' | 'completed-requests'
@@ -143,11 +145,28 @@ export const SignUI = {
         const time = new Date(raw);
         if (Number.isNaN(time.getTime())) return '-';
         return time.toLocaleString('ja-JP', {
+            timeZone: 'Asia/Tokyo',
             year: 'numeric',
             month: '2-digit',
             day: '2-digit',
             hour: '2-digit',
             minute: '2-digit'
+        });
+    },
+
+    formatDateTimeWithSeconds(value) {
+        const raw = String(value || '').trim();
+        if (!raw) return '-';
+        const time = new Date(raw);
+        if (Number.isNaN(time.getTime())) return '-';
+        return time.toLocaleString('ja-JP', {
+            timeZone: 'Asia/Tokyo',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
         });
     },
 
@@ -251,6 +270,54 @@ export const SignUI = {
 
     ensureSignQuota(app = window.app) {
         return true;
+    },
+
+    sanitizeDownloadFileName(name, fallback = 'signed-document.pdf') {
+        const trimmed = String(name || '').trim();
+        const normalized = trimmed
+            .replace(/[\\/:*?"<>|]+/g, '_')
+            .replace(/\.(docx?|dotx?)$/i, '')
+            .replace(/\.pdf$/i, '');
+        return `${normalized || fallback.replace(/\.pdf$/i, '')}.pdf`;
+    },
+
+    getCompletedDocumentApiUrl(request, download = false) {
+        const requestId = String(request?.id || '').trim();
+        if (!requestId) return '';
+        const suffix = download ? '?download=1' : '';
+        return toApiUrl(`/api/sign/${encodeURIComponent(requestId)}/completed-document${suffix}`);
+    },
+
+    async downloadCompletedDocument(requestId) {
+        try {
+            const requests = await dbService.getSignRequests();
+            const request = (Array.isArray(requests) ? requests : []).find((item) => String(item.id) === String(requestId));
+            if (!request) {
+                Notify.error('依頼が見つかりません');
+                return;
+            }
+
+            const token = await getIdToken();
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            const response = await fetch(this.getCompletedDocumentApiUrl(request, true), { headers });
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const blob = await response.blob();
+            const objectUrl = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = objectUrl;
+            link.download = this.sanitizeDownloadFileName(request.document_name, 'signed-document.pdf');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+            Notify.success('ダウンロードを開始しました');
+        } catch (error) {
+            console.error('Completed document download error:', error);
+            Notify.error('ダウンロードに失敗しました');
+        }
     },
 
     /**
@@ -383,7 +450,7 @@ export const SignUI = {
         listBody.innerHTML = contracts.map(c => {
             const isAnalyzed = this.isContractDiffAnalyzed(c);
             const signable = this.hasSignablePdfSource(c);
-            const startDisabled = false; // 上限はバックエンドで管理・ポップアップで通知
+            const startDisabled = !signable;
             const riskClass = !isAnalyzed
                 ? 'badge-neutral'
                 : (c.risk_level === 'High'
@@ -412,7 +479,7 @@ export const SignUI = {
                     <td><span class="badge ${riskClass}">${riskLabel}</span></td>
                     <td>${updatedAt}</td>
                     <td style="text-align:left;" onclick="event.stopPropagation()">
-                        <button class="btn-dashboard btn-primary-action" style="font-size:12px; min-width:140px; justify-content:center;${startDisabled ? ' opacity:0.5; cursor:not-allowed;' : ''}" onclick="window.signUI.startSingleRequest(${c.id})" ${startDisabled ? 'disabled' : ''} title="${!signable ? 'PDF原本がある書類のみ署名依頼できます' : ''}">
+                        <button class="btn-dashboard btn-primary-action" style="font-size:12px; min-width:140px; justify-content:center;${startDisabled ? ' opacity:0.5; cursor:not-allowed;' : ''}" onclick="window.signUI.startSingleRequest(${c.id})" ${startDisabled ? 'disabled' : ''} title="${!signable ? 'PDF原本または本文プレビューがある書類のみ署名依頼できます' : ''}">
                             署名依頼を開始
                         </button>
                     </td>
@@ -450,12 +517,12 @@ export const SignUI = {
             const dateStr = this.formatDateTime(r.created_at);
             
             return `
-                <tr onclick="window.app.navigate('sign-viewer', ${r.id})">
+                <tr>
                     <td style="font-weight:600;">${this.escapeHtml(r.document_name)}</td>
                     <td>${this.escapeHtml(r.sender)}</td>
                     <td><span class="sign-badge ${statusMeta.className}">${statusMeta.label}</span></td>
                     <td>${dateStr}</td>
-                    <td onclick="event.stopPropagation()">
+                    <td>
                         <div style="display:flex; gap:8px;">
                             ${this.isDraftRequest(r) ? `
                                 <button class="btn-dashboard" onclick="window.app.navigate('sign-editor', ${r.id})">
@@ -506,12 +573,12 @@ export const SignUI = {
             const statusMeta = this.getRequestStatusMeta(r);
             const completedDate = this.formatDateTime(r.completedAt || r.completed_at || r.declinedAt || r.expiredAt || r.updated_at || r.created_at);
             return `
-                <tr onclick="window.app.navigate('sign-viewer', ${r.id})">
+                <tr>
                     <td style="font-weight:600;">${this.escapeHtml(r.document_name)}</td>
                     <td>${this.escapeHtml(r.sender)}</td>
                     <td><span class="sign-badge ${statusMeta.className}">${statusMeta.label}</span></td>
                     <td>${completedDate}</td>
-                    <td onclick="event.stopPropagation()">
+                    <td>
                         <div style="display:flex; gap:8px;">
                             <button class="btn-dashboard" style="font-size:11px;" onclick="window.app.navigate('sign-viewer', ${r.id})">詳細</button>
                         </div>
@@ -554,13 +621,46 @@ export const SignUI = {
     async startSingleRequest(id) {
         if (!this.ensureSignQuota()) return;
         const contracts = await dbService.getContracts();
+        const contract = contracts.find((item) => String(item.id) === String(id));
+        if (!contract) {
+            Notify.error('対象の書類が見つかりません');
+            return;
+        }
+        if (!this.ensureContractsSignable([contract])) return;
         this.selectedDocIds.clear();
         this.selectedDocIds.add(id);
         await this.startOneScreenEditor();
     },
 
+    isPdfLikePreviewSource(source, fileName = '') {
+        const value = String(source || '').trim();
+        const name = String(fileName || value).trim();
+        return Boolean(name) && (
+            /\.pdf($|[?#])/i.test(name)
+            || value.startsWith('blob:')
+            || /\/uploads\//i.test(value)
+            || /firebasestorage\.googleapis\.com/i.test(value)
+        );
+    },
+
     hasSignablePdfSource(contract) {
-        return Boolean(String(contract?.pdf_url || '').trim() || String(contract?.pdf_storage_path || '').trim());
+        const hasPdfSource = Boolean(
+            this.isPdfLikePreviewSource(contract?.pdf_url)
+            || this.isPdfLikePreviewSource(contract?.pdf_storage_path)
+        );
+        const runtimePdfSource = window.app?.getRuntimePdfPreviewUrl?.(contract?.id) || '';
+        const persistedOriginalSource = String(contract?.original_file_url || contract?.original_file_path || '').trim();
+        const hasPersistedPdfSource = this.isPdfLikePreviewSource(persistedOriginalSource, contract?.original_filename || persistedOriginalSource);
+        const hasFallbackContent = Boolean(String(contract?.original_content || '').trim());
+        return Boolean(hasPdfSource || runtimePdfSource || hasPersistedPdfSource || hasFallbackContent);
+    },
+
+    ensureContractsSignable(contracts) {
+        const invalidContracts = (Array.isArray(contracts) ? contracts : []).filter((contract) => !this.hasSignablePdfSource(contract));
+        if (invalidContracts.length === 0) return true;
+        const firstName = invalidContracts[0]?.name || '選択した書類';
+        Notify.warning(`「${firstName}」はPDF原本または本文プレビューがないため、署名依頼を開始できません`);
+        return false;
     },
 
     async ensureLocalDummyContracts() {
@@ -661,7 +761,7 @@ export const SignUI = {
 
             const submitBtn = modal.querySelector('.btn-sign-primary') || modal.querySelector('.btn-primary-action');
             if (submitBtn) {
-                submitBtn.textContent = 'この内容で署名依頼を送信';
+                submitBtn.textContent = selectedCount === 1 ? '下書きを作成して配置へ' : '下書きを作成';
                 submitBtn.onclick = () => this.submitBatchRequest();
             }
             console.log("SignUI: Modal should now be visible.");
@@ -675,30 +775,16 @@ export const SignUI = {
         if (!this.ensureSignQuota()) return;
         const contracts = await dbService.getContracts();
         const selectedContracts = contracts.filter(c => this.selectedDocIds.has(c.id));
+        if (!this.ensureContractsSignable(selectedContracts)) return;
         
-        // Get recipients
-        const recipientRows = document.querySelectorAll('.recipient-input-row');
-        const recipients = [];
-        recipientRows.forEach((row, index) => {
-            const name = String(row.querySelector('.ri-name-input')?.value || '').trim();
-            const email = String(row.querySelector('.ri-email-input')?.value || '').trim();
-            if (name && email && this.validateEmail(email)) {
-                recipients.push({
-                    name,
-                    email,
-                    role: 'signer',
-                    display_name: `${name}様`
-                });
-            }
-        });
-
-        if (recipients.length === 0) {
-            Notify.warning('宛名とメールアドレスを正しく入力してください');
+        const { recipients, errorMessage } = this.collectRecipientInputs();
+        if (errorMessage) {
+            Notify.warning(errorMessage);
             return;
         }
 
         try {
-            Notify.info(`${selectedContracts.length}件の署名依頼を処理中...`);
+            Notify.info(`${selectedContracts.length}件の署名依頼ドラフトを作成中...`);
             
             // Create sign requests for each selected contract in parallel
             const promises = selectedContracts.map(c => 
@@ -712,7 +798,7 @@ export const SignUI = {
             const firstRequestId = createdRequests[0]?.id;
 
             this.closeSignUploadModal();
-            Notify.success(`${selectedContracts.length}件の署名依頼を作成しました`);
+            Notify.success(`${selectedContracts.length}件の署名依頼ドラフトを作成しました`);
             
             // Selection reset
             this.selectedDocIds.clear();
@@ -792,6 +878,8 @@ export const SignUI = {
             type: contract.type || '',
             pdf_url: contract.pdf_url || '',
             pdf_storage_path: contract.pdf_storage_path || '',
+            original_file_url: contract.original_file_url || '',
+            original_file_path: contract.original_file_path || '',
             original_content: contract.original_content || '',
             source_url: contract.source_url || '',
             original_filename: contract.original_filename || ''
@@ -807,6 +895,7 @@ export const SignUI = {
         const selected = contracts.filter(c => this.selectedDocIds.has(c.id));
         
         if (selected.length === 0) return;
+        if (!this.ensureContractsSignable(selected)) return;
 
         try {
             // For now, optimize for the first selected document
@@ -837,20 +926,49 @@ export const SignUI = {
     collectRecipientInputs() {
         const recipientRows = document.querySelectorAll('.recipient-input-row');
         const recipients = [];
-        recipientRows.forEach((row, index) => {
+        const seenEmails = new Set();
+        for (let index = 0; index < recipientRows.length; index += 1) {
+            const row = recipientRows[index];
             const name = String(row.querySelector('.ri-name-input')?.value || '').trim();
             const email = String(row.querySelector('.ri-email-input')?.value || '').trim();
-            if (email && this.validateEmail(email)) {
-                recipients.push({
-                    name,
-                    email,
-                    role: 'signer',
-                    status: 'pending',
-                    display_name: `${(name || email.split('@')[0] || `署名者${index + 1}`).trim()}様`
-                });
+            if (!name && !email) {
+                continue;
             }
-        });
-        return recipients;
+            if (!email || !this.validateEmail(email)) {
+                return {
+                    recipients: [],
+                    errorMessage: `${index + 1}人目のメールアドレスを正しく入力してください`
+                };
+            }
+            if (!name) {
+                return {
+                    recipients: [],
+                    errorMessage: `${index + 1}人目の宛名を入力してください`
+                };
+            }
+            const emailKey = email.toLowerCase();
+            if (seenEmails.has(emailKey)) {
+                return {
+                    recipients: [],
+                    errorMessage: '同じメールアドレスを重複して登録できません'
+                };
+            }
+            seenEmails.add(emailKey);
+            recipients.push({
+                name,
+                email,
+                role: 'signer',
+                status: 'pending',
+                display_name: `${name}様`
+            });
+        }
+        if (recipients.length === 0) {
+            return {
+                recipients: [],
+                errorMessage: '宛名とメールアドレスを正しく入力してください'
+            };
+        }
+        return { recipients, errorMessage: '' };
     },
 
     validateEmail(email) {
@@ -859,9 +977,9 @@ export const SignUI = {
     },
 
     async createSignRequest() {
-        const recipients = this.collectRecipientInputs();
-        if (recipients.length === 0) {
-            Notify.warning('送信先のメールアドレスを正しく入力してください');
+        const { recipients, errorMessage } = this.collectRecipientInputs();
+        if (errorMessage) {
+            Notify.warning(errorMessage);
             return;
         }
 
@@ -878,6 +996,7 @@ export const SignUI = {
                 Notify.error('対象の書類が見つかりません');
                 return;
             }
+            if (!this.ensureContractsSignable([contract])) return;
 
             try {
                 const draft = await dbService.addSignRequest({
@@ -991,8 +1110,18 @@ export const SignUI = {
                 </div>
 
                 <!-- Center: PDF Viewer -->
-                <div class="sign-editor-viewport" style="flex:1; position:relative; overflow:hidden; padding:40px; background:#dfe1e5;">
-                    <div id="sign-editor-page-switcher" class="sign-page-switcher is-hidden" style="max-width:240px; margin:0 auto 20px;"></div>
+                <div class="sign-editor-viewport" style="flex:1; min-width:0; min-height:0; position:relative; overflow:auto; padding:24px 40px 40px; background:#dfe1e5;">
+                    <div id="sign-editor-preview-toolbar" style="position:sticky; top:0; z-index:6; display:flex; justify-content:flex-end; margin:0 0 16px;">
+                        <div style="display:inline-flex; align-items:center; gap:8px; padding:8px 10px; border-radius:999px; background:rgba(255,255,255,0.92); box-shadow:0 8px 20px rgba(15,23,42,0.12); backdrop-filter:blur(8px);">
+                            <button id="sign-editor-zoom-out" class="btn-pdf-tool" type="button" onclick="window.SignEditor?.zoomOut()" aria-label="縮小">
+                                <i class="fa-solid fa-minus"></i>
+                            </button>
+                            <span id="sign-editor-zoom-percent" style="min-width:48px; text-align:center; font-size:12px; font-weight:700; color:#374151;">100%</span>
+                            <button id="sign-editor-zoom-in" class="btn-pdf-tool" type="button" onclick="window.SignEditor?.zoomIn()" aria-label="拡大">
+                                <i class="fa-solid fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
                     <div id="sign-editor-canvas-container" style="display:flex; flex-direction:column; align-items:center; position:relative; min-height:100%;">
                         <div class="loader-spinner" style="margin-top:120px;"></div>
                         <p style="margin-top:24px; color:#5f6368; font-weight:500;">ドキュメントを読み込み中...</p>
@@ -1031,8 +1160,19 @@ export const SignUI = {
                 </div>
 
                 <!-- Main Content: PDF Viewer -->
-                <div class="sign-recipient-viewport" style="flex:1; overflow:hidden; padding:40px; background:#dfe1e5;">
-                    <div id="sign-recipient-page-switcher" class="sign-page-switcher is-hidden" style="max-width:240px; margin:0 auto 20px;"></div>
+                <div class="sign-recipient-viewport" style="flex:1; overflow:auto; padding:40px; background:#dfe1e5;">
+                    <div style="position:sticky; top:0; z-index:6; display:flex; align-items:center; justify-content:center; gap:12px; margin:0 auto 20px;">
+                        <div id="sign-recipient-page-switcher" class="sign-page-switcher is-hidden" style="max-width:240px; margin:0;"></div>
+                        <div id="sign-recipient-preview-toolbar" style="display:inline-flex; align-items:center; gap:8px; padding:8px 10px; border-radius:999px; background:rgba(255,255,255,0.92); box-shadow:0 8px 20px rgba(15,23,42,0.12); backdrop-filter:blur(8px);">
+                            <button id="sign-recipient-zoom-out" class="btn-pdf-tool" type="button" onclick="window.SignRecipient?.zoomOut()" aria-label="縮小">
+                                <i class="fa-solid fa-minus"></i>
+                            </button>
+                            <span id="sign-recipient-zoom-percent" style="min-width:48px; text-align:center; font-size:12px; font-weight:700; color:#374151;">100%</span>
+                            <button id="sign-recipient-zoom-in" class="btn-pdf-tool" type="button" onclick="window.SignRecipient?.zoomIn()" aria-label="拡大">
+                                <i class="fa-solid fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
                     <div id="sign-recipient-canvas-container" style="display:flex; flex-direction:column; align-items:center; position:relative; min-height:100%;">
                         <div class="loader-spinner" style="margin-top:120px;"></div>
                         <p style="margin-top:24px; color:#5f6368; font-weight:500;">ドキュメントを読み込み中...</p>
@@ -1056,7 +1196,7 @@ export const SignUI = {
         const dateStr = this.formatDateTime(request.created_at);
         
         return `
-            <div class="sign-container">
+            <div class="sign-container" style="display:flex; flex-direction:column; height:calc(100vh - 112px); min-height:0; overflow:hidden;">
                 <div class="sign-header">
                     <div class="sign-title">
                         <div style="display:flex; align-items:center; gap:16px;">
@@ -1071,9 +1211,9 @@ export const SignUI = {
                     </div>
                 </div>
 
-                <div style="display:grid; grid-template-columns: 2fr 1fr; gap:24px;">
-                    <div style="display:flex; flex-direction:column; gap:14px;">
-                        <div id="sign-viewer-content" class="sign-list-card" style="padding:0; min-height:600px; display:flex; align-items:center; justify-content:center; background:#f0f0f0; border-radius:var(--radius-md);">
+                <div style="display:grid; grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr); gap:24px; flex:1; min-height:0; overflow:hidden;">
+                    <div style="display:flex; flex-direction:column; gap:14px; min-height:0;">
+                        <div id="sign-viewer-content" class="sign-list-card" style="padding:0; flex:1; min-height:0; height:100%; display:flex; align-items:center; justify-content:center; background:#f0f0f0; border-radius:var(--radius-md); overflow:hidden;">
                             <div style="text-align:center; color:var(--text-muted);">
                                 <i class="fa-solid fa-file-pdf" style="font-size:64px; margin-bottom:16px;"></i>
                                 <p>ドキュメント・プレビュー<br>(PDF表示エンジンを読み込み中)</p>
@@ -1081,7 +1221,7 @@ export const SignUI = {
                         </div>
                     </div>
 
-                    <div class="sign-viewer-detail-card">
+                    <div class="sign-viewer-detail-card" style="min-height:0; overflow:auto; background:var(--bg-surface); border:1px solid var(--border-subtle); border-radius:var(--radius-md); box-shadow:0 2px 4px rgba(0, 0, 0, 0.02); padding:24px;">
                         <h3 style="font-size:16px; margin-bottom:16px; padding-bottom:12px; border-bottom:1px solid var(--border-subtle);">
                             <i class="fa-solid fa-users-line"></i> 署名者の状況
                         </h3>
@@ -1093,10 +1233,10 @@ export const SignUI = {
                                     <div>
                                         <div style="font-weight:600; font-size:14px;">${this.escapeHtml(rec.display_name || rec.name || rec.email)}</div>
                                         <div style="font-size:11px; color:#888;">${this.escapeHtml(rec.email)}</div>
-                                        ${rec.signed_at ? `<div style="font-size:11px; color:#888; margin-top:4px;">署名日時: ${this.escapeHtml(new Date(rec.signed_at).toLocaleString('ja-JP'))}</div>` : ''}
-                                        ${rec.signedAt ? `<div style="font-size:11px; color:#888; margin-top:4px;">署名日時: ${this.escapeHtml(new Date(rec.signedAt).toLocaleString('ja-JP'))}</div>` : ''}
-                                        ${rec.declinedAt ? `<div style="font-size:11px; color:#888; margin-top:4px;">辞退日時: ${this.escapeHtml(new Date(rec.declinedAt).toLocaleString('ja-JP'))}</div>` : ''}
-                                        ${rec.consented_at ? `<div style="font-size:11px; color:#888; margin-top:2px;">同意確認: ${this.escapeHtml(new Date(rec.consented_at).toLocaleString('ja-JP'))}</div>` : ''}
+                                        ${rec.signed_at ? `<div style="font-size:11px; color:#888; margin-top:4px;">署名日時: ${this.escapeHtml(this.formatDateTimeWithSeconds(rec.signed_at))}</div>` : ''}
+                                        ${rec.signedAt ? `<div style="font-size:11px; color:#888; margin-top:4px;">署名日時: ${this.escapeHtml(this.formatDateTimeWithSeconds(rec.signedAt))}</div>` : ''}
+                                        ${rec.declinedAt ? `<div style="font-size:11px; color:#888; margin-top:4px;">辞退日時: ${this.escapeHtml(this.formatDateTimeWithSeconds(rec.declinedAt))}</div>` : ''}
+                                        ${rec.consented_at ? `<div style="font-size:11px; color:#888; margin-top:2px;">同意確認: ${this.escapeHtml(this.formatDateTimeWithSeconds(rec.consented_at))}</div>` : ''}
                                     </div>
                                     <span class="sign-badge ${recipientStatusMeta.className}" style="font-size:10px;">
                                         ${recipientStatusMeta.label}
@@ -1106,10 +1246,10 @@ export const SignUI = {
                         </div>
                         
                         <div style="margin-top:24px; padding-top:24px; border-top:1px solid var(--border-subtle);">
-                            ${request.completed_document_url ? `
-                                <a class="btn-dashboard btn-primary-action" style="width:100%; justify-content:center; text-decoration:none; min-height:48px; font-size:14px; padding:12px 16px;" href="${this.escapeHtml(request.completed_document_url)}" target="_blank" rel="noopener noreferrer" download>
+                            ${this.isCompletedRequest(request) ? `
+                                <button class="btn-dashboard btn-primary-action" type="button" style="width:100%; justify-content:center; text-decoration:none; min-height:48px; font-size:14px; padding:12px 16px;" onclick='window.signUI.downloadCompletedDocument(${JSON.stringify(String(request.id))})'>
                                     <i class="fa-solid fa-download"></i> ダウンロード
-                                </a>
+                                </button>
                             ` : ''}
                             ${request.completion_certificate_url ? `
                                 <a class="btn-dashboard" style="width:100%; justify-content:center; text-decoration:none; margin-top:10px;" href="${this.escapeHtml(request.completion_certificate_url)}" target="_blank" rel="noopener noreferrer">

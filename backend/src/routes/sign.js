@@ -25,6 +25,9 @@ function useFirmaProvider() {
 }
 
 function getFrontendBaseUrl() {
+    if (String(process.env.NODE_ENV || '').trim() === 'development') {
+        return String(process.env.LOCAL_FRONTEND_URL || 'http://127.0.0.1:3000').trim().replace(/\/$/, '');
+    }
     const explicit = String(process.env.FRONTEND_URL || '').trim();
     if (explicit) return explicit.replace(/\/$/, '');
     const appUrl = String(process.env.APP_URL || '').trim();
@@ -456,6 +459,14 @@ function normalizeDisplayName(name, fallback = 'ご担当者') {
     return fallback;
 }
 
+function formatTokyoDate(value) {
+    const date = new Date(value || Date.now());
+    if (Number.isNaN(date.getTime())) {
+        return new Date().toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
+    }
+    return date.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
+}
+
 function saveCompletedPdfLocal(signRequestId, pdfBuffer, req) {
     const uploadsDir = path.join(__dirname, '../../uploads/sign-completed');
     if (!fs.existsSync(uploadsDir)) {
@@ -659,22 +670,20 @@ async function generateSignedPdf(signRequest, req, contract = null, fallbackDocu
                 y: box.y + Math.max(2, (box.height - fontSize) / 2),
                 size: fontSize,
                 font: helvetica,
-                color: rgb(0, 0, 0.55)
+                color: rgb(0, 0, 0)
             });
         }
 
         if (field.type === 'date') {
             const signedAt = signatureValue?.signedAt || signRequest.recipients?.find((item) => item.email === recipientEmail)?.signedAt;
-            const dateText = signedAt
-                ? new Date(signedAt).toLocaleDateString('ja-JP')
-                : new Date().toLocaleDateString('ja-JP');
+            const dateText = formatTokyoDate(signedAt);
             const fontSize = Math.max(10, Math.min(18, box.height * 0.45));
             page.drawText(dateText, {
                 x: box.x + 4,
                 y: box.y + Math.max(2, (box.height - fontSize) / 2),
                 size: fontSize,
                 font: helvetica,
-                color: rgb(0.12, 0.32, 0.18)
+                color: rgb(0, 0, 0)
             });
         }
     }
@@ -912,6 +921,39 @@ function resolveOriginalSourceContentType(source = {}) {
         return 'application/pdf';
     }
     return 'application/octet-stream';
+}
+
+function resolveCompletedDocumentFileName(signRequest = {}) {
+    const baseName = String(
+        signRequest?.completed_document_name
+        || signRequest?.document_name
+        || signRequest?.fileName
+        || 'signed-document'
+    ).trim();
+    const normalized = baseName
+        .replace(/\.(docx?|dotx?)$/i, '')
+        .replace(/\.pdf$/i, '');
+    return sanitizeStorageFileName(`${normalized || 'signed-document'}.pdf`, 'signed-document.pdf');
+}
+
+async function loadCompletedDocumentBuffer(signRequest, contract = null) {
+    const candidates = [
+        signRequest?.signedPdfPath,
+        signRequest?.completed_document_url,
+        signRequest?.document_snapshot?.pdf_storage_path,
+        signRequest?.document_snapshot?.pdf_url,
+        contract?.pdf_storage_path,
+        contract?.pdf_url
+    ];
+
+    for (const candidate of candidates) {
+        const buffer = await loadPdfBufferFromCandidate(candidate, `sign-completed:${signRequest?.id || 'unknown'}`);
+        if (buffer?.length) {
+            return buffer;
+        }
+    }
+
+    return null;
 }
 
 async function saveAuditEvent({ signRequestId, ownerUid, event, actorEmail, ipAddress, userAgent, meta = null }) {
@@ -1314,6 +1356,44 @@ router.get('/:id/audit-events', async (req, res) => {
     }
 });
 
+router.get('/:id/completed-document', async (req, res) => {
+    try {
+        const ownerUid = req.user.uid;
+        const signRequestId = req.params.id;
+        const requests = await dbService.getSignRequests(ownerUid);
+        const signRequest = findSignRequestById(requests, signRequestId);
+        if (!signRequest) {
+            return res.status(404).json({ success: false, error: '署名依頼が見つかりません' });
+        }
+
+        let contract = null;
+        if (signRequest.contract_id && ownerUid) {
+            try {
+                const contracts = await dbService.getContracts(ownerUid);
+                contract = (Array.isArray(contracts) ? contracts : []).find((item) => String(item.id) === String(signRequest.contract_id)) || null;
+            } catch (contractError) {
+                logger.warn(`Sign completed-document contract lookup failed requestId=${signRequest.id} contractId=${signRequest.contract_id} error=${contractError.message}`);
+            }
+        }
+
+        const buffer = await loadCompletedDocumentBuffer(signRequest, contract);
+        if (!buffer?.length) {
+            return res.status(404).json({ success: false, error: '完了済みドキュメントが見つかりません' });
+        }
+
+        const fileName = resolveCompletedDocumentFileName(signRequest);
+        const encodedFileName = encodeURIComponent(fileName);
+        const disposition = String(req.query.download || '').trim() === '1' ? 'attachment' : 'inline';
+        res.set('Content-Type', 'application/pdf');
+        res.set('Cache-Control', 'private, max-age=300');
+        res.set('Content-Disposition', `${disposition}; filename="signed-document.pdf"; filename*=UTF-8''${encodedFileName}`);
+        return res.send(buffer);
+    } catch (error) {
+        logger.error(`API Sign Completed Document Error: ${error.message}\n${error.stack || ''}`);
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 router.get('/:id/signing-url', async (req, res) => {
     try {
         const requests = await dbService.getSignRequests(req.user.uid);
@@ -1602,7 +1682,16 @@ router.post('/submit', async (req, res) => {
             await sendRecipientActionNotice(currentRequest, actingRecipient, '署名が完了しました');
         }
 
-        return res.json({ success: true, data: { allSigned, request: saved || updates } });
+        const completedDocumentUrl = saved?.completed_document_url || updates?.completed_document_url || '';
+        return res.json({
+            success: true,
+            completedDocumentUrl,
+            data: {
+                allSigned,
+                request: saved || updates,
+                completedDocumentUrl
+            }
+        });
     } catch (error) {
         logger.error('[sign submit] error', {
             error: error.message,

@@ -3,8 +3,10 @@
  */
 import { Notify } from './notify.js';
 import { dbService } from './db-service.js';
-import { buildSignDocumentPreviewHtml } from './sign-document-preview.js';
-import { resolveBackendAssetUrl } from './api-base.js';
+import { buildSignDocumentPreviewHtml } from './sign-document-preview.js?v=20260402_signpreview_plain1';
+import { isDocxFileName, renderDocxPreviewPages, wrapPreviewPageShell } from './sign-docx-preview.js?v=20260402_signdocxpreview20';
+import { resolveBackendAssetUrl, toApiUrl } from './api-base-safe.js?v=20260329_api_base_safe1';
+import { getIdToken } from './auth.js';
 
 export const SignEditor = {
     _currentRequest: null,
@@ -16,6 +18,7 @@ export const SignEditor = {
     _recipients: [],
     _previewMode: 'pdf',
     _pageScale: 1,
+    _zoomLevel: 1,
     _dragFieldId: null,
     _selectedFieldId: null,
     _pointerDrag: null,
@@ -55,17 +58,35 @@ export const SignEditor = {
 
         // Get contract to find PDF URL
         const snapshot = this._currentRequest.document_snapshot || this._currentRequest.contract_snapshot || null;
-        const contracts = snapshot ? [] : await dbService.getContracts();
         const cid = this._currentRequest.contract_id || this._currentRequest.contractId;
-        const contract = snapshot
-            || contracts.find(c => String(c.id) === String(cid))
-            || contracts.find(c => String(c.name || '') === String(this._currentRequest.document_name || ''));
+        const liveContract = dbService.getContractById(cid) || null;
+        const contracts = liveContract ? [] : await dbService.getContracts();
+        const contract = liveContract
+            ? { ...(snapshot || {}), ...liveContract }
+            : (
+                snapshot
+                || contracts.find(c => String(c.id) === String(cid))
+                || contracts.find(c => String(c.name || '') === String(this._currentRequest.document_name || ''))
+            );
         
         if (!contract) {
             Notify.error('契約データが見つかりません');
             return;
         }
-        this._currentDoc = contract;
+        const previewContract = {
+            ...(contract || {}),
+            original_content: contract?.original_content
+                || snapshot?.original_content
+                || this._currentRequest?.document_snapshot?.original_content
+                || this._currentRequest?.contract_snapshot?.original_content
+                || '',
+            source_url: contract?.source_url
+                || snapshot?.source_url
+                || this._currentRequest?.document_snapshot?.source_url
+                || this._currentRequest?.contract_snapshot?.source_url
+                || ''
+        };
+        this._currentDoc = previewContract;
 
         const canvasContainer = document.getElementById('sign-editor-canvas-container');
         if (!canvasContainer) return;
@@ -88,30 +109,29 @@ export const SignEditor = {
         this.renderPageSwitcher();
         this.updatePreviewToggleButton();
 
-        const previewUrl = this.resolvePreviewUrl(contract);
-        const isPdfPreview = this.isPdfLikeUrl(previewUrl);
+        const previewSource = this.resolvePreviewSource(app, previewContract);
+        const hasFallbackContent = Boolean(
+            previewContract?.original_content
+        );
 
-        if (isPdfPreview) {
+        if (previewSource.kind === 'pdf' && this.isPdfLikeUrl(previewSource.value)) {
             await this.loadPdfJs();
-            await this.loadPdf(previewUrl, canvasContainer);
+            await this.loadPdf(previewSource.value, canvasContainer);
             this._previewMode = 'pdf';
+        } else if (previewSource.kind === 'docx' && previewSource.value) {
+            await this.loadDocx(previewSource.value, canvasContainer);
+            this._previewMode = 'docx';
+        } else if (hasFallbackContent) {
+            this.renderDocumentFallback(previewContract, canvasContainer);
+            this._previewMode = 'fallback';
         } else {
-            const hasFallbackContent = Boolean(
-                contract?.original_content
-                || this._currentRequest?.document_snapshot?.original_content
-                || this._currentRequest?.contract_snapshot?.original_content
-            );
-            if (hasFallbackContent) {
-                this.renderDocumentFallback(contract, canvasContainer);
-                this._previewMode = 'fallback';
-            } else {
-                this.renderUnavailableDocument(contract, canvasContainer);
-                this._previewMode = 'unavailable';
-            }
+            this.renderUnavailableDocument(previewContract, canvasContainer);
+            this._previewMode = 'unavailable';
         }
 
         this.renderFields();
         this.fitPreviewPages();
+        this.updateZoomUi();
         window.addEventListener('resize', () => this.fitPreviewPages());
         
         window.SignEditor = this;
@@ -196,6 +216,13 @@ export const SignEditor = {
     },
 
     getRecipientValidation() {
+        const emailCounts = this._recipients.reduce((map, recipient) => {
+            const email = String(recipient?.email || '').trim().toLowerCase();
+            if (email) {
+                map[email] = (map[email] || 0) + 1;
+            }
+            return map;
+        }, {});
         return this._recipients.map((recipient) => {
             const name = String(recipient?.name || '').trim();
             const email = String(recipient?.email || '').trim();
@@ -207,6 +234,9 @@ export const SignEditor = {
             }
             if (!this.validateEmail(email)) {
                 return { valid: false, message: 'メールアドレスの形式が正しくありません', field: 'email' };
+            }
+            if ((emailCounts[email.toLowerCase()] || 0) > 1) {
+                return { valid: false, message: '同じメールアドレスを重複して登録できません', field: 'email' };
             }
             return { valid: true, message: '', field: null };
         });
@@ -547,20 +577,56 @@ export const SignEditor = {
         }[m]));
     },
 
-    resolvePreviewUrl(contract) {
-        const candidates = [
-            contract?.completed_document_url,
-            contract?.pdf_url,
-            contract?.pdf_storage_path
+    resolvePreviewSource(app, contract) {
+        const contractId = this._currentRequest?.contract_id || this._currentRequest?.contractId || contract?.id;
+        const persistedOriginalUrl = resolveBackendAssetUrl(contract?.original_file_url || contract?.original_file_path);
+        const originalName = contract?.original_filename || persistedOriginalUrl || '';
+        const runtimeDoc = (typeof app?.getRuntimeOriginalPreviewFile === 'function')
+            ? app.getRuntimeOriginalPreviewFile(contractId)
+            : null;
+        if (runtimeDoc && isDocxFileName(runtimeDoc.name || originalName)) {
+            return { kind: 'docx', value: runtimeDoc };
+        }
+        if (persistedOriginalUrl && isDocxFileName(originalName)) {
+            return { kind: 'docx', value: persistedOriginalUrl };
+        }
+        const runtimePdfUrl = (typeof app?.getRuntimePdfPreviewUrl === 'function')
+            ? app.getRuntimePdfPreviewUrl(contractId)
+            : null;
+        const pdfCandidates = [
+            runtimePdfUrl,
+            resolveBackendAssetUrl(contract?.completed_document_url),
+            resolveBackendAssetUrl(contract?.pdf_url),
+            resolveBackendAssetUrl(contract?.pdf_storage_path)
         ];
-        for (const raw of candidates) {
-            const value = resolveBackendAssetUrl(raw);
-            if (!value) continue;
+        for (const value of pdfCandidates) {
             if (this.isPdfLikeUrl(value)) {
-                return value;
+                return { kind: 'pdf', value };
             }
         }
-        return '';
+        if (!isDocxFileName(originalName) && this.isPdfLikeUrl(persistedOriginalUrl)) {
+            return { kind: 'pdf', value: persistedOriginalUrl };
+        }
+        return { kind: 'none', value: '' };
+    },
+
+    async resolveDocxPreviewSource(source) {
+        if (source instanceof Blob) return source;
+        const contractId = this._currentRequest?.contract_id || this._currentRequest?.contractId || this._currentDoc?.id;
+        if (!contractId) return source;
+
+        try {
+            const token = await getIdToken();
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            const response = await fetch(toApiUrl(`/contracts/${encodeURIComponent(contractId)}/original-file`), { headers });
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            return await response.blob();
+        } catch (error) {
+            console.warn('DOCX preview proxy failed, falling back to original source', error);
+            return source;
+        }
     },
 
     isPdfLikeUrl(value) {
@@ -571,6 +637,29 @@ export const SignEditor = {
             || /\/uploads\//i.test(src)
             || /firebasestorage\.googleapis\.com/i.test(src)
         );
+    },
+
+    decoratePageWrapper(pageWrapper, pageNum) {
+        pageWrapper.onclick = (e) => this.handleCanvasClick(e, pageNum, pageWrapper);
+        pageWrapper.ondragover = (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+            pageWrapper.classList.add('page-drop-target');
+        };
+        pageWrapper.ondragleave = () => {
+            pageWrapper.classList.remove('page-drop-target');
+        };
+        pageWrapper.ondrop = (e) => {
+            e.preventDefault();
+            pageWrapper.classList.remove('page-drop-target');
+            const fieldType = e.dataTransfer.getData('field-type');
+            const moveFieldId = e.dataTransfer.getData('move-field-id');
+            if (moveFieldId) {
+                this.moveField(moveFieldId, pageNum, e, pageWrapper);
+            } else if (fieldType) {
+                this.handleDrop(e, pageNum, pageWrapper, fieldType);
+            }
+        };
     },
 
     // --- Tool Management ---
@@ -908,8 +997,7 @@ export const SignEditor = {
             this._pdf = await loadingTask.promise;
             this._totalPages = this._pdf.numPages;
             this._activePage = Math.min(this._activePage || 1, this._totalPages || 1);
-            
-            container.innerHTML = '';
+            const fragment = document.createDocumentFragment();
             for (let i = 1; i <= this._pdf.numPages; i++) {
                 const page = await this._pdf.getPage(i);
                 const viewport = page.getViewport({ scale: 1.0 });
@@ -929,37 +1017,16 @@ export const SignEditor = {
                 pageWrapper.className = 'editor-page-wrapper';
                 pageWrapper.style.position = 'relative';
                 pageWrapper.style.width = viewport.width + 'px';
-                pageWrapper.style.margin = '0 auto';
                 pageWrapper.dataset.baseWidth = String(viewport.width);
                 pageWrapper.dataset.baseHeight = String(viewport.height);
-                pageWrapper.style.transformOrigin = 'top center';
                 pageWrapper.appendChild(canvas);
-                
-                pageWrapper.onclick = (e) => this.handleCanvasClick(e, i, pageWrapper);
-                
-                // Drag and Drop Support
-                pageWrapper.ondragover = (e) => {
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = 'copy';
-                    pageWrapper.classList.add('page-drop-target');
-                };
-                pageWrapper.ondragleave = () => {
-                    pageWrapper.classList.remove('page-drop-target');
-                };
-                pageWrapper.ondrop = (e) => {
-                    e.preventDefault();
-                    pageWrapper.classList.remove('page-drop-target');
-                    const fieldType = e.dataTransfer.getData('field-type');
-                    const moveFieldId = e.dataTransfer.getData('move-field-id');
-                    if (moveFieldId) {
-                        this.moveField(moveFieldId, i, e, pageWrapper);
-                    } else if (fieldType) {
-                        this.handleDrop(e, i, pageWrapper, fieldType);
-                    }
-                };
-                
-                container.appendChild(pageWrapper);
+                this.decoratePageWrapper(pageWrapper, i);
+
+                const pageShell = wrapPreviewPageShell(pageWrapper);
+                fragment.appendChild(pageShell);
             }
+            container.innerHTML = '';
+            container.appendChild(fragment);
             this.updateVisiblePages();
             this.renderPageSwitcher();
             this.fitPreviewPages();
@@ -974,7 +1041,46 @@ export const SignEditor = {
         }
     },
 
+    async loadDocx(source, container) {
+        try {
+            let docxSource = source;
+            // URL source: fetch via backend proxy to avoid CORS (same approach as sign-viewer)
+            if (typeof source === 'string' && source) {
+                const contractId = this._currentDoc?.id || this._currentRequest?.contract_id || this._currentRequest?.contractId;
+                if (contractId) {
+                    try {
+                        const token = await getIdToken();
+                        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+                        const res = await fetch(toApiUrl(`/contracts/${encodeURIComponent(contractId)}/original-file`), { headers });
+                        if (res.ok) docxSource = await res.blob();
+                    } catch (_) { /* keep original source */ }
+                }
+            }
+            const pages = await renderDocxPreviewPages(container, docxSource);
+            if (!pages.length) throw new Error('Wordのページを表示できませんでした');
+            this._totalPages = pages.length;
+            this._activePage = Math.min(this._activePage || 1, this._totalPages || 1);
+            pages.forEach((pageWrapper, index) => {
+                pageWrapper.style.transformOrigin = 'top left';
+                this.decoratePageWrapper(pageWrapper, index + 1);
+            });
+            this.updateVisiblePages();
+            this.renderPageSwitcher();
+            this.fitPreviewPages();
+        } catch (error) {
+            console.error('DOCX Load Error:', error);
+            this.renderUnavailableDocument(
+                this._currentDoc,
+                container,
+                'Word原本のプレビューに失敗しました。見た目を変えないため、別レイアウトへの自動変換は行っていません。'
+            );
+            this._previewMode = 'unavailable';
+        }
+    },
+
     renderUnavailableDocument(contract, container, message = '取り込んだ原本ファイルを表示できませんでした。') {
+        const originalFileHref = resolveBackendAssetUrl(contract?.original_file_url || contract?.original_file_path);
+        const fallbackHref = originalFileHref || contract?.source_url || '';
         container.innerHTML = `
             <div style="width:min(760px, 100%); margin:40px auto; background:#fff; border:1px solid #e5e7eb; border-radius:18px; box-shadow:0 16px 40px rgba(15,23,42,0.08); padding:56px 40px; text-align:center;">
                 <div style="width:64px; height:64px; margin:0 auto 18px; border-radius:20px; background:#fef2f2; color:#c53030; display:flex; align-items:center; justify-content:center; font-size:28px;">
@@ -982,7 +1088,7 @@ export const SignEditor = {
                 </div>
                 <div style="font-size:18px; font-weight:700; color:#111827; margin-bottom:8px;">取り込んだ資料を表示できません</div>
                 <div style="font-size:13px; color:#6b7280; line-height:1.8;">${this.escapeHtml(message)}</div>
-                ${contract?.source_url ? `<div style="margin-top:18px;"><a href="${this.escapeHtml(contract.source_url)}" target="_blank" style="color:#166534; font-weight:600; text-decoration:none;">元の資料を開く</a></div>` : ''}
+                ${fallbackHref ? `<div style="margin-top:18px;"><a href="${this.escapeHtml(fallbackHref)}" target="_blank" rel="noopener noreferrer" style="color:#166534; font-weight:600; text-decoration:none;">元の資料を開く</a></div>` : ''}
             </div>
         `;
         this._totalPages = 1;
@@ -997,36 +1103,22 @@ export const SignEditor = {
             container.innerHTML = '<div style="padding:100px; color:#999;">表示できる本文データが見つかりません</div>';
             return;
         }
+
         container.innerHTML = '';
-        const totalPages = Math.max(1, contentPages.length);
-
+        const fragment = document.createDocumentFragment();
         contentPages.forEach((content, index) => {
-            const previewHtml = buildSignDocumentPreviewHtml(content);
-            const pageNum = index + 1;
-
             const pageWrapper = document.createElement('div');
             pageWrapper.className = 'editor-page-wrapper';
             pageWrapper.style.position = 'relative';
             pageWrapper.style.width = '794px';
-            pageWrapper.style.margin = '0 auto 40px auto';
+            pageWrapper.style.minHeight = '1123px';
             pageWrapper.style.background = '#fff';
             pageWrapper.style.borderRadius = '6px';
             pageWrapper.style.boxShadow = '0 8px 30px rgba(0,0,0,0.15)';
             pageWrapper.style.overflow = 'visible';
             pageWrapper.dataset.baseWidth = '794';
-            pageWrapper.style.transformOrigin = 'top center';
-            pageWrapper.onclick = (e) => this.handleCanvasClick(e, pageNum, pageWrapper);
-
-            const header = document.createElement('div');
-            header.style.padding = '18px 24px';
-            header.style.borderBottom = '1px solid #eee';
-            header.style.fontSize = '12px';
-            header.style.color = '#666';
-            header.innerHTML = `
-                <strong style="color:#333;">抽出テキスト・プレビュー</strong>
-                ${totalPages > 1 ? ` <span style="margin-left:8px; color:#9ca3af;">${pageNum} / ${totalPages}</span>` : ''}
-                ${contract?.source_url ? ` <span style="margin-left:8px;"><a href="${this.escapeHtml(contract.source_url)}" target="_blank" style="color:#1a73e8;">元ソースを開く</a></span>` : ''}
-            `;
+            pageWrapper.dataset.baseHeight = '1123';
+            pageWrapper.style.transformOrigin = 'top left';
 
             const body = document.createElement('div');
             body.style.padding = '42px 48px 56px';
@@ -1036,38 +1128,71 @@ export const SignEditor = {
             body.style.fontFamily = '"Noto Sans JP", sans-serif';
             body.style.boxSizing = 'border-box';
             body.style.background = '#fff';
-            body.innerHTML = previewHtml;
+            body.innerHTML = buildSignDocumentPreviewHtml(content);
 
-            pageWrapper.appendChild(header);
             pageWrapper.appendChild(body);
-            pageWrapper.dataset.baseHeight = String(Math.max(640, Math.ceil(header.offsetHeight + body.scrollHeight + 24)));
-            container.appendChild(pageWrapper);
+            this.decoratePageWrapper(pageWrapper, index + 1);
+            const pageShell = wrapPreviewPageShell(pageWrapper);
+            fragment.appendChild(pageShell);
         });
-
-        this._totalPages = totalPages;
-        this._activePage = Math.min(this._activePage || 1, totalPages);
+        container.appendChild(fragment);
+        this.syncRenderedPageDimensions(container);
+        this._totalPages = Math.max(1, contentPages.length);
+        this._activePage = Math.min(this._activePage || 1, this._totalPages);
         this.updateVisiblePages();
         this.renderPageSwitcher();
         this.fitPreviewPages();
     },
 
+    syncRenderedPageDimensions(container) {
+        (container || document).querySelectorAll('.editor-page-wrapper').forEach((wrapper) => {
+            const renderedHeight = Math.max(
+                1123,
+                Math.ceil(
+                    wrapper.scrollHeight
+                    || wrapper.offsetHeight
+                    || Number(wrapper.dataset.baseHeight || 0)
+                    || 1123
+                )
+            );
+            wrapper.dataset.baseHeight = String(renderedHeight);
+            const shell = wrapper.parentElement?.classList?.contains('editor-page-shell')
+                ? wrapper.parentElement
+                : null;
+            if (shell) {
+                shell.style.height = `${renderedHeight}px`;
+                shell.style.minHeight = `${renderedHeight}px`;
+            }
+        });
+    },
+
     fitPreviewPages() {
         const viewport = document.querySelector('.sign-editor-viewport');
         if (!viewport) return;
-        const availableWidth = Math.max(320, viewport.clientWidth - 96);
-        const switcher = document.getElementById('sign-editor-page-switcher');
-        const switcherHeight = switcher && !switcher.classList.contains('is-hidden')
-            ? switcher.offsetHeight + 20
-            : 0;
-        const availableHeight = Math.max(280, viewport.clientHeight - 96 - switcherHeight);
+        const pad = 80; // viewport horizontal padding: 40px * 2
+        const availableWidth = Math.max(320, viewport.clientWidth - pad);
         document.querySelectorAll('.editor-page-wrapper').forEach((wrapper) => {
             const baseWidth = Number(wrapper.dataset.baseWidth || wrapper.offsetWidth || 794);
             const baseHeight = Number(wrapper.dataset.baseHeight || wrapper.offsetHeight || 1123);
-            const scale = Math.min(1, availableWidth / baseWidth, availableHeight / baseHeight);
+            const fitScale = Math.min(1, availableWidth / baseWidth);
+            const scale = fitScale * (this._zoomLevel || 1);
+            const shell = wrapper.parentElement?.classList?.contains('editor-page-shell')
+                ? wrapper.parentElement
+                : null;
+            const scaledWidth = Math.max(180, Math.round(baseWidth * scale));
+            const scaledHeight = Math.max(120, Math.round(baseHeight * scale));
+            const pageGap = Math.max(36, Math.round(baseHeight * scale * 0.05));
+            if (shell) {
+                shell.style.width = `${scaledWidth}px`;
+                shell.style.height = `${scaledHeight}px`;
+                shell.style.minHeight = `${scaledHeight}px`;
+                shell.style.margin = `0 auto ${pageGap}px auto`;
+            }
+            wrapper.style.transformOrigin = 'top left';
             wrapper.style.transform = `scale(${scale})`;
-            wrapper.style.marginBottom = `${Math.max(16, Math.round(baseHeight * scale * 0.03))}px`;
             this._pageScale = scale;
         });
+        this.updateZoomUi();
     },
 
     setActivePage(page) {
@@ -1081,31 +1206,52 @@ export const SignEditor = {
     },
 
     updateVisiblePages() {
+        document.querySelectorAll('.editor-page-shell').forEach((shell) => {
+            shell.style.display = 'block';
+        });
         const wrappers = document.querySelectorAll('.editor-page-wrapper');
-        wrappers.forEach((wrapper, index) => {
-            const isActive = index + 1 === this._activePage;
-            wrapper.style.display = isActive ? 'block' : 'none';
+        wrappers.forEach((wrapper) => {
+            wrapper.style.display = 'block';
         });
     },
 
     renderPageSwitcher() {
         const root = document.getElementById('sign-editor-page-switcher');
         if (!root) return;
-        const total = Math.max(1, Number(this._totalPages || 1));
-        root.classList.toggle('is-hidden', total <= 1);
-        root.innerHTML = `
-            <div class="sign-page-switcher-summary">
-                <span class="sign-page-switcher-value">${this._activePage} / ${total}</span>
-            </div>
-            <div class="sign-page-switcher-actions">
-                <button class="btn-dashboard" ${this._activePage <= 1 ? 'disabled' : ''} onclick="window.SignEditor.setActivePage(${this._activePage - 1})">
-                    <i class="fa-solid fa-chevron-left"></i>
-                </button>
-                <button class="btn-dashboard" ${this._activePage >= total ? 'disabled' : ''} onclick="window.SignEditor.setActivePage(${this._activePage + 1})">
-                    <i class="fa-solid fa-chevron-right"></i>
-                </button>
-            </div>
-        `;
+        root.classList.add('is-hidden');
+        root.innerHTML = '';
+    },
+
+    updateZoomUi() {
+        const zoomPercent = document.getElementById('sign-editor-zoom-percent');
+        if (zoomPercent) {
+            zoomPercent.textContent = `${Math.round((this._zoomLevel || 1) * 100)}%`;
+        }
+        const zoomOutButton = document.getElementById('sign-editor-zoom-out');
+        if (zoomOutButton) {
+            zoomOutButton.disabled = (this._zoomLevel || 1) <= 0.6;
+        }
+        const zoomInButton = document.getElementById('sign-editor-zoom-in');
+        if (zoomInButton) {
+            zoomInButton.disabled = (this._zoomLevel || 1) >= 2.4;
+        }
+    },
+
+    zoomIn() {
+        if ((this._zoomLevel || 1) >= 2.4) return;
+        this._zoomLevel = Math.min(2.4, Math.round(((this._zoomLevel || 1) + 0.1) * 10) / 10);
+        this.fitPreviewPages();
+    },
+
+    zoomOut() {
+        if ((this._zoomLevel || 1) <= 0.6) return;
+        this._zoomLevel = Math.max(0.6, Math.round(((this._zoomLevel || 1) - 0.1) * 10) / 10);
+        this.fitPreviewPages();
+    },
+
+    resetZoom() {
+        this._zoomLevel = 1;
+        this.fitPreviewPages();
     },
 
     buildFallbackContentPages(content) {
@@ -1474,6 +1620,11 @@ export const SignEditor = {
         // Collect latest recipient values
         this.syncRecipientsFromDom();
         const validations = this.updateRecipientValidationState({ force: true });
+        const invalidRecipient = validations.find((state) => !state.valid);
+        if (invalidRecipient) {
+            Notify.warning(invalidRecipient.message || '宛名とメールアドレスを正しく入力してください');
+            return;
+        }
         const validRecipients = this._recipients
             .map((recipient, index) => ({
                 ...recipient,
@@ -1481,11 +1632,10 @@ export const SignEditor = {
                 email: String(recipient.email || '').trim(),
                 display_name: this.formatRecipientHonorific(recipient, index)
             }))
-            .filter((recipient, index) => validations[index]?.valid);
+            .filter((recipient) => recipient.name && recipient.email);
         
         if (validRecipients.length === 0) {
-            const firstInvalid = validations.find((state) => !state.valid);
-            Notify.warning(firstInvalid?.message || '宛名とメールアドレスを正しく入力してください');
+            Notify.warning('宛名とメールアドレスを正しく入力してください');
             return;
         }
 
@@ -1522,13 +1672,43 @@ export const SignEditor = {
                 requestId = createdRequest.id;
             }
 
-            const result = await dbService.updateSignRequest(requestId, {
+            const updatePayload = {
                 recipients: validRecipients,
                 fields: this._fields,
                 fieldStyles: this._fieldStyles,
                 page_dimensions: this.getPageDimensionsPayload(),
                 status: 'sent'
-            });
+            };
+
+            let result = null;
+            try {
+                result = await dbService.updateSignRequest(requestId, updatePayload, { throwOnError: true });
+            } catch (error) {
+                const notFound = Number(error?.status || 0) === 404 || /request not found/i.test(String(error?.message || ''));
+                if (!notFound) {
+                    throw error;
+                }
+
+                const recreatedRequest = await dbService.addSignRequest({
+                    contractId: this._currentRequest.contract_id || this._currentRequest.contractId,
+                    document_name: this._currentRequest.document_name || this._currentDoc?.name || '',
+                    document_snapshot: this._currentRequest.document_snapshot || this._currentRequest.contract_snapshot || this._currentDoc || null,
+                    recipients: validRecipients
+                });
+                if (!recreatedRequest?.id) {
+                    throw new Error('署名依頼の再作成に失敗しました');
+                }
+
+                if (this._currentRequest?.id && recreatedRequest.id !== this._currentRequest.id) {
+                    dbService.deleteSignRequest(this._currentRequest.id);
+                }
+                this._currentRequest = {
+                    ...this._currentRequest,
+                    ...recreatedRequest
+                };
+                requestId = recreatedRequest.id;
+                result = await dbService.updateSignRequest(requestId, updatePayload, { throwOnError: true });
+            }
 
             if (result) {
                 this.syncDraftState(result);
