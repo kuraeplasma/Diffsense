@@ -3,18 +3,22 @@
  */
 import { Notify } from './notify.js';
 import { dbService } from './db-service.js';
-import { buildSignDocumentPreviewHtml } from './sign-document-preview.js';
-import { getApiBaseUrl, resolveBackendAssetUrl, toApiUrl } from './api-base.js';
+import { buildSignDocumentPreviewHtml } from './sign-document-preview.js?v=20260402_signpreview_plain1';
+import { isDocxFileName, renderDocxPreviewPages, wrapPreviewPageShell } from './sign-docx-preview.js?v=20260402_signdocxpreview20';
+import { getApiBaseUrl, resolveBackendAssetUrl, toApiUrl } from './api-base-safe.js?v=20260329_api_base_safe1';
+import { getIdToken } from './auth.js';
 
 const API_BASE = getApiBaseUrl();
 
 export const SignRecipient = {
     _currentRequest: null,
+    _currentContract: null,
     _pdf: null,
     _fields: [],
     _signedFields: new Set(),
     _previewMode: 'pdf',
     _pageScale: 1,
+    _zoomLevel: 1,
     _fieldValues: {},
     _activeFieldId: null,
     _drawState: null,
@@ -43,8 +47,10 @@ export const SignRecipient = {
         }
 
         const snapshot = this._currentRequest.document_snapshot || this._currentRequest.contract_snapshot || null;
-        const contracts = previewContract || snapshot ? [] : await dbService.getContracts();
+        const liveContract = dbService.getContractById(this._currentRequest.contract_id || this._currentRequest.contractId) || null;
+        const contracts = previewContract || liveContract || snapshot ? [] : await dbService.getContracts();
         const contract = previewContract
+            || (liveContract ? { ...(snapshot || {}), ...liveContract } : null)
             || snapshot
             || contracts.find(c => String(c.id) === String(this._currentRequest.contract_id || this._currentRequest.contractId))
             || contracts.find(c => String(c.name || '') === String(this._currentRequest.document_name || ''));
@@ -53,17 +59,40 @@ export const SignRecipient = {
             Notify.error('契約データが見つかりません');
             return;
         }
+        const effectiveContract = {
+            ...(contract || {}),
+            original_content: contract?.original_content
+                || snapshot?.original_content
+                || this._currentRequest?.document_snapshot?.original_content
+                || this._currentRequest?.contract_snapshot?.original_content
+                || '',
+            source_url: contract?.source_url
+                || snapshot?.source_url
+                || this._currentRequest?.document_snapshot?.source_url
+                || this._currentRequest?.contract_snapshot?.source_url
+                || ''
+        };
+        this._currentContract = effectiveContract;
 
         const canvasContainer = document.getElementById('sign-recipient-canvas-container');
         if (!canvasContainer) return;
 
-        const previewUrl = this.resolvePreviewUrl(contract);
-        if (this.isPdfLikeUrl(previewUrl)) {
+        const previewSource = this.resolvePreviewSource(app, effectiveContract);
+        const hasFallbackContent = Boolean(
+            effectiveContract?.original_content
+        );
+        if (previewSource.kind === 'pdf' && this.isPdfLikeUrl(previewSource.value)) {
             await this.loadPdfJs();
-            await this.loadPdf(previewUrl, canvasContainer);
+            await this.loadPdf(previewSource.value, canvasContainer);
             this._previewMode = 'pdf';
+        } else if (previewSource.kind === 'docx' && previewSource.value) {
+            await this.loadDocx(previewSource.value, canvasContainer);
+            this._previewMode = 'docx';
+        } else if (hasFallbackContent) {
+            this.renderDocumentFallback(effectiveContract, canvasContainer);
+            this._previewMode = 'fallback';
         } else {
-            this.renderUnavailableDocument(contract, canvasContainer);
+            this.renderUnavailableDocument(effectiveContract, canvasContainer);
             this._previewMode = 'unavailable';
         }
         
@@ -75,6 +104,7 @@ export const SignRecipient = {
         this.renderRecipientFields();
         this.renderPageSwitcher();
         this.fitPreviewPages();
+        this.updateZoomUi();
         window.addEventListener('resize', () => this.fitPreviewPages());
         this.ensureSignatureModal();
         this.updatePreviewBanner();
@@ -118,8 +148,7 @@ export const SignRecipient = {
             this._pdf = await loadingTask.promise;
             this._totalPages = this._pdf.numPages;
             this._activePage = Math.min(this._activePage || 1, this._totalPages || 1);
-            
-            container.innerHTML = '';
+            const fragment = document.createDocumentFragment();
             for (let i = 1; i <= this._pdf.numPages; i++) {
                 const page = await this._pdf.getPage(i);
                 const viewport = page.getViewport({ scale: 1.0 });
@@ -139,21 +168,53 @@ export const SignRecipient = {
                 pageWrapper.style.width = viewport.width + 'px';
                 pageWrapper.dataset.baseWidth = String(viewport.width);
                 pageWrapper.dataset.baseHeight = String(viewport.height);
-                pageWrapper.style.transformOrigin = 'top center';
                 pageWrapper.appendChild(canvas);
-                
-                container.appendChild(pageWrapper);
+
+                const pageShell = wrapPreviewPageShell(pageWrapper);
+                fragment.appendChild(pageShell);
             }
+            container.innerHTML = '';
+            container.appendChild(fragment);
             this.updateVisiblePages();
             this.renderPageSwitcher();
             this.fitPreviewPages();
         } catch (error) {
             console.error('PDF Load Error:', error);
-            this.renderUnavailableDocument(this._currentRequest?.document_snapshot || null, container, 'PDFの読み込みに失敗しました。');
+            if (this._currentContract?.original_content) {
+                this.renderDocumentFallback(this._currentContract, container);
+                this._previewMode = 'fallback';
+                return;
+            }
+            this.renderUnavailableDocument(this._currentContract || this._currentRequest?.document_snapshot || null, container, 'PDFの読み込みに失敗しました。');
+        }
+    },
+
+    async loadDocx(source, container) {
+        try {
+            const previewSource = await this.resolveDocxPreviewSource(source);
+            const pages = await renderDocxPreviewPages(container, previewSource);
+            if (!pages.length) {
+                throw new Error('Wordのページを表示できませんでした');
+            }
+            this._totalPages = pages.length;
+            this._activePage = Math.min(this._activePage || 1, this._totalPages || 1);
+            this.updateVisiblePages();
+            this.renderPageSwitcher();
+            this.fitPreviewPages();
+        } catch (error) {
+            console.error('DOCX Load Error:', error);
+            this.renderUnavailableDocument(
+                this._currentContract || this._currentRequest?.document_snapshot || null,
+                container,
+                'Word原本のプレビューに失敗しました。見た目を変えないため、別レイアウトへの自動変換は行っていません。'
+            );
+            this._previewMode = 'unavailable';
         }
     },
 
     renderUnavailableDocument(contract, container, message = '取り込んだ原本ファイルを表示できませんでした。') {
+        const originalFileHref = resolveBackendAssetUrl(contract?.original_file_url || contract?.original_file_path);
+        const fallbackHref = originalFileHref || contract?.source_url || '';
         container.innerHTML = `
             <div style="width:min(760px, 100%); margin:40px auto; background:#fff; border:1px solid #e5e7eb; border-radius:18px; box-shadow:0 16px 40px rgba(15,23,42,0.08); padding:56px 40px; text-align:center;">
                 <div style="width:64px; height:64px; margin:0 auto 18px; border-radius:20px; background:#fef2f2; color:#c53030; display:flex; align-items:center; justify-content:center; font-size:28px;">
@@ -161,7 +222,7 @@ export const SignRecipient = {
                 </div>
                 <div style="font-size:18px; font-weight:700; color:#111827; margin-bottom:8px;">取り込んだ資料を表示できません</div>
                 <div style="font-size:13px; color:#6b7280; line-height:1.8;">${this.escapeHtml(message)}</div>
-                ${contract?.source_url ? `<div style="margin-top:18px;"><a href="${this.escapeHtml(contract.source_url)}" target="_blank" style="color:#166534; font-weight:600; text-decoration:none;">元の資料を開く</a></div>` : ''}
+                ${fallbackHref ? `<div style="margin-top:18px;"><a href="${this.escapeHtml(fallbackHref)}" target="_blank" rel="noopener noreferrer" style="color:#166534; font-weight:600; text-decoration:none;">元の資料を開く</a></div>` : ''}
             </div>
         `;
         this._totalPages = 1;
@@ -171,54 +232,71 @@ export const SignRecipient = {
     },
 
     renderDocumentFallback(contract, container) {
-        const previewHtml = buildSignDocumentPreviewHtml(contract?.original_content);
-        if (!previewHtml) {
+        const contentPages = this.buildFallbackContentPages(contract?.original_content);
+        if (!Array.isArray(contentPages) || contentPages.length === 0) {
             container.innerHTML = '<div style="padding:100px; color:#999;">表示できる本文データが見つかりません</div>';
             return;
         }
 
-        const pageWrapper = document.createElement('div');
-        pageWrapper.className = 'editor-page-wrapper';
-        pageWrapper.style.position = 'relative';
-        pageWrapper.style.width = '794px';
-        pageWrapper.style.margin = '0 auto 20px auto';
-        pageWrapper.style.background = '#fff';
-        pageWrapper.style.borderRadius = '6px';
-        pageWrapper.style.boxShadow = '0 8px 30px rgba(0,0,0,0.15)';
-        pageWrapper.style.overflow = 'visible';
-        pageWrapper.dataset.baseWidth = '794';
-        pageWrapper.style.transformOrigin = 'top center';
-
-        const header = document.createElement('div');
-        header.style.padding = '18px 24px';
-        header.style.borderBottom = '1px solid #eee';
-        header.style.fontSize = '12px';
-        header.style.color = '#666';
-        header.innerHTML = `
-            <strong style="color:#333;">抽出テキスト・プレビュー</strong>
-            ${contract?.source_url ? ` <span style="margin-left:8px;"><a href="${this.escapeHtml(contract.source_url)}" target="_blank" style="color:#1a73e8;">元ソースを開く</a></span>` : ''}
-        `;
-
-        const body = document.createElement('div');
-        body.style.padding = '42px 48px 56px';
-        body.style.lineHeight = '1.8';
-        body.style.fontSize = '13px';
-        body.style.color = '#333';
-        body.style.fontFamily = '"Noto Sans JP", sans-serif';
-        body.style.boxSizing = 'border-box';
-        body.style.background = '#fff';
-        body.innerHTML = previewHtml;
-
-        pageWrapper.appendChild(header);
-        pageWrapper.appendChild(body);
-        pageWrapper.dataset.baseHeight = String(Math.max(640, Math.ceil(header.offsetHeight + body.scrollHeight + 24)));
         container.innerHTML = '';
-        container.appendChild(pageWrapper);
-        this._totalPages = 1;
-        this._activePage = 1;
+        const fragment = document.createDocumentFragment();
+        contentPages.forEach((content) => {
+            const pageWrapper = document.createElement('div');
+            pageWrapper.className = 'editor-page-wrapper';
+            pageWrapper.style.position = 'relative';
+            pageWrapper.style.width = '794px';
+            pageWrapper.style.minHeight = '1123px';
+            pageWrapper.style.background = '#fff';
+            pageWrapper.style.borderRadius = '6px';
+            pageWrapper.style.boxShadow = '0 8px 30px rgba(0,0,0,0.15)';
+            pageWrapper.style.overflow = 'visible';
+            pageWrapper.dataset.baseWidth = '794';
+            pageWrapper.dataset.baseHeight = '1123';
+            pageWrapper.style.transformOrigin = 'top left';
+
+            const body = document.createElement('div');
+            body.style.padding = '42px 48px 56px';
+            body.style.lineHeight = '1.8';
+            body.style.fontSize = '13px';
+            body.style.color = '#333';
+            body.style.fontFamily = '"Noto Sans JP", sans-serif';
+            body.style.boxSizing = 'border-box';
+            body.style.background = '#fff';
+            body.innerHTML = buildSignDocumentPreviewHtml(content);
+
+            pageWrapper.appendChild(body);
+            const pageShell = wrapPreviewPageShell(pageWrapper);
+            fragment.appendChild(pageShell);
+        });
+        container.appendChild(fragment);
+        this.syncRenderedPageDimensions(container);
+        this._totalPages = Math.max(1, contentPages.length);
+        this._activePage = Math.min(this._activePage || 1, this._totalPages);
         this.updateVisiblePages();
         this.renderPageSwitcher();
         this.fitPreviewPages();
+    },
+
+    syncRenderedPageDimensions(container) {
+        (container || document).querySelectorAll('.editor-page-wrapper').forEach((wrapper) => {
+            const renderedHeight = Math.max(
+                1123,
+                Math.ceil(
+                    wrapper.scrollHeight
+                    || wrapper.offsetHeight
+                    || Number(wrapper.dataset.baseHeight || 0)
+                    || 1123
+                )
+            );
+            wrapper.dataset.baseHeight = String(renderedHeight);
+            const shell = wrapper.parentElement?.classList?.contains('editor-page-shell')
+                ? wrapper.parentElement
+                : null;
+            if (shell) {
+                shell.style.height = `${renderedHeight}px`;
+                shell.style.minHeight = `${renderedHeight}px`;
+            }
+        });
     },
 
     fitPreviewPages() {
@@ -233,11 +311,25 @@ export const SignRecipient = {
         document.querySelectorAll('.editor-page-wrapper').forEach((wrapper) => {
             const baseWidth = Number(wrapper.dataset.baseWidth || wrapper.offsetWidth || 794);
             const baseHeight = Number(wrapper.dataset.baseHeight || wrapper.offsetHeight || 1123);
-            const scale = Math.min(1, availableWidth / baseWidth, availableHeight / baseHeight);
+            const fitScale = Math.min(1, availableWidth / baseWidth, availableHeight / baseHeight);
+            const scale = fitScale * (this._zoomLevel || 1);
+            const shell = wrapper.parentElement?.classList?.contains('editor-page-shell')
+                ? wrapper.parentElement
+                : null;
+            const scaledWidth = Math.max(180, Math.round(baseWidth * scale));
+            const scaledHeight = Math.max(120, Math.round(baseHeight * scale));
+            const pageGap = Math.max(24, Math.round(baseHeight * scale * 0.035));
+            if (shell) {
+                shell.style.width = `${scaledWidth}px`;
+                shell.style.height = `${scaledHeight}px`;
+                shell.style.minHeight = `${scaledHeight}px`;
+                shell.style.margin = `0 auto ${pageGap}px auto`;
+            }
+            wrapper.style.transformOrigin = 'top left';
             wrapper.style.transform = `scale(${scale})`;
-            wrapper.style.marginBottom = `${Math.max(16, Math.round(baseHeight * scale * 0.03))}px`;
             this._pageScale = scale;
         });
+        this.updateZoomUi();
     },
 
     setActivePage(page) {
@@ -251,6 +343,11 @@ export const SignRecipient = {
     },
 
     updateVisiblePages() {
+        const shells = Array.from(document.querySelectorAll('.editor-page-shell'));
+        shells.forEach((shell, index) => {
+            const isActive = index + 1 === this._activePage;
+            shell.style.display = isActive ? 'block' : 'none';
+        });
         const wrappers = document.querySelectorAll('.editor-page-wrapper');
         wrappers.forEach((wrapper, index) => {
             const isActive = index + 1 === this._activePage;
@@ -276,6 +373,197 @@ export const SignRecipient = {
                 </button>
             </div>
         `;
+    },
+
+    updateZoomUi() {
+        const zoomPercent = document.getElementById('sign-recipient-zoom-percent');
+        if (zoomPercent) {
+            zoomPercent.textContent = `${Math.round((this._zoomLevel || 1) * 100)}%`;
+        }
+        const zoomOutButton = document.getElementById('sign-recipient-zoom-out');
+        if (zoomOutButton) {
+            zoomOutButton.disabled = (this._zoomLevel || 1) <= 0.6;
+        }
+        const zoomInButton = document.getElementById('sign-recipient-zoom-in');
+        if (zoomInButton) {
+            zoomInButton.disabled = (this._zoomLevel || 1) >= 2.4;
+        }
+    },
+
+    zoomIn() {
+        if ((this._zoomLevel || 1) >= 2.4) return;
+        this._zoomLevel = Math.min(2.4, Math.round(((this._zoomLevel || 1) + 0.1) * 10) / 10);
+        this.fitPreviewPages();
+    },
+
+    zoomOut() {
+        if ((this._zoomLevel || 1) <= 0.6) return;
+        this._zoomLevel = Math.max(0.6, Math.round(((this._zoomLevel || 1) - 0.1) * 10) / 10);
+        this.fitPreviewPages();
+    },
+
+    resetZoom() {
+        this._zoomLevel = 1;
+        this.fitPreviewPages();
+    },
+
+    buildFallbackContentPages(content) {
+        if (!content) return [];
+
+        if (Array.isArray(content)) {
+            const groups = this.chunkFallbackList(content, 6, 4200);
+            return groups.length > 0 ? groups : [content];
+        }
+
+        if (typeof content === 'object' && Array.isArray(content.articles)) {
+            const base = content || {};
+            const hasPreamble = Boolean(String(base.preamble || '').trim());
+            const maxPerPage = hasPreamble ? 5 : 6;
+            const groups = this.chunkFallbackList(base.articles || [], maxPerPage, 4200);
+            if (groups.length <= 1) return [base];
+            return groups.map((articles, index) => ({
+                ...base,
+                preamble: index === 0 ? base.preamble : '',
+                articles
+            }));
+        }
+
+        if (typeof content === 'string') {
+            const blocks = String(content)
+                .split(/\r?\n{2,}/)
+                .map((line) => line.trim())
+                .filter(Boolean);
+            if (blocks.length <= 1) return [content];
+            const pages = [];
+            let bucket = [];
+            let bucketChars = 0;
+            blocks.forEach((block) => {
+                const weight = block.length + 80;
+                const shouldSplit = bucket.length >= 8 || (bucketChars + weight > 4200 && bucket.length > 0);
+                if (shouldSplit) {
+                    pages.push(bucket.join('\n\n'));
+                    bucket = [];
+                    bucketChars = 0;
+                }
+                bucket.push(block);
+                bucketChars += weight;
+            });
+            if (bucket.length > 0) {
+                pages.push(bucket.join('\n\n'));
+            }
+            return pages.length > 0 ? pages : [content];
+        }
+
+        return [content];
+    },
+
+    chunkFallbackList(list, maxItems, maxWeight) {
+        const items = Array.isArray(list) ? list : [];
+        if (items.length === 0) return [];
+        const groups = [];
+        let bucket = [];
+        let bucketWeight = 0;
+        items.forEach((item) => {
+            const weight = this.measureFallbackItemWeight(item);
+            const shouldSplit = bucket.length >= maxItems || (bucketWeight + weight > maxWeight && bucket.length > 0);
+            if (shouldSplit) {
+                groups.push(bucket);
+                bucket = [];
+                bucketWeight = 0;
+            }
+            bucket.push(item);
+            bucketWeight += weight;
+        });
+        if (bucket.length > 0) {
+            groups.push(bucket);
+        }
+        return groups;
+    },
+
+    measureFallbackItemWeight(item) {
+        if (!item) return 120;
+        if (typeof item === 'string') return Math.max(120, item.length + 80);
+        const title = String(item.article || item.articleNumber || item.title || item.header || '').length;
+        const body = Array.isArray(item.paragraphs)
+            ? item.paragraphs.map((line) => String(line || '')).join('\n').length
+            : String(item.body || item.content || '').length;
+        return Math.max(200, title + body + 120);
+    },
+
+    nextPaint() {
+        return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    },
+
+    async captureDocxShellImage(shell, wrapper) {
+        const baseWidth = Number(wrapper?.dataset.baseWidth || wrapper?.offsetWidth || 794);
+        const baseHeight = Number(wrapper?.dataset.baseHeight || wrapper?.offsetHeight || 1123);
+        const host = document.createElement('div');
+        host.style.position = 'fixed';
+        host.style.left = '-20000px';
+        host.style.top = '0';
+        host.style.width = `${baseWidth}px`;
+        host.style.height = `${baseHeight}px`;
+        host.style.pointerEvents = 'none';
+        host.style.background = '#ffffff';
+        host.style.overflow = 'hidden';
+        host.style.zIndex = '-1';
+
+        const targetClone = (shell || wrapper).cloneNode(true);
+        host.appendChild(targetClone);
+        document.body.appendChild(host);
+
+        try {
+            const cloneShell = targetClone.classList?.contains('editor-page-shell')
+                ? targetClone
+                : targetClone.querySelector?.('.editor-page-shell') || targetClone;
+            const cloneWrapper = cloneShell.querySelector?.('.editor-page-wrapper') || cloneShell;
+
+            cloneShell.style.display = 'block';
+            cloneShell.style.width = `${baseWidth}px`;
+            cloneShell.style.height = `${baseHeight}px`;
+            cloneShell.style.minHeight = `${baseHeight}px`;
+            cloneShell.style.margin = '0';
+            cloneShell.style.padding = '0';
+            cloneShell.style.overflow = 'hidden';
+            cloneShell.style.background = '#ffffff';
+
+            cloneWrapper.style.display = 'block';
+            cloneWrapper.style.transformOrigin = 'top left';
+            cloneWrapper.style.transform = 'scale(1)';
+            cloneWrapper.style.width = `${baseWidth}px`;
+            cloneWrapper.style.minHeight = `${baseHeight}px`;
+            cloneWrapper.querySelectorAll('.recipient-field-marker').forEach((marker) => marker.remove());
+
+            await this.nextPaint();
+            const canvas = await window.html2canvas(cloneShell, {
+                backgroundColor: '#ffffff',
+                scale: 2,
+                useCORS: true,
+                logging: false
+            });
+            return canvas.toDataURL('image/png');
+        } finally {
+            host.remove();
+        }
+    },
+
+    async captureRenderedPageImages() {
+        if (typeof window.app?.ensurePdfLibraries === 'function') {
+            await window.app.ensurePdfLibraries();
+        }
+        if (typeof window.html2canvas !== 'function') {
+            throw new Error('プレビュー画像の生成に必要なライブラリを読み込めませんでした');
+        }
+
+        const shells = Array.from(document.querySelectorAll('.editor-page-shell'));
+        const wrappers = Array.from(document.querySelectorAll('.editor-page-wrapper'));
+        if (wrappers.length === 0) return [];
+
+        const images = [];
+        for (let index = 0; index < wrappers.length; index += 1) {
+            images.push(await this.captureDocxShellImage(shells[index], wrappers[index]));
+        }
+        return images;
     },
 
     normalizePreviewText(content) {
@@ -353,17 +641,13 @@ export const SignRecipient = {
                 div.style.boxShadow = 'none';
                 if (field.type === 'signature') {
                     const signatureText = String(storedValue?.text || '').trim();
-                    const signatureSize = this.getSignatureSealSize(signatureText, {
-                        minSize: field.width || 84,
-                        maxSize: 280
-                    });
-                    div.style.width = signatureSize;
-                    div.style.height = signatureSize;
-                    const signatureHtml = storedValue?.kind === 'draw' && storedValue?.dataUrl
-                        ? `<img src="${storedValue.dataUrl}" alt="signature" style="max-width:92%; max-height:28px; object-fit:contain;" />`
+                    div.style.width = `${field.width || 180}px`;
+                    div.style.height = `${field.height || 48}px`;
+                    const signatureHtml = storedValue?.dataUrl
+                        ? `<img src="${storedValue.dataUrl}" alt="signature" style="max-width:100%; max-height:100%; object-fit:contain;" />`
                         : this.buildSignatureSealHtml(signatureText, {
-                            size: signatureSize,
-                            fontSize: this.getSignatureSealFontSize(signatureSize)
+                            size: `${field.height || 48}px`,
+                            fontSize: this.getSignatureSealFontSize(field.height || 48)
                         });
                     div.innerHTML = signatureHtml;
                 } else {
@@ -509,20 +793,56 @@ export const SignRecipient = {
         return `${Math.max(10, Math.min(32, Math.round(numericSize * 0.16)))}px`;
     },
 
-    resolvePreviewUrl(contract) {
-        const candidates = [
-            contract?.completed_document_url,
-            contract?.pdf_url,
-            contract?.pdf_storage_path
+    resolvePreviewSource(app, contract) {
+        const contractId = this._currentRequest?.contract_id || this._currentRequest?.contractId || contract?.id;
+        const persistedOriginalUrl = resolveBackendAssetUrl(contract?.original_file_url || contract?.original_file_path);
+        const originalName = contract?.original_filename || persistedOriginalUrl || '';
+        const runtimeDoc = (typeof app?.getRuntimeOriginalPreviewFile === 'function')
+            ? app.getRuntimeOriginalPreviewFile(contractId)
+            : null;
+        if (runtimeDoc && isDocxFileName(runtimeDoc.name || originalName)) {
+            return { kind: 'docx', value: runtimeDoc };
+        }
+        if (persistedOriginalUrl && isDocxFileName(originalName)) {
+            return { kind: 'docx', value: persistedOriginalUrl };
+        }
+        const runtimePdfUrl = (typeof app?.getRuntimePdfPreviewUrl === 'function')
+            ? app.getRuntimePdfPreviewUrl(contractId)
+            : null;
+        const pdfCandidates = [
+            runtimePdfUrl,
+            resolveBackendAssetUrl(contract?.completed_document_url),
+            resolveBackendAssetUrl(contract?.pdf_url),
+            resolveBackendAssetUrl(contract?.pdf_storage_path)
         ];
-        for (const raw of candidates) {
-            const value = resolveBackendAssetUrl(raw);
-            if (!value) continue;
-            if (value.startsWith('blob:') || /^https?:\/\//i.test(value)) {
-                return value;
+        for (const value of pdfCandidates) {
+            if (this.isPdfLikeUrl(value)) {
+                return { kind: 'pdf', value };
             }
         }
-        return '';
+        if (persistedOriginalUrl && !isDocxFileName(originalName) && this.isPdfLikeUrl(persistedOriginalUrl)) {
+            return { kind: 'pdf', value: persistedOriginalUrl };
+        }
+        return { kind: 'none', value: '' };
+    },
+
+    async resolveDocxPreviewSource(source) {
+        if (source instanceof Blob) return source;
+        const contractId = this._currentRequest?.contract_id || this._currentRequest?.contractId || this._currentContract?.id;
+        if (!contractId) return source;
+
+        try {
+            const token = await getIdToken();
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            const response = await fetch(toApiUrl(`/contracts/${encodeURIComponent(contractId)}/original-file`), { headers });
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            return await response.blob();
+        } catch (error) {
+            console.warn('DOCX preview proxy failed, falling back to original source', error);
+            return source;
+        }
     },
 
     buildSignatureSealHtml(text, options = {}) {
@@ -534,12 +854,10 @@ export const SignRecipient = {
                 display:inline-flex;
                 align-items:center;
                 justify-content:center;
-                width:${size};
-                height:${size};
-                border:2px solid #c53030;
-                border-radius:50%;
+                min-height:${size};
+                max-width:100%;
                 color:#c53030;
-                background:rgba(197, 48, 48, 0.03);
+                background:transparent;
                 font-family:'Noto Serif JP','Yu Mincho','Hiragino Mincho ProN',serif;
                 font-size:${fontSize};
                 font-weight:700;
@@ -549,7 +867,7 @@ export const SignRecipient = {
                 white-space:normal;
                 text-align:center;
                 word-break:break-all;
-                padding:10px;
+                padding:0;
             ">${this.escapeHtml(value)}</span>
         `;
     },
@@ -698,9 +1016,11 @@ export const SignRecipient = {
                     Notify.warning('署名する名前を入力してください');
                     return;
                 }
+                const activeField = this._fields.find((item) => String(item.id) === key) || {};
                 this._fieldValues[key] = {
                     kind: 'text',
                     text,
+                    dataUrl: this.renderTextSignatureDataUrl(text, activeField),
                     completedAt: new Date().toISOString()
                 };
             } else {
@@ -773,12 +1093,16 @@ export const SignRecipient = {
 
             if (recipientToken) {
                 const signatures = this.getSubmitSignaturesPayload();
+                const fallbackDocumentImageDataUrls = this._previewMode === 'pdf'
+                    ? []
+                    : await this.captureRenderedPageImages();
                 const response = await fetch(`${API_BASE}/api/sign/submit`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         token: recipientToken,
-                        signatures
+                        signatures,
+                        fallbackDocumentImageDataUrls
                     })
                 });
                 const result = await response.json();
@@ -853,7 +1177,7 @@ export const SignRecipient = {
                     fieldId: String(field.id),
                     type: 'text',
                     fontText: value.text,
-                    dataUrl: this.renderTextSignatureDataUrl(value.text, field)
+                    dataUrl: value.dataUrl || this.renderTextSignatureDataUrl(value.text, field)
                 };
             }
             return null;
@@ -875,11 +1199,11 @@ export const SignRecipient = {
         const baseSize = Math.max(28, Math.min(78, Math.round(height * 0.48)));
         ctx.textBaseline = 'middle';
         ctx.textAlign = 'left';
-        ctx.fillStyle = '#00008b';
+        ctx.fillStyle = '#c53030';
 
         let fontSize = baseSize;
         const applyFont = () => {
-            ctx.font = `${fontSize}px serif`;
+            ctx.font = `${fontSize}px "Noto Serif JP", "Yu Mincho", serif`;
         };
         applyFont();
 
