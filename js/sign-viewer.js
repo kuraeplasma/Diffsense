@@ -56,7 +56,9 @@ export const SignViewer = {
         this._currentRequest = null;
 
         try {
-            const request = await dbService.getSignRequestById(requestId);
+            const request = typeof dbService.getSignRequestById === 'function'
+                ? await dbService.getSignRequestById(requestId)
+                : (await dbService.getSignRequests()).find((item) => String(item?.id) === requestId);
             if (initSeq !== this._initSeq) return;
 
             if (!request) {
@@ -87,10 +89,18 @@ export const SignViewer = {
                 };
                 const runtimeUrl = (typeof app.getRuntimePdfPreviewUrl === 'function') ? app.getRuntimePdfPreviewUrl(request.contract_id) : null;
                 const persistedOriginalUrl = resolveBackendAssetUrl(previewContract?.original_file_url || previewContract?.original_file_path);
-                const completedDocumentUrl = this.getCompletedDocumentApiUrl(request);
+                const runtimeDoc = (typeof app.getRuntimeOriginalPreviewFile === 'function')
+                    ? app.getRuntimeOriginalPreviewFile(request.contract_id)
+                    : null;
+                const originalName = previewContract?.original_filename || persistedOriginalUrl || '';
+                const runtimeDocx = Boolean(runtimeDoc && isDocxFileName(runtimeDoc.name || originalName));
+                const persistedDocx = Boolean(persistedOriginalUrl && isDocxFileName(originalName));
+                const isOriginalDocx = runtimeDocx || persistedDocx;
+                // Skip completed-document proxy for Word files (no PDF generated)
+                const completedDocumentUrl = isOriginalDocx ? null : this.getCompletedDocumentApiUrl(request);
                 const rawPdfUrl = completedDocumentUrl || runtimeUrl || previewContract?.pdf_url || previewContract?.pdf_storage_path || request.completed_document_url || persistedOriginalUrl;
                 const pdfUrl = resolveBackendAssetUrl(rawPdfUrl);
-                
+
                 // Check if it's a real PDF file or just a reference
                 const normalizedPdfUrl = String(pdfUrl || '').trim().toLowerCase();
                 const isActuallyPdf = Boolean(pdfUrl) && (
@@ -99,13 +109,7 @@ export const SignViewer = {
                     || normalizedPdfUrl.includes('/uploads/')
                     || this.isCompletedDocumentProxyUrl(pdfUrl)
                 );
-                const runtimeDoc = (typeof app.getRuntimeOriginalPreviewFile === 'function')
-                    ? app.getRuntimeOriginalPreviewFile(request.contract_id)
-                    : null;
-                const originalName = previewContract?.original_filename || persistedOriginalUrl || '';
                 const hasFallbackContent = Boolean(previewContract?.original_content);
-                const runtimeDocx = Boolean(runtimeDoc && isDocxFileName(runtimeDoc.name || originalName));
-                const persistedDocx = Boolean(persistedOriginalUrl && isDocxFileName(originalName));
                 const rawPdfLooksDocx = /\.docx?($|[?#])/i.test(String(rawPdfUrl || ''));
                 const selectedSourceIsPersistedDocx = Boolean(
                     persistedDocx
