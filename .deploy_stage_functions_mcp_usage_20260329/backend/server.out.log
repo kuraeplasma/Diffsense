@@ -1,0 +1,5 @@
+2026-03-11 18:11:04 [32minfo[39m: GEMINI_API_KEY is configured (starts with AIza...)
+2026-03-11 18:11:04 [33mwarn[39m: Firebase credentials not configured. Set FB_PROJECT_ID, FB_CLIENT_EMAIL, and FB_PRIVATE_KEY in .env
+2026-03-11 18:11:04 [33mwarn[39m: Server will start without Firebase. Set AUTH_BYPASS=true in .env for local development.
+2026-03-11 18:11:04 [33mwarn[39m: DBService: Firestore not available, falling back to file-based storage (data may be lost on restart)
+2026-03-11 18:11:04 [32minfo[39m: Email Service Configured: From: "DIFFsense" <contact@spacegleam.co.jp>, Link: https://diffsense.netlify.app/dashboard
