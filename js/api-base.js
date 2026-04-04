@@ -13,6 +13,43 @@ function normalizeBaseUrl(value) {
     return raw;
 }
 
+const PROD_API_BASE_URL = 'https://api-qf37m5ba2q-an.a.run.app';
+const LOCAL_API_BASE_URL = 'http://localhost:3001';
+const API_BASE_STORAGE_KEY = 'diffsense_api_base';
+
+export function isLocalHostEnvironment() {
+    return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+}
+
+function syncApiBaseOverrideFromUrl() {
+    if (typeof window === 'undefined') return;
+
+    const params = new URLSearchParams(window.location.search);
+    const prodApiFlag = params.get('prodApi');
+
+    try {
+        if (prodApiFlag === '1') {
+            localStorage.setItem(API_BASE_STORAGE_KEY, PROD_API_BASE_URL);
+            return;
+        }
+
+        if (prodApiFlag === '0') {
+            localStorage.removeItem(API_BASE_STORAGE_KEY);
+        }
+    } catch {
+        // Ignore storage access issues in restricted/private contexts.
+    }
+}
+
+function readExplicitApiBase() {
+    const params = new URLSearchParams(window.location.search);
+    return normalizeBaseUrl(
+        window.__DIFFSENSE_API_BASE__
+        || params.get('apiBase')
+        || localStorage.getItem(API_BASE_STORAGE_KEY)
+    );
+}
+
 function shouldIgnoreExplicitBase(explicitBase) {
     if (!explicitBase) return false;
     try {
@@ -28,19 +65,27 @@ function shouldIgnoreExplicitBase(explicitBase) {
     }
 }
 
-const PROD_API_BASE_URL = 'https://api-qf37m5ba2q-an.a.run.app';
-
 export function getApiBaseUrl() {
-    const params = new URLSearchParams(window.location.search);
-    const explicit = normalizeBaseUrl(
-        window.__DIFFSENSE_API_BASE__
-        || params.get('apiBase')
-        || localStorage.getItem('diffsense_api_base')
-    );
+    syncApiBaseOverrideFromUrl();
+
+    const explicit = readExplicitApiBase();
     if (explicit && !shouldIgnoreExplicitBase(explicit)) return explicit;
 
-    const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    return isLocalHost ? 'http://localhost:3001' : PROD_API_BASE_URL;
+    return isLocalHostEnvironment() ? LOCAL_API_BASE_URL : PROD_API_BASE_URL;
+}
+
+export function shouldUseLocalDevAuthBypass() {
+    if (!isLocalHostEnvironment()) return false;
+
+    const apiBase = normalizeBaseUrl(getApiBaseUrl());
+    if (!apiBase) return true;
+
+    try {
+        const parsed = new URL(apiBase);
+        return parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+    } catch {
+        return apiBase === LOCAL_API_BASE_URL;
+    }
 }
 
 export function toApiUrl(endpoint = '') {
@@ -65,7 +110,9 @@ export function resolveBackendAssetUrl(value) {
         return toApiUrl(normalized.slice(uploadsIndex));
     }
 
-    if (/\.pdf($|[?#])/i.test(normalized)) {
+    // Only convert bare filenames (no directory separators) to /uploads/ paths.
+    // GCS paths like "contracts/123/file.pdf" must NOT be converted.
+    if (/\.pdf($|[?#])/i.test(normalized) && !normalized.includes('/')) {
         const filename = normalized.split('/').pop();
         if (filename) {
             return toApiUrl(`/uploads/${filename}`);
@@ -74,3 +121,5 @@ export function resolveBackendAssetUrl(value) {
 
     return '';
 }
+
+syncApiBaseOverrideFromUrl();

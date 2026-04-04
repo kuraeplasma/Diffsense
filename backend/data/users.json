@@ -30,5 +30,25 @@
     "pendingBillingCycle": "monthly",
     "stripeCheckoutSessionId": "cs_live_b1vojyHveFg0kRGf3FLko5izLCEaIL821PW79nQ23RKr27tJWkyd1PsB4Y",
     "stripeCheckoutCreatedAt": "2026-03-25T12:53:58.984Z"
+  },
+  {
+    "uid": "dev-uid",
+    "plan": "free",
+    "billingCycle": "monthly",
+    "hasPaymentMethod": false,
+    "usageCount": 0,
+    "lastResetDate": "2026-03-27T07:14:41.148Z",
+    "mcpApiKey": "mcp_eaba4e8fb0a24e3fb2afff79a5479152",
+    "mcp_updated_at": "2026-03-27T09:49:56.674Z"
+  },
+  {
+    "uid": "QIExRrJJFxT17j3oMwD93O6Bw933",
+    "lastResetDate": "2026-04-01T18:05:01.780Z",
+    "billingCycle": "monthly",
+    "hasPaymentMethod": false,
+    "plan": "free",
+    "email": "kuraeplasma@gmail.com",
+    "lastUsedAt": "2026-04-01T18:59:21.642Z",
+    "usageCount": 3
   }
 ]

@@ -56,7 +56,7 @@
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Noto+Sans+JP:wght@300;400;500;700&family=Noto+Serif+JP:wght@400;500;700&family=Shippori+Mincho:wght@400;500;700&display=swap"></noscript>
 
     <!-- Preload LCP Hero Image -->
-    <link rel="preload" as="image" href="images/hero-dashboard-20260321-clean.webp" type="image/webp">
+    <link rel="preload" as="image" href="images/lp-hero-recut-local-poster.png?v=20260330_lpvideo_local2" type="image/png">
 
     <!-- FontAwesome -->
     <link rel="preconnect" href="https://cdnjs.cloudflare.com">
@@ -64,7 +64,7 @@
     <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
 
     <!-- Styles -->
-    <link rel="stylesheet" href="css/style.css?v=20260321-mobile-hero-clean14">
+    <link rel="stylesheet" href="css/style.css?v=20260329_mcp_visuals8">
     <link rel="stylesheet" href="css/dashboard-mockup.css?v=1">
 </head>
 
@@ -104,15 +104,23 @@
             </p>
             <div class="hero-inline-shot mobile-only" aria-label="DIFFsense画面イメージ">
                 <div class="hero-inline-shot-trust" aria-label="安心ポイント">
-                    <span class="hero-inline-shot-trust-item"><span class="hero-visual-trust-check" aria-hidden="true">✓</span>AI要約チェック付き</span>
+                    <span class="hero-inline-shot-trust-item"><span class="hero-visual-trust-check" aria-hidden="true">✓</span>AI要約</span>
                     <span class="hero-inline-shot-trust-item"><span class="hero-visual-trust-check" aria-hidden="true">✓</span>立会人型電子署名</span>
                     <span class="hero-inline-shot-trust-item"><span class="hero-visual-trust-check" aria-hidden="true">✓</span>国内サーバー運用</span>
+                    <span class="hero-inline-shot-trust-item"><span class="hero-visual-trust-check" aria-hidden="true">✓</span>MCP連携対応</span>
                 </div>
-                <picture>
-  <source srcset="images/hero-dashboard-20260321-clean.webp?v=20260321hero3" type="image/webp">
-  <img class="hero-inline-shot-img" src="images/hero-dashboard-20260321-clean.png?v=20260321hero3"
-                    alt="DIFFsenseの解析画面スクリーンショット">
-</picture>
+                <video
+                    class="hero-inline-shot-img demo-video"
+                    autoplay
+                    muted
+                    loop
+                    playsinline
+                    preload="metadata"
+                    poster="images/lp-hero-recut-local-poster.png?v=20260330_lpvideo_local2"
+                    aria-label="DIFFsenseの解析画面動画">
+  <source src="images/lp-hero-recut-local.mp4?v=20260330_lpvideo_local2" type="video/mp4">
+  あなたのブラウザは動画再生に対応していません。
+</video>
             </div>
             <div class="hero-btns hero-support-btns">
                 <a href="login.html?mode=signup" class="btn btn-primary">今すぐ無料で始める</a>
@@ -124,18 +132,26 @@
         </div>
         <div class="hero-visual lp-static-visual hero-support-visual">
             <div class="hero-visual-trust" aria-label="安心ポイント">
-                <span class="hero-visual-trust-item"><span class="hero-visual-trust-check" aria-hidden="true">✓</span>AI要約チェック付き</span>
+                <span class="hero-visual-trust-item"><span class="hero-visual-trust-check" aria-hidden="true">✓</span>AI要約</span>
                 <span class="hero-visual-trust-item"><span class="hero-visual-trust-check" aria-hidden="true">✓</span>立会人型電子署名</span>
                 <span class="hero-visual-trust-item"><span class="hero-visual-trust-check" aria-hidden="true">✓</span>国内サーバー運用</span>
+                <span class="hero-visual-trust-item"><span class="hero-visual-trust-check" aria-hidden="true">✓</span>MCP連携対応</span>
                 <span class="hero-visual-trust-item hero-visual-trust-item-trial"><span class="hero-visual-trust-check" aria-hidden="true">✓</span>無料プラン</span>
             </div>
             <div class="hero-support-panel">
                 <div class="hero-support-shot">
-                    <picture>
-  <source srcset="images/hero-dashboard-20260321-clean.webp?v=20260321hero3" type="image/webp">
-  <img class="lp-dashboard-screenshot" src="images/hero-dashboard-20260321-clean.png?v=20260321hero3"
-                        alt="DIFFsenseの解析画面スクリーンショット">
-</picture>
+                    <video
+                        class="lp-dashboard-screenshot demo-video"
+                        autoplay
+                        muted
+                        loop
+                        playsinline
+                        preload="metadata"
+                        poster="images/lp-hero-recut-local-poster.png?v=20260330_lpvideo_local2"
+                        aria-label="DIFFsenseの解析画面動画">
+  <source src="images/lp-hero-recut-local.mp4?v=20260330_lpvideo_local2" type="video/mp4">
+  あなたのブラウザは動画再生に対応していません。
+</video>
                 </div>
             </div>
         </div>
@@ -469,6 +485,126 @@
     </div>
 </section>
 
+<!-- MCP Section -->
+<section class="section mcp-section">
+    <div class="container">
+        <div class="section-header text-center">
+            <h2 class="section-title">いつものAIから、<span class="text-accent">そのまま契約チェック</span></h2>
+            <div class="section-desc">
+                <p class="mcp-lead-copy">ClaudeやCursorなど、MCP対応クライアントからDIFFsenseを直接呼び出せます。</p>
+                <p class="mcp-flow-copy">ダッシュボードとAIを行き来せず、会話の流れのまま残回数の確認、単体解析、差分比較まで進められます。</p>
+            </div>
+        </div>
+
+        <div class="mcp-grid">
+            <div class="mcp-overview-card">
+                <h3>Claudeから、そのままDIFFsenseを動かせます</h3>
+                <div class="mcp-brand-flow" aria-label="対応クライアントと連携イメージ">
+                    <div class="mcp-brand-card">
+                        <img src="images/claude-official-apple-touch-icon.png" alt="Claudeロゴ" class="mcp-brand-logo">
+                        <div class="mcp-brand-copy">
+                            <strong>Claude</strong>
+                            <span>CursorなどのMCP対応AIから利用</span>
+                        </div>
+                    </div>
+                    <div class="mcp-brand-arrow" aria-hidden="true"><i class="fa-solid fa-arrow-right-long"></i></div>
+                    <div class="mcp-brand-card is-diffsense">
+                        <img src="images/scaled_favicon.png" alt="DIFFsenseロゴ" class="mcp-brand-logo mcp-brand-logo-diffsense">
+                        <div class="mcp-brand-copy">
+                            <strong>DIFFsense</strong>
+                            <span>残数確認・一覧取得・解析・差分比較</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="mcp-meta-strip" aria-label="導入ポイント">
+                    <span>接続URL追加だけ</span>
+                    <span>保存済み契約から実行</span>
+                    <span>全プランでMCP対応</span>
+                </div>
+                <div class="mcp-quick-grid" aria-label="AIが実行できること">
+                    <div class="mcp-quick-item">
+                        <span class="mcp-quick-number">1</span>
+                        <div class="mcp-quick-copy">
+                            <strong>残数を確認</strong>
+                            <span>今月のAI枠</span>
+                        </div>
+                    </div>
+                    <div class="mcp-quick-item">
+                        <span class="mcp-quick-number">2</span>
+                        <div class="mcp-quick-copy">
+                            <strong>一覧を取る</strong>
+                            <span>IDと契約名</span>
+                        </div>
+                    </div>
+                    <div class="mcp-quick-item">
+                        <span class="mcp-quick-number">3</span>
+                        <div class="mcp-quick-copy">
+                            <strong>単体解析</strong>
+                            <span>1通のリスク</span>
+                        </div>
+                    </div>
+                    <div class="mcp-quick-item">
+                        <span class="mcp-quick-number">4</span>
+                        <div class="mcp-quick-copy">
+                            <strong>差分比較</strong>
+                            <span>変更点と推奨対応</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="mcp-feature-grid" aria-label="MCPでできること">
+                    <article class="mcp-tool-card">
+                        <div class="mcp-tool-top">
+                            <span class="mcp-tool-badge is-usage">残数確認</span>
+                            <span class="mcp-tool-code">get_usage_status</span>
+                        </div>
+                        <h3>今月の残回数と内訳を返す</h3>
+                        <p>今月の残回数とMCP利用内訳を返します。</p>
+                        <div class="mcp-tool-return">返る内容: 残回数 / 単体解析回数 / 差分比較回数</div>
+                    </article>
+                    <article class="mcp-tool-card">
+                        <div class="mcp-tool-top">
+                            <span class="mcp-tool-badge is-list">一覧取得</span>
+                            <span class="mcp-tool-code">list_contracts</span>
+                        </div>
+                        <h3>保存済み契約の候補を出す</h3>
+                        <p>保存済み契約を、名前・ID・状態つきで返します。</p>
+                        <div class="mcp-tool-return">返る内容: 契約ID / 契約名 / 状態</div>
+                    </article>
+                    <article class="mcp-tool-card">
+                        <div class="mcp-tool-top">
+                            <span class="mcp-tool-badge is-analyze">単体解析</span>
+                            <span class="mcp-tool-code">analyze_contract</span>
+                        </div>
+                        <h3>1通だけをリスク解析する</h3>
+                        <p>1通だけの要約・リスク・注意条項を返します。</p>
+                        <div class="mcp-tool-return">返る内容: 要約 / リスク / 注意点</div>
+                    </article>
+                    <article class="mcp-tool-card">
+                        <div class="mcp-tool-top">
+                            <span class="mcp-tool-badge is-compare">差分比較</span>
+                            <span class="mcp-tool-code">compare_contracts</span>
+                        </div>
+                        <h3>差分だけで2通を比較する</h3>
+                        <p>差分だけをもとに、重要変更点を整理します。</p>
+                        <div class="mcp-tool-return">返る内容: 変更点概要 / リスク評価 / 推奨アクション</div>
+                    </article>
+                </div>
+            </div>
+            <div class="mcp-visual-stage" aria-label="MCP利用イメージ">
+                <p class="mcp-visual-note">実際のClaudeの画面です</p>
+                <figure class="mcp-shot-card mcp-shot-card-main">
+                    <figcaption class="mcp-shot-label">差分比較</figcaption>
+                    <img src="images/mcp-chat-compare.png" alt="MCPで契約書差分を比較している画面" class="mcp-shot-image">
+                </figure>
+                <figure class="mcp-shot-card mcp-shot-card-sub">
+                    <figcaption class="mcp-shot-label">単体解析</figcaption>
+                    <img src="images/mcp-chat-analyze.png" alt="MCPで契約書を単体解析している画面" class="mcp-shot-image">
+                </figure>
+            </div>
+        </div>
+    </div>
+</section>
+
 <!-- LP Added Section: Trust Badges -->
 <section class="section lp-trust-section">
     <div class="container">
@@ -556,6 +692,7 @@
                         <li>AI要約・リスク判定（High / Medium / Low）</li>
                         <li>差分ハイライト表示</li>
                         <li>チーム管理・1人</li>
+                        <li>MCP対応</li>
                     </ul>
                 </div>
                 <div class="pricing-cta">
@@ -596,6 +733,7 @@
                         <li>差分ハイライト、履歴管理</li>
                         <li>解析ログ・監査履歴の閲覧</li>
                         <li>チーム管理・1人</li>
+                        <li>MCP対応</li>
                     </ul>
                 </div>
                 <div class="pricing-cta">
@@ -638,6 +776,7 @@
                         <li>差分ハイライト、分析ログ</li>
                         <li>チーム管理・3人</li>
                         <li>PDF エクスポート</li>
+                        <li>MCP対応</li>
                     </ul>
                 </div>
                 <div class="pricing-cta">
@@ -682,6 +821,7 @@
                         <li>定期URL監視・Slack／メール通知</li>
                         <li>チーム管理・10人</li>
                         <li>PDF エクスポート</li>
+                        <li>MCP対応</li>
                     </ul>
                 </div>
                 <div class="pricing-cta">

@@ -5,69 +5,74 @@ const escapeHtml = (value) => String(value || '')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 
-export function buildSignDocumentPreviewHtml(content) {
-    if (!content) {
-        return '<div class="document-content-full is-frameless">表示できる本文データが見つかりません</div>';
-    }
+const buildPlainPreviewText = (content) => {
+    if (!content) return '';
 
     if (typeof content === 'string') {
-        return `<div class="document-content-full is-frameless">${escapeHtml(content).replace(/\r?\n/g, '<br>')}</div>`;
+        return String(content).trim();
     }
 
     if (Array.isArray(content)) {
-        const clauses = content.map((item, index) => {
-            const title = escapeHtml(item.article || item.articleNumber || item.title || `第${index + 1}条`);
-            const header = escapeHtml(item.header || '');
-            const paragraphs = Array.isArray(item.paragraphs)
-                ? item.paragraphs.map((p) => `<p>${escapeHtml(p)}</p>`).join('')
-                : `<p>${escapeHtml(item.body || item.content || '')}</p>`;
-            return `
-                <article class="clause-card">
-                    <div class="clause-card-header">
-                        <h3>${title}</h3>
-                        ${header ? `<div class="clause-card-subtitle">${header}</div>` : ''}
-                    </div>
-                    <div class="clause-card-body">${paragraphs}</div>
-                </article>
-            `;
-        }).join('');
-
-        return `<div class="is-structured"><div class="contract-structured-container"><div class="clause-cards-container">${clauses}</div></div></div>`;
+        return content
+            .map((item, index) => buildPlainPreviewTextFromItem(item, index))
+            .filter(Boolean)
+            .join('\n\n')
+            .trim();
     }
 
     if (typeof content === 'object' && Array.isArray(content.articles)) {
         const preamble = String(content.preamble || '').trim();
-        const articles = content.articles.map((item, index) => {
-            const title = escapeHtml(item.articleNumber || item.article || `第${index + 1}条`);
-            const header = escapeHtml(item.title || item.header || '');
-            const bodySource = Array.isArray(item.paragraphs)
-                ? item.paragraphs
-                : String(item.content || '').split(/\r?\n/).filter(Boolean);
-            const paragraphs = bodySource.map((p) => `<p>${escapeHtml(p)}</p>`).join('');
-            return `
-                <article class="clause-card">
-                    <div class="clause-card-header">
-                        <h3>${title}</h3>
-                        ${header ? `<div class="clause-card-subtitle">${header}</div>` : ''}
-                    </div>
-                    <div class="clause-card-body">${paragraphs}</div>
-                </article>
-            `;
-        }).join('');
-
-        const preambleHtml = preamble
-            ? `
-                <article class="clause-card">
-                    <div class="clause-card-header">
-                        <h3>前文</h3>
-                    </div>
-                    <div class="clause-card-body">${escapeHtml(preamble).replace(/\r?\n/g, '<br>')}</div>
-                </article>
-            `
-            : '';
-
-        return `<div class="is-structured"><div class="contract-structured-container"><div class="clause-cards-container">${preambleHtml}${articles}</div></div></div>`;
+        const articles = content.articles
+            .map((item, index) => buildPlainPreviewTextFromItem(item, index))
+            .filter(Boolean)
+            .join('\n\n')
+            .trim();
+        return [preamble, articles].filter(Boolean).join('\n\n').trim();
     }
 
-    return `<div class="document-content-full is-frameless">${escapeHtml(String(content))}</div>`;
+    return String(content).trim();
+};
+
+function buildPlainPreviewTextFromItem(item, index = 0) {
+    if (!item) return '';
+    if (typeof item === 'string') return item.trim();
+
+    const fullText = String(item.full_text || item.fullText || '').trim();
+    if (fullText) return fullText;
+
+    const articleLabel = String(item.article || item.articleNumber || '').trim();
+    const heading = String(item.title || item.header || '').trim();
+    const titleLine = [articleLabel, heading]
+        .filter((part, partIndex, parts) => {
+            if (!part) return false;
+            if (partIndex === 1 && parts[0] && (parts[0].includes(part) || part.includes(parts[0]))) {
+                return false;
+            }
+            return true;
+        })
+        .join(' ')
+        .trim();
+
+    const paragraphText = Array.isArray(item.paragraphs)
+        ? item.paragraphs.map((p) => String(p || '').trim()).filter(Boolean).join('\n')
+        : String(item.body || item.content || '').trim();
+
+    const fallbackTitle = !titleLine && !paragraphText ? `第${index + 1}条` : '';
+    return [titleLine || fallbackTitle, paragraphText].filter(Boolean).join('\n').trim();
+}
+
+const renderPlainPreviewHtml = (text) => {
+    const normalized = String(text || '').replace(/\r/g, '').trim();
+    if (!normalized) {
+        return '<div class="document-content-full is-frameless">表示できる本文データが見つかりません</div>';
+    }
+    return `
+        <div class="document-content-full is-frameless sign-plain-document" style="white-space:pre-wrap; word-break:break-word;">
+            ${escapeHtml(normalized)}
+        </div>
+    `;
+};
+
+export function buildSignDocumentPreviewHtml(content) {
+    return renderPlainPreviewHtml(buildPlainPreviewText(content));
 }

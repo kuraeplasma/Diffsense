@@ -15,3 +15,99 @@
   to = "/.netlify/functions/paypal-checkout"
   status = 200
   force = true
+
+[[redirects]]
+  from = "/favicon.ico"
+  to = "/backend/public/favicon.ico"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/icon.png"
+  to = "/backend/public/apple-touch-icon.png"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/apple-touch-icon.png"
+  to = "/backend/public/apple-touch-icon.png"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/mcp/favicon.ico"
+  to = "/backend/public/favicon.ico"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/mcp/favicon.png"
+  to = "/backend/public/apple-touch-icon.png"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/mcp/favicon2.png"
+  to = "/backend/public/apple-touch-icon.png"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/mcp/icon.png"
+  to = "/backend/public/apple-touch-icon.png"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/mcp/apple-touch-icon.png"
+  to = "/backend/public/apple-touch-icon.png"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/.well-known/oauth-protected-resource/mcp"
+  to = "https://api-qf37m5ba2q-an.a.run.app/.well-known/oauth-protected-resource/mcp"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/.well-known/oauth-authorization-server"
+  to = "https://api-qf37m5ba2q-an.a.run.app/.well-known/oauth-authorization-server"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/authorize"
+  to = "https://api-qf37m5ba2q-an.a.run.app/authorize"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/token"
+  to = "https://api-qf37m5ba2q-an.a.run.app/token"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/register"
+  to = "https://api-qf37m5ba2q-an.a.run.app/register"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/revoke"
+  to = "https://api-qf37m5ba2q-an.a.run.app/revoke"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/mcp"
+  to = "https://api-qf37m5ba2q-an.a.run.app/mcp"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/mcp/*"
+  to = "https://api-qf37m5ba2q-an.a.run.app/mcp/:splat"
+  status = 200
+  force = true

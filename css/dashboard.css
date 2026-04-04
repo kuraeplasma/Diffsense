@@ -830,6 +830,14 @@ ul {
     text-overflow: ellipsis;
 }
 
+/* Deadlines table: allow badge cells to display fully at any zoom */
+.deadlines-table td {
+    overflow: visible;
+}
+.deadlines-table td:first-child {
+    overflow: hidden;
+}
+
 /* Table Specific Column Widths */
 /* 1. Dashboard Table */
 .dashboard-table th:nth-child(1),

@@ -176,6 +176,11 @@ class StripeService {
         return stripe.subscriptions.retrieve(subscriptionId);
     }
 
+    async cancelSubscription(subscriptionId) {
+        const stripe = this.getClient();
+        return stripe.subscriptions.cancel(subscriptionId);
+    }
+
     constructWebhookEvent(payload, signature, webhookSecret) {
         const stripe = this.getClient();
         return stripe.webhooks.constructEvent(payload, signature, webhookSecret);

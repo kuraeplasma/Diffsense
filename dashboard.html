@@ -58,6 +58,10 @@
                 <div class="nav-icon"><i class="fa-solid fa-file-contract"></i></div>
                 <span>契約・規約管理</span>
             </div>
+            <div class="nav-item" id="nav-deadlines" onclick="window.app.navigate('deadlines')">
+                <div class="nav-icon"><i class="fa-solid fa-calendar-days"></i></div>
+                <span>期限・アラート管理</span>
+            </div>
             <div class="nav-item" onclick="window.app.navigate('history')">
                 <div class="nav-icon"><i class="fa-solid fa-clock-rotate-left"></i></div>
                 <span>解析履歴</span>
@@ -283,7 +287,7 @@
     </div>
 
     <!-- App Logic -->
-    <script type="module" src="js/dashboard.js?v=20260326_limit_fix_v7"></script>
+    <script type="module" src="js/dashboard.js?v=20260403_signui_sendfix29"></script>
     <script type="module">
         import { requireAuth, handleLogout } from './js/auth.js?v=20260311d';
 

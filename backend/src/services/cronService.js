@@ -24,6 +24,12 @@ class CronService {
             this.executeMonthlyReset();
         });
 
+        // Run every day at 09:00 JST - deadline alerts
+        cron.schedule('0 9 * * *', () => {
+            logger.info('Starting daily deadline alert check...');
+            this.executeDeadlineAlert();
+        });
+
         logger.info('Cron Service initialized');
     }
 
@@ -110,7 +116,7 @@ class CronService {
             updates.stable_count = 0;
 
             // Get AI-generated change summary
-            const changeSummary = await this.getChangeSummary(contract.original_content, result.text);
+            const changeSummary = await this.getChangeSummary(contract.ownerUid || null, contract.original_content, result.text);
 
             // Send notifications
             try {
@@ -126,21 +132,33 @@ class CronService {
             delete updates.original_content;
         }
 
-        await dbService.updateContract(contract.id, updates);
+        await dbService.updateContract(contract.id, updates, contract.ownerUid || null);
     }
 
     /**
      * Use Gemini AI to summarize what changed between two text versions
      */
-    async getChangeSummary(oldText, newText) {
+    async getChangeSummary(ownerUid, oldText, newText) {
         try {
+            if (!ownerUid) return '';
+            const userProfile = await dbService.getUserProfile(ownerUid);
+            const limit = dbService.getUsageLimit(userProfile);
+            const currentUsage = Number(userProfile?.usageCount || 0);
+            if (currentUsage >= limit) {
+                logger.info(`Skipping monitored AI summary: usage limit reached for uid=${ownerUid} (${currentUsage}/${limit})`);
+                return '';
+            }
             const geminiService = require('./gemini');
             const maxLen = 3000;
             const oldSnip = (oldText || '').slice(0, maxLen);
             const newSnip = (newText || '').slice(0, maxLen);
             const prompt = `以下はWebページの変更前後のテキストです。何が変わったか100文字程度で日本語で端的にまとめてください。\n\n【変更前】\n${oldSnip}\n\n【変更後】\n${newSnip}`;
             const summary = await geminiService.generateText(prompt);
-            return (summary || '').trim().slice(0, 200);
+            const normalizedSummary = (summary || '').trim().slice(0, 200);
+            if (normalizedSummary) {
+                await dbService.incrementUsage(ownerUid);
+            }
+            return normalizedSummary;
         } catch (err) {
             logger.warn(`AI change summary failed: ${err.message}`);
             return '';
@@ -195,6 +213,105 @@ class CronService {
             }
         }
     }
+    /**
+     * Check contract deadlines and send alerts for contracts expiring soon.
+     * Runs every day at 09:00 JST.
+     * Alert thresholds: 30 days, 7 days, 0 days (same day).
+     */
+    async executeDeadlineAlert() {
+        try {
+            const contracts = await dbService.getAllContractsForDeadlineCheck();
+            logger.info(`Deadline check: ${contracts.length} contracts to check`);
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            for (const contract of contracts) {
+                try {
+                    await this.checkContractDeadline(contract, today);
+                } catch (err) {
+                    logger.error(`Deadline check error for contract ${contract.id}: ${err.message}`);
+                }
+            }
+        } catch (error) {
+            logger.error('Deadline alert error:', error);
+        }
+    }
+
+    /**
+     * Check a single contract's deadlines and send notification if needed.
+     */
+    async checkContractDeadline(contract, today) {
+        const targetDate = contract.renewal_deadline || contract.expiry_date;
+        if (!targetDate) return;
+
+        const deadline = new Date(targetDate);
+        deadline.setHours(0, 0, 0, 0);
+        const daysRemaining = Math.round((deadline - today) / (1000 * 60 * 60 * 24));
+
+        // Only alert for future or same-day deadlines
+        if (daysRemaining < 0) return;
+
+        let alertField = null;
+        if (daysRemaining === 0 && !contract.alert_sent_0d) {
+            alertField = 'alert_sent_0d';
+        } else if (daysRemaining <= 7 && !contract.alert_sent_7d) {
+            alertField = 'alert_sent_7d';
+        } else if (daysRemaining <= 30 && !contract.alert_sent_30d) {
+            alertField = 'alert_sent_30d';
+        }
+
+        if (!alertField) return;
+
+        const ownerUid = contract.ownerUid;
+        if (!ownerUid) return;
+
+        const notifSettings = await dbService.getNotificationSettings(ownerUid);
+        const userProfile = await dbService.getUserProfile(ownerUid);
+        const frontendUrl = (process.env.FRONTEND_URL || 'https://diffsense.spacegleam.co.jp').replace(/\/$/, '');
+        const dashboardUrl = `${frontendUrl}/dashboard.html#deadlines`;
+
+        // Email alert (all plans)
+        if (notifSettings?.email?.crawlAlert !== false && userProfile?.email) {
+            try {
+                const mailer = require('./mailer');
+                await mailer.sendDeadlineAlertEmail({
+                    to: userProfile.email,
+                    userName: userProfile.name || '',
+                    contractName: contract.name || '契約書',
+                    expiryDate: contract.expiry_date || null,
+                    renewalDeadline: contract.renewal_deadline || null,
+                    daysRemaining,
+                    dashboardUrl
+                });
+            } catch (err) {
+                logger.error(`Deadline email failed for contract ${contract.id}: ${err.message}`);
+            }
+        }
+
+        // Slack alert (Business+ only)
+        const plan = userProfile?.plan || 'free';
+        const slackEligible = ['business', 'pro'].includes(plan);
+        if (slackEligible && notifSettings?.slack?.enabled && notifSettings?.slack?.webhookUrl && notifSettings?.slack?.deadlineAlert !== false) {
+            try {
+                const slackService = require('./slackService');
+                await slackService.sendDeadlineAlertSlack(notifSettings.slack.webhookUrl, {
+                    contractName: contract.name || '契約書',
+                    daysRemaining,
+                    expiryDate: contract.expiry_date || null,
+                    renewalDeadline: contract.renewal_deadline || null,
+                    dashboardUrl
+                });
+            } catch (err) {
+                logger.error(`Deadline Slack failed for contract ${contract.id}: ${err.message}`);
+            }
+        }
+
+        // Mark alert as sent
+        await dbService.updateContract(contract.id, { [alertField]: true }, contract.ownerUid || null);
+        logger.info(`Deadline alert sent for contract ${contract.id}, field=${alertField}, daysRemaining=${daysRemaining}`);
+    }
+
     /**
      * Reset monthly usage counts for all paid users
      * Runs on the 1st of every month

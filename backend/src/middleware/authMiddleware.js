@@ -2,49 +2,23 @@ const { admin, firebaseInitialized } = require('../firebase');
 const logger = require('../utils/logger');
 const dbService = require('../services/db');
 
-function decodeJwtPayload(token) {
-    try {
-        if (!token || typeof token !== 'string') return null;
-        const parts = token.split('.');
-        if (parts.length < 2) return null;
-        const payloadBase64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-        const padded = payloadBase64.padEnd(Math.ceil(payloadBase64.length / 4) * 4, '=');
-        const decoded = Buffer.from(padded, 'base64').toString('utf8');
-        return JSON.parse(decoded);
-    } catch (error) {
-        logger.warn(`Failed to decode JWT payload in dev bypass: ${error.message}`);
-        return null;
-    }
-}
-
-/**
- * Firebase Auth Middleware
- * Verifies the ID token sent in the Authorization header.
- * Attaches the decoded token (including uid) to req.user.
- */
 const authMiddleware = async (req, res, next) => {
     try {
-        // Development bypass: skip auth when Firebase is not configured
-        if (process.env.NODE_ENV === 'development' && process.env.AUTH_BYPASS === 'true') {
-            const authHeader = req.headers.authorization;
-            const bearerToken = (authHeader && authHeader.startsWith('Bearer '))
-                ? authHeader.split('Bearer ')[1]
-                : null;
-            const decoded = decodeJwtPayload(bearerToken);
+
+        const authHeader = req.headers.authorization;
+        
+        // --- Local Development Bypass ---
+        const isLocalHost = req.headers.host?.includes('localhost') || req.headers.host?.includes('127.0.0.1');
+        if (process.env.NODE_ENV === 'development' && process.env.AUTH_BYPASS === 'true' && isLocalHost) {
             req.user = {
-                uid: decoded?.user_id || decoded?.sub || 'dev-user-001',
-                email: decoded?.email || 'dev@localhost'
+                uid: 'dev-uid',
+                email: 'dev@localhost',
+                name: 'Dev User',
+                is_mock: true
             };
-            logger.warn(`DEV AUTH BYPASS: Using ${decoded ? 'decoded token user' : 'temporary user'} (${req.user.uid}).`);
-            try {
-                await dbService.upsertUserEmail(req.user.uid, req.user.email);
-            } catch (e) {
-                logger.warn(`Failed to sync dev user email: ${e.message}`);
-            }
             return next();
         }
 
-        const authHeader = req.headers.authorization;
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
             logger.warn('Auth blocked: Missing or invalid Authorization header');
             return res.status(401).json({

@@ -1,0 +1,39 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ユーザープロフィールの保護（本人のみ）
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      // サブコレクション（usageなど）も本人のみ
+      match /{allPaths=**} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+    
+    // 契約データの保護（所有者のみ）
+    match /contracts/{contractId} {
+      allow read, write: if request.auth != null && resource.data.ownerUid == request.auth.uid;
+      // 新規作成時は認証済みであれば許可（バックエンドで ownerUid がセットされる）
+      allow create: if request.auth != null;
+    }
+    
+    // 署名依頼の保護（所有者のみ）
+    match /sign_requests/{requestId} {
+      allow read, write: if request.auth != null && resource.data.ownerUid == request.auth.uid;
+      allow create: if request.auth != null;
+    }
+    
+    // チーム設定の保護
+    match /teams/{teamId} {
+      allow read, write: if request.auth != null && (resource.data.ownerUid == request.auth.uid || resource.data.email == request.auth.token.email);
+      allow create: if request.auth != null;
+    }
+    
+    // 監査ログの保護（フロントエンドからの直接読み書きを禁止）
+    // ※Admin SDK（バックエンド）からのアクセスは常に許可されます
+    match /audit_events/{eventId} {
+      allow read, write: if false;
+    }
+  }
+}

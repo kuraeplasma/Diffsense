@@ -406,6 +406,347 @@ function buildStructuredResultsRiskReason(results) {
     return '軽微な契約変更を検出しました。変更内容を確認してください。';
 }
 
+function scoreMcpDiffChange(change) {
+    const source = `${change?.section || ''}\n${change?.old || ''}\n${change?.new || ''}`;
+    let score = 0;
+    if (String(change?.type || '').toUpperCase() === 'DELETE') score += 3;
+    if (/損害賠償|免責|解除|知的財産|著作権|秘密保持|個人情報|再委託|競業|反社会的勢力|準拠法|裁判管轄/u.test(source)) score += 4;
+    if (/[0-9０-９]+|%|％|円|ヶ月|か月|日以内|営業日/u.test(source)) score += 1;
+    return score;
+}
+
+function prioritizeMcpDiffChanges(changes, limit = 10) {
+    return [...(Array.isArray(changes) ? changes : [])]
+        .sort((a, b) => scoreMcpDiffChange(b) - scoreMcpDiffChange(a))
+        .slice(0, limit);
+}
+
+function buildSanitizedRegulatorySearch(changes) {
+    const source = (Array.isArray(changes) ? changes : [])
+        .map((change) => `${change?.section || ''}\n${change?.old || ''}\n${change?.new || ''}`)
+        .join('\n');
+    const keywords = [];
+
+    if (/下請|委託|発注|受領拒否|買いたたき|支払遅延/u.test(source)) {
+        keywords.push('下請法 契約 条項見直し');
+    }
+    if (/個人情報|個人データ|プライバシー|再委託|漏えい/u.test(source)) {
+        keywords.push('個人情報保護法 契約 条項 2024 2026');
+    }
+    if (/フリーランス|業務委託|募集情報|ハラスメント|中途解除/u.test(source)) {
+        keywords.push('フリーランス新法 業務委託 契約 条項');
+    }
+    if (/電子帳簿|電磁的記録|保存|電子取引/u.test(source)) {
+        keywords.push('電子帳簿保存法 契約 実務 2024 2026');
+    }
+
+    return {
+        required: keywords.length > 0,
+        keywords: Array.from(new Set(keywords)).slice(0, 5)
+    };
+}
+
+function normalizeRecommendedActions(value) {
+    if (Array.isArray(value)) {
+        return value
+            .map((item) => String(item || '').trim())
+            .filter(Boolean)
+            .slice(0, 5);
+    }
+    const text = String(value || '').trim();
+    if (!text) return [];
+    return text
+        .split(/\r?\n|[•・]|-\s+/)
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .slice(0, 5);
+}
+
+function normalizeMcpMaterialChanges(value) {
+    if (!Array.isArray(value)) return [];
+    return value
+        .map((item) => ({
+            section: String(item?.section || item?.clause || '本文').trim() || '本文',
+            changeType: normalizeStructuredChangeType(item?.changeType || item?.type || 'MODIFY'),
+            direction: String(item?.direction || '要確認').trim() || '要確認',
+            summary: String(item?.summary || '').trim(),
+            risk: String(item?.risk || '').trim()
+        }))
+        .filter((item) => item.summary)
+        .slice(0, 8);
+}
+
+function buildMcpRiskEvaluation(riskLevel, rawDisplay = '') {
+    const explicit = String(rawDisplay || '').trim();
+    if (explicit) return explicit;
+    if (riskLevel >= 3) return '🔴 高リスク';
+    if (riskLevel === 2) return '🟡 中リスク';
+    return '🟢 改善';
+}
+
+function normalizeMcpRegulatorySearch(value, changes) {
+    const fallback = buildSanitizedRegulatorySearch(changes);
+    const rawKeywords = Array.isArray(value?.keywords)
+        ? value.keywords
+        : [];
+    const keywords = rawKeywords
+        .map((item) => String(item || '').trim())
+        .filter(Boolean)
+        .slice(0, 5);
+    return {
+        required: value?.required === true || String(value?.required || '').trim().toLowerCase() === 'true' || fallback.required,
+        keywords: keywords.length > 0 ? keywords : fallback.keywords
+    };
+}
+
+function normalizeMcpComparisonResult(parsed, changes) {
+    const riskLevel = normalizeRiskLevelValue(parsed?.riskLevel || parsed?.risk_level || parsed?.risk);
+    const recommendedActions = normalizeRecommendedActions(parsed?.recommendedActions || parsed?.recommended_actions);
+    const changeSummary = String(parsed?.changeSummary || parsed?.change_summary || '').trim()
+        || `${Array.isArray(changes) ? changes.length : 0}件の差分を検出しました。`;
+    const latestRegulatoryAlignment = String(parsed?.latestRegulatoryAlignment || parsed?.latest_regulatory_alignment || '').trim()
+        || '最新法規制との整合性は要確認です。必要に応じて一般化キーワードで追加確認してください。';
+    const materialChanges = normalizeMcpMaterialChanges(parsed?.materialChanges || parsed?.material_changes);
+    return {
+        changeSummary,
+        riskLevel,
+        riskEvaluation: buildMcpRiskEvaluation(riskLevel, parsed?.riskEvaluation || parsed?.risk_evaluation),
+        latestRegulatoryAlignment,
+        recommendedActions: recommendedActions.length > 0
+            ? recommendedActions
+            : ['重要条項の変更理由と自社影響を法務担当に確認してください。'],
+        materialChanges,
+        regulatorySearch: normalizeMcpRegulatorySearch(parsed?.regulatorySearch || parsed?.regulatory_search, changes),
+        summary: changeSummary,
+        riskReason: latestRegulatoryAlignment,
+        changes: materialChanges,
+        isFallback: parsed?.isFallback === true
+    };
+}
+
+function normalizeMcpSingleRiskItems(value) {
+    if (!Array.isArray(value)) return [];
+    return value
+        .map((item) => {
+            const level = riskLevelToLabel(item?.level || item?.risk || item?.riskLevel || item?.risk_level);
+            const reason = String(item?.reason || item?.summary || item?.concern || item?.impact || '').trim();
+            const action = String(item?.action || item?.recommendedAction || item?.recommendation || item?.new || '').trim();
+            return {
+                section: String(item?.section || item?.clause || '本文').trim() || '本文',
+                level,
+                reason,
+                action: action || '法務観点で妥当性を確認してください。'
+            };
+        })
+        .filter((item) => item.reason)
+        .slice(0, 5);
+}
+
+function normalizeMcpSingleAnalysisResult(parsed) {
+    const riskLevel = normalizeRiskLevelValue(parsed?.riskLevel || parsed?.risk_level || parsed?.risk);
+    const risks = normalizeMcpSingleRiskItems(parsed?.risks || parsed?.items || parsed?.changes);
+    return {
+        summary: String(parsed?.summary || '').trim() || '解析結果を返しました。',
+        riskLevel,
+        riskReason: String(parsed?.riskReason || parsed?.risk_reason || '').trim()
+            || '主要な注意点を確認してください。',
+        risks: risks.length > 0
+            ? risks
+            : [{
+                section: '本文',
+                level: riskLevelToLabel(riskLevel),
+                reason: String(parsed?.riskReason || parsed?.risk_reason || '主要な注意点を確認してください。').trim(),
+                action: '重要条項を法務観点で確認してください。'
+            }],
+        isFallback: parsed?.isFallback === true
+    };
+}
+
+function buildLocalMcpDiffAnalysis(changes) {
+    const prioritized = prioritizeMcpDiffChanges(changes, 3);
+    const regulatorySearch = buildSanitizedRegulatorySearch(changes);
+    const hasHighRiskKeyword = prioritized.some((change) => /損害賠償|免責|解除|知的財産|個人情報/u.test(`${change?.section || ''}\n${change?.old || ''}\n${change?.new || ''}`));
+    const riskLevel = hasHighRiskKeyword ? 3 : (prioritized.length > 0 ? 2 : 1);
+    const changeSummary = prioritized.length > 0
+        ? `${prioritized.length}件の主要差分を抽出しました。全文ではなく差分箇所だけをもとに確認しています。`
+        : '実質的な差分は検出されませんでした。';
+    const latestRegulatoryAlignment = regulatorySearch.required
+        ? '最新法規制との整合性は未確認です。返却された一般化キーワードで追加確認してください。'
+        : '現時点で直近法改正の確認が必要な主要キーワードは目立ちません。';
+    const materialChanges = prioritized.map((change) => ({
+        section: String(change?.section || '本文').trim() || '本文',
+        changeType: normalizeStructuredChangeType(change?.type || 'MODIFY'),
+        direction: '要確認',
+        summary: `${String(change?.type || 'MODIFY').toUpperCase()} の差分を検出しました。`,
+        risk: buildMcpRiskEvaluation(riskLevel)
+    }));
+    return {
+        changeSummary,
+        riskLevel,
+        riskEvaluation: buildMcpRiskEvaluation(riskLevel),
+        latestRegulatoryAlignment,
+        recommendedActions: prioritized.length > 0
+            ? [
+                '損害賠償・解除・知的財産・個人情報に関する変更有無を優先確認してください。',
+                '差分が自社に有利か不利かを相手方ひな型との関係で再確認してください。'
+            ]
+            : ['差分なしとして扱ってよいか、最新版の体裁変更有無だけ最終確認してください。'],
+        materialChanges,
+        regulatorySearch,
+        summary: changeSummary,
+        riskReason: latestRegulatoryAlignment,
+        changes: materialChanges,
+        isFallback: true
+    };
+}
+
+function buildLocalMcpSingleAnalysis(contractText) {
+    const base = buildLocalSingleAnalysis(contractText);
+    const risks = Array.isArray(base?.changes)
+        ? base.changes.map((item) => ({
+            section: String(item?.section || '本文').trim() || '本文',
+            level: riskLevelToLabel(base?.riskLevel || 1),
+            reason: String(item?.concern || item?.impact || '主要な注意点を確認してください。').trim(),
+            action: '重要条項をダッシュボード上でも確認してください。'
+        })).filter((item) => item.reason).slice(0, 5)
+        : [];
+    return {
+        summary: base.summary,
+        riskLevel: base.riskLevel,
+        riskReason: base.riskReason,
+        risks: risks.length > 0
+            ? risks
+            : [{
+                section: '本文',
+                level: riskLevelToLabel(base?.riskLevel || 1),
+                reason: base.riskReason || '主要な注意点を確認してください。',
+                action: '重要条項をダッシュボード上でも確認してください。'
+            }],
+        isFallback: true
+    };
+}
+
+function buildMcpDiffPrompt(changes, options = {}) {
+    const contractAName = String(options?.contractAName || '旧版').trim() || '旧版';
+    const contractBName = String(options?.contractBName || '新版').trim() || '新版';
+    const prioritized = prioritizeMcpDiffChanges(changes, 10);
+    const diffBody = prioritized.map((change, index) => {
+        const diffText = truncateStructuredClauseText(change?.diffText || [change?.old || '', change?.new || ''].filter(Boolean).join('\n'), 700);
+        return [
+            `[差分${index + 1}]`,
+            `区分: ${normalizeStructuredChangeType(change?.type || 'MODIFY')}`,
+            `条項: ${String(change?.section || '本文').trim() || '本文'}`,
+            diffText || '差分データなし'
+        ].join('\n');
+    }).join('\n\n');
+
+    return `# 役割
+あなたは高度な法務専門AIエージェントです。
+提供された2通の契約書の「差分データ」のみを根拠に、リスク分析と実務アドバイスを行ってください。
+契約全文は与えられていません。差分以外の条文を推測で補わないでください。
+
+# 比較対象
+- 旧版: ${contractAName}
+- 新版: ${contractBName}
+
+# 必須タスク
+1. 差分箇所の特定:
+   追加、削除、変更された条項を差分データどおりに整理してください。
+
+2. リーガルリスクの判定:
+   各差分が「自社にとって有利 / 不利 / 中立 / 要確認」のどれかを判定してください。
+   特に、損害賠償、免責、解除規定、知的財産権の帰属、個人情報、再委託は最優先で分析してください。
+
+3. 最新法規制との整合性:
+   差分に 2024年〜2026年の法改正に関連し得るキーワードが含まれる場合、
+   このシステムでは外部検索は実行しないでください。
+   その代わり、一般化した法務キーワードだけを regulatorySearch.keywords に返し、
+   latestRegulatoryAlignment には「最新法令は要確認」と明記してください。
+
+4. 匿名性の維持:
+   社名、案件名、金額などの固有情報は検索語や要約に含めず、一般的な法務用語へ置き換えてください。
+
+# 差分データ
+${diffBody || '差分なし'}
+
+# 出力形式
+以下の JSON のみを返してください。説明文やコードブロックは不要です。
+{
+  "changeSummary": "【変更点概要】に入る簡潔なまとめ",
+  "riskLevel": 2,
+  "riskEvaluation": "🟡 中リスク",
+  "latestRegulatoryAlignment": "【最新法規制との整合性】に入る助言。外部検索未実施ならその旨を明記",
+  "recommendedActions": [
+    "【推奨アクション】1",
+    "【推奨アクション】2"
+  ],
+  "materialChanges": [
+    {
+      "section": "第5条（損害賠償）",
+      "changeType": "ADD | DELETE | MODIFY",
+      "direction": "自社に有利 | 自社に不利 | 中立 | 要確認",
+      "summary": "変更内容の要約",
+      "risk": "🔴 高リスク | 🟡 中リスク | 🟢 改善"
+    }
+  ],
+  "regulatorySearch": {
+    "required": true,
+    "keywords": [
+      "下請法 契約 条項見直し"
+    ]
+  }
+}
+
+# 重要
+- 日本語で回答してください。
+- riskLevel は 1, 2, 3 のいずれかです。
+- riskEvaluation は必ず「🔴 高リスク」「🟡 中リスク」「🟢 改善」のいずれかにしてください。
+- materialChanges は重要な差分のみ最大 5 件に絞ってください。
+- 差分がない場合は、changeSummary に「実質的な差分は検出されませんでした」と書いてください。`;
+}
+
+function buildMcpSingleAnalysisPrompt(contractText) {
+    const maxLength = 28000;
+    const truncatedText = contractText.length > maxLength
+        ? `${contractText.substring(0, maxLength)}\n\n[...テキストが長すぎるため省略されました]`
+        : contractText;
+
+    return `# 役割
+あなたは契約書レビュー専門AIです。
+以下の契約書を解析し、要約と主要リスクだけを返してください。
+
+# 制約
+- 原文の引用は禁止です。
+- 条文全文や長い抜粋を出してはいけません。
+- 社名、案件名、金額などの固有情報は必要以上に繰り返さないでください。
+- ダッシュボードに出すことを前提に、簡潔で実務的な日本語にしてください。
+
+# 入力契約書
+${truncatedText}
+
+# 出力形式
+JSONのみを返してください。説明文やコードブロックは不要です。
+{
+  "summary": "契約の要点と全体リスクの要約",
+  "riskLevel": 2,
+  "riskReason": "総合リスクの理由",
+  "risks": [
+    {
+      "section": "第5条（損害賠償）",
+      "level": "HIGH | MEDIUM | LOW",
+      "reason": "何が問題かを簡潔に説明",
+      "action": "相手方に確認・修正したい事項"
+    }
+  ]
+}
+
+# 重要
+- 原文の引用やコピペは禁止です。
+- risks は最大5件までに絞ってください。
+- level は必ず HIGH / MEDIUM / LOW のいずれかです。
+- riskLevel は 1, 2, 3 のいずれかです。`;
+}
+
 async function mapWithConcurrency(items, limit, mapper) {
     const results = new Array(items.length);
     let cursor = 0;
@@ -485,6 +826,47 @@ class GeminiService {
             }
             logger.warn('Returning heuristic fallback analysis instead of AI failure');
             return buildHeuristicFallbackAnalysis(currentText, previousText);
+        }
+    }
+
+    async analyzeMcpContract(contractText) {
+        const currentText = typeof contractText === 'string'
+            ? contractText
+            : JSON.stringify(contractText || '');
+
+        if (shouldUseLocalAiFallback()) {
+            if (!GEMINI_API_KEY || process.env.LOCAL_AI_ONLY === 'true') {
+                logger.info('Using local MCP single-contract fallback analysis');
+                return buildLocalMcpSingleAnalysis(currentText);
+            }
+        }
+
+        if (!GEMINI_API_KEY) {
+            throw new Error('Gemini API key is not configured');
+        }
+
+        const prompt = buildMcpSingleAnalysisPrompt(currentText);
+        logger.info('Starting Gemini analyzeMcpContract request');
+
+        try {
+            const primary = await this.requestGeminiJson(prompt, true);
+            return {
+                ...normalizeMcpSingleAnalysisResult(primary),
+                isFallback: false
+            };
+        } catch (error) {
+            logger.warn('Gemini analyzeMcpContract primary request failed, retrying without JSON mime type:', error.message);
+            try {
+                const fallback = await this.requestGeminiJson(prompt, false);
+                return {
+                    ...normalizeMcpSingleAnalysisResult(fallback),
+                    isFallback: false
+                };
+            } catch (retryError) {
+                logger.error('Gemini analyzeMcpContract failed:', retryError);
+            }
+            logger.warn('Returning local MCP single-contract fallback analysis instead of AI failure');
+            return buildLocalMcpSingleAnalysis(currentText);
         }
     }
 
@@ -589,6 +971,63 @@ class GeminiService {
             results: successfulResults,
             isFallback: false
         };
+    }
+
+    async analyzeMcpDiff(changes, options = {}) {
+        const normalizedChanges = Array.isArray(changes) ? changes.filter(Boolean) : [];
+        if (normalizedChanges.length === 0) {
+            return {
+                changeSummary: '実質的な差分は検出されませんでした。',
+                riskLevel: 1,
+                riskEvaluation: '🟢 改善',
+                latestRegulatoryAlignment: '現時点で直近法改正との追加照合が必要な主要差分は見当たりません。',
+                recommendedActions: ['差分なしとして扱ってよいか、念のため最終確認してください。'],
+                materialChanges: [],
+                regulatorySearch: {
+                    required: false,
+                    keywords: []
+                },
+                summary: '実質的な差分は検出されませんでした。',
+                riskReason: '現時点で直近法改正との追加照合が必要な主要差分は見当たりません。',
+                changes: [],
+                isFallback: false
+            };
+        }
+
+        if (shouldUseLocalAiFallback()) {
+            if (!GEMINI_API_KEY || process.env.LOCAL_AI_ONLY === 'true') {
+                logger.info('Using local MCP diff fallback analysis');
+                return buildLocalMcpDiffAnalysis(normalizedChanges);
+            }
+        }
+
+        if (!GEMINI_API_KEY) {
+            throw new Error('Gemini API key is not configured');
+        }
+
+        const prompt = buildMcpDiffPrompt(normalizedChanges, options);
+        logger.info('Starting Gemini analyzeMcpDiff request');
+
+        try {
+            const primary = await this.requestGeminiJson(prompt, true);
+            return {
+                ...normalizeMcpComparisonResult(primary, normalizedChanges),
+                isFallback: false
+            };
+        } catch (error) {
+            logger.warn('Gemini analyzeMcpDiff primary request failed, retrying without JSON mime type:', error.message);
+            try {
+                const fallback = await this.requestGeminiJson(prompt, false);
+                return {
+                    ...normalizeMcpComparisonResult(fallback, normalizedChanges),
+                    isFallback: false
+                };
+            } catch (retryError) {
+                logger.error('Gemini analyzeMcpDiff failed:', retryError);
+            }
+            logger.warn('Returning local MCP diff fallback analysis instead of AI failure');
+            return buildLocalMcpDiffAnalysis(normalizedChanges);
+        }
     }
 
     buildStructuredClausePrompt(change) {
