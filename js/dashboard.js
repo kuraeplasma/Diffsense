@@ -61,11 +61,11 @@ function loadExternalScriptOnce(src, globalGuard = null) {
 
 const parseArticleNumeric = (label) => {
     if (!label) return 0;
-    const m = String(label).match(/第\s*([0-9０-９一二三四五六七八九十百千〇零]+)\s*条/);
+    const m = String(label).match(/隨ｬ\s*([0-9・・・吩ｸ莠御ｸ牙屁莠泌・荳・・荵晏香逋ｾ蜊・・峺]+)\s*譚｡/);
     if (!m) return 0;
-    const raw = m[1].replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xfee0));
+    const raw = m[1].replace(/[・・・兢/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xfee0));
     if (/^\d+$/.test(raw)) return parseInt(raw, 10);
-    const map = { '零': 0, '〇': 0, '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9 };
+    const map = { '髮ｶ': 0, '縲・: 0, '荳': 1, '莠・: 2, '荳・: 3, '蝗・: 4, '莠・: 5, '蜈ｭ': 6, '荳・: 7, '蜈ｫ': 8, '荵・: 9 };
     if (map[raw] !== undefined) return map[raw];
     return 0;
 };
@@ -88,7 +88,7 @@ const normalizeStructuredDisplayContent = (content) => {
             const body = String(a.content || '').trim();
             if (!body) return true;
             if (body.length < 30) return true;
-            return /(前文|契約書|規約|改訂|ver\.?|version)/i.test(body);
+            return /(蜑肴枚|螂醍ｴ・嶌|隕冗ｴл謾ｹ險・ver\.?|version)/i.test(body);
         });
 
         if (allLikelyNoise) {
@@ -153,7 +153,7 @@ const clauseBodyText = (clause) => Array.isArray(clause?.paragraphs)
 const renderClauseParagraphs = (text) => {
     const lines = String(text || '').split(/\n+/).filter((line) => line.length > 0);
     if (lines.length === 0) {
-        return '<p class="text-muted">本文なし</p>';
+        return '<p class="text-muted">譛ｬ譁・↑縺・/p>';
     }
     return lines.map((line) => `<p class="clause-p">${escapeHtmlText(line)}</p>`).join('');
 };
@@ -166,8 +166,8 @@ const isMeaningfulAnalysisPayload = (payload) => {
 
     if (changes.length > 0) return true;
     if (!summary) return false;
-    if (/まだ解析されていません|比較先を選択すると|AI解析がありません|解析データなし|ローカルテストモード|ローカル差分要約|ローカル要約|補完解析を返しました|補完要約|補完差分要約|AI差分要約を取得できませんでした/.test(summary)) return false;
-    if (/ローカルテストモード|本番AI解析ではありません|Gemini応答不安定/.test(riskReason)) return false;
+    if (/縺ｾ縺�隗｣譫舌＆繧後※縺・∪縺帙ｓ|豈碑ｼ・・繧帝∈謚槭☆繧九→|AI隗｣譫舌′縺ゅｊ縺ｾ縺帙ｓ|隗｣譫舌ョ繝ｼ繧ｿ縺ｪ縺慾繝ｭ繝ｼ繧ｫ繝ｫ繝・せ繝医Δ繝ｼ繝榎繝ｭ繝ｼ繧ｫ繝ｫ蟾ｮ蛻・ｦ∫ｴл繝ｭ繝ｼ繧ｫ繝ｫ隕∫ｴл陬懷ｮ瑚ｧ｣譫舌ｒ霑斐＠縺ｾ縺励◆|陬懷ｮ瑚ｦ∫ｴл陬懷ｮ悟ｷｮ蛻・ｦ∫ｴлAI蟾ｮ蛻・ｦ∫ｴ・ｒ蜿門ｾ励〒縺阪∪縺帙ｓ縺ｧ縺励◆/.test(summary)) return false;
+    if (/繝ｭ繝ｼ繧ｫ繝ｫ繝・せ繝医Δ繝ｼ繝榎譛ｬ逡ｪAI隗｣譫舌〒縺ｯ縺ゅｊ縺ｾ縺帙ｓ|Gemini蠢懃ｭ比ｸ榊ｮ牙ｮ・.test(riskReason)) return false;
     return true;
 };
 
@@ -184,7 +184,7 @@ const sanitizeAnalysisPayload = (payload) => {
     const changes = Array.isArray(base.changes) ? base.changes.filter(Boolean) : [];
     const summaryRaw = String(base.summary || '').trim();
     const reasonRaw = String(base.riskReason || '').trim();
-    const hasFallbackPhrase = /ローカルテストモード|ローカル差分要約|ローカル要約|本番AI解析ではありません|Gemini応答不安定|補完解析を返しました|補完要約|補完差分要約|AI評価を一部補完表示しています|AI評価を取得できなかったため補完解析を表示しています|AI評価を取得できなかったため補完差分を表示しています|AI評価を取得できなかったため補完要約を表示しています|AI差分要約を取得できませんでした|AI差分要約未取得/.test(`${summaryRaw} ${reasonRaw}`);
+    const hasFallbackPhrase = /繝ｭ繝ｼ繧ｫ繝ｫ繝・せ繝医Δ繝ｼ繝榎繝ｭ繝ｼ繧ｫ繝ｫ蟾ｮ蛻・ｦ∫ｴл繝ｭ繝ｼ繧ｫ繝ｫ隕∫ｴл譛ｬ逡ｪAI隗｣譫舌〒縺ｯ縺ゅｊ縺ｾ縺帙ｓ|Gemini蠢懃ｭ比ｸ榊ｮ牙ｮ嘶陬懷ｮ瑚ｧ｣譫舌ｒ霑斐＠縺ｾ縺励◆|陬懷ｮ瑚ｦ∫ｴл陬懷ｮ悟ｷｮ蛻・ｦ∫ｴлAI隧穂ｾ｡繧剃ｸ驛ｨ陬懷ｮ瑚｡ｨ遉ｺ縺励※縺・∪縺處AI隧穂ｾ｡繧貞叙蠕励〒縺阪↑縺九▲縺溘◆繧∬｣懷ｮ瑚ｧ｣譫舌ｒ陦ｨ遉ｺ縺励※縺・∪縺處AI隧穂ｾ｡繧貞叙蠕励〒縺阪↑縺九▲縺溘◆繧∬｣懷ｮ悟ｷｮ蛻・ｒ陦ｨ遉ｺ縺励※縺・∪縺處AI隧穂ｾ｡繧貞叙蠕励〒縺阪↑縺九▲縺溘◆繧∬｣懷ｮ瑚ｦ∫ｴ・ｒ陦ｨ遉ｺ縺励※縺・∪縺處AI蟾ｮ蛻・ｦ∫ｴ・ｒ蜿門ｾ励〒縺阪∪縺帙ｓ縺ｧ縺励◆|AI蟾ｮ蛻・ｦ∫ｴ・悴蜿門ｾ・.test(`${summaryRaw} ${reasonRaw}`);
     const isFallback = base.isFallback === true || hasFallbackPhrase;
 
     if (!isFallback) {
@@ -201,26 +201,26 @@ const sanitizeAnalysisPayload = (payload) => {
         .slice(0, 2);
     const canKeepOriginalSummary = Boolean(
         summaryRaw
-        && !/AI差分要約を取得できませんでした|AI差分要約未取得|差分は検出されませんでした|変更点は検出されませんでした|変更点を確認してください/.test(summaryRaw)
-        && !/\d+件の変更点?を検出しました/.test(summaryRaw)
+        && !/AI蟾ｮ蛻・ｦ∫ｴ・ｒ蜿門ｾ励〒縺阪∪縺帙ｓ縺ｧ縺励◆|AI蟾ｮ蛻・ｦ∫ｴ・悴蜿門ｾ慾蟾ｮ蛻・・讀懷・縺輔ｌ縺ｾ縺帙ｓ縺ｧ縺励◆|螟画峩轤ｹ縺ｯ讀懷・縺輔ｌ縺ｾ縺帙ｓ縺ｧ縺励◆|螟画峩轤ｹ繧堤｢ｺ隱阪＠縺ｦ縺上□縺輔＞/.test(summaryRaw)
+        && !/\d+莉ｶ縺ｮ螟画峩轤ｹ?繧呈､懷・縺励∪縺励◆/.test(summaryRaw)
     );
     const sectionLabels = changes
         .map((c) => String(c.section || '').trim())
         .filter(Boolean)
         .slice(0, 3);
-    const sectionHint = sectionLabels.length > 0 ? `（${sectionLabels.join('、')}）` : '';
+    const sectionHint = sectionLabels.length > 0 ? `・・{sectionLabels.join('縲・)}・荏 : '';
     const summary = canKeepOriginalSummary
         ? summaryRaw
         : (impactSnippets.length > 0
-            ? `${impactSnippets.join(' ')}${changes.length > impactSnippets.length ? ` ほか${changes.length - impactSnippets.length}件の変更があります。` : ''}`.trim()
+            ? `${impactSnippets.join(' ')}${changes.length > impactSnippets.length ? ` 縺ｻ縺・{changes.length - impactSnippets.length}莉ｶ縺ｮ螟画峩縺後≠繧翫∪縺吶Ａ : ''}`.trim()
             : (changes.length > 0
-                ? `${changes.length}件の変更点を検出しました${sectionHint}。`
-                : '変更点を確認してください。'));
+                ? `${changes.length}莉ｶ縺ｮ螟画峩轤ｹ繧呈､懷・縺励∪縺励◆${sectionHint}縲Ａ
+                : '螟画峩轤ｹ繧堤｢ｺ隱阪＠縺ｦ縺上□縺輔＞縲・));
 
     return {
         ...base,
         summary,
-        riskReason: '変更点を要確認',
+        riskReason: '螟画峩轤ｹ繧定ｦ∫｢ｺ隱・,
         changes,
         isFallback
     };
@@ -232,7 +232,7 @@ const hasMeaningfulAiSummary = (payload) => {
     const riskReason = String(payload.riskReason || '').trim();
     if (!summary) return false;
     const combined = `${summary} ${riskReason}`;
-    if (/AI差分要約を取得できませんでした|AI差分要約未取得|AI差分未保存|まだ保存されていません|差分は検出されませんでした|変更点は検出されませんでした|解析データなし/.test(combined)) {
+    if (/AI蟾ｮ蛻・ｦ∫ｴ・ｒ蜿門ｾ励〒縺阪∪縺帙ｓ縺ｧ縺励◆|AI蟾ｮ蛻・ｦ∫ｴ・悴蜿門ｾ慾AI蟾ｮ蛻・悴菫晏ｭ・縺ｾ縺�菫晏ｭ倥＆繧後※縺・∪縺帙ｓ|蟾ｮ蛻・・讀懷・縺輔ｌ縺ｾ縺帙ｓ縺ｧ縺励◆|螟画峩轤ｹ縺ｯ讀懷・縺輔ｌ縺ｾ縺帙ｓ縺ｧ縺励◆|隗｣譫舌ョ繝ｼ繧ｿ縺ｪ縺・.test(combined)) {
         return false;
     }
     return true;
@@ -278,9 +278,9 @@ const buildStoredContractAnalysis = (contract) => {
     const riskReason = String(contract.ai_risk_reason || '').trim();
     if (!summary && changes.length === 0) return null;
     return {
-        summary: summary || 'AI解析が完了しました',
+        summary: summary || 'AI隗｣譫舌′螳御ｺ・＠縺ｾ縺励◆',
         riskLevel: contract.risk_level === 'High' ? 3 : (contract.risk_level === 'Medium' ? 2 : 1),
-        riskReason: riskReason || 'リスク判定が完了しました',
+        riskReason: riskReason || '繝ｪ繧ｹ繧ｯ蛻､螳壹′螳御ｺ・＠縺ｾ縺励◆',
         changes,
         isFallback: contract.ai_is_fallback === true
     };
@@ -290,7 +290,7 @@ const extractChangeDisplayKey = (change) => {
     const section = String(change?.section || '').trim();
     const explicitNumber = Number(change?.articleNumber || change?.oldArticleNumber || 0);
     if (explicitNumber > 0) return `article:${explicitNumber}`;
-    const articleMatch = section.match(/^第\s*[0-9０-９一二三四五六七八九十百千〇零]+\s*条/);
+    const articleMatch = section.match(/^隨ｬ\s*[0-9・・・吩ｸ莠御ｸ牙屁莠泌・荳・・荵晏香逋ｾ蜊・・峺]+\s*譚｡/);
     if (articleMatch) {
         return `section:${articleMatch[0].replace(/\s+/g, '')}`;
     }
@@ -357,7 +357,7 @@ const isExplicitNoDiffAnalysis = (payload) => {
     const riskReason = String(normalized.riskReason || '').trim();
     const changes = Array.isArray(normalized.changes) ? normalized.changes.filter(Boolean) : [];
     if (changes.length > 0) return false;
-    return /差分は検出されませんでした|変更点は検出されませんでした/.test(`${summary} ${riskReason}`);
+    return /蟾ｮ蛻・・讀懷・縺輔ｌ縺ｾ縺帙ｓ縺ｧ縺励◆|螟画峩轤ｹ縺ｯ讀懷・縺輔ｌ縺ｾ縺帙ｓ縺ｧ縺励◆/.test(`${summary} ${riskReason}`);
 };
 
 const buildParagraphDiffOps = (previousParagraphs, currentParagraphs) => {
@@ -515,7 +515,7 @@ const buildStructuredFallbackAnalysis = (previousContent, currentContent) => {
         const previousClause = previousMap.get(key) || null;
         const currentClause = currentMap.get(key) || null;
         const section = composeClauseHeading(
-            currentClause?.title || previousClause?.title || '条文',
+            currentClause?.title || previousClause?.title || '譚｡譁・,
             currentClause?.header || previousClause?.header || ''
         );
         return buildClauseLevelChange(section, previousClause, currentClause);
@@ -523,9 +523,9 @@ const buildStructuredFallbackAnalysis = (previousContent, currentContent) => {
 
     if (changes.length === 0) {
         return {
-            summary: '差分は検出されませんでした',
+            summary: '蟾ｮ蛻・・讀懷・縺輔ｌ縺ｾ縺帙ｓ縺ｧ縺励◆',
             riskLevel: 1,
-            riskReason: '差分は検出されませんでした',
+            riskReason: '蟾ｮ蛻・・讀懷・縺輔ｌ縺ｾ縺帙ｓ縺ｧ縺励◆',
             changes: [],
             isFallback: true
         };
@@ -539,35 +539,35 @@ const buildStructuredFallbackAnalysis = (previousContent, currentContent) => {
     const modifyCount = changes.filter((item) => item.type === 'MODIFY').length;
     const addCount = changes.filter((item) => item.type === 'ADD').length;
     const deleteCount = changes.filter((item) => item.type === 'DELETE').length;
-    let riskReason = '条文差分を検出しました';
+    let riskReason = '譚｡譁・ｷｮ蛻・ｒ讀懷・縺励∪縺励◆';
     if (hasDelete && (hasAdd || hasModify)) {
-        riskReason = '追加・削除・変更を検出しました';
+        riskReason = '霑ｽ蜉�繝ｻ蜑企勁繝ｻ螟画峩繧呈､懷・縺励∪縺励◆';
     } else if (hasDelete) {
-        riskReason = '削除を検出しました';
+        riskReason = '蜑企勁繧呈､懷・縺励∪縺励◆';
     } else if (hasAdd && hasModify) {
-        riskReason = '追加・変更を検出しました';
+        riskReason = '霑ｽ蜉�繝ｻ螟画峩繧呈､懷・縺励∪縺励◆';
     } else if (hasAdd) {
-        riskReason = '追加を検出しました';
+        riskReason = '霑ｽ蜉�繧呈､懷・縺励∪縺励◆';
     } else if (hasModify) {
-        riskReason = '変更を検出しました';
+        riskReason = '螟画峩繧呈､懷・縺励∪縺励◆';
     }
 
     const previewText = previewChanges.map((item) => {
-        const typeLabel = item.type === 'ADD' ? '追加' : (item.type === 'DELETE' ? '削除' : '変更');
-        return `${item.section}で${typeLabel}`;
-    }).join('、');
+        const typeLabel = item.type === 'ADD' ? '霑ｽ蜉�' : (item.type === 'DELETE' ? '蜑企勁' : '螟画峩');
+        return `${item.section}縺ｧ${typeLabel}`;
+    }).join('縲・);
     const suffix = changes.length > previewChanges.length
-        ? `。ほか${changes.length - previewChanges.length}条文でも変更があります。`
-        : '。';
+        ? `縲ゅ⊇縺・{changes.length - previewChanges.length}譚｡譁・〒繧ょ､画峩縺後≠繧翫∪縺吶Ａ
+        : '縲・;
     let summary = `${previewText}${suffix}`;
     if (!previewText) {
         const summaryParts = [];
-        if (modifyCount > 0) summaryParts.push(`変更 ${modifyCount}件`);
-        if (addCount > 0) summaryParts.push(`追加 ${addCount}件`);
-        if (deleteCount > 0) summaryParts.push(`削除 ${deleteCount}件`);
+        if (modifyCount > 0) summaryParts.push(`螟画峩 ${modifyCount}莉ｶ`);
+        if (addCount > 0) summaryParts.push(`霑ｽ蜉� ${addCount}莉ｶ`);
+        if (deleteCount > 0) summaryParts.push(`蜑企勁 ${deleteCount}莉ｶ`);
         summary = summaryParts.length > 0
-            ? `${summaryParts.join('、')}を確認しました。`
-            : '変更点を確認してください。';
+            ? `${summaryParts.join('縲・)}繧堤｢ｺ隱阪＠縺ｾ縺励◆縲Ａ
+            : '螟画峩轤ｹ繧堤｢ｺ隱阪＠縺ｦ縺上□縺輔＞縲・;
     }
 
     return {
@@ -599,7 +599,7 @@ const contentToComparableText = (content) => {
         return content.map((item, idx) => {
             if (typeof item === 'string') return item;
             if (!item || typeof item !== 'object') return String(item || '');
-            const article = String(item.article || item.articleNumber || `第${idx + 1}条`).trim();
+            const article = String(item.article || item.articleNumber || `隨ｬ${idx + 1}譚｡`).trim();
             const title = String(item.title || '').trim();
             const header = title ? `${article} ${title}`.trim() : article;
             const paragraphs = Array.isArray(item.paragraphs)
@@ -703,10 +703,10 @@ const renderStructuredDiffParagraphColumn = (paragraphs, counterpartParagraphs, 
             paragraphHtml = escapeHtmlText(current);
         }
 
-        html.push(`<p class="${paragraphClasses.join(' ')}">${paragraphHtml || '　'}</p>`);
+        html.push(`<p class="${paragraphClasses.join(' ')}">${paragraphHtml || '縲'}</p>`);
     }
 
-    return html.join('') || '<p class="clause-p text-muted">本文なし</p>';
+    return html.join('') || '<p class="clause-p text-muted">譛ｬ譁・↑縺・/p>';
 };
 
 const renderStructuredDiffView = (previousContent, currentContent, options = {}) => {
@@ -717,7 +717,7 @@ const renderStructuredDiffView = (previousContent, currentContent, options = {})
     const currentClauses = parseContractIntoClauses(currentContent);
 
     if (previousClauses.length === 0 && currentClauses.length === 0) {
-        return '<div class="text-center text-muted" style="padding:40px;">比較できる条文データがありません</div>';
+        return '<div class="text-center text-muted" style="padding:40px;">豈碑ｼ・〒縺阪ｋ譚｡譁・ョ繝ｼ繧ｿ縺後≠繧翫∪縺帙ｓ</div>';
     }
 
     const previousMap = new Map(previousClauses.map((clause) => [clauseIdentityKey(clause), clause]));
@@ -734,7 +734,7 @@ const renderStructuredDiffView = (previousContent, currentContent, options = {})
     });
 
     const renderClauseCard = (key, currentClause, previousClause, index) => {
-        const title = currentClause?.title || previousClause?.title || '条文';
+        const title = currentClause?.title || previousClause?.title || '譚｡譁・;
         const header = currentClause?.header || previousClause?.header || '';
         const previousParagraphs = clauseParagraphs(previousClause);
         const currentParagraphs = clauseParagraphs(currentClause);
@@ -768,12 +768,12 @@ const renderStructuredDiffView = (previousContent, currentContent, options = {})
 
     const navHtml = `
         <div class="clause-nav">
-            <div class="clause-nav-title">条文目次</div>
+            <div class="clause-nav-title">譚｡譁・岼谺｡</div>
             <ul class="clause-nav-list">
                 ${orderedKeys.map((key, index) => {
         const previousClause = previousMap.get(key) || null;
         const currentClause = currentMap.get(key) || null;
-        const title = currentClause?.title || previousClause?.title || '条文';
+        const title = currentClause?.title || previousClause?.title || '譚｡譁・;
         const header = currentClause?.header || previousClause?.header || '';
         const fullClauseTitle = composeClauseHeading(title, header);
         const clauseId = `${idPrefix}-clause-${index}`;
@@ -803,7 +803,7 @@ const renderStructuredDiffView = (previousContent, currentContent, options = {})
 // --- View Renderers Helpers ---
 
 /**
- * 契約書を条文単位（第n条）で分割する
+ * 螂醍ｴ・嶌繧呈擅譁・腰菴搾ｼ育ｬｬn譚｡・峨〒蛻・牡縺吶ｋ
  */
 const parseContractIntoClauses = (content) => {
     if (!content) return [];
@@ -811,10 +811,10 @@ const parseContractIntoClauses = (content) => {
     const applyHeadingPromotion = (title, header, paragraphs) => {
         let nextHeader = String(header || '').trim();
         let nextParagraphs = Array.isArray(paragraphs) ? [...paragraphs] : [];
-        if (!nextHeader && title !== '前文' && nextParagraphs.length > 0) {
+        if (!nextHeader && title !== '蜑肴枚' && nextParagraphs.length > 0) {
             const firstRaw = String(nextParagraphs[0] || '').trim();
-            const bracketed = firstRaw.match(/^([（(【][^）)】]{1,20}[）)】])\s*(.*)$/);
-            if (bracketed && !String(bracketed[1]).includes('。')) {
+            const bracketed = firstRaw.match(/^([・・縲疹[^・・縲曽{1,20}[・・縲曽)\s*(.*)$/);
+            if (bracketed && !String(bracketed[1]).includes('縲・)) {
                 nextHeader = String(bracketed[1] || '').trim();
                 const rest = String(bracketed[2] || '').trim();
                 if (rest) {
@@ -823,7 +823,7 @@ const parseContractIntoClauses = (content) => {
                     nextParagraphs = nextParagraphs.slice(1);
                 }
             } else {
-                const looksLikeHeading = firstRaw.length > 0 && firstRaw.length <= 20 && !firstRaw.includes('。');
+                const looksLikeHeading = firstRaw.length > 0 && firstRaw.length <= 20 && !firstRaw.includes('縲・);
                 if (looksLikeHeading) {
                     nextHeader = firstRaw;
                     nextParagraphs = nextParagraphs.slice(1);
@@ -839,19 +839,19 @@ const parseContractIntoClauses = (content) => {
         const clauses = [];
         if (normalized.preamble) {
             clauses.push({
-                title: '前文',
+                title: '蜑肴枚',
                 header: normalized.title || '',
                 paragraphs: String(normalized.preamble).split(/\n+/).filter(Boolean)
             });
         }
         normalized.articles.forEach((item, idx) => {
             const promoted = applyHeadingPromotion(
-                item.articleNumber || `第${idx + 1}条`,
+                item.articleNumber || `隨ｬ${idx + 1}譚｡`,
                 item.title || '',
                 String(item.content || '').split(/\n+/).filter(Boolean)
             );
             clauses.push({
-                title: item.articleNumber || `第${idx + 1}条`,
+                title: item.articleNumber || `隨ｬ${idx + 1}譚｡`,
                 header: promoted.header,
                 paragraphs: promoted.paragraphs
             });
@@ -862,9 +862,9 @@ const parseContractIntoClauses = (content) => {
     // If content is already structured (Array from backend)
     if (Array.isArray(content)) {
         return content.map((item, idx) => {
-            let title = item.article || (idx === 0 ? '前文' : `第${idx}条`);
-            // 「前文/ヘッダー」などの冗長な表記を正規化
-            if (title === '前文/ヘッダー') title = '前文';
+            let title = item.article || (idx === 0 ? '蜑肴枚' : `隨ｬ${idx}譚｡`);
+            // 縲悟燕譁・繝倥ャ繝繝ｼ縲阪↑縺ｩ縺ｮ蜀鈴聞縺ｪ陦ｨ險倥ｒ豁｣隕丞喧
+            if (title === '蜑肴枚/繝倥ャ繝繝ｼ') title = '蜑肴枚';
 
             const promoted = applyHeadingPromotion(
                 title,
@@ -873,8 +873,8 @@ const parseContractIntoClauses = (content) => {
             );
             let header = promoted.header;
             let paragraphs = promoted.paragraphs;
-            // 「前文/ヘッダー」がタイトルと重複する場合は非表示にする
-            if (idx === 0 && (header === '前文/ヘッダー' || header === '前文' || header === title)) {
+            // 縲悟燕譁・繝倥ャ繝繝ｼ縲阪′繧ｿ繧､繝医Ν縺ｨ驥崎､・☆繧句�ｴ蜷医・髱櫁｡ｨ遉ｺ縺ｫ縺吶ｋ
+            if (idx === 0 && (header === '蜑肴枚/繝倥ャ繝繝ｼ' || header === '蜑肴枚' || header === title)) {
                 header = '';
             }
             return {
@@ -888,14 +888,14 @@ const parseContractIntoClauses = (content) => {
     // Fallback: parse from plain text
     const lines = content.split(/\r?\n/);
     const clauses = [];
-    let currentClause = { title: '前文', header: '', body: [] };
+    let currentClause = { title: '蜑肴枚', header: '', body: [] };
 
-    const clauseRegex = /^(?:第\s*[\d０-９]+\s*条|【\s*第\s*[\d０-９]+\s*条\s*】)/;
+    const clauseRegex = /^(?:隨ｬ\s*[\d・・・兢+\s*譚｡|縲申s*隨ｬ\s*[\d・・・兢+\s*譚｡\s*縲・/;
 
     lines.forEach(line => {
         const trimmedLine = line.trim();
         if (clauseRegex.test(trimmedLine)) {
-            if (currentClause.body.length > 0 || currentClause.title !== '前文') {
+            if (currentClause.body.length > 0 || currentClause.title !== '蜑肴枚') {
                 clauses.push({
                     title: currentClause.title,
                     header: currentClause.header,
@@ -903,12 +903,12 @@ const parseContractIntoClauses = (content) => {
                 });
             }
             // Split title into "Clause Number" and "Header" if possible
-            const match = trimmedLine.match(/^(第\s*[\d０-９]+\s*条|【\s*第\s*[\d０-９]+\s*条\s*】)(.*)/);
+            const match = trimmedLine.match(/^(隨ｬ\s*[\d・・・兢+\s*譚｡|縲申s*隨ｬ\s*[\d・・・兢+\s*譚｡\s*縲・(.*)/);
             if (match) {
-                const rawHeader = match[2].trim().replace(/^[\(（【]|[）\)】]$/g, '');
+                const rawHeader = match[2].trim().replace(/^[\(・医疹|[・噂)縲曽$/g, '');
                 const normalizedHeader = String(rawHeader || '');
-                const isValidTitle = normalizedHeader.length > 0 && normalizedHeader.length <= 20 && !normalizedHeader.includes('。');
-                currentClause = { title: match[1].replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0)), header: isValidTitle ? normalizedHeader : '', body: [] };
+                const isValidTitle = normalizedHeader.length > 0 && normalizedHeader.length <= 20 && !normalizedHeader.includes('縲・);
+                currentClause = { title: match[1].replace(/[・・・兢/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0)), header: isValidTitle ? normalizedHeader : '', body: [] };
                 if (!isValidTitle && normalizedHeader) {
                     currentClause.body.push(normalizedHeader);
                 }
@@ -920,7 +920,7 @@ const parseContractIntoClauses = (content) => {
         }
     });
 
-    if (currentClause.body.length > 0 || currentClause.title !== '前文') {
+    if (currentClause.body.length > 0 || currentClause.title !== '蜑肴枚') {
         clauses.push({
             title: currentClause.title,
             header: currentClause.header,
@@ -935,7 +935,7 @@ const composeClauseHeading = (title, header) => {
     const t = String(title || '').trim();
     const h = String(header || '').trim();
     if (!h) return t;
-    if (/^[（(【]/.test(h)) return `${t}${h}`;
+    if (/^[・・縲疹/.test(h)) return `${t}${h}`;
     return `${t} ${h}`.trim();
 };
 
@@ -961,13 +961,13 @@ const formatDisplayTimestamp = (value) => {
     });
 };
 
-const trimDocumentLabel = (value, fallback = '資料') => {
+const trimDocumentLabel = (value, fallback = '雉・侭') => {
     const raw = String(value || '').trim();
     if (!raw) return fallback;
     return raw.length > 42 ? `${raw.slice(0, 42)}...` : raw;
 };
 
-const buildComparisonLabel = (name, timestamp, fallbackName = '資料') => {
+const buildComparisonLabel = (name, timestamp, fallbackName = '雉・侭') => {
     const label = trimDocumentLabel(name, fallbackName);
     const stamp = formatDisplayTimestamp(timestamp);
     return stamp ? `${label} / ${stamp}` : label;
@@ -975,7 +975,7 @@ const buildComparisonLabel = (name, timestamp, fallbackName = '資料') => {
 
 const buildDocumentOptionLabel = (doc) => {
     if (!doc) return '';
-    const primary = trimDocumentLabel(doc.document_name || '資料', 64);
+    const primary = trimDocumentLabel(doc.document_name || '雉・侭', 64);
     const stamp = formatDisplayTimestamp(doc.uploaded_at);
     return stamp ? `${primary} | ${stamp}` : primary;
 };
@@ -983,11 +983,11 @@ const buildDocumentOptionLabel = (doc) => {
 const renderStructuredView = (content, idPrefix = 'clause') => {
     try {
         const clauses = parseContractIntoClauses(content);
-        if (!clauses || clauses.length === 0) return '<div class="text-muted p-4">表示できる内容がありません</div>';
+        if (!clauses || clauses.length === 0) return '<div class="text-muted p-4">陦ｨ遉ｺ縺ｧ縺阪ｋ蜀・ｮｹ縺後≠繧翫∪縺帙ｓ</div>';
 
         const navHtml = `
             <div class="clause-nav">
-                <div class="clause-nav-title">条文目次</div>
+                <div class="clause-nav-title">譚｡譁・岼谺｡</div>
                 <ul class="clause-nav-list">
                     ${clauses.map((c, i) => {
             const fullClauseTitle = composeClauseHeading(c.title, c.header);
@@ -1009,7 +1009,7 @@ const renderStructuredView = (content, idPrefix = 'clause') => {
                     const text = typeof p === 'string' ? p : (p.body || p.content || JSON.stringify(p));
                     return `<p class="clause-p">${text.replace(/\n/g, '<br>')}</p>`;
                 }).join('')
-                : `<p class="text-muted">本文なし</p>`;
+                : `<p class="text-muted">譛ｬ譁・↑縺・/p>`;
 
             const fullClauseTitle = composeClauseHeading(c.title, c.header);
             return `
@@ -1033,22 +1033,22 @@ const renderStructuredView = (content, idPrefix = 'clause') => {
         `;
     } catch (e) {
         console.error('renderStructuredView Error:', e);
-        return `<div class="alert alert-danger">表示中にエラーが発生しました: ${e.message}</div>`;
+        return `<div class="alert alert-danger">陦ｨ遉ｺ荳ｭ縺ｫ繧ｨ繝ｩ繝ｼ縺檎匱逕溘＠縺ｾ縺励◆: ${e.message}</div>`;
     }
 };
 
 const Views = {
     loading: (viewId = 'dashboard') => {
         const titleMap = {
-            dashboard: 'ダッシュボードを読み込み中',
-            contracts: '契約一覧を読み込み中',
-            diff: '詳細を読み込み中',
-            history: '履歴を読み込み中',
-            team: 'チーム情報を読み込み中',
-            plan: 'プラン情報を読み込み中'
+            dashboard: '繝繝・す繝･繝懊・繝峨ｒ隱ｭ縺ｿ霎ｼ縺ｿ荳ｭ',
+            contracts: '螂醍ｴ・ｸ隕ｧ繧定ｪｭ縺ｿ霎ｼ縺ｿ荳ｭ',
+            diff: '隧ｳ邏ｰ繧定ｪｭ縺ｿ霎ｼ縺ｿ荳ｭ',
+            history: '螻･豁ｴ繧定ｪｭ縺ｿ霎ｼ縺ｿ荳ｭ',
+            team: '繝√・繝�諠・�ｱ繧定ｪｭ縺ｿ霎ｼ縺ｿ荳ｭ',
+            plan: '繝励Λ繝ｳ諠・�ｱ繧定ｪｭ縺ｿ霎ｼ縺ｿ荳ｭ'
         };
         return `
-            <div class="page-title">${titleMap[viewId] || '読み込み中'}</div>
+            <div class="page-title">${titleMap[viewId] || '隱ｭ縺ｿ霎ｼ縺ｿ荳ｭ'}</div>
             <div class="shell-skeleton">
                 <div class="skeleton-block" style="width:42%"></div>
                 <div class="skeleton-block" style="width:66%"></div>
@@ -1069,10 +1069,10 @@ const Views = {
         const payment = window.app ? window.app.paymentStatus : null;
         if (!sub || !sub.plan) {
             return `
-                <div class="page-title">プラン管理</div>
+                <div class="page-title">繝励Λ繝ｳ邂｡逅・/div>
                 <div class="plan-loading" style="text-align:center; padding:50px;">
                     <i class="fa-solid fa-spinner fa-spin" style="font-size:2rem; color:#c19b4a; margin-bottom:16px;"></i>
-                    <p>利用状況を確認しています...</p>
+                    <p>蛻ｩ逕ｨ迥ｶ豕√ｒ遒ｺ隱阪＠縺ｦ縺・∪縺・..</p>
                 </div>
             `;
         }
@@ -1085,10 +1085,10 @@ const Views = {
                 ? 'monthly'
                 : requestedBillingCycle;
 
-        const currentCycleLabel = currentBillingCycle === 'annual' ? '年額' : '月額';
-        const selectedCycleLabel = selectedBillingCycle === 'annual' ? '年額' : '月額';
+        const currentCycleLabel = currentBillingCycle === 'annual' ? '蟷ｴ鬘・ : '譛磯｡・;
+        const selectedCycleLabel = selectedBillingCycle === 'annual' ? '蟷ｴ鬘・ : '譛磯｡・;
         const planAvailability = window.app?.paymentPlanAvailability || null;
-        const formatYen = (value) => `¥${Number(value).toLocaleString('ja-JP')}`;
+        const formatYen = (value) => `ﾂ･${Number(value).toLocaleString('ja-JP')}`;
 
         const plans = [
             {
@@ -1096,12 +1096,12 @@ const Views = {
                 name: 'Free',
                 prices: { monthly: 0, annual: 0 },
                 features: [
-                    'Word / PDF / URL 登録：無制限',
-                    'AI差分チェック：月3回まで',
-                    '電子署名機能：月10回まで',
-                    'AI要約・リスク判定（High / Medium / Low）',
-                    '差分ハイライト表示',
-                    'チーム管理・1人'
+                    'Word / PDF / URL 逋ｻ骭ｲ・夂┌蛻ｶ髯・,
+                    'AI蟾ｮ蛻・メ繧ｧ繝・け・壽怦3蝗槭∪縺ｧ',
+                    '髮ｻ蟄千ｽｲ蜷肴ｩ溯・・壽怦10蝗槭∪縺ｧ',
+                    'AI隕∫ｴ・・繝ｪ繧ｹ繧ｯ蛻､螳夲ｼ・igh / Medium / Low・・,
+                    '蟾ｮ蛻・ワ繧､繝ｩ繧､繝郁｡ｨ遉ｺ',
+                    '繝√・繝�邂｡逅・・1莠ｺ'
                 ]
             },
             {
@@ -1109,13 +1109,13 @@ const Views = {
                 name: 'Starter',
                 prices: { monthly: 1480, annual: 14800 },
                 features: [
-                    'Word / PDF / URL 登録：無制限',
-                    'AI差分チェック：月50回まで',
-                    '電子署名機能：月25回まで',
-                    'AI要約・リスク判定',
-                    '差分ハイライト、履歴管理',
-                    '解析ログ・監査履歴の閲覧',
-                    'チーム管理・1人'
+                    'Word / PDF / URL 逋ｻ骭ｲ・夂┌蛻ｶ髯・,
+                    'AI蟾ｮ蛻・メ繧ｧ繝・け・壽怦50蝗槭∪縺ｧ',
+                    '髮ｻ蟄千ｽｲ蜷肴ｩ溯・・壽怦25蝗槭∪縺ｧ',
+                    'AI隕∫ｴ・・繝ｪ繧ｹ繧ｯ蛻､螳・,
+                    '蟾ｮ蛻・ワ繧､繝ｩ繧､繝医∝ｱ･豁ｴ邂｡逅・,
+                    '隗｣譫舌Ο繧ｰ繝ｻ逶｣譟ｻ螻･豁ｴ縺ｮ髢ｲ隕ｧ',
+                    '繝√・繝�邂｡逅・・1莠ｺ'
                 ]
             },
             {
@@ -1123,14 +1123,14 @@ const Views = {
                 name: 'Business',
                 prices: { monthly: 4980, annual: 49800 },
                 features: [
-                    'Word / PDF / URL 登録：無制限',
-                    'AI差分チェック：月120回まで',
-                    '電子署名機能：月100件まで',
-                    'AI要約・リスク判定',
-                    '法的影響・懸念点の詳細解説',
-                    '差分ハイライト、分析ログ',
-                    'チーム管理・3人',
-                    'PDF エクスポート'
+                    'Word / PDF / URL 逋ｻ骭ｲ・夂┌蛻ｶ髯・,
+                    'AI蟾ｮ蛻・メ繧ｧ繝・け・壽怦120蝗槭∪縺ｧ',
+                    '髮ｻ蟄千ｽｲ蜷肴ｩ溯・・壽怦100莉ｶ縺ｾ縺ｧ',
+                    'AI隕∫ｴ・・繝ｪ繧ｹ繧ｯ蛻､螳・,
+                    '豕慕噪蠖ｱ髻ｿ繝ｻ諛ｸ蠢ｵ轤ｹ縺ｮ隧ｳ邏ｰ隗｣隱ｬ',
+                    '蟾ｮ蛻・ワ繧､繝ｩ繧､繝医∝・譫舌Ο繧ｰ',
+                    '繝√・繝�邂｡逅・・3莠ｺ',
+                    'PDF 繧ｨ繧ｯ繧ｹ繝昴・繝・
                 ]
             },
             {
@@ -1138,16 +1138,16 @@ const Views = {
                 name: 'Pro',
                 prices: { monthly: 9800, annual: 98000 },
                 features: [
-                    'Word / PDF / URL 登録：無制限',
-                    'AI差分チェック：月400回まで',
-                    '電子署名機能：無制限',
-                    'AI要約・リスク判定',
-                    '法的影響・懸念点の詳細解説',
-                    '差分ハイライト表示、バージョン履歴管理',
-                    '解析ログ・監査履歴の閲覧',
-                    '定期URL監視・Slack／メール通知',
-                    'チーム管理・10人',
-                    'PDF エクスポート'
+                    'Word / PDF / URL 逋ｻ骭ｲ・夂┌蛻ｶ髯・,
+                    'AI蟾ｮ蛻・メ繧ｧ繝・け・壽怦400蝗槭∪縺ｧ',
+                    '髮ｻ蟄千ｽｲ蜷肴ｩ溯・・夂┌蛻ｶ髯・,
+                    'AI隕∫ｴ・・繝ｪ繧ｹ繧ｯ蛻､螳・,
+                    '豕慕噪蠖ｱ髻ｿ繝ｻ諛ｸ蠢ｵ轤ｹ縺ｮ隧ｳ邏ｰ隗｣隱ｬ',
+                    '蟾ｮ蛻・ワ繧､繝ｩ繧､繝郁｡ｨ遉ｺ縲√ヰ繝ｼ繧ｸ繝ｧ繝ｳ螻･豁ｴ邂｡逅・,
+                    '隗｣譫舌Ο繧ｰ繝ｻ逶｣譟ｻ螻･豁ｴ縺ｮ髢ｲ隕ｧ',
+                    '螳壽悄URL逶｣隕悶・Slack・上Γ繝ｼ繝ｫ騾夂衍',
+                    '繝√・繝�邂｡逅・・10莠ｺ',
+                    'PDF 繧ｨ繧ｯ繧ｹ繝昴・繝・
                 ]
             }
         ];
@@ -1161,18 +1161,18 @@ const Views = {
             const hideCurrentButtonInAnnual = selectedBillingCycle === 'annual' && isCurrentSelection;
             const isFree = p.id === 'free';
             const selectedPrice = p.prices[selectedBillingCycle] || p.prices.monthly;
-            const selectedUnit = selectedBillingCycle === 'annual' ? ' / 年' : ' / 月';
+            const selectedUnit = selectedBillingCycle === 'annual' ? ' / 蟷ｴ' : ' / 譛・;
             const annualMonthlyEquivalent = Math.round(p.prices.annual / 12);
             const annualRegularPrice = p.prices.monthly * 12;
             const canStartSelectedCycle = isFree || !planAvailability || Boolean(planAvailability[selectedBillingCycle]?.[p.id]);
             const ctaDisabled = isCurrentSelection || (!isFree && !canStartSelectedCycle);
             const ctaLabel = isCurrentSelection
-                ? '現在利用中'
+                ? '迴ｾ蝨ｨ蛻ｩ逕ｨ荳ｭ'
                 : isFree
-                    ? 'プランを変更する'
+                    ? '繝励Λ繝ｳ繧貞､画峩縺吶ｋ'
                     : canStartSelectedCycle
-                        ? 'プランを変更する'
-                        : `${selectedCycleLabel}は準備中`;
+                        ? '繝励Λ繝ｳ繧貞､画峩縺吶ｋ'
+                        : `${selectedCycleLabel}縺ｯ貅門ｙ荳ｭ`;
             const ctaAction = ctaDisabled
                 ? 'disabled'
                 : isFree
@@ -1185,24 +1185,24 @@ const Views = {
             return `
                 <article class="plan-card ${isCurrentPlan ? 'is-current' : ''} ${isBusiness ? 'is-business' : 'is-muted'}">
                     <div class="plan-card-header">
-                        ${isBusiness ? `<span class="plan-recommend-chip">おすすめ</span>` : ''}
-                        ${isCurrentPlan ? `<span class="plan-current-chip">現在の契約${isFree ? '' : `（${currentCycleLabel}）`}</span>` : ''}
+                        ${isBusiness ? `<span class="plan-recommend-chip">縺翫☆縺吶ａ</span>` : ''}
+                        ${isCurrentPlan ? `<span class="plan-current-chip">迴ｾ蝨ｨ縺ｮ螂醍ｴ・{isFree ? '' : `・・{currentCycleLabel}・荏}</span>` : ''}
                     </div>
                     <h3 class="plan-name">${p.name}</h3>
                     <div class="plan-pricing-block">
                         <div class="plan-price-line">
-                            <span class="plan-price">${isFree ? '無料' : formatYen(selectedPrice)}</span>
+                            <span class="plan-price">${isFree ? '辟｡譁・ : formatYen(selectedPrice)}</span>
                             ${isFree ? '' : `<span class="plan-price-unit">${selectedUnit}</span>`}
                         </div>
                         <div class="plan-meta-slot ${isFree ? 'is-free-spacer' : (selectedBillingCycle === 'annual' ? 'is-annual' : 'is-monthly')}">
                             ${isFree ? '<div class="plan-annual-meta" style="visibility:hidden; height:54px;">spacer</div>' : `
                                 <div class="plan-annual-meta">
-                                    <p class="plan-effective">月あたり <strong>${formatYen(annualMonthlyEquivalent)}</strong> で利用</p>
-                                    <p class="plan-compare">通常価格 <span class="plan-regular">${formatYen(annualRegularPrice)}</span> → 年額合計 <span>${formatYen(p.prices.annual)}</span></p>
-                                    <p class="plan-discount">2ヶ月分お得</p>
+                                    <p class="plan-effective">譛医≠縺溘ｊ <strong>${formatYen(annualMonthlyEquivalent)}</strong> 縺ｧ蛻ｩ逕ｨ</p>
+                                    <p class="plan-compare">騾壼ｸｸ萓｡譬ｼ <span class="plan-regular">${formatYen(annualRegularPrice)}</span> 竊・蟷ｴ鬘榊粋險・<span>${formatYen(p.prices.annual)}</span></p>
+                                    <p class="plan-discount">2繝ｶ譛亥・縺雁ｾ・/p>
                                 </div>
                                 <div class="plan-price-meta">
-                                    年額なら ${formatYen(p.prices.annual)} / 年（2ヶ月分お得）
+                                    蟷ｴ鬘阪↑繧・${formatYen(p.prices.annual)} / 蟷ｴ・・繝ｶ譛亥・縺雁ｾ暦ｼ・
                                 </div>
                             `}
                         </div>
@@ -1224,13 +1224,13 @@ const Views = {
         let paymentSection = '';
         if (hasPayment) {
             const renewalText = (sub && sub.renewalDate)
-                ? `<div style="margin-top:8px; font-size:13px; color:#555;">次回更新日: <strong>${new Date(sub.renewalDate).toLocaleDateString('ja-JP')}</strong></div>`
+                ? `<div style="margin-top:8px; font-size:13px; color:#555;">谺｡蝗樊峩譁ｰ譌･: <strong>${new Date(sub.renewalDate).toLocaleDateString('ja-JP')}</strong></div>`
                 : '';
             paymentSection = `
                 <div class="plan-payment-card is-ok compact">
                     <div class="plan-payment-title ok">
                         <i class="fa-solid fa-circle-check"></i>
-                        <strong>お支払い方法が登録されています</strong>
+                        <strong>縺頑髪謇輔＞譁ｹ豕輔′逋ｻ骭ｲ縺輔ｌ縺ｦ縺・∪縺・/strong>
                     </div>
                     ${renewalText}
                 </div>
@@ -1239,7 +1239,7 @@ const Views = {
             paymentSection = `
                 <div class="plan-inline-alert-badge">
                     <i class="fa-solid fa-triangle-exclamation"></i>
-                    <span>お支払い方法が未登録です</span>
+                    <span>縺頑髪謇輔＞譁ｹ豕輔′譛ｪ逋ｻ骭ｲ縺ｧ縺・/span>
                 </div>
             `;
         }
@@ -1248,24 +1248,24 @@ const Views = {
             <div class="plan-cancel-section" style="margin: 20px 0 40px 0; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px; text-align: left; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
                 <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
                     <div>
-                        <h3 style="font-size: 1rem; font-weight: 700; color: #111827; margin: 0 0 4px 0;">プランの解約（無料プランへの移行）</h3>
-                        <p style="color: #6b7280; font-size: 0.85rem; margin: 0;">有料プランをご利用の場合は、こちらからいつでも解約手続きが可能です。</p>
+                        <h3 style="font-size: 1rem; font-weight: 700; color: #111827; margin: 0 0 4px 0;">繝励Λ繝ｳ縺ｮ隗｣邏・ｼ育┌譁吶・繝ｩ繝ｳ縺ｸ縺ｮ遘ｻ陦鯉ｼ・/h3>
+                        <p style="color: #6b7280; font-size: 0.85rem; margin: 0;">譛画侭繝励Λ繝ｳ繧偵＃蛻ｩ逕ｨ縺ｮ蝣ｴ蜷医・縲√％縺｡繧峨°繧峨＞縺､縺ｧ繧りｧ｣邏・焔邯壹″縺悟庄閭ｽ縺ｧ縺吶・/p>
                     </div>
                     <button onclick="window.app.showCancelModal()" class="btn-dashboard plan-cancel-btn" style="background:#fff; color:#dc2626; border:1px solid #dc2626; padding:8px 16px; font-weight:600; border-radius:8px; white-space:nowrap;">
-                        <i class="fa-solid fa-xmark"></i> プランを解約する
+                        <i class="fa-solid fa-xmark"></i> 繝励Λ繝ｳ繧定ｧ｣邏・☆繧・
                     </button>
                 </div>
             </div>
         `;
 
         return `
-            <div class="page-title">プラン管理</div>
+            <div class="page-title">繝励Λ繝ｳ邂｡逅・/div>
             <div class="plan-billing-toolbar">
-                <div class="plan-cycle-switch" role="group" aria-label="請求サイクル切替">
-                    <button class="plan-cycle-btn ${selectedBillingCycle === 'monthly' ? 'active' : ''}" onclick="window.app.setPlanBillingCycle('monthly')">月額</button>
-                    <button class="plan-cycle-btn ${selectedBillingCycle === 'annual' ? 'active' : ''}" onclick="window.app.setPlanBillingCycle('annual')" ${annualKnownUnavailable ? 'disabled' : ''}>年額（2ヶ月分お得）</button>
+                <div class="plan-cycle-switch" role="group" aria-label="隲区ｱゅし繧､繧ｯ繝ｫ蛻・崛">
+                    <button class="plan-cycle-btn ${selectedBillingCycle === 'monthly' ? 'active' : ''}" onclick="window.app.setPlanBillingCycle('monthly')">譛磯｡・/button>
+                    <button class="plan-cycle-btn ${selectedBillingCycle === 'annual' ? 'active' : ''}" onclick="window.app.setPlanBillingCycle('annual')" ${annualKnownUnavailable ? 'disabled' : ''}>蟷ｴ鬘搾ｼ・繝ｶ譛亥・縺雁ｾ暦ｼ・/button>
                 </div>
-                <p class="plan-cycle-note">${annualKnownUnavailable ? '年額プランは現在準備中です。' : ''}</p>
+                <p class="plan-cycle-note">${annualKnownUnavailable ? '蟷ｴ鬘阪・繝ｩ繝ｳ縺ｯ迴ｾ蝨ｨ貅門ｙ荳ｭ縺ｧ縺吶・ : ''}</p>
             </div>
             ${paymentSection}
             ${cancelSection}
@@ -1280,10 +1280,10 @@ const Views = {
         const currentFilter = window.app ? window.app.dashboardFilter : 'pending';
         const filteredItems = dbService.getFilteredContracts(currentFilter);
 
-        let sectionTitle = "要確認アイテム (優先度順)";
-        if (currentFilter === 'pending') sectionTitle = "未処理のアイテム (新着・変更検知)";
-        if (currentFilter === 'risk') sectionTitle = "リスク要判定アイテム";
-        if (currentFilter === 'total') sectionTitle = "全監視対象（最新順）";
+        let sectionTitle = "隕∫｢ｺ隱阪い繧､繝・Β (蜆ｪ蜈亥ｺｦ鬆・";
+        if (currentFilter === 'pending') sectionTitle = "譛ｪ蜃ｦ逅・・繧｢繧､繝・Β (譁ｰ逹繝ｻ螟画峩讀懃衍)";
+        if (currentFilter === 'risk') sectionTitle = "繝ｪ繧ｹ繧ｯ隕∝愛螳壹い繧､繝・Β";
+        if (currentFilter === 'total') sectionTitle = "蜈ｨ逶｣隕門ｯｾ雎｡・域怙譁ｰ鬆・ｼ・;
 
         const tableRows = filteredItems.length > 0 ? filteredItems.slice(0, 10).map(c => {
             let riskBadgeClass = 'badge-neutral';
@@ -1292,14 +1292,14 @@ const Views = {
             else if (c.risk_level === 'Low') riskBadgeClass = 'badge-success';
 
             let statusBadge = '';
-            if (c.status === '未解析') statusBadge = '<span class="badge badge-info">未解析 (新規)</span>';
-            else if (c.status === '未処理') statusBadge = '<span class="badge badge-info">未処理</span>';
-            else if (c.status === '未確認') statusBadge = '<span class="badge badge-warning">要確認 (変更)</span>';
-            else if (c.status === '確認済') statusBadge = '<span class="badge badge-neutral"><i class="fa-solid fa-check"></i> 確認済</span>';
+            if (c.status === '譛ｪ隗｣譫・) statusBadge = '<span class="badge badge-info">譛ｪ隗｣譫・(譁ｰ隕・</span>';
+            else if (c.status === '譛ｪ蜃ｦ逅・) statusBadge = '<span class="badge badge-info">譛ｪ蜃ｦ逅・/span>';
+            else if (c.status === '譛ｪ遒ｺ隱・) statusBadge = '<span class="badge badge-warning">隕∫｢ｺ隱・(螟画峩)</span>';
+            else if (c.status === '遒ｺ隱肴ｸ・) statusBadge = '<span class="badge badge-neutral"><i class="fa-solid fa-check"></i> 遒ｺ隱肴ｸ・/span>';
 
             const actionBtn = window.app.can('operate_contract')
-                ? `<button class="btn-dashboard">${c.status === '確認済' ? '履歴を見る' : '確認する'}</button>`
-                : `<button class="btn-dashboard">詳細を見る</button>`;
+                ? `<button class="btn-dashboard">${c.status === '遒ｺ隱肴ｸ・ ? '螻･豁ｴ繧定ｦ九ｋ' : '遒ｺ隱阪☆繧・}</button>`
+                : `<button class="btn-dashboard">隧ｳ邏ｰ繧定ｦ九ｋ</button>`;
 
             return `
                 <tr onclick="window.app.navigate('diff', ${c.id})">
@@ -1310,21 +1310,21 @@ const Views = {
                     <td>${actionBtn}</td>
                 </tr>
             `;
-        }).join('') : '<tr><td colspan="5" class="text-center text-muted" style="padding:40px;">該当するアイテムはありません</td></tr>';
+        }).join('') : '<tr><td colspan="5" class="text-center text-muted" style="padding:40px;">隧ｲ蠖薙☆繧九い繧､繝・Β縺ｯ縺ゅｊ縺ｾ縺帙ｓ</td></tr>';
 
         return `
-            <div class="page-title">ダッシュボード</div>
+            <div class="page-title">繝繝・す繝･繝懊・繝・/div>
             <div class="stats-grid">
                 <div class="stat-card ${currentFilter === 'pending' ? 'active' : ''}" onclick="window.app.setDashboardFilter('pending')">
-                    <div class="stat-label ${currentFilter === 'pending' ? 'text-warning' : ''}"><i class="fa-regular fa-square-check"></i> 未処理</div>
-                    <div class="stat-value">${stats.pending}件</div>
+                    <div class="stat-label ${currentFilter === 'pending' ? 'text-warning' : ''}"><i class="fa-regular fa-square-check"></i> 譛ｪ蜃ｦ逅・/div>
+                    <div class="stat-value">${stats.pending}莉ｶ</div>
                 </div>
                 <div class="stat-card ${currentFilter === 'risk' ? 'active' : ''}" onclick="window.app.setDashboardFilter('risk')">
-                    <div class="stat-label ${currentFilter === 'risk' ? 'text-danger' : ''}"><i class="fa-solid fa-triangle-exclamation"></i> リスク要判定</div>
-                    <div class="stat-value">${stats.highRisk}件</div>
+                    <div class="stat-label ${currentFilter === 'risk' ? 'text-danger' : ''}"><i class="fa-solid fa-triangle-exclamation"></i> 繝ｪ繧ｹ繧ｯ隕∝愛螳・/div>
+                    <div class="stat-value">${stats.highRisk}莉ｶ</div>
                 </div>
                 <div class="stat-card ${currentFilter === 'total' ? 'active' : ''}" onclick="window.app.setDashboardFilter('total')">
-                    <div class="stat-label"><i class="fa-solid fa-satellite-dish"></i> 監視中</div>
+                    <div class="stat-label"><i class="fa-solid fa-satellite-dish"></i> 逶｣隕紋ｸｭ</div>
                     <div class="stat-value text-muted">${stats.total}</div>
                 </div>
             </div>
@@ -1334,11 +1334,11 @@ const Views = {
                 <table class="data-table dashboard-table">
                     <thead>
                         <tr>
-                            <th>リスク</th>
-                            <th>契約・規約名</th>
-                            <th>日付</th>
-                            <th>ステータス</th>
-                            <th>アクション</th>
+                            <th>繝ｪ繧ｹ繧ｯ</th>
+                            <th>螂醍ｴ・・隕冗ｴ・錐</th>
+                            <th>譌･莉・/th>
+                            <th>繧ｹ繝・・繧ｿ繧ｹ</th>
+                            <th>繧｢繧ｯ繧ｷ繝ｧ繝ｳ</th>
                         </tr>
                     </thead>
                     <tbody id="dashboard-table-body">
@@ -1364,9 +1364,9 @@ const Views = {
             else if (c.risk_level === 'Low') riskBadge = '<span class="badge badge-success">Low</span>';
             else riskBadge = '<span class="badge badge-neutral">-</span>';
 
-            const statusBadge = c.status === '確認済'
-                ? '<span class="badge badge-neutral"><i class="fa-solid fa-check"></i> 確認済</span>'
-                : '<span class="badge badge-warning">未確認</span>';
+            const statusBadge = c.status === '遒ｺ隱肴ｸ・
+                ? '<span class="badge badge-neutral"><i class="fa-solid fa-check"></i> 遒ｺ隱肴ｸ・/span>'
+                : '<span class="badge badge-warning">譛ｪ遒ｺ隱・/span>';
 
             return `
                 <tr onclick="window.app.navigate('diff', ${c.id})">
@@ -1382,7 +1382,7 @@ const Views = {
 
         return `
             <div class="flex justify-between items-center mb-md">
-                <h2 class="page-title" style="margin-bottom:0;">契約・規約管理</h2>
+                <h2 class="page-title" style="margin-bottom:0;">螂醍ｴ・・隕冗ｴ・ｮ｡逅・/h2>
                 <div class="flex gap-sm">
                 </div>
             </div>
@@ -1391,16 +1391,16 @@ const Views = {
                 <div class="flex flex-wrap gap-md items-center">
                     <div style="position:relative; flex:1; min-width:250px;">
                         <i class="fa-solid fa-magnifying-glass" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:#999;"></i>
-                        <input type="text" id="contract-search" placeholder="契約名・種別・担当者で検索..." 
+                        <input type="text" id="contract-search" placeholder="螂醍ｴ・錐繝ｻ遞ｮ蛻･繝ｻ諡・ｽ楢・〒讀懃ｴ｢..." 
                                value="${appFilters.query || ''}"
                                style="padding:8px 12px 8px 36px; border:1px solid #ddd; border-radius:4px; width:100%; font-size:13px;"
                                oninput="window.app.updateFilter('query', this.value)">
                     </div>
                     
                     <div class="flex gap-sm items-center">
-                        <span class="text-muted" style="font-size:12px;">リスク:</span>
+                        <span class="text-muted" style="font-size:12px;">繝ｪ繧ｹ繧ｯ:</span>
                         <select onchange="window.app.updateFilter('risk', this.value)" style="padding:6px 8px; border:1px solid #ddd; border-radius:4px; font-size:13px;">
-                            <option value="all" ${appFilters.risk === 'all' ? 'selected' : ''}>すべて</option>
+                            <option value="all" ${appFilters.risk === 'all' ? 'selected' : ''}>縺吶∋縺ｦ</option>
                             <option value="High" ${appFilters.risk === 'High' ? 'selected' : ''}>High</option>
                             <option value="Medium" ${appFilters.risk === 'Medium' ? 'selected' : ''}>Medium</option>
                             <option value="Low" ${appFilters.risk === 'Low' ? 'selected' : ''}>Low</option>
@@ -1408,19 +1408,19 @@ const Views = {
                     </div>
 
                     <div class="flex gap-sm items-center">
-                        <span class="text-muted" style="font-size:12px;">状態:</span>
+                        <span class="text-muted" style="font-size:12px;">迥ｶ諷・</span>
                         <select onchange="window.app.updateFilter('status', this.value)" style="padding:6px 8px; border:1px solid #ddd; border-radius:4px; font-size:13px;">
-                            <option value="all" ${appFilters.status === 'all' ? 'selected' : ''}>すべて</option>
-                            <option value="未確認" ${appFilters.status === '未確認' ? 'selected' : ''}>未確認</option>
-                            <option value="確認済" ${appFilters.status === '確認済' ? 'selected' : ''}>確認済</option>
+                            <option value="all" ${appFilters.status === 'all' ? 'selected' : ''}>縺吶∋縺ｦ</option>
+                            <option value="譛ｪ遒ｺ隱・ ${appFilters.status === '譛ｪ遒ｺ隱・ ? 'selected' : ''}>譛ｪ遒ｺ隱・/option>
+                            <option value="遒ｺ隱肴ｸ・ ${appFilters.status === '遒ｺ隱肴ｸ・ ? 'selected' : ''}>遒ｺ隱肴ｸ・/option>
                         </select>
                     </div>
 
                     <div class="flex gap-sm items-center">
-                        <span class="text-muted" style="font-size:12px;">種別:</span>
+                        <span class="text-muted" style="font-size:12px;">遞ｮ蛻･:</span>
                         <select onchange="window.app.updateFilter('type', this.value)" style="padding:6px 8px; border:1px solid #ddd; border-radius:4px; font-size:13px;">
-                            <option value="all" ${appFilters.type === 'all' ? 'selected' : ''}>すべて</option>
-                            ${(() => { const fixed = ['利用規約','NDA','業務委託契約','プライバシーポリシー']; const dynamic = dbService.getContracts().map(c => c.type).filter(Boolean); const types = [...new Set([...fixed, ...dynamic.filter(t => t !== 'その他')])]; types.push('その他'); return types.map(t => `<option value="${t}" ${appFilters.type === t ? 'selected' : ''}>${t}</option>`).join(''); })()}
+                            <option value="all" ${appFilters.type === 'all' ? 'selected' : ''}>縺吶∋縺ｦ</option>
+                            ${(() => { const fixed = ['蛻ｩ逕ｨ隕冗ｴ・,'NDA','讌ｭ蜍吝ｧ碑ｨ怜･醍ｴ・,'繝励Λ繧､繝舌す繝ｼ繝昴Μ繧ｷ繝ｼ']; const dynamic = dbService.getContracts().map(c => c.type).filter(Boolean); const types = [...new Set([...fixed, ...dynamic.filter(t => t !== '縺昴・莉・)])]; types.push('縺昴・莉・); return types.map(t => `<option value="${t}" ${appFilters.type === t ? 'selected' : ''}>${t}</option>`).join(''); })()}
                         </select>
                     </div>
                 </div>
@@ -1430,24 +1430,24 @@ const Views = {
                 <table class="data-table contracts-table">
                     <thead>
                         <tr>
-                            <th>契約・規約名</th>
-                            <th>種別</th>
-                            <th>最終更新</th>
-                            <th>リスク</th>
-                            <th>状態</th>
-                            <th>担当者</th>
+                            <th>螂醍ｴ・・隕冗ｴ・錐</th>
+                            <th>遞ｮ蛻･</th>
+                            <th>譛邨よ峩譁ｰ</th>
+                            <th>繝ｪ繧ｹ繧ｯ</th>
+                            <th>迥ｶ諷・/th>
+                            <th>諡・ｽ楢・/th>
                         </tr>
                     </thead>
-                    <tbody>${rows || '<tr><td colspan="6" class="text-center text-muted" style="padding:40px;">該当する契約が見つかりませんでした</td></tr>'}</tbody>
+                    <tbody>${rows || '<tr><td colspan="6" class="text-center text-muted" style="padding:40px;">隧ｲ蠖薙☆繧句･醍ｴ・′隕九▽縺九ｊ縺ｾ縺帙ｓ縺ｧ縺励◆</td></tr>'}</tbody>
                 </table>
             </div>
 
             <div class="flex justify-between items-center mt-md">
-                <div class="text-muted" style="font-size:13px;">全 ${totalItems} 件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, totalItems)} 件を表示</div>
+                <div class="text-muted" style="font-size:13px;">蜈ｨ ${totalItems} 莉ｶ荳ｭ ${(page - 1) * pageSize + 1}縲・{Math.min(page * pageSize, totalItems)} 莉ｶ繧定｡ｨ遉ｺ</div>
                 <div class="flex gap-sm">
-                    <button class="btn-dashboard" ${page <= 1 ? 'disabled' : ''} onclick="window.app.changePage(${page - 1})">前へ</button>
+                    <button class="btn-dashboard" ${page <= 1 ? 'disabled' : ''} onclick="window.app.changePage(${page - 1})">蜑阪∈</button>
                     <div style="display:flex; align-items:center; padding:0 12px; font-size:13px; font-weight:600;">${page} / ${totalPages || 1}</div>
-                    <button class="btn-dashboard" ${page >= totalPages ? 'disabled' : ''} onclick="window.app.changePage(${page + 1})">次へ</button>
+                    <button class="btn-dashboard" ${page >= totalPages ? 'disabled' : ''} onclick="window.app.changePage(${page + 1})">谺｡縺ｸ</button>
                 </div>
             </div>
 `;
@@ -1534,7 +1534,7 @@ const Views = {
             && (
                 !selectedDiffPayload
                 || shouldForceAutoPairAnalysis
-                || selectedDiffPayload?.riskReason === 'AI差分未保存'
+                || selectedDiffPayload?.riskReason === 'AI蟾ｮ蛻・悴菫晏ｭ・
             )
         );
         if (shouldAutoPairAnalysis) {
@@ -1562,10 +1562,10 @@ const Views = {
         const sourceType = String(contract?.source_type || '').toUpperCase();
         const isPdfSource = sourceType === 'PDF' || (contract?.original_filename || '').toLowerCase().endsWith('.pdf');
         const hasPdfPreview = Boolean(resolvedPdfPreviewUrl);
-        // Align with production expectation: keep "原本全文" as structured text view even for PDF.
+        // Align with production expectation: keep "蜴滓悽蜈ｨ譁・ as structured text view even for PDF.
         const showPdfViewerInRightPane = false;
 
-        // AI解析結果があればそれを使用、なければ静的コンテンツまたはデフォルト
+        // AI隗｣譫千ｵ先棡縺後≠繧後・縺昴ｌ繧剃ｽｿ逕ｨ縲√↑縺代ｌ縺ｰ髱咏噪繧ｳ繝ｳ繝・Φ繝・∪縺溘・繝・ヵ繧ｩ繝ｫ繝・
         const hasComparableVersion = documentOptions.length >= 2;
         const hasAIResults = Boolean(contract.ai_summary || contract.summary || (Array.isArray(contract.ai_changes) && contract.ai_changes.length > 0));
         const canTriggerPairAnalysis = Boolean(selectedSourceDoc && selectedTargetDoc && window.app?.can('operate_contract'));
@@ -1574,63 +1574,63 @@ const Views = {
         if (effectiveSelectedDiffData) {
             const cached = effectiveSelectedDiffData?.isFallback === true
                 ? {
-                    summary: String(effectiveSelectedDiffData.summary || 'AI差分要約を取得できませんでした。再解析を実行してください。').trim() || 'AI差分要約を取得できませんでした。再解析を実行してください。',
+                    summary: String(effectiveSelectedDiffData.summary || 'AI蟾ｮ蛻・ｦ∫ｴ・ｒ蜿門ｾ励〒縺阪∪縺帙ｓ縺ｧ縺励◆縲ょ・隗｣譫舌ｒ螳溯｡後＠縺ｦ縺上□縺輔＞縲・).trim() || 'AI蟾ｮ蛻・ｦ∫ｴ・ｒ蜿門ｾ励〒縺阪∪縺帙ｓ縺ｧ縺励◆縲ょ・隗｣譫舌ｒ螳溯｡後＠縺ｦ縺上□縺輔＞縲・,
                     riskLevel: effectiveSelectedDiffData.riskLevel ?? 1,
-                    riskReason: String(effectiveSelectedDiffData.riskReason || 'AI差分要約未取得').trim() || 'AI差分要約未取得',
+                    riskReason: String(effectiveSelectedDiffData.riskReason || 'AI蟾ｮ蛻・ｦ∫ｴ・悴蜿門ｾ・).trim() || 'AI蟾ｮ蛻・ｦ∫ｴ・悴蜿門ｾ・,
                     changes: Array.isArray(effectiveSelectedDiffData.changes) ? effectiveSelectedDiffData.changes.filter(Boolean) : [],
                     isFallback: true
                 }
                 : sanitizeAnalysisPayload(effectiveSelectedDiffData);
             diffData = {
-                title: `${contract.name} - 文書比較`,
-                summary: cached.summary || '選択した2文書の差分結果を表示しています。',
+                title: `${contract.name} - 譁・嶌豈碑ｼチ,
+                summary: cached.summary || '驕ｸ謚槭＠縺・譁・嶌縺ｮ蟾ｮ蛻・ｵ先棡繧定｡ｨ遉ｺ縺励※縺・∪縺吶・,
                 riskLevel: cached.riskLevel ?? 1,
-                riskReason: cached.riskReason || '保存済みの差分結果を表示しています。',
+                riskReason: cached.riskReason || '菫晏ｭ俶ｸ医∩縺ｮ蟾ｮ蛻・ｵ先棡繧定｡ｨ遉ｺ縺励※縺・∪縺吶・,
                 changes: cached.changes || [],
                 isFallback: cached.isFallback === true
             };
         } else if (shouldShowStructuredFallbackPanel && structuredFallbackAnalysis) {
             diffData = {
-                title: `${contract.name} - 文書比較`,
-                summary: structuredFallbackAnalysis.summary || '変更点を表示しています。',
+                title: `${contract.name} - 譁・嶌豈碑ｼチ,
+                summary: structuredFallbackAnalysis.summary || '螟画峩轤ｹ繧定｡ｨ遉ｺ縺励※縺・∪縺吶・,
                 riskLevel: structuredFallbackAnalysis.riskLevel ?? 1,
-                riskReason: structuredFallbackAnalysis.riskReason || '変更点を表示しています',
+                riskReason: structuredFallbackAnalysis.riskReason || '螟画峩轤ｹ繧定｡ｨ遉ｺ縺励※縺・∪縺・,
                 changes: Array.isArray(structuredFallbackAnalysis.changes) ? structuredFallbackAnalysis.changes : [],
                 isFallback: false
             };
         } else if (hasFallbackNoDiffResult) {
             diffData = {
-                title: `${contract.name} - 文書比較`,
-                summary: 'AI差分要約を取得できませんでした。再解析を実行してください。',
+                title: `${contract.name} - 譁・嶌豈碑ｼチ,
+                summary: 'AI蟾ｮ蛻・ｦ∫ｴ・ｒ蜿門ｾ励〒縺阪∪縺帙ｓ縺ｧ縺励◆縲ょ・隗｣譫舌ｒ螳溯｡後＠縺ｦ縺上□縺輔＞縲・,
                 riskLevel: 1,
-                riskReason: 'AI差分要約未取得',
+                riskReason: 'AI蟾ｮ蛻・ｦ∫ｴ・悴蜿門ｾ・,
                 changes: [],
                 isFallback: true
             };
         } else if (selectedSourceDoc && selectedTargetDoc) {
             diffData = {
-                title: `${contract.name} - 文書比較`,
-                summary: 'この文書ペアのAI差分要約はまだ保存されていません。必要に応じてAI差分解析を実行してください。',
+                title: `${contract.name} - 譁・嶌豈碑ｼチ,
+                summary: '縺薙・譁・嶌繝壹い縺ｮAI蟾ｮ蛻・ｦ∫ｴ・・縺ｾ縺�菫晏ｭ倥＆繧後※縺・∪縺帙ｓ縲ょｿ・ｦ√↓蠢懊§縺ｦAI蟾ｮ蛻・ｧ｣譫舌ｒ螳溯｡後＠縺ｦ縺上□縺輔＞縲・,
                 riskLevel: 1,
-                riskReason: 'AI差分未保存',
+                riskReason: 'AI蟾ｮ蛻・悴菫晏ｭ・,
                 changes: [],
                 isFallback: false
             };
         } else if (comparisonContext?.analysis) {
             diffData = {
-                title: `${contract.name} - 比較解析`,
-                summary: comparisonContext.analysis.summary || '選択した履歴との差分比較を表示しています。',
+                title: `${contract.name} - 豈碑ｼ・ｧ｣譫秦,
+                summary: comparisonContext.analysis.summary || '驕ｸ謚槭＠縺溷ｱ･豁ｴ縺ｨ縺ｮ蟾ｮ蛻・ｯ碑ｼ・ｒ陦ｨ遉ｺ縺励※縺・∪縺吶・,
                 riskLevel: comparisonContext.analysis.riskLevel ?? 1,
-                riskReason: comparisonContext.analysis.riskReason || '選択した履歴との差分を解析しました。',
+                riskReason: comparisonContext.analysis.riskReason || '驕ｸ謚槭＠縺溷ｱ･豁ｴ縺ｨ縺ｮ蟾ｮ蛻・ｒ隗｣譫舌＠縺ｾ縺励◆縲・,
                 changes: comparisonContext.analysis.changes || [],
                 isFallback: comparisonContext.analysis.isFallback === true
             };
         } else if (comparisonContext?.analysisNotice) {
             diffData = {
-                title: `${contract.name} - 比較表示`,
+                title: `${contract.name} - 豈碑ｼ・｡ｨ遉ｺ`,
                 summary: comparisonContext.analysisNotice,
                 riskLevel: 1,
-                riskReason: '比較表示のみ',
+                riskReason: '豈碑ｼ・｡ｨ遉ｺ縺ｮ縺ｿ',
                 changes: [],
                 isFallback: false
             };
@@ -1642,54 +1642,54 @@ const Views = {
                 changes: contract.ai_changes || [],
                 isFallback: contract.ai_is_fallback === true
             });
-            // AI解析結果を使用
+            // AI隗｣譫千ｵ先棡繧剃ｽｿ逕ｨ
             diffData = {
-                title: `${contract.name} - AI解析結果`,
-                summary: normalizedStored.summary || 'AI解析が完了しました',
+                title: `${contract.name} - AI隗｣譫千ｵ先棡`,
+                summary: normalizedStored.summary || 'AI隗｣譫舌′螳御ｺ・＠縺ｾ縺励◆',
                 riskLevel: normalizedStored.riskLevel ?? 1,
-                riskReason: normalizedStored.riskReason || 'リスク判定が完了しました',
+                riskReason: normalizedStored.riskReason || '繝ｪ繧ｹ繧ｯ蛻､螳壹′螳御ｺ・＠縺ｾ縺励◆',
                 changes: normalizedStored.changes || [],
                 isFallback: normalizedStored.isFallback === true
             };
         } else {
-            // デフォルトデータ
+            // 繝・ヵ繧ｩ繝ｫ繝医ョ繝ｼ繧ｿ
             diffData = {
-                title: `${contract.name} - 詳細分析`,
-                summary: contract.status === '未解析'
-                    ? 'このドキュメントはまだAI解析されていません。新規登録から解析を実行してください。'
+                title: `${contract.name} - 隧ｳ邏ｰ蛻・梵`,
+                summary: contract.status === '譛ｪ隗｣譫・
+                    ? '縺薙・繝峨く繝･繝｡繝ｳ繝医・縺ｾ縺�AI隗｣譫舌＆繧後※縺・∪縺帙ｓ縲よ眠隕冗匳骭ｲ縺九ｉ隗｣譫舌ｒ螳溯｡後＠縺ｦ縺上□縺輔＞縲・
                     : (!hasComparableVersion
-                        ? '比較対象の旧バージョンがないため、差分要約は表示されません。'
-                        : 'このドキュメントの最新の変更要約をAIが生成しています...'),
+                        ? '豈碑ｼ・ｯｾ雎｡縺ｮ譌ｧ繝舌・繧ｸ繝ｧ繝ｳ縺後↑縺・◆繧√∝ｷｮ蛻・ｦ∫ｴ・・陦ｨ遉ｺ縺輔ｌ縺ｾ縺帙ｓ縲・
+                        : '縺薙・繝峨く繝･繝｡繝ｳ繝医・譛譁ｰ縺ｮ螟画峩隕∫ｴ・ｒAI縺檎函謌舌＠縺ｦ縺・∪縺・..'),
                 riskLevel: contract.risk_level === 'High' ? 3 : (contract.risk_level === 'Medium' ? 2 : 1),
-                riskReason: contract.status === '未解析'
-                    ? 'AI解析が未実行です'
+                riskReason: contract.status === '譛ｪ隗｣譫・
+                    ? 'AI隗｣譫舌′譛ｪ螳溯｡後〒縺・
                     : (!hasComparableVersion
-                        ? '旧バージョンが未登録のため差分判定は未実行です'
-                        : '特定の変更箇所において、リスク要因が検知されました。詳細を確認してください。'),
+                        ? '譌ｧ繝舌・繧ｸ繝ｧ繝ｳ縺梧悴逋ｻ骭ｲ縺ｮ縺溘ａ蟾ｮ蛻・愛螳壹・譛ｪ螳溯｡後〒縺・
+                        : '迚ｹ螳壹・螟画峩邂・園縺ｫ縺翫＞縺ｦ縲√Μ繧ｹ繧ｯ隕∝屏縺梧､懃衍縺輔ｌ縺ｾ縺励◆縲りｩｳ邏ｰ繧堤｢ｺ隱阪＠縺ｦ縺上□縺輔＞縲・),
                 changes: [],
                 isFallback: false
             };
         }
 
-        // デバッグ情報（開発時のみ表示）
+        // 繝・ヰ繝・げ諠・�ｱ・磯幕逋ｺ譎ゅ・縺ｿ陦ｨ遉ｺ・・
         const debugInfoHtml = '';
 
         const compareBannerHtml = activeTab === 'diff' ? `
             <div class="document-compare-toolbar">
                 <div class="document-compare-grid">
                     <label class="document-compare-field">
-                        <span class="document-compare-label">比較元</span>
+                        <span class="document-compare-label">豈碑ｼ・・</span>
                         <select class="document-compare-select" onchange="window.app.handleDocumentCompareChange(${id}, 'docA', this.value)">
-                            <option value="">文書を選択</option>
+                            <option value="">譁・嶌繧帝∈謚・/option>
                             ${documentOptions.map((doc) => `
                                 <option value="${doc.id}" ${selectedSourceDoc?.id === doc.id ? 'selected' : ''}>${escapeHtmlText(buildDocumentOptionLabel(doc))}</option>
                             `).join('')}
                         </select>
                     </label>
                     <label class="document-compare-field">
-                        <span class="document-compare-label">比較先</span>
+                        <span class="document-compare-label">豈碑ｼ・・</span>
                         <select class="document-compare-select" onchange="window.app.handleDocumentCompareChange(${id}, 'docB', this.value)">
-                            <option value="">文書を選択</option>
+                            <option value="">譁・嶌繧帝∈謚・/option>
                             ${documentOptions.map((doc) => `
                                 <option value="${doc.id}" ${selectedTargetDoc?.id === doc.id ? 'selected' : ''}>${escapeHtmlText(buildDocumentOptionLabel(doc))}</option>
                             `).join('')}
@@ -1698,8 +1698,8 @@ const Views = {
                 </div>
                 <div class="document-compare-status">
                     ${selectedSourceDoc && selectedTargetDoc
-                ? `比較中: <strong>${escapeHtmlText(trimDocumentLabel(selectedSourceDoc.document_name, '比較元資料'))}</strong> → <strong>${escapeHtmlText(trimDocumentLabel(selectedTargetDoc.document_name, '比較先資料'))}</strong>`
-                : '比較元と比較先を選択してください'}
+                ? `豈碑ｼ・ｸｭ: <strong>${escapeHtmlText(trimDocumentLabel(selectedSourceDoc.document_name, '豈碑ｼ・・雉・侭'))}</strong> 竊・<strong>${escapeHtmlText(trimDocumentLabel(selectedTargetDoc.document_name, '豈碑ｼ・・雉・侭'))}</strong>`
+                : '豈碑ｼ・・縺ｨ豈碑ｼ・・繧帝∈謚槭＠縺ｦ縺上□縺輔＞'}
                 </div>
             </div>
         ` : '';
@@ -1714,9 +1714,9 @@ const Views = {
                 <div style="background:#f0f0f0; padding:8px 12px; font-weight:600; font-size:12px; border-bottom:1px solid #eee;">
                     ${c.section} <span style="font-weight:normal; color:#666; margin-left:8px;">(${(() => {
                 const t = String(c.type || '').toUpperCase();
-                if (t === 'ADD') return '追加';
-                if (t === 'DELETE') return '削除';
-                return '変更';
+                if (t === 'ADD') return '霑ｽ蜉�';
+                if (t === 'DELETE') return '蜑企勁';
+                return '螟画峩';
             })()})</span>
                 </div>
                 <div class="diff-container" style="height:auto; min-height:100px;">
@@ -1725,8 +1725,8 @@ const Views = {
                 </div>
                 ${(c.impact || c.concern) ? `
                 <div style="background:#fff8e1; padding:10px 12px; border-top:1px solid #ffeeba; font-size:12px; color:#5c3a00;">
-                    ${c.impact ? `<div style="margin-bottom:4px;"><strong><i class="fa-solid fa-scale-balanced"></i> 法的影響:</strong> ${c.impact}</div>` : ''}
-                    ${c.concern ? `<div><strong><i class="fa-solid fa-triangle-exclamation"></i> 懸念点:</strong> ${c.concern}</div>` : ''}
+                    ${c.impact ? `<div style="margin-bottom:4px;"><strong><i class="fa-solid fa-scale-balanced"></i> 豕慕噪蠖ｱ髻ｿ:</strong> ${c.impact}</div>` : ''}
+                    ${c.concern ? `<div><strong><i class="fa-solid fa-triangle-exclamation"></i> 諛ｸ蠢ｵ轤ｹ:</strong> ${c.concern}</div>` : ''}
                 </div>
                 ` : ''}
             </div>
@@ -1737,7 +1737,7 @@ const Views = {
                 <!-- Breadcrumb & Top Actions -->
                 <div class="detail-split-header flex justify-between items-center">
                     <div class="detail-header-main">
-                        <a onclick="window.app.navigate('dashboard')" style="color:#666; font-size:12px; cursor:pointer;" title="戻る">
+                        <a onclick="window.app.navigate('dashboard')" style="color:#666; font-size:12px; cursor:pointer;" title="謌ｻ繧・>
                             <i class="fa-solid fa-arrow-left"></i>
                         </a>
                         <div class="detail-header-title-wrap">
@@ -1749,15 +1749,15 @@ const Views = {
                         </div>
                     </div>
                     <div class="flex gap-sm">
-                        ${window.app.can('operate_contract') ? `<button class="btn-dashboard" onclick="window.app.shareReport(${contract.id})"><i class="fa-solid fa-share-nodes"></i> 共有</button>` : ''}
-                        ${(['pro', 'business'].includes(window.app.subscription?.plan)) ? `<button class="btn-dashboard" onclick="window.app.exportPDF(${contract.id})"><i class="fa-solid fa-file-pdf"></i> PDF出力</button>` : ''}
-                        ${window.app.can('operate_contract') ? `<button class="btn-dashboard" onclick="window.app.showHistoryModal(${id})"><i class="fa-solid fa-note-sticky"></i> メモ</button>` : ''}
+                        ${window.app.can('operate_contract') ? `<button class="btn-dashboard" onclick="window.app.shareReport(${contract.id})"><i class="fa-solid fa-share-nodes"></i> 蜈ｱ譛・/button>` : ''}
+                        ${(['pro', 'business'].includes(window.app.subscription?.plan)) ? `<button class="btn-dashboard" onclick="window.app.exportPDF(${contract.id})"><i class="fa-solid fa-file-pdf"></i> PDF蜃ｺ蜉・/button>` : ''}
+                        ${window.app.can('operate_contract') ? `<button class="btn-dashboard" onclick="window.app.showHistoryModal(${id})"><i class="fa-solid fa-note-sticky"></i> 繝｡繝｢</button>` : ''}
                         ${window.app.can('operate_contract')
-                ? (contract.status === '未処理'
+                ? (contract.status === '譛ｪ蜃ｦ逅・
                     ? ''
-                    : contract.status === '未確認'
-                        ? `<button class="btn-dashboard btn-primary-action" onclick="window.app.confirmContract(${id})"><i class="fa-solid fa-check"></i> 確認済みにする</button>`
-                        : `<button class="btn-dashboard" disabled><i class="fa-solid fa-check"></i> 確認済み</button>`)
+                    : contract.status === '譛ｪ遒ｺ隱・
+                        ? `<button class="btn-dashboard btn-primary-action" onclick="window.app.confirmContract(${id})"><i class="fa-solid fa-check"></i> 遒ｺ隱肴ｸ医∩縺ｫ縺吶ｋ</button>`
+                        : `<button class="btn-dashboard" disabled><i class="fa-solid fa-check"></i> 遒ｺ隱肴ｸ医∩</button>`)
                 : ''}
                     </div>
                 </div>
@@ -1766,19 +1766,19 @@ const Views = {
                     <!-- Left Pane: Analysis & Diffs -->
                     <div class="pane">
                         <div class="pane-header" style="min-height:56px; box-sizing:border-box;">
-                            <span><i class="fa-solid fa-magnifying-glass-chart"></i> AI解析・差分判定</span>
+                            <span><i class="fa-solid fa-magnifying-glass-chart"></i> AI隗｣譫舌・蟾ｮ蛻・愛螳・/span>
                             <button id="btn-reanalyze" class="btn-upload-version" onclick="window.app.confirmReanalyze('${contract.id}')">
-                                <i class="fa-solid fa-wand-magic-sparkles"></i>リスク解析をする
+                                <i class="fa-solid fa-wand-magic-sparkles"></i>繝ｪ繧ｹ繧ｯ隗｣譫舌ｒ縺吶ｋ
                             </button>
                         </div>
                         <div class="pane-scroll-area">
                             ${hasAIResults ? `
                             <div class="analysis-section-title" style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
-                                <span><i class="fa-solid fa-robot text-primary"></i> AIリスク要約</span>
+                                <span><i class="fa-solid fa-robot text-primary"></i> AI繝ｪ繧ｹ繧ｯ隕∫ｴ・/span>
                                 ${canTriggerPairAnalysis && shouldAutoPairAnalysis ? `
                                     <span style="font-size:12px; color:${isAutoPairAnalysisPending ? '#0f766e' : '#64748b'};">
                                         <i class="fa-solid ${isAutoPairAnalysisPending ? 'fa-spinner fa-spin' : 'fa-circle-check'}"></i>
-                                        ${isAutoPairAnalysisPending ? '自動解析を実行中...' : '自動解析キュー済み'}
+                                        ${isAutoPairAnalysisPending ? '閾ｪ蜍戊ｧ｣譫舌ｒ螳溯｡御ｸｭ...' : '閾ｪ蜍戊ｧ｣譫舌く繝･繝ｼ貂医∩'}
                                     </span>
                                 ` : ''}
                             </div>
@@ -1789,7 +1789,7 @@ const Views = {
                                     </span>
                                     <span style="font-size:12px; color:#666;">${diffData.riskReason || ''}</span>
                                 </div>
-                                <div style="font-size:13px; color:#333; line-height:1.7; white-space:pre-wrap;">${diffData.summary || 'AI解析結果がありません'}</div>
+                                <div style="font-size:13px; color:#333; line-height:1.7; white-space:pre-wrap;">${diffData.summary || 'AI隗｣譫千ｵ先棡縺後≠繧翫∪縺帙ｓ'}</div>
                             </div>
                             ` : ''}
 
@@ -1813,42 +1813,42 @@ const Views = {
                                 const urgentDays = renewalDays !== null ? renewalDays : expiryDays;
                                 const alertColor = urgentDays !== null && urgentDays <= 7 ? '#e53935' : urgentDays !== null && urgentDays <= 30 ? '#f57c00' : '#2e7d32';
                                 const confBadge = contract.date_confidence === 'high'
-                                    ? '<span style="font-size:10px;background:#e8f5e9;color:#2e7d32;border-radius:4px;padding:2px 6px;margin-left:6px;">AI自動抽出</span>'
+                                    ? '<span style="font-size:10px;background:#e8f5e9;color:#2e7d32;border-radius:4px;padding:2px 6px;margin-left:6px;">AI閾ｪ蜍墓歓蜃ｺ</span>'
                                     : contract.date_confidence === 'partial'
-                                    ? '<span style="font-size:10px;background:#fff8e1;color:#f57c00;border-radius:4px;padding:2px 6px;margin-left:6px;">一部手動確認推奨</span>'
+                                    ? '<span style="font-size:10px;background:#fff8e1;color:#f57c00;border-radius:4px;padding:2px 6px;margin-left:6px;">荳驛ｨ謇句虚遒ｺ隱肴耳螂ｨ</span>'
                                     : '';
-                                const dayLabel = (days) => days === null ? '' : days === 0 ? '本日' : days < 0 ? '期限切れ' : `あと${days}日`;
+                                const dayLabel = (days) => days === null ? '' : days === 0 ? '譛ｬ譌･' : days < 0 ? '譛滄剞蛻・ｌ' : `縺ゅ→${days}譌･`;
                                 return `<div style="background:#f0f7ff;border:1px solid #bbdefb;border-radius:12px;padding:16px 20px;margin-bottom:20px;">
                                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
                                         <i class="fa-solid fa-calendar-check" style="color:#1976d2;"></i>
-                                        <span style="font-size:14px;font-weight:700;color:#1976d2;">AIが検出した期限情報</span>
+                                        <span style="font-size:14px;font-weight:700;color:#1976d2;">AI縺梧､懷・縺励◆譛滄剞諠・�ｱ</span>
                                         ${confBadge}
                                         ${contract.contract_category ? `<span style="font-size:11px;background:#e3f2fd;color:#1976d2;border-radius:4px;padding:2px 7px;margin-left:auto;">${contract.contract_category}</span>` : ''}
                                     </div>
                                     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:10px;">
-                                        ${contract.contract_start ? `<div style="background:#fff;border-radius:8px;padding:10px 14px;border:1px solid #e3f2fd;"><div style="font-size:11px;color:#8a7a6a;margin-bottom:2px;">契約開始日</div><div style="font-size:13px;font-weight:600;">${fmtDate(contract.contract_start)}</div></div>` : ''}
-                                        ${contract.expiry_date ? `<div style="background:#fff;border-radius:8px;padding:10px 14px;border:1px solid #e3f2fd;"><div style="font-size:11px;color:#8a7a6a;margin-bottom:2px;">契約終了日</div><div style="font-size:13px;font-weight:600;">${fmtDate(contract.expiry_date)}</div>${expiryDays !== null ? `<div style="font-size:11px;color:${expiryDays <= 30 ? alertColor : '#666'};margin-top:2px;">${dayLabel(expiryDays)}</div>` : ''}</div>` : ''}
-                                        ${contract.renewal_deadline ? `<div style="background:#fff;border-radius:8px;padding:10px 14px;border:1px solid #ffe0b2;"><div style="font-size:11px;color:#8a7a6a;margin-bottom:2px;">更新拒絶期限</div><div style="font-size:13px;font-weight:600;">${fmtDate(contract.renewal_deadline)}</div>${renewalDays !== null ? `<div style="font-size:11px;color:${renewalDays <= 30 ? alertColor : '#666'};margin-top:2px;">${dayLabel(renewalDays)}</div>` : ''}</div>` : ''}
-                                        ${contract.auto_renewal !== undefined ? `<div style="background:#fff;border-radius:8px;padding:10px 14px;border:1px solid #e3f2fd;"><div style="font-size:11px;color:#8a7a6a;margin-bottom:2px;">自動更新</div><div style="font-size:13px;font-weight:600;color:${contract.auto_renewal ? '#e53935' : '#2e7d32'}">${contract.auto_renewal ? 'あり（要注意）' : 'なし'}</div></div>` : ''}
+                                        ${contract.contract_start ? `<div style="background:#fff;border-radius:8px;padding:10px 14px;border:1px solid #e3f2fd;"><div style="font-size:11px;color:#8a7a6a;margin-bottom:2px;">螂醍ｴ・幕蟋区律</div><div style="font-size:13px;font-weight:600;">${fmtDate(contract.contract_start)}</div></div>` : ''}
+                                        ${contract.expiry_date ? `<div style="background:#fff;border-radius:8px;padding:10px 14px;border:1px solid #e3f2fd;"><div style="font-size:11px;color:#8a7a6a;margin-bottom:2px;">螂醍ｴ・ｵゆｺ・律</div><div style="font-size:13px;font-weight:600;">${fmtDate(contract.expiry_date)}</div>${expiryDays !== null ? `<div style="font-size:11px;color:${expiryDays <= 30 ? alertColor : '#666'};margin-top:2px;">${dayLabel(expiryDays)}</div>` : ''}</div>` : ''}
+                                        ${contract.renewal_deadline ? `<div style="background:#fff;border-radius:8px;padding:10px 14px;border:1px solid #ffe0b2;"><div style="font-size:11px;color:#8a7a6a;margin-bottom:2px;">譖ｴ譁ｰ諡堤ｵｶ譛滄剞</div><div style="font-size:13px;font-weight:600;">${fmtDate(contract.renewal_deadline)}</div>${renewalDays !== null ? `<div style="font-size:11px;color:${renewalDays <= 30 ? alertColor : '#666'};margin-top:2px;">${dayLabel(renewalDays)}</div>` : ''}</div>` : ''}
+                                        ${contract.auto_renewal !== undefined ? `<div style="background:#fff;border-radius:8px;padding:10px 14px;border:1px solid #e3f2fd;"><div style="font-size:11px;color:#8a7a6a;margin-bottom:2px;">閾ｪ蜍墓峩譁ｰ</div><div style="font-size:13px;font-weight:600;color:${contract.auto_renewal ? '#e53935' : '#2e7d32'}">${contract.auto_renewal ? '縺ゅｊ・郁ｦ∵ｳｨ諢擾ｼ・ : '縺ｪ縺・}</div></div>` : ''}
                                     </div>
                                     <div style="margin-top:10px;text-align:right;">
-                                        <a onclick="window.app.navigate('deadlines')" style="font-size:12px;color:#1976d2;cursor:pointer;"><i class="fa-solid fa-arrow-right" style="margin-right:4px;"></i>期限一覧を見る</a>
+                                        <a onclick="window.app.navigate('deadlines')" style="font-size:12px;color:#1976d2;cursor:pointer;"><i class="fa-solid fa-arrow-right" style="margin-right:4px;"></i>譛滄剞荳隕ｧ繧定ｦ九ｋ</a>
                                     </div>
                                 </div>`;
                             })() : ''}
 
                             <div class="analysis-section-title">
-                                <i class="fa-solid fa-circle-exclamation text-warning"></i> 検知された重要な変更点
+                                <i class="fa-solid fa-circle-exclamation text-warning"></i> 讀懃衍縺輔ｌ縺滄㍾隕√↑螟画峩轤ｹ
                             </div>
                             <div style="margin-bottom:32px;">
-                                ${changesHtml || `<div style="padding:20px; text-align:center; color:#999; font-size:13px;">変更点は検知されませんでした</div>`}
+                                ${changesHtml || `<div style="padding:20px; text-align:center; color:#999; font-size:13px;">螟画峩轤ｹ縺ｯ讀懃衍縺輔ｌ縺ｾ縺帙ｓ縺ｧ縺励◆</div>`}
                             </div>
                             ` : `
                             <div style="padding:32px 20px; text-align:center; color:#999;">
                                 <i class="fa-solid fa-code-compare" style="font-size:32px; margin-bottom:12px; display:block; opacity:0.3;"></i>
-                                <div style="font-size:14px;">差分はまだありません</div>
-                                <div style="font-size:12px; margin-top:6px;">新バージョンをアップロードすると差分解析とリスク解析と期限取得が開始されます</div>
-                                <div style="font-size:12px; margin-top:4px;">「リスク解析をする」をクリックでリスク解析と期限取得が開始されます</div>
+                                <div style="font-size:14px;">蟾ｮ蛻・・縺ｾ縺�縺ゅｊ縺ｾ縺帙ｓ</div>
+                                <div style="font-size:12px; margin-top:6px;">譁ｰ繝舌・繧ｸ繝ｧ繝ｳ繧偵い繝・・繝ｭ繝ｼ繝峨☆繧九→蟾ｮ蛻・ｧ｣譫舌→繝ｪ繧ｹ繧ｯ隗｣譫舌→譛滄剞蜿門ｾ励′髢句ｧ九＆繧後∪縺・/div>
+                                <div style="font-size:12px; margin-top:4px;">縲後Μ繧ｹ繧ｯ隗｣譫舌ｒ縺吶ｋ縲阪ｒ繧ｯ繝ｪ繝・け縺ｧ繝ｪ繧ｹ繧ｯ隗｣譫舌→譛滄剞蜿門ｾ励′髢句ｧ九＆繧後∪縺・/div>
                             </div>
                             `}
                         </div>
@@ -1859,7 +1859,7 @@ const Views = {
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                                 <div style="display:flex; align-items:center; gap:10px;">
                                     <i class="fa-solid fa-satellite-dish" style="color:var(--accent-gold, #c19b4a); font-size:16px;"></i>
-                                    <span style="font-weight:600; font-size:14px;">定期監視</span>
+                                    <span style="font-weight:600; font-size:14px;">螳壽悄逶｣隕・/span>
                                 </div>
                                 <label class="toggle-switch">
                                     <input type="checkbox" ${contract.monitoring_enabled ? 'checked' : ''} onchange="window.app.toggleMonitoring(${id}, this.checked)">
@@ -1867,33 +1867,33 @@ const Views = {
                                 </label>
                             </div>
                             <p style="font-size:12px; color:#888; margin:0 0 16px; line-height:1.5;">
-                                URLの変更を自動チェックし、差分がある場合のみAI解析を実行します。
+                                URL縺ｮ螟画峩繧定・蜍輔メ繧ｧ繝・け縺励∝ｷｮ蛻・′縺ゅｋ蝣ｴ蜷医・縺ｿAI隗｣譫舌ｒ螳溯｡後＠縺ｾ縺吶・
                             </p>
                             <div style="background:#f8f9fa; border-radius:8px; padding:14px; font-size:13px; margin-bottom:14px;">
                                 <div style="display:flex; justify-content:space-between; margin-bottom:8px; color:#555;">
-                                    <span>最終チェック</span>
-                                    <span style="font-weight:500;">${contract.last_checked_at ? new Date(contract.last_checked_at).toLocaleString('ja-JP') : '—'}</span>
+                                    <span>譛邨ゅメ繧ｧ繝・け</span>
+                                    <span style="font-weight:500;">${contract.last_checked_at ? new Date(contract.last_checked_at).toLocaleString('ja-JP') : '窶・}</span>
                                 </div>
                                 <div style="display:flex; justify-content:space-between; color:#555;">
-                                    <span>監視頻度</span>
-                                    <span style="font-weight:500;">${contract.stable_count >= 14 ? '3日に1回（安定）' : (contract.stable_count >= 7 ? '2日に1回' : '毎日')}</span>
+                                    <span>逶｣隕夜�ｻ蠎ｦ</span>
+                                    <span style="font-weight:500;">${contract.stable_count >= 14 ? '3譌･縺ｫ1蝗橸ｼ亥ｮ牙ｮ夲ｼ・ : (contract.stable_count >= 7 ? '2譌･縺ｫ1蝗・ : '豈取律')}</span>
                                 </div>
                             </div>
                             <button class="btn-crawl-check" onclick="window.app.manualCrawl(${id})">
-                                <i class="fa-solid fa-arrows-rotate"></i> 今すぐ更新を確認
+                                <i class="fa-solid fa-arrows-rotate"></i> 莉翫☆縺先峩譁ｰ繧堤｢ｺ隱・
                             </button>
-                            <p style="font-size:11px; color:#aaa; margin:8px 0 0; text-align:center;">※ 変更検出時にAI解析回数を1回消費します</p>
+                            <p style="font-size:11px; color:#aaa; margin:8px 0 0; text-align:center;">窶ｻ 螟画峩讀懷・譎ゅ↓AI隗｣譫仙屓謨ｰ繧・蝗樊ｶ郁ｲｻ縺励∪縺・/p>
                             ` : `
                             <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
                                 <i class="fa-solid fa-satellite-dish" style="color:#ccc; font-size:16px;"></i>
-                                <span style="font-weight:600; font-size:14px; color:#999;">定期監視・Slack／メール通知</span>
-                                <span style="background:#f3f0ea; color:#c5a059; border:1px solid #e8d9b8; border-radius:10px; padding:2px 10px; font-size:11px; font-weight:700;">Pro限定</span>
+                                <span style="font-weight:600; font-size:14px; color:#999;">螳壽悄逶｣隕悶・Slack・上Γ繝ｼ繝ｫ騾夂衍</span>
+                                <span style="background:#f3f0ea; color:#c5a059; border:1px solid #e8d9b8; border-radius:10px; padding:2px 10px; font-size:11px; font-weight:700;">Pro髯仙ｮ・/span>
                             </div>
                             <p style="font-size:12px; color:#aaa; margin:0 0 16px; line-height:1.5;">
-                                URLの変更を自動チェックし、差分をSlack・メールで通知します。
+                                URL縺ｮ螟画峩繧定・蜍輔メ繧ｧ繝・け縺励∝ｷｮ蛻・ｒSlack繝ｻ繝｡繝ｼ繝ｫ縺ｧ騾夂衍縺励∪縺吶・
                             </p>
-                            <button class="btn-dashboard" style="width:100%; background:#c5a059; color:#fff; border:none; border-radius:8px; padding:10px; font-size:13px; font-weight:600; cursor:pointer;" onclick="window.app.showProFeatureModal('定期URL監視・Slack／メール通知はProプラン限定の機能です。')">
-                                <i class="fa-solid fa-lock" style="margin-right:6px;"></i> Proプランで使う
+                            <button class="btn-dashboard" style="width:100%; background:#c5a059; color:#fff; border:none; border-radius:8px; padding:10px; font-size:13px; font-weight:600; cursor:pointer;" onclick="window.app.showProFeatureModal('螳壽悄URL逶｣隕悶・Slack・上Γ繝ｼ繝ｫ騾夂衍縺ｯPro繝励Λ繝ｳ髯仙ｮ壹・讖溯・縺ｧ縺吶・)">
+                                <i class="fa-solid fa-lock" style="margin-right:6px;"></i> Pro繝励Λ繝ｳ縺ｧ菴ｿ縺・
                             </button>
                             `}
                         </div>
@@ -1904,26 +1904,26 @@ const Views = {
                     <div class="pane">
                         <div class="pane-header" style="display:flex; justify-content:space-between; align-items:center; min-height:56px; box-sizing:border-box;">
                             <div style="display:flex; align-items:center; gap:8px; min-width:0;">
-                                <span><i class="fa-solid fa-file-contract"></i> ドキュメント表示</span>
+                                <span><i class="fa-solid fa-file-contract"></i> 繝峨く繝･繝｡繝ｳ繝郁｡ｨ遉ｺ</span>
                                 ${contract.original_filename ? `<span class="doc-source-name" title="${contract.original_filename}"><i class="fa-solid fa-file-lines"></i> ${contract.original_filename}</span>` : ''}
                             </div>
                             
                             ${window.app.can('operate_contract') ? `
                             <button class="btn-upload-version" onclick="window.app.uploadNewVersion(${id})">
-                                <i class="fa-solid fa-cloud-arrow-up"></i> 新しいバージョンをアップロード
+                                <i class="fa-solid fa-cloud-arrow-up"></i> 譁ｰ縺励＞繝舌・繧ｸ繝ｧ繝ｳ繧偵い繝・・繝ｭ繝ｼ繝・
                             </button>` : ''}
                         </div>
                         <div class="tabs-row">
-                            <button class="tab-item ${activeTab === 'diff' ? 'active' : ''}" onclick="window.app.setDetailTab('diff')">差分表示</button>
-                            <button class="tab-item ${activeTab === 'original' ? 'active' : ''}" onclick="window.app.setDetailTab('original')">原本全文</button>
+                            <button class="tab-item ${activeTab === 'diff' ? 'active' : ''}" onclick="window.app.setDetailTab('diff')">蟾ｮ蛻・｡ｨ遉ｺ</button>
+                            <button class="tab-item ${activeTab === 'original' ? 'active' : ''}" onclick="window.app.setDetailTab('original')">蜴滓悽蜈ｨ譁・/button>
                         </div>
                         <div class="pane-scroll-area ${showPdfViewerInRightPane ? '' : 'document-pane-bg is-frameless'}" style="padding:0; flex:1; display:flex; flex-direction:column; overflow-y:auto;">
                                 ${showPdfViewerInRightPane
                 ? `<div style="width:100%; height:100%; display:flex; flex-direction:column;">
                         <iframe src="${resolvedPdfPreviewUrl}" style="width:100%; flex:1; border:none; background:#525659; min-height:600px;"></iframe>
                         <div style="padding:10px; text-align:center; background:#f9f9f9; border-top:1px solid #ddd; font-size:12px;">
-                            <a href="${resolvedPdfPreviewUrl}" target="_blank" class="text-primary"><i class="fa-solid fa-external-link-alt"></i> PDFを別ウィンドウで開く</a>
-                             <span style="margin-left:10px; color:#999;">(Shift+Clickでダウンロード)</span>
+                            <a href="${resolvedPdfPreviewUrl}" target="_blank" class="text-primary"><i class="fa-solid fa-external-link-alt"></i> PDF繧貞挨繧ｦ繧｣繝ｳ繝峨え縺ｧ髢九￥</a>
+                             <span style="margin-left:10px; color:#999;">(Shift+Click縺ｧ繝繧ｦ繝ｳ繝ｭ繝ｼ繝・</span>
                         </div>
                    </div>`
                 : `${compareBannerHtml}<div class="document-paper-container is-frameless">
@@ -1932,20 +1932,20 @@ const Views = {
                                         ${activeTab === 'diff'
                     ? (() => {
                         try {
-                            // 差分表示ロジック
+                            // 蟾ｮ蛻・｡ｨ遉ｺ繝ｭ繧ｸ繝・け
                             const renderAiChangeCards = () => {
                                 const aiOnlyHtml = normalizeChangesForDisplay(contract.ai_changes || []).map((c, idx) => {
                                     const escapedOld = escapeHtmlText(c.old || '');
                                     const escapedNew = escapeHtmlText(c.new || '');
-                                    const typeLabel = c.type === 'ADD' ? '追加' : (c.type === 'DELETE' ? '削除' : '変更');
+                                    const typeLabel = c.type === 'ADD' ? '霑ｽ蜉�' : (c.type === 'DELETE' ? '蜑企勁' : '螟画峩');
                                     return `
                                     <div style="margin-bottom:18px; border:1px solid #e5e7eb; border-radius:8px; overflow:hidden; background:#fff;">
                                         <div style="padding:10px 14px; background:#f8fafc; border-bottom:1px solid #e5e7eb; font-size:12px; font-weight:600;">
-                                            ${c.section || `変更 ${idx + 1}`} <span style="font-weight:normal; color:#667085; margin-left:8px;">(${typeLabel})</span>
+                                            ${c.section || `螟画峩 ${idx + 1}`} <span style="font-weight:normal; color:#667085; margin-left:8px;">(${typeLabel})</span>
                                         </div>
                                         <div class="diff-container" style="height:auto; min-height:90px;">
-                                            <div class="diff-pane diff-left"><span class="diff-del">${escapedOld || '（変更前なし）'}</span></div>
-                                            <div class="diff-pane diff-right"><span class="diff-add">${escapedNew || '（変更後なし）'}</span></div>
+                                            <div class="diff-pane diff-left"><span class="diff-del">${escapedOld || '・亥､画峩蜑阪↑縺暦ｼ・}</span></div>
+                                            <div class="diff-pane diff-right"><span class="diff-add">${escapedNew || '・亥､画峩蠕後↑縺暦ｼ・}</span></div>
                                         </div>
                                     </div>
                                 `;
@@ -1959,8 +1959,8 @@ const Views = {
                                 if (!src) return '';
                                 const lines = src.split(/\r?\n/);
                                 const out = [];
-                                const articleHeaderPattern = /^第\s*[0-9０-９一二三四五六七八九十百千〇零]+\s*条(?:\s+.*)?$/;
-                                const listLinePattern = /^([0-9０-９]+[\.．\)]|[・●○■□\-]|第\s*[0-9０-９一二三四五六七八九十百千〇零]+\s*条)/;
+                                const articleHeaderPattern = /^隨ｬ\s*[0-9・・・吩ｸ莠御ｸ牙屁莠泌・荳・・荵晏香逋ｾ蜊・・峺]+\s*譚｡(?:\s+.*)?$/;
+                                const listLinePattern = /^([0-9・・・兢+[\.・蚕)]|[繝ｻ笳鞘雷笆�笆｡\-]|隨ｬ\s*[0-9・・・吩ｸ莠御ｸ牙屁莠泌・荳・・荵晏香逋ｾ蜊・・峺]+\s*譚｡)/;
                                 const shortTailPattern = /^[\u3040-\u30ff\u3400-\u9fffA-Za-z0-9]{1,6}$/;
 
                                 for (let i = 0; i < lines.length; i += 1) {
@@ -1978,7 +1978,7 @@ const Views = {
                                         !isList &&
                                         prevTrim &&
                                         prevTrim !== '' &&
-                                        /[\u3040-\u30ff\u3400-\u9fffA-Za-z0-9）)】]$/.test(prevTrim);
+                                        /[\u3040-\u30ff\u3400-\u9fffA-Za-z0-9・・縲曽$/.test(prevTrim);
 
                                     if (out.length === 0 || prevTrim === '' || isList) {
                                         out.push(line);
@@ -2024,17 +2024,17 @@ const Views = {
                             const previousVersionText = contentToComparableText(previousVersion);
                             if (previousVersionText === currentVersionText) {
                                 return `
-                                <div class="text-muted text-center" style="padding:24px;">比較可能な差分がありません（旧版と同一内容です）</div>
+                                <div class="text-muted text-center" style="padding:24px;">豈碑ｼ・庄閭ｽ縺ｪ蟾ｮ蛻・′縺ゅｊ縺ｾ縺帙ｓ・域立迚医→蜷御ｸ蜀・ｮｹ縺ｧ縺呻ｼ・/div>
                             `;
                             }
 
                             if (isStructuredDocumentContent(previousVersion) || isStructuredDocumentContent(currentVersion)) {
                                 const previousLabel = displaySourceDoc
-                                    ? buildComparisonLabel(displaySourceDoc.document_name, displaySourceDoc.uploaded_at, '比較元資料')
-                                    : (comparisonContext?.previousLabel || buildComparisonLabel(contract.original_filename || contract.name, contract.last_updated_at, '比較元資料'));
+                                    ? buildComparisonLabel(displaySourceDoc.document_name, displaySourceDoc.uploaded_at, '豈碑ｼ・・雉・侭')
+                                    : (comparisonContext?.previousLabel || buildComparisonLabel(contract.original_filename || contract.name, contract.last_updated_at, '豈碑ｼ・・雉・侭'));
                                 const currentLabel = displayTargetDoc
-                                    ? buildComparisonLabel(displayTargetDoc.document_name, displayTargetDoc.uploaded_at, '比較先資料')
-                                    : (comparisonContext?.currentLabel || buildComparisonLabel(contract.original_filename || contract.name, contract.last_analyzed_at || contract.last_updated_at, '比較先資料'));
+                                    ? buildComparisonLabel(displayTargetDoc.document_name, displayTargetDoc.uploaded_at, '豈碑ｼ・・雉・侭')
+                                    : (comparisonContext?.currentLabel || buildComparisonLabel(contract.original_filename || contract.name, contract.last_analyzed_at || contract.last_updated_at, '豈碑ｼ・・雉・侭'));
                                 return renderStructuredDiffView(previousVersion, currentVersion, {
                                     idPrefix: `diff-${id}`,
                                     previousLabel,
@@ -2050,11 +2050,11 @@ const Views = {
                                     <div class="document-content-diff-wrap">
                                         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:12px;">
                                             <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px;">
-                                                <div style="font-size:12px; font-weight:700; color:#b42318; margin-bottom:8px;">変更前（旧版全文）</div>
+                                                <div style="font-size:12px; font-weight:700; color:#b42318; margin-bottom:8px;">螟画峩蜑搾ｼ域立迚亥・譁・ｼ・/div>
                                                 <div style="white-space:pre-wrap; line-height:1.9;">${escapeHtmlText(lhsText)}</div>
                                             </div>
                                             <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px;">
-                                                <div style="font-size:12px; font-weight:700; color:#027a48; margin-bottom:8px;">変更後（新版本文）</div>
+                                                <div style="font-size:12px; font-weight:700; color:#027a48; margin-bottom:8px;">螟画峩蠕鯉ｼ域眠迚域悽譁・ｼ・/div>
                                                 <div style="white-space:pre-wrap; line-height:1.9;">${escapeHtmlText(rhsText)}</div>
                                             </div>
                                         </div>
@@ -2082,11 +2082,11 @@ const Views = {
                                 <div class="document-content-diff-wrap">
                                     <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:12px;">
                                         <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px;">
-                                            <div style="font-size:12px; font-weight:700; color:#b42318; margin-bottom:8px;">変更前（旧版全文）</div>
+                                            <div style="font-size:12px; font-weight:700; color:#b42318; margin-bottom:8px;">螟画峩蜑搾ｼ域立迚亥・譁・ｼ・/div>
                                             <div style="white-space:pre-wrap; line-height:1.9;">${oldHtml}</div>
                                         </div>
                                         <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px;">
-                                            <div style="font-size:12px; font-weight:700; color:#027a48; margin-bottom:8px;">変更後（新版本文）</div>
+                                            <div style="font-size:12px; font-weight:700; color:#027a48; margin-bottom:8px;">螟画峩蠕鯉ｼ域眠迚域悽譁・ｼ・/div>
                                             <div style="white-space:pre-wrap; line-height:1.9;">${newHtml}</div>
                                         </div>
                                     </div>
@@ -2102,12 +2102,12 @@ const Views = {
                                 ? window.Diff.diffChars(previousVersionText, currentVersionText)
                                 : [{ value: currentVersionText }];
 
-                            // HTML生成
+                            // HTML逕滓・
                             let diffHtml = diff.map(part => {
                                 const colorClass = part.added ? 'diff-inline-add' :
                                     part.removed ? 'diff-inline-del' : '';
 
-                                // エスケープ処理（XSS対策）
+                                // 繧ｨ繧ｹ繧ｱ繝ｼ繝怜・逅・ｼ・SS蟇ｾ遲厄ｼ・
                                 const escapedValue = escapeHtmlText(part.value);
 
                                 return colorClass ? `<span class="${colorClass}">${escapedValue}</span>` : escapedValue;
@@ -2123,21 +2123,21 @@ const Views = {
                                 displayTargetDoc?.content || selectedTargetDoc?.content || contract.original_content || ''
                             );
                             const fallbackPreviousLabel = displaySourceDoc
-                                ? buildComparisonLabel(displaySourceDoc.document_name, displaySourceDoc.uploaded_at, '比較元資料')
-                                : (comparisonContext?.previousLabel || '比較元資料');
+                                ? buildComparisonLabel(displaySourceDoc.document_name, displaySourceDoc.uploaded_at, '豈碑ｼ・・雉・侭')
+                                : (comparisonContext?.previousLabel || '豈碑ｼ・・雉・侭');
                             const fallbackCurrentLabel = displayTargetDoc
-                                ? buildComparisonLabel(displayTargetDoc.document_name, displayTargetDoc.uploaded_at, '比較先資料')
-                                : (comparisonContext?.currentLabel || '比較先資料');
+                                ? buildComparisonLabel(displayTargetDoc.document_name, displayTargetDoc.uploaded_at, '豈碑ｼ・・雉・侭')
+                                : (comparisonContext?.currentLabel || '豈碑ｼ・・雉・侭');
                             return `
                                 <div class="document-content-diff-wrap">
                                     <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:12px;">
                                         <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px;">
                                             <div style="font-size:12px; font-weight:700; color:#667085; margin-bottom:8px;">${escapeHtmlText(fallbackPreviousLabel)}</div>
-                                            <div style="white-space:pre-wrap; line-height:1.9;">${escapeHtmlText(fallbackPreviousText || '比較元データなし')}</div>
+                                            <div style="white-space:pre-wrap; line-height:1.9;">${escapeHtmlText(fallbackPreviousText || '豈碑ｼ・・繝・・繧ｿ縺ｪ縺・)}</div>
                                         </div>
                                         <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px;">
                                             <div style="font-size:12px; font-weight:700; color:#667085; margin-bottom:8px;">${escapeHtmlText(fallbackCurrentLabel)}</div>
-                                            <div style="white-space:pre-wrap; line-height:1.9;">${escapeHtmlText(fallbackCurrentText || '比較先データなし')}</div>
+                                            <div style="white-space:pre-wrap; line-height:1.9;">${escapeHtmlText(fallbackCurrentText || '豈碑ｼ・・繝・・繧ｿ縺ｪ縺・)}</div>
                                         </div>
                                     </div>
                                 </div>
@@ -2146,7 +2146,7 @@ const Views = {
                     })()
                     : (contract.original_content
                         ? `<div class="is-structured">${renderStructuredView(contract.original_content, `orig-${id}`)}</div>`
-                        : '<div class="text-center text-muted" style="padding:40px;">原本データがありません</div>')
+                        : '<div class="text-center text-muted" style="padding:40px;">蜴滓悽繝・・繧ｿ縺後≠繧翫∪縺帙ｓ</div>')
                 }
                     </div>
                 </div>`
@@ -2163,37 +2163,37 @@ const Views = {
         const logs = Array.isArray(liveLogs) && liveLogs.length > 0 ? liveLogs : cachedLogs;
         const rows = logs.map(h => {
             let statusBadge = 'badge-neutral';
-            if (h.status === '成功') statusBadge = 'badge-success';
-            else if (h.status === '失敗') statusBadge = 'badge-danger';
-            else if (h.status === 'スキップ') statusBadge = 'badge-info';
+            if (h.status === '謌仙粥') statusBadge = 'badge-success';
+            else if (h.status === '螟ｱ謨・) statusBadge = 'badge-danger';
+            else if (h.status === '繧ｹ繧ｭ繝・・') statusBadge = 'badge-info';
 
             return `
                 <tr>
                     <td>${h.created_at}</td>
                     <td class="col-name" title="${h.target_name}">${h.target_name}</td>
-                    <td><span class="badge ${statusBadge}">${h.status || '成功'}</span></td>
+                    <td><span class="badge ${statusBadge}">${h.status || '謌仙粥'}</span></td>
                     <td>${h.action}</td>
                     <td>${h.actor}</td>
-                    <td><button class="btn-dashboard" style="padding:2px 8px; font-size:11px;" onclick="window.app.showLogDetails(${h.id})">詳細</button></td>
+                    <td><button class="btn-dashboard" style="padding:2px 8px; font-size:11px;" onclick="window.app.showLogDetails(${h.id})">隧ｳ邏ｰ</button></td>
                 </tr>
             `;
         }).join('');
 
         return `
-            <h2 class="page-title">解析ログ・監査履歴</h2>
+            <h2 class="page-title">隗｣譫舌Ο繧ｰ繝ｻ逶｣譟ｻ螻･豁ｴ</h2>
             <div class="table-container">
             <table class="data-table history-table">
                 <thead>
                     <tr>
-                        <th>日時</th>
-                        <th>対象</th>
-                        <th>ステータス</th>
-                        <th>操作/種別</th>
-                        <th>実行者</th>
-                        <th>詳細</th>
+                        <th>譌･譎・/th>
+                        <th>蟇ｾ雎｡</th>
+                        <th>繧ｹ繝・・繧ｿ繧ｹ</th>
+                        <th>謫堺ｽ・遞ｮ蛻･</th>
+                        <th>螳溯｡瑚・/th>
+                        <th>隧ｳ邏ｰ</th>
                     </tr>
                 </thead>
-                <tbody>${rows || '<tr><td colspan="6" class="text-center text-muted">履歴はありません</td></tr>'}</tbody>
+                <tbody>${rows || '<tr><td colspan="6" class="text-center text-muted">螻･豁ｴ縺ｯ縺ゅｊ縺ｾ縺帙ｓ</td></tr>'}</tbody>
             </table>
         </div>
 `;
@@ -2207,26 +2207,26 @@ const Views = {
     <tr>
                 <td class="col-name" title="${m.name}">${m.name}</td>
             <td>${m.email}</td>
-            <td><span class="badge ${m.role === '管理者' ? 'badge-warning' : (m.role === '作業者' ? 'badge-success' : 'badge-neutral')}">${m.role}</span></td>
+            <td><span class="badge ${m.role === '邂｡逅・・ ? 'badge-warning' : (m.role === '菴懈･ｭ閠・ ? 'badge-success' : 'badge-neutral')}">${m.role}</span></td>
             <td>${m.last_active_at}</td>
-            <td>${window.app.can('manage_team') ? `<button class="btn-dashboard" onclick="window.app.showEditMemberModal('${m.email}')">編集</button>` : '-'}</td>
+            <td>${window.app.can('manage_team') ? `<button class="btn-dashboard" onclick="window.app.showEditMemberModal('${m.email}')">邱ｨ髮・/button>` : '-'}</td>
         </tr>
     `).join('');
 
         return `
     <div class="flex justify-between items-center mb-md">
-        <h2 class="page-title" style="margin-bottom:0;">チーム管理 <small style="font-size:14px; font-weight:normal; color:#666; margin-left:12px;">(${users.length} / ${limit} 名)</small></h2>
-                ${window.app.can('manage_team') ? `<button class="btn-dashboard btn-primary-action" onclick="window.app.showInviteModal()"><i class="fa-solid fa-user-plus"></i> メンバー招待</button>` : ''}
+        <h2 class="page-title" style="margin-bottom:0;">繝√・繝�邂｡逅・<small style="font-size:14px; font-weight:normal; color:#666; margin-left:12px;">(${users.length} / ${limit} 蜷・</small></h2>
+                ${window.app.can('manage_team') ? `<button class="btn-dashboard btn-primary-action" onclick="window.app.showInviteModal()"><i class="fa-solid fa-user-plus"></i> 繝｡繝ｳ繝舌・諡帛ｾ・/button>` : ''}
             </div>
     <div class="table-container">
         <table class="data-table team-table">
             <thead>
                 <tr>
-                    <th>名前</th>
-                    <th>メールアドレス</th>
-                    <th>権限</th>
-                    <th>最終アクティブ</th>
-                    <th>操作</th>
+                    <th>蜷榊燕</th>
+                    <th>繝｡繝ｼ繝ｫ繧｢繝峨Ξ繧ｹ</th>
+                    <th>讓ｩ髯・/th>
+                    <th>譛邨ゅい繧ｯ繝・ぅ繝・/th>
+                    <th>謫堺ｽ・/th>
                 </tr>
             </thead>
             <tbody>${rows}</tbody>
@@ -2274,16 +2274,16 @@ class RegistrationFlow {
 
     open() {
         if (!window.app.can('operate_contract')) {
-            Notify.warning('閲覧のみの権限では新規登録できません');
+            Notify.warning('髢ｲ隕ｧ縺ｮ縺ｿ縺ｮ讓ｩ髯舌〒縺ｯ譁ｰ隕冗匳骭ｲ縺ｧ縺阪∪縺帙ｓ');
             return;
         }
         this.currentStep = 1;
         this.tempData = {};
 
-        // 先にレンダリング
+        // 蜈医↓繝ｬ繝ｳ繝繝ｪ繝ｳ繧ｰ
         this.renderStep();
 
-        // 次のフレームで表示（描画のちらつき防止＆滑らかさ向上）
+        // 谺｡縺ｮ繝輔Ξ繝ｼ繝�縺ｧ陦ｨ遉ｺ・域緒逕ｻ縺ｮ縺｡繧峨▽縺埼亟豁｢・・ｻ代ｉ縺九＆蜷台ｸ奇ｼ・
         requestAnimationFrame(() => {
             if (this.modal) this.modal.classList.add('active');
         });
@@ -2300,28 +2300,28 @@ class RegistrationFlow {
         if (!this.modalBody) return;
 
         if (this.currentStep === 1) {
-            this.modalTitle.textContent = "新規登録 - 登録方法の選択";
+            this.modalTitle.textContent = "譁ｰ隕冗匳骭ｲ - 逋ｻ骭ｲ譁ｹ豕輔・驕ｸ謚・;
             this.modalBody.innerHTML = `
                 <div class="reg-method-grid">
                     <div class="reg-method-card" id="reg-card-docx">
                         <div class="reg-method-icon"><i class="fa-solid fa-file-word"></i></div>
                         <div class="reg-method-info">
-                            <h4>Wordをアップロード</h4>
-                            <p>Wordファイル(.docx)を解析・比較します</p>
+                            <h4>Word繧偵い繝・・繝ｭ繝ｼ繝・/h4>
+                            <p>Word繝輔ぃ繧､繝ｫ(.docx)繧定ｧ｣譫舌・豈碑ｼ・＠縺ｾ縺・/p>
                         </div>
                     </div>
                     <div class="reg-method-card" id="reg-card-pdf">
                         <div class="reg-method-icon"><i class="fa-solid fa-file-pdf"></i></div>
                         <div class="reg-method-info">
-                            <h4>PDFをアップロード</h4>
-                            <p>ファイルをここにドロップするか、クリックして選択</p>
+                            <h4>PDF繧偵い繝・・繝ｭ繝ｼ繝・/h4>
+                            <p>繝輔ぃ繧､繝ｫ繧偵％縺薙↓繝峨Ο繝・・縺吶ｋ縺九√け繝ｪ繝・け縺励※驕ｸ謚・/p>
                         </div>
                     </div>
                     <div class="reg-method-card" id="reg-card-url">
                         <div class="reg-method-icon"><i class="fa-solid fa-globe"></i></div>
                         <div class="reg-method-info">
-                            <h4>URLを登録 (Web規約)</h4>
-                            <p>公開URLを監視対象に設定します</p>
+                            <h4>URL繧堤匳骭ｲ (Web隕冗ｴ・</h4>
+                            <p>蜈ｬ髢偽RL繧堤屮隕門ｯｾ雎｡縺ｫ險ｭ螳壹＠縺ｾ縺・/p>
                         </div>
                     </div>
                 </div>
@@ -2330,19 +2330,19 @@ class RegistrationFlow {
         } else if (this.currentStep === 2) {
             const isPdf = this.tempData.method === 'pdf';
             const isDocx = this.tempData.method === 'docx';
-            const methodLabel = (isPdf || isDocx) ? 'アップロードされたファイル' : '監視対象のURL';
-            const sourceVal = (isPdf || isDocx) ? (this.tempData.fileName || '選択済み') : "";
+            const methodLabel = (isPdf || isDocx) ? '繧｢繝・・繝ｭ繝ｼ繝峨＆繧後◆繝輔ぃ繧､繝ｫ' : '逶｣隕門ｯｾ雎｡縺ｮURL';
+            const sourceVal = (isPdf || isDocx) ? (this.tempData.fileName || '驕ｸ謚樊ｸ医∩') : "";
             const defaultName = this.tempData.fileName ? this.tempData.fileName.replace(/\.[^/.]+$/, "") : "";
 
             this.modalBody.innerHTML = `
                 <div class="form-group">
-                    <label>管理名 (必須)</label>
-                    <input type="text" id="reg-name" class="form-control" placeholder="例: 利用規約 (2026年版)" value="${defaultName}">
+                    <label>邂｡逅・錐 (蠢・�・</label>
+                    <input type="text" id="reg-name" class="form-control" placeholder="萓・ 蛻ｩ逕ｨ隕冗ｴ・(2026蟷ｴ迚・" value="${defaultName}">
                 </div>
                 <div class="form-group">
-                    <label>種別</label>
+                    <label>遞ｮ蛻･</label>
                     <select id="reg-type" class="form-control">
-                        ${(() => { const fixed = ['利用規約','NDA','業務委託契約','プライバシーポリシー']; const dynamic = dbService.getContracts().map(c => c.type).filter(Boolean); const types = [...new Set([...fixed, ...dynamic.filter(t => t !== 'その他')])]; types.push('その他'); return types.map(t => `<option value="${t}">${t}</option>`).join(''); })()}
+                        ${(() => { const fixed = ['蛻ｩ逕ｨ隕冗ｴ・,'NDA','讌ｭ蜍吝ｧ碑ｨ怜･醍ｴ・,'繝励Λ繧､繝舌す繝ｼ繝昴Μ繧ｷ繝ｼ']; const dynamic = dbService.getContracts().map(c => c.type).filter(Boolean); const types = [...new Set([...fixed, ...dynamic.filter(t => t !== '縺昴・莉・)])]; types.push('縺昴・莉・); return types.map(t => `<option value="${t}">${t}</option>`).join(''); })()}
                     </select>
                 </div>
                 <div class="form-group">
@@ -2354,20 +2354,20 @@ class RegistrationFlow {
                 </div>
                 
 <div class="reg-actions">
-    <button class="btn-dashboard" onclick="window.app.registration.nextStep(1)">戻る</button>
-    <button class="btn-dashboard btn-primary-action" onclick="window.app.registration.submit()">解析・登録する</button>
+    <button class="btn-dashboard" onclick="window.app.registration.nextStep(1)">謌ｻ繧・/button>
+    <button class="btn-dashboard btn-primary-action" onclick="window.app.registration.submit()">隗｣譫舌・逋ｻ骭ｲ縺吶ｋ</button>
 </div>
 `;
         } else if (this.currentStep === 3) {
-            this.modalTitle.textContent = "登録完了";
+            this.modalTitle.textContent = "逋ｻ骭ｲ螳御ｺ・;
             this.modalBody.innerHTML = `
     <div class="reg-success-icon"><i class="fa-solid fa-check-circle"></i></div>
                 <div class="reg-success-text">
-                    <h4>登録を受け付けました</h4>
-                    <p>「${this.tempData.name}」を監視対象として登録しました。ダッシュボードから確認できます。</p>
+                    <h4>逋ｻ骭ｲ繧貞女縺台ｻ倥￠縺ｾ縺励◆</h4>
+                    <p>縲・{this.tempData.name}縲阪ｒ逶｣隕門ｯｾ雎｡縺ｨ縺励※逋ｻ骭ｲ縺励∪縺励◆縲ゅム繝・す繝･繝懊・繝峨°繧臥｢ｺ隱阪〒縺阪∪縺吶・/p>
                 </div>
                 <div class="reg-actions">
-                    <button class="btn-dashboard btn-primary-action" onclick="window.app.registration.close()">ダッシュボードへ</button>
+                    <button class="btn-dashboard btn-primary-action" onclick="window.app.registration.close()">繝繝・す繝･繝懊・繝峨∈</button>
                 </div>
 `;
         }
@@ -2417,7 +2417,7 @@ class RegistrationFlow {
             }
             cardUrl.onclick = () => {
                 if (!isPro) {
-                    window.app.showProFeatureModal('URLを登録して定期的に変更を監視し、差分をSlack・メールで通知する機能はProプラン限定です。');
+                    window.app.showProFeatureModal('URL繧堤匳骭ｲ縺励※螳壽悄逧・↓螟画峩繧堤屮隕悶＠縲∝ｷｮ蛻・ｒSlack繝ｻ繝｡繝ｼ繝ｫ縺ｧ騾夂衍縺吶ｋ讖溯・縺ｯPro繝励Λ繝ｳ髯仙ｮ壹〒縺吶・);
                     return;
                 }
                 this.nextStep(2, { method: 'url' });
@@ -2432,7 +2432,7 @@ class RegistrationFlow {
         const isDocx = file.name.toLowerCase().endsWith('.docx');
 
         if (!isPdf && !isDocx) {
-            Notify.warning('PDFまたはWordファイル(.docx)を選択してください');
+            Notify.warning('PDF縺ｾ縺溘・Word繝輔ぃ繧､繝ｫ(.docx)繧帝∈謚槭＠縺ｦ縺上□縺輔＞');
             return;
         }
 
@@ -2470,20 +2470,20 @@ class RegistrationFlow {
         const comparePrevId = comparePrevInput ? comparePrevInput.value : "";
 
         if (!name) {
-            Notify.warning('管理名を入力してください');
+            Notify.warning('邂｡逅・錐繧貞・蜉帙＠縺ｦ縺上□縺輔＞');
             return;
         }
 
         this.tempData.name = name;
         this.tempData.type = type;
         this.tempData.source = source;
-        this.tempData.comparePrevId = null; // 旧UIのID指定は無効化
+        this.tempData.comparePrevId = null; // 譌ｧUI縺ｮID謖・ｮ壹・辟｡蜉ｹ蛹・
 
-        // ローディング表示（抽出中）
+        // 繝ｭ繝ｼ繝・ぅ繝ｳ繧ｰ陦ｨ遉ｺ・域歓蜃ｺ荳ｭ・・
         const isPdf = this.tempData.method === 'pdf';
         const isDocx = this.tempData.method === 'docx';
-        const loadingText = isPdf ? 'PDFを取り込み中...' : (isDocx ? 'Wordファイルを取り込み中...' : 'URLから規約を解析中...');
-        const loadingSubText = (isPdf || isDocx) ? '解析準備をしています' : 'Webサイトから詳細を取得しています';
+        const loadingText = isPdf ? 'PDF繧貞叙繧願ｾｼ縺ｿ荳ｭ...' : (isDocx ? 'Word繝輔ぃ繧､繝ｫ繧貞叙繧願ｾｼ縺ｿ荳ｭ...' : 'URL縺九ｉ隕冗ｴ・ｒ隗｣譫蝉ｸｭ...');
+        const loadingSubText = (isPdf || isDocx) ? '隗｣譫先ｺ門ｙ繧偵＠縺ｦ縺・∪縺・ : 'Web繧ｵ繧､繝医°繧芽ｩｳ邏ｰ繧貞叙蠕励＠縺ｦ縺・∪縺・;
 
         const loadingMsg = document.createElement('div');
         loadingMsg.id = 'reg-loading';
@@ -2491,36 +2491,36 @@ class RegistrationFlow {
         loadingMsg.innerHTML = `<div class="custom-loader"></div><br><strong>${loadingText}</strong><br><span style="font-size:12px; color:#666;">${loadingSubText}</span>`;
         document.body.appendChild(loadingMsg);
 
-        // 背景を暗くするオーバーレイ
+        // 閭梧勹繧呈囓縺上☆繧九が繝ｼ繝舌・繝ｬ繧､
         const overlay = document.createElement('div');
         overlay.id = 'reg-overlay';
         overlay.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10004;';
         document.body.appendChild(overlay);
 
-        // UI描画を確実にするための短い遅延
+        // UI謠冗判繧堤｢ｺ螳溘↓縺吶ｋ縺溘ａ縺ｮ遏ｭ縺・≦蟒ｶ
         await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 50)));
 
         try {
-            // DBに登録
+            // DB縺ｫ逋ｻ骭ｲ
             const isWord = this.tempData.method === 'docx';
             const newContract = dbService.addContract({
-                name: this.tempData.name || ((this.tempData.method === 'pdf' || isWord) ? this.tempData.fileData.name : 'Web規約'),
-                type: this.tempData.type, // デフォルト
+                name: this.tempData.name || ((this.tempData.method === 'pdf' || isWord) ? this.tempData.fileData.name : 'Web隕冗ｴ・),
+                type: this.tempData.type, // 繝・ヵ繧ｩ繝ｫ繝・
                 sourceUrl: this.tempData.method === 'url' ? this.tempData.source : '',
                 originalFilename: (this.tempData.method === 'pdf' || isWord) ? this.tempData.fileData.name : ''
             });
             const savedContract = await dbService.persistContractToApi(newContract, 'POST', { throwOnError: true });
             if (!savedContract) {
-                throw new Error('契約データの保存に失敗しました');
+                throw new Error('螂醍ｴ・ョ繝ｼ繧ｿ縺ｮ菫晏ｭ倥↓螟ｱ謨励＠縺ｾ縺励◆');
             }
             await dbService.syncContractsFromApi();
-            // 2. テキスト抽出を実行（失敗しても登録は維持する）
+            // 2. 繝・く繧ｹ繝域歓蜃ｺ繧貞ｮ溯｡鯉ｼ亥､ｱ謨励＠縺ｦ繧ら匳骭ｲ縺ｯ邯ｭ謖√☆繧具ｼ・
             let extractionSucceeded = false;
             try {
                 let previousText = null;
                 let previousFileBase64 = null;
 
-                // Wordの場合はファイル同士の比較を行う
+                // Word縺ｮ蝣ｴ蜷医・繝輔ぃ繧､繝ｫ蜷悟｣ｫ縺ｮ豈碑ｼ・ｒ陦後≧
                 if (isWord && this.compareFile) {
                     previousFileBase64 = await aiService.convertFileToBase64(this.compareFile);
                 }
@@ -2529,21 +2529,21 @@ class RegistrationFlow {
                 await dbService.syncContractsFromApi();
             } catch (extractError) {
                 console.error('Text Extraction Failed (Non-fatal):', extractError);
-                // 失敗時はステータスを更新しておく（ユーザーには後で通知）
-                // NOTE: dbService側で自動的に '未処理' になっているはずだが、エラー情報を残すならここで更新
+                // 螟ｱ謨玲凾縺ｯ繧ｹ繝・・繧ｿ繧ｹ繧呈峩譁ｰ縺励※縺翫￥・医Θ繝ｼ繧ｶ繝ｼ縺ｫ縺ｯ蠕後〒騾夂衍・・
+                // NOTE: dbService蛛ｴ縺ｧ閾ｪ蜍慕噪縺ｫ '譛ｪ蜃ｦ逅・ 縺ｫ縺ｪ縺｣縺ｦ縺・ｋ縺ｯ縺壹□縺後√お繝ｩ繝ｼ諠・�ｱ繧呈ｮ九☆縺ｪ繧峨％縺薙〒譖ｴ譁ｰ
             }
 
-            // 3. 完了処理
+            // 3. 螳御ｺ・・逅・
             if (document.getElementById('reg-loading')) document.getElementById('reg-loading').remove();
             if (document.getElementById('reg-overlay')) document.getElementById('reg-overlay').remove();
 
             this.close();
 
             if (extractionSucceeded) {
-                // 4. 詳細ページへ遷移（まずは原本を表示して安心させる）
+                // 4. 隧ｳ邏ｰ繝壹・繧ｸ縺ｸ驕ｷ遘ｻ・医∪縺壹・蜴滓悽繧定｡ｨ遉ｺ縺励※螳牙ｿ・＆縺帙ｋ・・
                 this.app.activeDetailTab = 'original';
                 this.app.navigate('diff', newContract.id);
-                Notify.toast('読み込みが完了しました。', {
+                Notify.toast('隱ｭ縺ｿ霎ｼ縺ｿ縺悟ｮ御ｺ・＠縺ｾ縺励◆縲・, {
                     type: 'success',
                     duration: 2000,
                     closable: false,
@@ -2551,14 +2551,14 @@ class RegistrationFlow {
                 });
             } else {
                 this.app.navigate('contracts');
-                this.app.showToast('⚠️ 登録は完了しましたが、テキスト抽出に失敗しました', 'warning', 5000);
+                this.app.showToast('笞�・・逋ｻ骭ｲ縺ｯ螳御ｺ・＠縺ｾ縺励◆縺後√ユ繧ｭ繧ｹ繝域歓蜃ｺ縺ｫ螟ｱ謨励＠縺ｾ縺励◆', 'warning', 5000);
             }
 
         } catch (error) {
             console.error('Registration Error:', error);
             if (document.getElementById('reg-loading')) document.getElementById('reg-loading').remove();
             if (document.getElementById('reg-overlay')) document.getElementById('reg-overlay').remove();
-            Notify.error('登録中にエラーが発生しました: ' + error.message);
+            Notify.error('逋ｻ骭ｲ荳ｭ縺ｫ繧ｨ繝ｩ繝ｼ縺檎匱逕溘＠縺ｾ縺励◆: ' + error.message);
         }
     }
 
@@ -2566,7 +2566,7 @@ class RegistrationFlow {
         try {
             let sourceData = this.tempData.source;
 
-            // PDFまたはWordの場合はFileReaderでBase64に変換
+            // PDF縺ｾ縺溘・Word縺ｮ蝣ｴ蜷医・FileReader縺ｧBase64縺ｫ螟画鋤
             if ((this.tempData.method === 'pdf' || this.tempData.method === 'docx') && this.tempData.fileData) {
                 sourceData = await aiService.convertFileToBase64(this.tempData.fileData);
                 if (this.tempData.method === 'pdf') {
@@ -2584,11 +2584,11 @@ class RegistrationFlow {
                 );
 
                 if (!result.success) {
-                    throw new Error(result.error || 'Word差分解析に失敗しました');
+                    throw new Error(result.error || 'Word蟾ｮ蛻・ｧ｣譫舌↓螟ｱ謨励＠縺ｾ縺励◆');
                 }
                 const extractedContent = resolveExtractedContentPayload(result.data);
                 if (!extractedContent) {
-                    throw new Error('Word解析結果に本文データが含まれていません');
+                    throw new Error('Word隗｣譫千ｵ先棡縺ｫ譛ｬ譁・ョ繝ｼ繧ｿ縺悟性縺ｾ繧後※縺・∪縺帙ｓ');
                 }
 
                 dbService.updateContractAnalysis(contractId, {
@@ -2601,7 +2601,7 @@ class RegistrationFlow {
                     summary: result.data.summary,
                     isFallback: result.data.isFallback === true,
                     aiFailed: result.data.aiFailed === true,
-                    status: '未確認',
+                    status: '譛ｪ遒ｺ隱・,
                     originalFilename: this.tempData.fileData?.name || ''
                 });
                 await this.app.refreshSubscriptionStatusSafe();
@@ -2614,16 +2614,16 @@ class RegistrationFlow {
                 contractId,
                 this.tempData.method,
                 sourceData,
-                previousFileBase64 || previousVersion, // Word比較ならBase64を優先
+                previousFileBase64 || previousVersion, // Word豈碑ｼ・↑繧隠ase64繧貞━蜈・
                 { skipAI: true }
             );
 
             if (result.success) {
                 const extractedContent = resolveExtractedContentPayload(result.data);
                 if (!extractedContent) {
-                    throw new Error('抽出結果に本文データが含まれていません');
+                    throw new Error('謚ｽ蜃ｺ邨先棡縺ｫ譛ｬ譁・ョ繝ｼ繧ｿ縺悟性縺ｾ繧後※縺・∪縺帙ｓ');
                 }
-                // 抽出されたテキストのみを保存（AI解析結果は保存しない）
+                // 謚ｽ蜃ｺ縺輔ｌ縺溘ユ繧ｭ繧ｹ繝医・縺ｿ繧剃ｿ晏ｭ假ｼ・I隗｣譫千ｵ先棡縺ｯ菫晏ｭ倥＠縺ｪ縺・ｼ・
                 dbService.updateContractText(contractId, {
                     extractedText: extractedContent,
                     rawExtractedText: result.data.rawExtractedText,
@@ -2632,26 +2632,26 @@ class RegistrationFlow {
                     sourceType: result.data.sourceType,
                     pdfStoragePath: result.data.pdfStoragePath,
                     pdfUrl: result.data.pdfUrl,
-                    status: '未処理'  // 差分がまだないので未処理
+                    status: '譛ｪ蜃ｦ逅・  // 蟾ｮ蛻・′縺ｾ縺�縺ｪ縺・・縺ｧ譛ｪ蜃ｦ逅・
                 });
 
                 console.log('Text extraction completed');
                 return true;
             } else {
-                throw new Error(result.error || 'テキスト抽出に失敗しました');
+                throw new Error(result.error || '繝・く繧ｹ繝域歓蜃ｺ縺ｫ螟ｱ謨励＠縺ｾ縺励◆');
             }
 
         } catch (error) {
-            console.error('テキスト抽出エラー:', error);
+            console.error('繝・く繧ｹ繝域歓蜃ｺ繧ｨ繝ｩ繝ｼ:', error);
 
-            // エラーステータスに更新
-            dbService.updateContractStatus(contractId, '登録失敗');
+            // 繧ｨ繝ｩ繝ｼ繧ｹ繝・・繧ｿ繧ｹ縺ｫ譖ｴ譁ｰ
+            dbService.updateContractStatus(contractId, '逋ｻ骭ｲ螟ｱ謨・);
 
-            // ユーザーにエラーを通知
+            // 繝ｦ繝ｼ繧ｶ繝ｼ縺ｫ繧ｨ繝ｩ繝ｼ繧帝夂衍
             const methodLabel = this.tempData.method === 'pdf' ? 'PDF' : (this.tempData.method === 'docx' ? 'Word' : 'URL');
-            Notify.alert(`申し訳ありません。${methodLabel}からのテキスト抽出に失敗しました。\n\n原因: ${error.message}\n\n※画像PDFやパスワード付きPDF、または破損したWordファイルは対応していない場合があります。`, { type: 'error' });
+            Notify.alert(`逕ｳ縺苓ｨｳ縺ゅｊ縺ｾ縺帙ｓ縲・{methodLabel}縺九ｉ縺ｮ繝・く繧ｹ繝域歓蜃ｺ縺ｫ螟ｱ謨励＠縺ｾ縺励◆縲・n\n蜴溷屏: ${error.message}\n\n窶ｻ逕ｻ蜒襲DF繧・ヱ繧ｹ繝ｯ繝ｼ繝我ｻ倥″PDF縲√∪縺溘・遐ｴ謳阪＠縺欷ord繝輔ぃ繧､繝ｫ縺ｯ蟇ｾ蠢懊＠縺ｦ縺・↑縺・�ｴ蜷医′縺ゅｊ縺ｾ縺吶Ａ, { type: 'error' });
 
-            console.warn(`テキスト抽出に失敗: ${error.message}`);
+            console.warn(`繝・く繧ｹ繝域歓蜃ｺ縺ｫ螟ｱ謨・ ${error.message}`);
             return false;
         }
     }
@@ -2665,7 +2665,7 @@ class DashboardApp {
         this.mainContent = document.getElementById('app-content');
         this.pageTitle = document.getElementById('page-header-title');
         this.currentViewParams = null;
-        this.userRole = '管理者'; // Default: オーナー（API失敗時はチームメンバーではないのでオーナー扱い）
+        this.userRole = '邂｡逅・・; // Default: 繧ｪ繝ｼ繝翫・・・PI螟ｱ謨玲凾縺ｯ繝√・繝�繝｡繝ｳ繝舌・縺ｧ縺ｯ縺ｪ縺・・縺ｧ繧ｪ繝ｼ繝翫・謇ｱ縺・ｼ・
 
 
         // Navigation State
@@ -2689,7 +2689,7 @@ class DashboardApp {
 
         // Registration Flow
         this.registration = new RegistrationFlow(this);
-        // 無料期間終了フロー時は決済モーダルを閉じられないようにする
+        // 辟｡譁呎悄髢鍋ｵゆｺ・ヵ繝ｭ繝ｼ譎ゅ・豎ｺ貂医Δ繝ｼ繝繝ｫ繧帝哩縺倥ｉ繧後↑縺・ｈ縺・↓縺吶ｋ
         this.forceSubscriptionPayment = false;
         this.planViewBillingCycle = null;
         this.paymentConfig = null;
@@ -2698,17 +2698,17 @@ class DashboardApp {
         this.stripeEnabled = false;
         this.stripePublishableKey = '';
 
-        // 初期表示を無料プランに設定 (チェック用)
+        // 蛻晄悄陦ｨ遉ｺ繧堤┌譁吶・繝ｩ繝ｳ縺ｫ險ｭ螳・(繝√ぉ繝・け逕ｨ)
         this.subscription = { plan: 'free', billingCycle: 'monthly', usageCount: 0, usageLimit: 3, daysRemaining: null, planLimit: 10 };
         this.userPlan = 'free';
 
-        // URLパラメータによるプラン強制 (検証用: ?forcePlan=free)
+        // URL繝代Λ繝｡繝ｼ繧ｿ縺ｫ繧医ｋ繝励Λ繝ｳ蠑ｷ蛻ｶ (讀懆ｨｼ逕ｨ: ?forcePlan=free)
         const urlParams = new URLSearchParams(window.location.search);
         const forcedPlan = urlParams.get('forcePlan');
         if (forcedPlan === 'free') {
             this.subscription = { plan: 'free', billingCycle: 'monthly', usageCount: 0, usageLimit: 3, daysRemaining: null, planLimit: 10 };
             this.userPlan = 'free';
-            // キャッシュにも保存して一貫性を保つ
+            // 繧ｭ繝｣繝・す繝･縺ｫ繧ゆｿ晏ｭ倥＠縺ｦ荳雋ｫ諤ｧ繧剃ｿ昴▽
             this.setCachedItem(DASHBOARD_CACHE_KEYS.SUBSCRIPTION, this.subscription);
         }
 
@@ -2862,7 +2862,7 @@ class DashboardApp {
     }
 
     hydrateCachedState() {
-        // URLパラメータ優先
+        // URL繝代Λ繝｡繝ｼ繧ｿ蜆ｪ蜈・
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('forcePlan') === 'free') return;
 
@@ -2924,7 +2924,7 @@ class DashboardApp {
      * Format YYYY-MM-DD to Japanese locale string.
      */
     _formatDateJa(dateStr) {
-        if (!dateStr) return '—';
+        if (!dateStr) return '窶・;
         const d = new Date(dateStr);
         if (isNaN(d.getTime())) return dateStr;
         return d.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -2945,7 +2945,7 @@ class DashboardApp {
             if (clauses && clauses.length > 0) {
                 contentHtml = clauses.map(clause => {
                     const titleHtml = clause.title
-                        ? `<div style="font-size:13px;font-weight:700;color:#c5a059;margin-bottom:4px;">${clause.title}${clause.header ? `　${clause.header}` : ''}</div>`
+                        ? `<div style="font-size:13px;font-weight:700;color:#c5a059;margin-bottom:4px;">${clause.title}${clause.header ? `縲${clause.header}` : ''}</div>`
                         : '';
                     const bodyHtml = (clause.paragraphs || []).map(p =>
                         `<p style="margin:0 0 8px;line-height:1.8;font-size:13px;color:#2b2623;">${String(p).replace(/\n/g, '<br>')}</p>`
@@ -2963,8 +2963,8 @@ class DashboardApp {
         if (!contentHtml) {
             contentHtml = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#aaa;gap:12px;padding:40px 0;">
                 <i class="fa-solid fa-file-lines" style="font-size:36px;"></i>
-                <div style="font-size:13px;">書類の本文が取得できませんでした</div>
-                <div style="font-size:12px;">下記フォームから期限を直接入力してください</div>
+                <div style="font-size:13px;">譖ｸ鬘槭・譛ｬ譁・′蜿門ｾ励〒縺阪∪縺帙ｓ縺ｧ縺励◆</div>
+                <div style="font-size:12px;">荳玖ｨ倥ヵ繧ｩ繝ｼ繝�縺九ｉ譛滄剞繧堤峩謗･蜈･蜉帙＠縺ｦ縺上□縺輔＞</div>
               </div>`;
         }
 
@@ -2979,10 +2979,10 @@ class DashboardApp {
                 <!-- Header -->
                 <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid #eee;flex-shrink:0;">
                     <div>
-                        <div style="font-size:15px;font-weight:700;color:#2b2623;">${c.name || '契約書'}</div>
-                        <div style="font-size:12px;color:#aaa;margin-top:2px;">${c.type || ''}${c.contract_category ? ' · ' + c.contract_category : ''}</div>
+                        <div style="font-size:15px;font-weight:700;color:#2b2623;">${c.name || '螂醍ｴ・嶌'}</div>
+                        <div style="font-size:12px;color:#aaa;margin-top:2px;">${c.type || ''}${c.contract_category ? ' ﾂｷ ' + c.contract_category : ''}</div>
                     </div>
-                    <button onclick="document.getElementById('deadline-input-overlay').remove()" style="background:none;border:none;font-size:22px;color:#aaa;cursor:pointer;line-height:1;padding:4px 8px;">✕</button>
+                    <button onclick="document.getElementById('deadline-input-overlay').remove()" style="background:none;border:none;font-size:22px;color:#aaa;cursor:pointer;line-height:1;padding:4px 8px;">笨・/button>
                 </div>
 
                 <!-- Body: left=doc, right=form -->
@@ -2997,9 +2997,9 @@ class DashboardApp {
 
                     <!-- Deadline input form -->
                     <div style="width:280px;flex-shrink:0;display:flex;flex-direction:column;padding:24px 20px;gap:16px;overflow-y:auto;">
-                        <div style="font-size:13px;font-weight:700;color:#2b2623;margin-bottom:4px;"><i class="fa-solid fa-calendar-days" style="color:#c5a059;margin-right:6px;"></i>期限を入力</div>
+                        <div style="font-size:13px;font-weight:700;color:#2b2623;margin-bottom:4px;"><i class="fa-solid fa-calendar-days" style="color:#c5a059;margin-right:6px;"></i>譛滄剞繧貞・蜉・/div>
                         <div>
-                            <label style="font-size:11px;font-weight:600;color:#5e544d;display:block;margin-bottom:5px;">契約終了日</label>
+                            <label style="font-size:11px;font-weight:600;color:#5e544d;display:block;margin-bottom:5px;">螂醍ｴ・ｵゆｺ・律</label>
                             <input type="date" id="dl-expiry" value="${c.expiry_date || ''}"
                                 style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;box-sizing:border-box;">
                         </div>
@@ -3007,10 +3007,10 @@ class DashboardApp {
                         <div style="display:flex;flex-direction:column;gap:8px;">
                             <button onclick="window.app.saveDeadlineInput('${contractId}')"
                                 style="padding:10px;border:none;border-radius:6px;background:#c5a059;color:#fff;font-size:13px;font-weight:600;cursor:pointer;width:100%;">
-                                <i class="fa-solid fa-check" style="margin-right:6px;"></i>保存
+                                <i class="fa-solid fa-check" style="margin-right:6px;"></i>菫晏ｭ・
                             </button>
                             <button onclick="document.getElementById('deadline-input-overlay').remove()"
-                                style="padding:9px;border:1px solid #ddd;border-radius:6px;background:#fff;color:#5e544d;font-size:13px;cursor:pointer;width:100%;">キャンセル</button>
+                                style="padding:9px;border:1px solid #ddd;border-radius:6px;background:#fff;color:#5e544d;font-size:13px;cursor:pointer;width:100%;">繧ｭ繝｣繝ｳ繧ｻ繝ｫ</button>
                         </div>
                     </div>
                 </div>
@@ -3033,23 +3033,23 @@ class DashboardApp {
                         <i class="fa-solid fa-wand-magic-sparkles" style="color:#c5a059;font-size:18px;"></i>
                     </div>
                     <div>
-                        <div style="font-size:15px;font-weight:700;color:#2b2623;margin-bottom:6px;">AIリスク解析を実行しますか？</div>
+                        <div style="font-size:15px;font-weight:700;color:#2b2623;margin-bottom:6px;">AI繝ｪ繧ｹ繧ｯ隗｣譫舌ｒ螳溯｡後＠縺ｾ縺吶°・・/div>
                         <div style="font-size:13px;color:#5e544d;line-height:1.6;">
-                            リスク解析と期限解析を同時に行います。<br>
-                            <strong style="color:#c5a059;">解析1回を消費します。</strong>
+                            繝ｪ繧ｹ繧ｯ隗｣譫舌→譛滄剞隗｣譫舌ｒ蜷梧凾縺ｫ陦後＞縺ｾ縺吶・br>
+                            <strong style="color:#c5a059;">隗｣譫・蝗槭ｒ豸郁ｲｻ縺励∪縺吶・/strong>
                         </div>
                     </div>
                 </div>
                 <div style="background:#f8f6f3;border-radius:8px;padding:12px 14px;margin-bottom:20px;font-size:12px;color:#7a6a5a;line-height:1.6;">
                     <i class="fa-solid fa-circle-info" style="color:#c5a059;margin-right:6px;"></i>
-                    差分チェックなしでも、AIが書類全体のリスクと契約期限を抽出します。
+                    蟾ｮ蛻・メ繧ｧ繝・け縺ｪ縺励〒繧ゅ、I縺梧嶌鬘槫・菴薙・繝ｪ繧ｹ繧ｯ縺ｨ螂醍ｴ・悄髯舌ｒ謚ｽ蜃ｺ縺励∪縺吶・
                 </div>
                 <div style="display:flex;gap:10px;justify-content:flex-end;">
                     <button onclick="document.getElementById('reanalyze-confirm-overlay').remove()"
-                        style="padding:9px 20px;border:1px solid #ddd;border-radius:6px;background:#fff;color:#5e544d;font-size:14px;cursor:pointer;">キャンセル</button>
+                        style="padding:9px 20px;border:1px solid #ddd;border-radius:6px;background:#fff;color:#5e544d;font-size:14px;cursor:pointer;">繧ｭ繝｣繝ｳ繧ｻ繝ｫ</button>
                     <button onclick="document.getElementById('reanalyze-confirm-overlay').remove();window.app.runReanalyze('${contractId}')"
                         style="padding:9px 22px;border:none;border-radius:6px;background:#c5a059;color:#fff;font-size:14px;font-weight:600;cursor:pointer;">
-                        <i class="fa-solid fa-play" style="margin-right:6px;"></i>解析する
+                        <i class="fa-solid fa-play" style="margin-right:6px;"></i>隗｣譫舌☆繧・
                     </button>
                 </div>
             </div>`;
@@ -3063,9 +3063,9 @@ class DashboardApp {
     async runReanalyze(contractId) {
         const contracts = dbService.getContracts();
         const c = contracts.find(x => String(x.id) === String(contractId));
-        if (!c) { Notify.error('契約が見つかりません'); return; }
+        if (!c) { Notify.error('螂醍ｴ・′隕九▽縺九ｊ縺ｾ縺帙ｓ'); return; }
 
-        // original_content がオブジェクト（構造化JSON）の場合はテキストに変換
+        // original_content 縺後が繝悶ず繧ｧ繧ｯ繝茨ｼ域ｧ矩�蛹褒SON・峨・蝣ｴ蜷医・繝・く繧ｹ繝医↓螟画鋤
         let contractText = '';
         if (c.original_content && typeof c.original_content === 'object') {
             const oc = c.original_content;
@@ -3083,7 +3083,7 @@ class DashboardApp {
             contractText = (typeof c.original_content === 'string' ? c.original_content : (c.extracted_text || '')).trim();
         }
         if (!contractText || contractText.length < 10) {
-            Notify.warning('書類の本文データがありません。差分チェックで取り込んでください。');
+            Notify.warning('譖ｸ鬘槭・譛ｬ譁・ョ繝ｼ繧ｿ縺後≠繧翫∪縺帙ｓ縲ょｷｮ蛻・メ繧ｧ繝・け縺ｧ蜿悶ｊ霎ｼ繧薙〒縺上□縺輔＞縲・);
             return;
         }
 
@@ -3091,7 +3091,7 @@ class DashboardApp {
         const btn = document.getElementById('btn-reanalyze');
         if (btn) {
             btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right:6px;"></i>解析中...';
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right:6px;"></i>隗｣譫蝉ｸｭ...';
         }
 
         try {
@@ -3110,20 +3110,20 @@ class DashboardApp {
             const data = await res.json();
 
             if (!data.success) {
-                Notify.error(data.error || '解析に失敗しました');
-                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i>AIリスク解析'; }
+                Notify.error(data.error || '隗｣譫舌↓螟ｱ謨励＠縺ｾ縺励◆');
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i>AI繝ｪ繧ｹ繧ｯ隗｣譫・; }
                 return;
             }
 
-            // updateContractAnalysis で ai_summary/ai_risk_reason/ai_changes を正しく保存
+            // updateContractAnalysis 縺ｧ ai_summary/ai_risk_reason/ai_changes 繧呈ｭ｣縺励￥菫晏ｭ・
             dbService.updateContractAnalysis(contractId, {
                 summary: data.data.summary,
                 riskLevel: data.data.riskLevel,
                 riskReason: data.data.riskReason,
                 changes: data.data.changes || [],
-                status: '未確認',
+                status: '譛ｪ遒ｺ隱・,
             });
-            // contract_meta（期限情報）を追加保存
+            // contract_meta・域悄髯先ュ蝣ｱ・峨ｒ霑ｽ蜉�菫晏ｭ・
             if (data.data.contract_meta) {
                 const meta = data.data.contract_meta;
                 const allContracts = dbService.getContracts();
@@ -3142,23 +3142,23 @@ class DashboardApp {
             }
             await this.refreshSubscriptionStatusSafe();
 
-            // 期限情報の取得結果を通知
+            // 譛滄剞諠・�ｱ縺ｮ蜿門ｾ礼ｵ先棡繧帝夂衍
             const meta = data.data.contract_meta;
             const hasDeadline = meta && (meta.expiry_date || meta.renewal_deadline || meta.contract_start);
             if (hasDeadline) {
-                Notify.success('解析完了。期限情報を期限・アラート管理に格納しました');
+                Notify.success('隗｣譫仙ｮ御ｺ・よ悄髯先ュ蝣ｱ繧呈悄髯舌・繧｢繝ｩ繝ｼ繝育ｮ｡逅・↓譬ｼ邏阪＠縺ｾ縺励◆');
             } else {
-                Notify.success('解析が完了しました');
+                Notify.success('隗｣譫舌′螳御ｺ・＠縺ｾ縺励◆');
                 setTimeout(() => {
-                    Notify.info('期限情報を取得できませんでした。「期限・アラート管理」から手動入力すると、スラック・メールで通知が届きます', { duration: 6000 });
+                    Notify.info('譛滄剞諠・�ｱ繧貞叙蠕励〒縺阪∪縺帙ｓ縺ｧ縺励◆縲ゅ梧悄髯舌・繧｢繝ｩ繝ｼ繝育ｮ｡逅・阪°繧画焔蜍募・蜉帙☆繧九→縲√せ繝ｩ繝・け繝ｻ繝｡繝ｼ繝ｫ縺ｧ騾夂衍縺悟ｱ翫″縺ｾ縺・, { duration: 6000 });
                 }, 800);
             }
             // Re-render detail view
             this.navigate('diff', contractId);
 
         } catch (err) {
-            Notify.error('解析エラー: ' + err.message);
-            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i>AIリスク解析'; }
+            Notify.error('隗｣譫舌お繝ｩ繝ｼ: ' + err.message);
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i>AI繝ｪ繧ｹ繧ｯ隗｣譫・; }
         }
     }
 
@@ -3179,7 +3179,7 @@ class DashboardApp {
     saveDeadlineInput(contractId) {
         const expiry = document.getElementById('dl-expiry')?.value || null;
         if (!expiry) {
-            Notify.warning('契約終了日を入力してください');
+            Notify.warning('螂醍ｴ・ｵゆｺ・律繧貞・蜉帙＠縺ｦ縺上□縺輔＞');
             return;
         }
 
@@ -3195,7 +3195,7 @@ class DashboardApp {
         localStorage.setItem(dbService.KEYS.CONTRACTS, JSON.stringify(contracts));
 
         document.getElementById('deadline-input-overlay')?.remove();
-        Notify.success('期限を保存しました');
+        Notify.success('譛滄剞繧剃ｿ晏ｭ倥＠縺ｾ縺励◆');
         this.navigate('deadlines');
     }
 
@@ -3205,7 +3205,7 @@ class DashboardApp {
     async runDeadlineReanalyze(contractId) {
         const contracts = dbService.getContracts();
         const c = contracts.find(x => String(x.id) === String(contractId));
-        if (!c) { Notify.error('契約が見つかりません'); return; }
+        if (!c) { Notify.error('螂醍ｴ・′隕九▽縺九ｊ縺ｾ縺帙ｓ'); return; }
 
         let contractText = '';
         if (c.original_content && typeof c.original_content === 'object') {
@@ -3224,14 +3224,14 @@ class DashboardApp {
             contractText = (typeof c.original_content === 'string' ? c.original_content : (c.extracted_text || '')).trim();
         }
         if (!contractText || contractText.length < 10) {
-            Notify.warning('書類の本文データがありません。差分チェックから再取り込みしてください。');
+            Notify.warning('譖ｸ鬘槭・譛ｬ譁・ョ繝ｼ繧ｿ縺後≠繧翫∪縺帙ｓ縲ょｷｮ蛻・メ繧ｧ繝・け縺九ｉ蜀榊叙繧願ｾｼ縺ｿ縺励※縺上□縺輔＞縲・);
             return;
         }
 
         const btn = document.getElementById(`btn-deadline-reanalyze-${contractId}`);
         if (btn) {
             btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right:4px;font-size:10px;"></i>解析中...';
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right:4px;font-size:10px;"></i>隗｣譫蝉ｸｭ...';
         }
 
         try {
@@ -3250,8 +3250,8 @@ class DashboardApp {
             const data = await res.json();
 
             if (!data.success) {
-                Notify.error(data.error || '再解析に失敗しました');
-                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-rotate" style="margin-right:4px;font-size:10px;"></i>再解析'; }
+                Notify.error(data.error || '蜀崎ｧ｣譫舌↓螟ｱ謨励＠縺ｾ縺励◆');
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-rotate" style="margin-right:4px;font-size:10px;"></i>蜀崎ｧ｣譫・; }
                 return;
             }
 
@@ -3276,14 +3276,14 @@ class DashboardApp {
             const meta = data.data.contract_meta;
             const hasDeadline = meta && (meta.expiry_date || meta.renewal_deadline);
             if (hasDeadline) {
-                Notify.success('再解析完了。期限情報を取得しました');
+                Notify.success('蜀崎ｧ｣譫仙ｮ御ｺ・よ悄髯先ュ蝣ｱ繧貞叙蠕励＠縺ｾ縺励◆');
             } else {
-                Notify.warning('再解析しましたが期限情報を取得できませんでした。手動で入力してください。');
+                Notify.warning('蜀崎ｧ｣譫舌＠縺ｾ縺励◆縺梧悄髯先ュ蝣ｱ繧貞叙蠕励〒縺阪∪縺帙ｓ縺ｧ縺励◆縲よ焔蜍輔〒蜈･蜉帙＠縺ｦ縺上□縺輔＞縲・);
             }
             this.navigate('deadlines');
         } catch (err) {
-            Notify.error('再解析エラー: ' + err.message);
-            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-rotate" style="margin-right:4px;font-size:10px;"></i>再解析'; }
+            Notify.error('蜀崎ｧ｣譫舌お繝ｩ繝ｼ: ' + err.message);
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-rotate" style="margin-right:4px;font-size:10px;"></i>蜀崎ｧ｣譫・; }
         }
     }
 
@@ -3319,7 +3319,7 @@ class DashboardApp {
         const sortDir = opts.sortDir || 'desc';
 
         const allContracts = (dbService.getContracts ? dbService.getContracts() : (dbService._localContracts || []))
-            .filter(c => c.last_analyzed_at); // リスク解析済みのみ表示
+            .filter(c => c.last_analyzed_at); // 繝ｪ繧ｹ繧ｯ隗｣譫先ｸ医∩縺ｮ縺ｿ陦ｨ遉ｺ
 
         // Annotate with days remaining
         const annotated = allContracts.map(c => {
@@ -3382,7 +3382,7 @@ class DashboardApp {
         const sortBtn = (key, label, extraStyle = '') => {
             const active = sortKey === key;
             const nextDir = active && sortDir === 'asc' ? 'desc' : 'asc';
-            const arrow = active ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '';
+            const arrow = active ? (sortDir === 'asc' ? ' 竊・ : ' 竊・) : '';
             return `<th style="padding:10px 12px;text-align:left;font-size:12px;color:${active ? '#c5a059' : '#8a7a6a'};font-weight:600;cursor:pointer;white-space:nowrap;${extraStyle}"
                 onclick="window.app.navigate('deadlines', {query:'${query}',filterRange:'${filterRange}',sortKey:'${key}',sortDir:'${nextDir}'})">${label}${arrow}</th>`;
         };
@@ -3391,7 +3391,7 @@ class DashboardApp {
             const days = c._daysRemaining;
             const noDate = c._range === 'nodate';
             const badgeColor = days === null ? '#aaa' : days <= 7 ? '#e53935' : days <= 30 ? '#f57c00' : '#2e7d32';
-            const daysLabel = days === null ? '未設定' : days === 0 ? '本日' : days < 0 ? '期限切れ' : `あと ${days} 日`;
+            const daysLabel = days === null ? '譛ｪ險ｭ螳・ : days === 0 ? '譛ｬ譌･' : days < 0 ? '譛滄剞蛻・ｌ' : `縺ゅ→ ${days} 譌･`;
             const targetDate = c.expiry_date;
             const notifyEnabled = c.deadline_notify !== false;
             const notifyToggle = `<label class="toggle-switch" style="flex-shrink:0;" onclick="event.stopPropagation()">
@@ -3405,18 +3405,18 @@ class DashboardApp {
                 ? `<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">
                     <button onclick="event.stopPropagation();window.app.showDeadlineInputModal('${c.id}')"
                         style="background:#fff;border:1.5px dashed #c5a059;color:#c5a059;border-radius:20px;padding:3px 0;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;width:90px;text-align:center;">
-                        <i class="fa-solid fa-plus" style="margin-right:4px;font-size:10px;"></i>期限を入力
+                        <i class="fa-solid fa-plus" style="margin-right:4px;font-size:10px;"></i>譛滄剞繧貞・蜉・
                     </button>
                     <button id="btn-deadline-reanalyze-${c.id}" onclick="event.stopPropagation();window.app.runDeadlineReanalyze('${c.id}')"
                         style="background:#fff;border:1.5px dashed #aaa;color:#666;border-radius:20px;padding:3px 0;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;width:90px;text-align:center;">
-                        <i class="fa-solid fa-rotate" style="margin-right:4px;font-size:10px;"></i>再解析
+                        <i class="fa-solid fa-rotate" style="margin-right:4px;font-size:10px;"></i>蜀崎ｧ｣譫・
                     </button>
                   </div>`
                 : `<span style="display:inline-block;background:${badgeColor};color:#fff;border-radius:20px;padding:3px 12px;font-size:12px;font-weight:700;">${daysLabel}</span>`;
             const rowClick = `onclick="window.app.showDeadlineInputModal('${c.id}')"`;
             return `<tr style="cursor:pointer;" ${rowClick}>
-                <td><div style="font-weight:600;color:#2b2623;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.name || '—'}</div>${categoryBadge ? `<div style="margin-top:4px;">${categoryBadge}</div>` : ''}</td>
-                <td style="font-size:13px;color:#5e544d;white-space:nowrap;width:130px;">${targetDate ? this._formatDateJa(targetDate) : '—'}</td>
+                <td><div style="font-weight:600;color:#2b2623;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.name || '窶・}</div>${categoryBadge ? `<div style="margin-top:4px;">${categoryBadge}</div>` : ''}</td>
+                <td style="font-size:13px;color:#5e544d;white-space:nowrap;width:130px;">${targetDate ? this._formatDateJa(targetDate) : '窶・}</td>
                 <td style="white-space:nowrap;width:140px;">${daysBadge}</td>
                 <td style="white-space:nowrap;width:90px;">${notifyToggle}</td>
             </tr>`;
@@ -3433,24 +3433,24 @@ class DashboardApp {
 
         const pageHtml = `
         <div class="flex justify-between items-center mb-md">
-            <h2 class="page-title" style="margin-bottom:0;">期限・アラート管理</h2>
+            <h2 class="page-title" style="margin-bottom:0;">譛滄剞繝ｻ繧｢繝ｩ繝ｼ繝育ｮ｡逅・/h2>
         </div>
 
         <div class="filter-bar mb-md">
             <div class="flex flex-wrap gap-md items-center">
                 <div style="position:relative;flex:1;min-width:240px;">
                     <i class="fa-solid fa-magnifying-glass" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#999;"></i>
-                    <input type="text" placeholder="契約名・種別で検索..."
+                    <input type="text" placeholder="螂醍ｴ・錐繝ｻ遞ｮ蛻･縺ｧ讀懃ｴ｢..."
                         value="${query}"
                         style="padding:8px 12px 8px 36px;border:1px solid #ddd;border-radius:4px;width:100%;font-size:13px;box-sizing:border-box;"
                         oninput="window.app.navigate('deadlines', {query:this.value,filterRange:'${filterRange}',sortKey:'${sortKey}',sortDir:'${sortDir}'})">
                 </div>
                 <div class="flex gap-sm items-center flex-wrap">
-                    ${tabBtn('all', 'すべて', '')}
-                    ${tabBtn('urgent', '7日以内', '')}
-                    ${tabBtn('warning', '30日以内', '')}
-                    ${tabBtn('upcoming', '90日以内', '')}
-                    ${tabBtn('nodate', '期限未設定', '')}
+                    ${tabBtn('all', '縺吶∋縺ｦ', '')}
+                    ${tabBtn('urgent', '7譌･莉･蜀・, '')}
+                    ${tabBtn('warning', '30譌･莉･蜀・, '')}
+                    ${tabBtn('upcoming', '90譌･莉･蜀・, '')}
+                    ${tabBtn('nodate', '譛滄剞譛ｪ險ｭ螳・, '')}
                 </div>
             </div>
         </div>
@@ -3459,22 +3459,22 @@ class DashboardApp {
             <table class="data-table deadlines-table" style="table-layout:fixed;width:100%;">
                 <thead>
                     <tr>
-                        ${sortBtn('name', '契約名')}
-                        ${sortBtn('date', '期限日', 'white-space:nowrap;width:130px;')}
-                        ${sortBtn('days', '残り日数', 'white-space:nowrap;width:140px;')}
-                        <th style="padding:10px 12px;text-align:left;font-size:12px;color:#8a7a6a;font-weight:600;white-space:nowrap;width:90px;">通知</th>
+                        ${sortBtn('name', '螂醍ｴ・錐')}
+                        ${sortBtn('date', '譛滄剞譌･', 'white-space:nowrap;width:130px;')}
+                        ${sortBtn('days', '谿九ｊ譌･謨ｰ', 'white-space:nowrap;width:140px;')}
+                        <th style="padding:10px 12px;text-align:left;font-size:12px;color:#8a7a6a;font-weight:600;white-space:nowrap;width:90px;">騾夂衍</th>
                     </tr>
                 </thead>
                 <tbody>
-                    ${sorted.length > 0 ? rows : `<tr><td colspan="4" class="text-center text-muted" style="padding:40px;">該当する契約が見つかりませんでした</td></tr>`}
+                    ${sorted.length > 0 ? rows : `<tr><td colspan="4" class="text-center text-muted" style="padding:40px;">隧ｲ蠖薙☆繧句･醍ｴ・′隕九▽縺九ｊ縺ｾ縺帙ｓ縺ｧ縺励◆</td></tr>`}
                 </tbody>
             </table>
         </div>
-        <div class="text-muted" style="font-size:13px;margin-top:12px;">全 ${counts.all} 件中 ${sorted.length} 件を表示
-            ${counts.nodate > 0 ? `<span style="margin-left:16px;"><i class="fa-solid fa-circle-info" style="color:#c5a059;margin-right:4px;"></i>期限未設定 ${counts.nodate} 件：契約書を解析するとAIが自動で期限を抽出します。失敗した解析回数は消耗しません。</span>` : ''}
+        <div class="text-muted" style="font-size:13px;margin-top:12px;">蜈ｨ ${counts.all} 莉ｶ荳ｭ ${sorted.length} 莉ｶ繧定｡ｨ遉ｺ
+            ${counts.nodate > 0 ? `<span style="margin-left:16px;"><i class="fa-solid fa-circle-info" style="color:#c5a059;margin-right:4px;"></i>譛滄剞譛ｪ險ｭ螳・${counts.nodate} 莉ｶ・壼･醍ｴ・嶌繧定ｧ｣譫舌☆繧九→AI縺瑚・蜍輔〒譛滄剞繧呈歓蜃ｺ縺励∪縺吶ょ､ｱ謨励＠縺溯ｧ｣譫仙屓謨ｰ縺ｯ豸郁励＠縺ｾ縺帙ｓ縲・/span>` : ''}
         </div>`;
 
-        const lockOverlay = deadlineLocked ? `<div style="position:fixed;top:0;right:0;bottom:0;left:240px;display:flex;align-items:center;justify-content:center;background:rgba(245,247,250,0.85);backdrop-filter:blur(3px);z-index:1000;"><div style="background:#fff;border-radius:12px;padding:32px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,0.13);max-width:300px;width:90%;"><i class="fa-solid fa-crown" style="color:#c19b4a;font-size:2rem;margin-bottom:12px;display:block;"></i><div style="display:inline-block;background:#f3f0ea;color:#c5a059;border:1px solid #e8d9b8;border-radius:10px;padding:3px 12px;font-size:11px;font-weight:700;margin-bottom:12px;">Business / Proプラン限定</div><div style="font-weight:700;font-size:15px;margin-bottom:8px;color:#2b2623;">期限・アラート管理</div><p style="font-size:12px;color:#888;line-height:1.6;margin-bottom:20px;">契約期限の自動抽出・アラート通知はBusinessプラン以上でご利用いただけます。</p><button onclick="window.app.navigate('plan')" style="width:100%;padding:10px;border:none;border-radius:8px;background:#c5a059;color:#fff;font-size:13px;font-weight:700;cursor:pointer;">アップグレードする</button></div></div>` : '';
+        const lockOverlay = deadlineLocked ? `<div style="position:fixed;top:0;right:0;bottom:0;left:240px;display:flex;align-items:center;justify-content:center;background:rgba(245,247,250,0.85);backdrop-filter:blur(3px);z-index:1000;"><div style="background:#fff;border-radius:12px;padding:32px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,0.13);max-width:300px;width:90%;"><i class="fa-solid fa-crown" style="color:#c19b4a;font-size:2rem;margin-bottom:12px;display:block;"></i><div style="display:inline-block;background:#f3f0ea;color:#c5a059;border:1px solid #e8d9b8;border-radius:10px;padding:3px 12px;font-size:11px;font-weight:700;margin-bottom:12px;">Business / Pro繝励Λ繝ｳ髯仙ｮ・/div><div style="font-weight:700;font-size:15px;margin-bottom:8px;color:#2b2623;">譛滄剞繝ｻ繧｢繝ｩ繝ｼ繝育ｮ｡逅・/div><p style="font-size:12px;color:#888;line-height:1.6;margin-bottom:20px;">螂醍ｴ・悄髯舌・閾ｪ蜍墓歓蜃ｺ繝ｻ繧｢繝ｩ繝ｼ繝磯夂衍縺ｯBusiness繝励Λ繝ｳ莉･荳翫〒縺泌茜逕ｨ縺・◆縺�縺代∪縺吶・/p><button onclick="window.app.navigate('plan')" style="width:100%;padding:10px;border:none;border-radius:8px;background:#c5a059;color:#fff;font-size:13px;font-weight:700;cursor:pointer;">繧｢繝・・繧ｰ繝ｬ繝ｼ繝峨☆繧・/button></div></div>` : '';
 
         return `<div style="position:relative;">${pageHtml}${lockOverlay}</div>`;
     }
@@ -3504,9 +3504,9 @@ class DashboardApp {
 
         switch (action) {
             case 'manage_team':
-                return this.userRole === '管理者';
+                return this.userRole === '邂｡逅・・;
             case 'operate_contract':
-                return this.userRole === '管理者' || this.userRole === '作業者';
+                return this.userRole === '邂｡逅・・ || this.userRole === '菴懈･ｭ閠・;
             case 'view_only':
                 return true;
             default:
@@ -3537,6 +3537,36 @@ class DashboardApp {
 
     async init() {
         try {
+            // --- Local Mock Mode Support ---
+            const params = new URLSearchParams(window.location.search);
+            const planParam = params.get('plan');
+            if (planParam) {
+                console.log(`[MockMode] Plan: ${planParam}`);
+                window.isMockMode = true;
+                this.userPlan = planParam;
+                this.user = { uid: 'mock-uid', email: 'mock@example.com', plan: planParam };
+                
+                // --- DATA MOCKS ---
+                if (window.dbService) {
+                    window.dbService.setCurrentUser('mock-uid');
+                    window.dbService.getStats = () => ({ pending: 5, highRisk: 2, total: 10 });
+                    window.dbService.syncContractsFromApi = async () => { console.log('[Mock] Skipping API sync'); return true; };
+                }
+                
+                // Bypassing real network calls
+                this.loadContracts = async () => { console.log('[Mock] Skipping real contracts fetch'); return []; };
+                this.loadAlerts = async () => { console.log('[Mock] Skipping real alerts fetch'); return []; };
+                this.fetchPaymentConfig = async () => { console.log('[Mock] Skipping real payment config fetch'); return {}; };
+                
+                // --- BOOTSTRAP MOCK ---
+                this.bindEvents();
+                this.registration.init();
+                this.updateSubscriptionUI();
+                
+                // Navigate to dashboard
+                this.navigate('dashboard');
+                return;
+            }
             console.log('Dashboard App Initializing...');
             const initStartMs = performance.now();
             if ('scrollRestoration' in window.history) {
@@ -3577,13 +3607,14 @@ class DashboardApp {
             this.bindEvents();
             this.registration.init();
 
-            // UIを初期想定（Pro）で更新
+            // UI繧貞・譛滓Φ螳夲ｼ・ro・峨〒譖ｴ譁ｰ
             this.updateSubscriptionUI();
 
             const urlParams = new URLSearchParams(window.location.search);
             const shouldStartPayment = urlParams.get('start_payment') === '1';
             const paymentPlan = urlParams.get('plan');
             const paymentBilling = urlParams.get('billing');
+            const fromTrialExpired = urlParams.get('reason') === 'trial_expired';
             // Critical UI first: route immediately, data bootstrap in background
             const hash = window.location.hash;
             if (hash && hash.startsWith('#diff/')) {
@@ -3610,7 +3641,7 @@ class DashboardApp {
                     console.error('Bootstrap initialization failed:', error);
                 });
 
-            // 無料期間終了後の決済開始フロー
+            // 辟｡譁呎悄髢鍋ｵゆｺ・ｾ後・豎ｺ貂磯幕蟋九ヵ繝ｭ繝ｼ
             if (shouldStartPayment) {
                 this.forceSubscriptionPayment = fromTrialExpired;
                 await bootstrapPromise;
@@ -3632,7 +3663,7 @@ class DashboardApp {
             console.log('Dashboard App Initialized Successfully');
         } catch (error) {
             console.error('Initialization Error:', error);
-            Notify.error('ダッシュボードの初期化中にエラーが発生しました。詳細はコンソールを確認してください。');
+            Notify.error('繝繝・す繝･繝懊・繝峨・蛻晄悄蛹紋ｸｭ縺ｫ繧ｨ繝ｩ繝ｼ縺檎匱逕溘＠縺ｾ縺励◆縲りｩｳ邏ｰ縺ｯ繧ｳ繝ｳ繧ｽ繝ｼ繝ｫ繧堤｢ｺ隱阪＠縺ｦ縺上□縺輔＞縲・);
         }
     }
 
@@ -3667,9 +3698,9 @@ class DashboardApp {
                         }
                     }
                 } catch (roleErr) {
-                    console.warn('Could not fetch role from backend, defaulting to 管理者:', roleErr);
-                    // API失敗時はオーナー（管理者）としてデフォルト動作（バックエンドと同じロジック）
-                    this.userRole = '管理者';
+                    console.warn('Could not fetch role from backend, defaulting to 邂｡逅・・', roleErr);
+                    // API螟ｱ謨玲凾縺ｯ繧ｪ繝ｼ繝翫・・育ｮ｡逅・・ｼ峨→縺励※繝・ヵ繧ｩ繝ｫ繝亥虚菴懶ｼ医ヰ繝・け繧ｨ繝ｳ繝峨→蜷後§繝ｭ繧ｸ繝・け・・
+                    this.userRole = '邂｡逅・・;
                     this.isTeamMember = false;
                 }
 
@@ -3702,7 +3733,7 @@ class DashboardApp {
                 const emailEl = document.getElementById('user-email-display');
                 if (emailEl) emailEl.textContent = user.email || '';
                 const nameEl = document.getElementById('user-name-display');
-                if (nameEl) nameEl.textContent = user.displayName || user.email?.split('@')[0] || 'ユーザー';
+                if (nameEl) nameEl.textContent = user.displayName || user.email?.split('@')[0] || '繝ｦ繝ｼ繧ｶ繝ｼ';
 
                 // Fetch real subscription status from backend (parallel)
                 await Promise.all([
@@ -3735,7 +3766,7 @@ class DashboardApp {
                 const urlParams = new URLSearchParams(window.location.search);
                 const paymentState = urlParams.get('payment');
 
-                // PayPal遷移戻りの確定処理
+                // PayPal驕ｷ遘ｻ謌ｻ繧翫・遒ｺ螳壼・逅・
                 if (paymentState === 'success') {
                     const returnedPlan = urlParams.get('plan') || this.subscription?.plan || 'starter';
                     const returnedBillingCycle = urlParams.get('billing') || this.subscription?.billingCycle || 'monthly';
@@ -3793,9 +3824,9 @@ class DashboardApp {
                     const roleBadge = document.getElementById('user-role-badge');
                     if (roleBadge) {
                         const roleColors = {
-                            '管理者': '#4CAF50',
-                            '作業者': '#2196F3',
-                            '閲覧のみ': '#FF9800'
+                            '邂｡逅・・: '#4CAF50',
+                            '菴懈･ｭ閠・: '#2196F3',
+                            '髢ｲ隕ｧ縺ｮ縺ｿ': '#FF9800'
                         };
                         roleBadge.textContent = this.userRole;
                         roleBadge.style.cssText = `display:inline-block; background:${roleColors[this.userRole] || '#999'}; color:#fff; padding:2px 10px; border-radius:12px; font-size:11px; font-weight:600; margin-left:8px;`;
@@ -3834,7 +3865,7 @@ class DashboardApp {
             const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
             
             if (!token && !isLocalDev) {
-                if (!silent) Notify.warning('ログイン状態を確認できませんでした。');
+                if (!silent) Notify.warning('繝ｭ繧ｰ繧､繝ｳ迥ｶ諷九ｒ遒ｺ隱阪〒縺阪∪縺帙ｓ縺ｧ縺励◆縲・);
                 return false;
             }
 
@@ -3850,7 +3881,7 @@ class DashboardApp {
             return true;
         } catch (error) {
             console.error('reloadPlanData error:', error);
-            if (!silent) Notify.error('利用状況の再取得に失敗しました。');
+            if (!silent) Notify.error('蛻ｩ逕ｨ迥ｶ豕√・蜀榊叙蠕励↓螟ｱ謨励＠縺ｾ縺励◆縲・);
             return false;
         }
     }
@@ -3892,7 +3923,7 @@ class DashboardApp {
             }
         } catch (error) {
             console.error('Failed to fetch subscription status:', error);
-            // API接続失敗時：proをデフォルトにする
+            // API謗･邯壼､ｱ謨玲凾・嗔ro繧偵ョ繝輔か繝ｫ繝医↓縺吶ｋ
             this.subscription = { plan: 'pro', billingCycle: 'monthly', usageCount: 0, usageLimit: 999999, daysRemaining: null, planLimit: 999999 };
             this.userPlan = 'pro';
             this.setCachedItem(DASHBOARD_CACHE_KEYS.SUBSCRIPTION, this.subscription);
@@ -3987,7 +4018,7 @@ class DashboardApp {
     setPlanBillingCycle(billingCycle = 'monthly') {
         const selectedBillingCycle = billingCycle === 'annual' ? 'annual' : 'monthly';
         if (selectedBillingCycle === 'annual' && this.hasAnnualBillingPlans === false && this.subscription?.billingCycle !== 'annual') {
-            Notify.info('年額プランは現在準備中です。');
+            Notify.info('蟷ｴ鬘阪・繝ｩ繝ｳ縺ｯ迴ｾ蝨ｨ貅門ｙ荳ｭ縺ｧ縺吶・);
             return;
         }
 
@@ -3999,8 +4030,8 @@ class DashboardApp {
 
     async startSubscriptionCheckout(plan, billingCycle = this.subscription?.billingCycle || 'monthly', forcePayment = this.forceSubscriptionPayment) {
         if (!this.stripeEnabled) {
-            Notify.error('Stripe決済の設定が未完了です。環境変数をご確認ください。');
-            // 切り戻し用（残置）:
+            Notify.error('Stripe豎ｺ貂医・險ｭ螳壹′譛ｪ螳御ｺ・〒縺吶ら腸蠅・､画焚繧偵＃遒ｺ隱阪￥縺�縺輔＞縲・);
+            // 蛻・ｊ謌ｻ縺礼畑・域ｮ狗ｽｮ・・
             // await this.startPayPalSubscription(plan, billingCycle, forcePayment);
             return;
         }
@@ -4014,10 +4045,10 @@ class DashboardApp {
         if (existing) existing.remove();
 
         const planNames = { starter: 'Starter', business: 'Business', pro: 'Pro' };
-        const billingLabel = cycle === 'annual' ? '年額（一括）' : '月額';
+        const billingLabel = cycle === 'annual' ? '蟷ｴ鬘搾ｼ井ｸ諡ｬ・・ : '譛磯｡・;
         const planPrices = {
-            monthly: { starter: '¥1,480 / 月（税込）', business: '¥4,980 / 月（税込）', pro: '¥9,800 / 月（税込）' },
-            annual: { starter: '¥14,800 / 年（税込）', business: '¥49,800 / 年（税込）', pro: '¥98,000 / 年（税込）' }
+            monthly: { starter: 'ﾂ･1,480 / 譛茨ｼ育ｨ手ｾｼ・・, business: 'ﾂ･4,980 / 譛茨ｼ育ｨ手ｾｼ・・, pro: 'ﾂ･9,800 / 譛茨ｼ育ｨ手ｾｼ・・ },
+            annual: { starter: 'ﾂ･14,800 / 蟷ｴ・育ｨ手ｾｼ・・, business: 'ﾂ･49,800 / 蟷ｴ・育ｨ手ｾｼ・・, pro: 'ﾂ･98,000 / 蟷ｴ・育ｨ手ｾｼ・・ }
         };
 
         const overlay = document.createElement('div');
@@ -4027,19 +4058,19 @@ class DashboardApp {
         <div class="modal-content" style="max-width:480px;">
             <div class="modal-header">
                 <h3 style="margin:0; font-size:1.1rem;">
-                    <i class="fa-solid fa-credit-card" style="margin-right:8px; color:#B8860B;"></i>お支払い方法を登録
+                    <i class="fa-solid fa-credit-card" style="margin-right:8px; color:#B8860B;"></i>縺頑髪謇輔＞譁ｹ豕輔ｒ逋ｻ骭ｲ
                 </h3>
                 ${forcePayment ? '' : '<button class="btn-close" onclick="document.getElementById(\'stripe-modal-overlay\').remove()">&times;</button>'}
             </div>
             <div class="modal-body" style="padding:24px;">
                 <div style="background:#faf8f5; border:1px solid #e8e0d4; border-radius:8px; padding:16px; margin-bottom:16px; text-align:center;">
-                    <div style="font-size:0.8rem; color:#888; margin-bottom:4px;">選択プラン</div>
+                    <div style="font-size:0.8rem; color:#888; margin-bottom:4px;">驕ｸ謚槭・繝ｩ繝ｳ</div>
                     <div style="font-size:1.1rem; font-weight:700; color:#24292E;">${planNames[targetPlan] || targetPlan}</div>
-                    <div style="font-size:0.8rem; color:#8a6f40; margin-top:4px;">請求サイクル: ${billingLabel}</div>
+                    <div style="font-size:0.8rem; color:#8a6f40; margin-top:4px;">隲区ｱゅし繧､繧ｯ繝ｫ: ${billingLabel}</div>
                     <div style="font-size:1.3rem; font-weight:700; color:#B8860B; margin-top:4px;">${planPrices[cycle]?.[targetPlan] || ''}</div>
                 </div>
                 <button class="btn-dashboard full-width" style="background:#B8860B; color:#fff; border:none; font-weight:700;" onclick="window.app.startStripeCheckout('${targetPlan}', '${cycle}', ${forcePayment ? 'true' : 'false'})">
-                    お支払いを登録する
+                    縺頑髪謇輔＞繧堤匳骭ｲ縺吶ｋ
                 </button>
             </div>
         </div>`;
@@ -4055,7 +4086,7 @@ class DashboardApp {
             const token = await authModule.getIdToken();
             const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
             if (!token && !isLocalDev) {
-                Notify.error('ログイン状態を確認できませんでした。再ログインしてください。');
+                Notify.error('繝ｭ繧ｰ繧､繝ｳ迥ｶ諷九ｒ遒ｺ隱阪〒縺阪∪縺帙ｓ縺ｧ縺励◆縲ょ・繝ｭ繧ｰ繧､繝ｳ縺励※縺上□縺輔＞縲・);
                 return;
             }
             const headers = {
@@ -4079,7 +4110,7 @@ class DashboardApp {
             });
             const result = await response.json();
             if (!result.success || !result.data?.url) {
-                Notify.error(result.error || 'Stripe決済ページの作成に失敗しました。');
+                Notify.error(result.error || 'Stripe豎ｺ貂医・繝ｼ繧ｸ縺ｮ菴懈・縺ｫ螟ｱ謨励＠縺ｾ縺励◆縲・);
                 if (forcePayment) {
                     window.location.replace(`${window.location.origin}/select-plan-preview.html&billing=${selectedBillingCycle}`);
                 }
@@ -4089,7 +4120,7 @@ class DashboardApp {
             window.location.href = result.data.url;
         } catch (error) {
             console.error('Stripe checkout error:', error);
-            Notify.error('Stripe決済の開始に失敗しました。');
+            Notify.error('Stripe豎ｺ貂医・髢句ｧ九↓螟ｱ謨励＠縺ｾ縺励◆縲・);
             if (forcePayment) {
                 window.location.replace(`${window.location.origin}/select-plan-preview.html&billing=${selectedBillingCycle}`);
             }
@@ -4104,7 +4135,7 @@ class DashboardApp {
             const token = await authModule.getIdToken();
             const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
             if (!token && !isLocalDev) {
-                Notify.error('ログイン状態を確認できませんでした。再ログインしてください。');
+                Notify.error('繝ｭ繧ｰ繧､繝ｳ迥ｶ諷九ｒ遒ｺ隱阪〒縺阪∪縺帙ｓ縺ｧ縺励◆縲ょ・繝ｭ繧ｰ繧､繝ｳ縺励※縺上□縺輔＞縲・);
                 return false;
             }
             const headers = {
@@ -4131,10 +4162,10 @@ class DashboardApp {
                 }
                 return true;
             }
-            Notify.error(result.error || 'Stripe決済の確定に失敗しました。');
+            Notify.error(result.error || 'Stripe豎ｺ貂医・遒ｺ螳壹↓螟ｱ謨励＠縺ｾ縺励◆縲・);
         } catch (error) {
             console.error('Confirm Stripe session error:', error);
-            Notify.error('Stripe決済の確定処理でエラーが発生しました。');
+            Notify.error('Stripe豎ｺ貂医・遒ｺ螳壼・逅・〒繧ｨ繝ｩ繝ｼ縺檎匱逕溘＠縺ｾ縺励◆縲・);
         }
         return false;
     }
@@ -4146,7 +4177,7 @@ class DashboardApp {
         try {
             const config = await this.fetchPaymentConfig(true);
             if (!config) {
-                Notify.error('PayPal設定の取得に失敗しました。');
+                Notify.error('PayPal險ｭ螳壹・蜿門ｾ励↓螟ｱ謨励＠縺ｾ縺励◆縲・);
                 if (forcePayment) {
                     window.location.replace(`${window.location.origin}/select-plan-preview.html`);
                 }
@@ -4155,7 +4186,7 @@ class DashboardApp {
             const { clientId, planIds } = config;
             const paypalPlanId = planIds?.[selectedBillingCycle]?.[targetPlan] || planIds?.[targetPlan];
             if (!paypalPlanId) {
-                Notify.error(selectedBillingCycle === 'annual' ? '年額プランは現在準備中です。' : 'プランIDが見つかりません。');
+                Notify.error(selectedBillingCycle === 'annual' ? '蟷ｴ鬘阪・繝ｩ繝ｳ縺ｯ迴ｾ蝨ｨ貅門ｙ荳ｭ縺ｧ縺吶・ : '繝励Λ繝ｳID縺瑚ｦ九▽縺九ｊ縺ｾ縺帙ｓ縲・);
                 if (forcePayment) {
                     window.location.replace(`${window.location.origin}/select-plan-preview.html&billing=${selectedBillingCycle}`);
                 }
@@ -4216,28 +4247,28 @@ class DashboardApp {
                 onCancel: () => {
                     console.log('User cancelled PayPal subscription');
                     if (forcePayment) {
-                        Notify.warning('継続利用にはお支払い方法の登録が必要です。');
+                        Notify.warning('邯咏ｶ壼茜逕ｨ縺ｫ縺ｯ縺頑髪謇輔＞譁ｹ豕輔・逋ｻ骭ｲ縺悟ｿ・ｦ√〒縺吶・);
                         return;
                     }
                     const modal = document.getElementById('paypal-modal-overlay');
                     if (modal) modal.remove();
-                    Notify.info('お支払いがキャンセルされました。');
+                    Notify.info('縺頑髪謇輔＞縺後く繝｣繝ｳ繧ｻ繝ｫ縺輔ｌ縺ｾ縺励◆縲・);
                 },
                 onError: (err) => {
                     console.error('PayPal Buttons error:', err);
                     if (forcePayment) {
-                        Notify.error('お支払い処理でエラーが発生しました。再度お試しください。');
+                        Notify.error('縺頑髪謇輔＞蜃ｦ逅・〒繧ｨ繝ｩ繝ｼ縺檎匱逕溘＠縺ｾ縺励◆縲ょ・蠎ｦ縺願ｩｦ縺励￥縺�縺輔＞縲・);
                         return;
                     }
                     const modal = document.getElementById('paypal-modal-overlay');
                     if (modal) modal.remove();
-                    Notify.error('お支払い処理でエラーが発生しました。');
+                    Notify.error('縺頑髪謇輔＞蜃ｦ逅・〒繧ｨ繝ｩ繝ｼ縺檎匱逕溘＠縺ｾ縺励◆縲・);
                 }
             }).render('#paypal-button-container');
 
         } catch (error) {
             console.error('PayPal subscription error:', error);
-            Notify.error('お支払い処理でエラーが発生しました。');
+            Notify.error('縺頑髪謇輔＞蜃ｦ逅・〒繧ｨ繝ｩ繝ｼ縺檎匱逕溘＠縺ｾ縺励◆縲・);
             if (forcePayment) {
                 window.location.replace(`${window.location.origin}/select-plan-preview.html&billing=${selectedBillingCycle}`);
             }
@@ -4251,10 +4282,10 @@ class DashboardApp {
 
         const planNames = { starter: 'Starter', business: 'Business', pro: 'Pro' };
         const cycle = billingCycle === 'annual' ? 'annual' : 'monthly';
-        const billingLabel = cycle === 'annual' ? '年額（一括）' : '月額';
+        const billingLabel = cycle === 'annual' ? '蟷ｴ鬘搾ｼ井ｸ諡ｬ・・ : '譛磯｡・;
         const planPrices = {
-            monthly: { starter: '¥1,480 / 月（税込）', business: '¥4,980 / 月（税込）', pro: '¥9,800 / 月（税込）' },
-            annual: { starter: '¥14,800 / 年（税込）', business: '¥49,800 / 年（税込）', pro: '¥98,000 / 年（税込）' }
+            monthly: { starter: 'ﾂ･1,480 / 譛茨ｼ育ｨ手ｾｼ・・, business: 'ﾂ･4,980 / 譛茨ｼ育ｨ手ｾｼ・・, pro: 'ﾂ･9,800 / 譛茨ｼ育ｨ手ｾｼ・・ },
+            annual: { starter: 'ﾂ･14,800 / 蟷ｴ・育ｨ手ｾｼ・・, business: 'ﾂ･49,800 / 蟷ｴ・育ｨ手ｾｼ・・, pro: 'ﾂ･98,000 / 蟷ｴ・育ｨ手ｾｼ・・ }
         };
 
         const overlay = document.createElement('div');
@@ -4264,27 +4295,27 @@ class DashboardApp {
         <div class="modal-content" style="max-width:480px;">
             <div class="modal-header">
                 <h3 style="margin:0; font-size:1.1rem;">
-                    <i class="fa-solid fa-credit-card" style="margin-right:8px; color:#c19b4a;"></i>お支払い方法を登録
+                    <i class="fa-solid fa-credit-card" style="margin-right:8px; color:#c19b4a;"></i>縺頑髪謇輔＞譁ｹ豕輔ｒ逋ｻ骭ｲ
                 </h3>
                 ${forcePayment ? '' : '<button class="btn-close" onclick="document.getElementById(\'paypal-modal-overlay\').remove()">&times;</button>'}
             </div>
             <div class="modal-body" style="padding:24px;">
                 <div style="background:#faf8f5; border:1px solid #e8e0d4; border-radius:8px; padding:16px; margin-bottom:20px; text-align:center;">
-                    <div style="font-size:0.8rem; color:#888; margin-bottom:4px;">選択プラン</div>
+                    <div style="font-size:0.8rem; color:#888; margin-bottom:4px;">驕ｸ謚槭・繝ｩ繝ｳ</div>
                     <div style="font-size:1.1rem; font-weight:700; color:#24292E;">${planNames[plan] || plan}</div>
-                    <div style="font-size:0.8rem; color:#8a6f40; margin-top:4px;">請求サイクル: ${billingLabel}</div>
+                    <div style="font-size:0.8rem; color:#8a6f40; margin-top:4px;">隲区ｱゅし繧､繧ｯ繝ｫ: ${billingLabel}</div>
                     <div style="font-size:1.3rem; font-weight:700; color:#c19b4a; margin-top:4px;">${planPrices[cycle]?.[plan] || ''}</div>
                 </div>
                 <p style="font-size:0.82rem; color:#666; margin-bottom:16px; text-align:center;">
-                    クレジットカード/デビットカードで決済できます。
+                    繧ｯ繝ｬ繧ｸ繝・ヨ繧ｫ繝ｼ繝・繝・ン繝・ヨ繧ｫ繝ｼ繝峨〒豎ｺ貂医〒縺阪∪縺吶・
                 </p>
                 <div id="paypal-button-container" style="min-height:150px; display:flex; align-items:center; justify-content:center;">
-                    <div style="color:#999; font-size:0.85rem;"><i class="fa-solid fa-spinner fa-spin" style="margin-right:8px;"></i>決済ボタンを読み込み中...</div>
+                    <div style="color:#999; font-size:0.85rem;"><i class="fa-solid fa-spinner fa-spin" style="margin-right:8px;"></i>豎ｺ貂医・繧ｿ繝ｳ繧定ｪｭ縺ｿ霎ｼ縺ｿ荳ｭ...</div>
                 </div>
                 ${forcePayment ? `
                         <div style="margin-top:12px;">
                             <button onclick="window.location.replace('${window.location.origin}/index.html')" class="btn-dashboard full-width" style="background:#fff; color:#333; border:1px solid #ddd;">
-                                TOPへ戻る
+                                TOP縺ｸ謌ｻ繧・
                             </button>
                         </div>
                     ` : ''}
@@ -4309,7 +4340,7 @@ class DashboardApp {
             script.id = 'paypal-sdk-script';
             script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&vault=true&intent=subscription&locale=ja_JP`;
             script.onload = () => resolve();
-            script.onerror = () => reject(new Error('PayPal SDKの読み込みに失敗しました'));
+            script.onerror = () => reject(new Error('PayPal SDK縺ｮ隱ｭ縺ｿ霎ｼ縺ｿ縺ｫ螟ｱ謨励＠縺ｾ縺励◆'));
             document.head.appendChild(script);
         });
     }
@@ -4367,11 +4398,11 @@ class DashboardApp {
     isSignLimitReached() {
         const sub = this.subscription;
         if (!sub) return false;
-        // Proプランなら無制限
+        // Pro繝励Λ繝ｳ縺ｪ繧臥┌蛻ｶ髯・
         if (sub.plan === 'pro') return false;
         
         const count = Number(sub.signUsageCount || 0);
-        const limit = Number(sub.signUsageLimit || 1); // デフォルト1回
+        const limit = Number(sub.signUsageLimit || 1); // 繝・ヵ繧ｩ繝ｫ繝・蝗・
         return count >= limit;
     }
 
@@ -4380,11 +4411,11 @@ class DashboardApp {
         window.location.replace(`${window.location.origin}/select-plan-preview.html?billing=${billing}`);
     }
 
-    ensurePaymentAccess(featureLabel = '機能') {
+    ensurePaymentAccess(featureLabel = '讖溯・') {
         if (!this.requiresPaymentRegistration()) {
             return true;
         }
-        Notify.warning(`${featureLabel}を利用するには、お支払い方法の登録が必要です。プラン選択画面へ移動します。`);
+        Notify.warning(`${featureLabel}繧貞茜逕ｨ縺吶ｋ縺ｫ縺ｯ縲√♀謾ｯ謇輔＞譁ｹ豕輔・逋ｻ骭ｲ縺悟ｿ・ｦ√〒縺吶ゅ・繝ｩ繝ｳ驕ｸ謚樒判髱｢縺ｸ遘ｻ蜍輔＠縺ｾ縺吶Ａ);
         this.redirectToPlanSelection('upgrade');
         return false;
     }
@@ -4400,19 +4431,19 @@ class DashboardApp {
         const deadlineSlackEnabled = settings?.slack?.deadlineAlert !== false && slackConnected;
         const crawlerLocked = plan !== 'pro';
         const deadlineLocked = plan === 'free';
-        const lockOverlayCrawler = '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(245,247,250,0.82);backdrop-filter:blur(2px);border-radius:8px;z-index:1"><div style="background:#fff;border-radius:10px;padding:24px 32px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.1);max-width:280px"><i class=\'fa-solid fa-crown\' style=\'color:#c19b4a;font-size:1.8rem;margin-bottom:10px;display:block\'></i><div style=\'font-weight:700;font-size:15px;margin-bottom:8px\'>Proプラン限定</div><p style=\'font-size:12px;color:#888;line-height:1.6;margin-bottom:16px\'>クローラー通知はProプランの機能です</p><button class=\'btn-dashboard btn-primary-action\' style=\'width:100%;padding:10px;font-size:13px\' onclick=\'window.app.navigate("plan")\'>アップグレードする</button></div></div>';
-        const lockOverlayDeadline = '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(245,247,250,0.82);backdrop-filter:blur(2px);border-radius:8px;z-index:1"><div style="background:#fff;border-radius:10px;padding:24px 32px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.1);max-width:280px"><i class=\'fa-solid fa-crown\' style=\'color:#c19b4a;font-size:1.8rem;margin-bottom:10px;display:block\'></i><div style=\'font-weight:700;font-size:15px;margin-bottom:8px\'>Business / Proプラン限定</div><p style=\'font-size:12px;color:#888;line-height:1.6;margin-bottom:16px\'>期限アラート通知はBusinessプラン以上の機能です</p><button class=\'btn-dashboard btn-primary-action\' style=\'width:100%;padding:10px;font-size:13px\' onclick=\'window.app.navigate("plan")\'>アップグレードする</button></div></div>';
+        const lockOverlayCrawler = '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(245,247,250,0.82);backdrop-filter:blur(2px);border-radius:8px;z-index:1"><div style="background:#fff;border-radius:10px;padding:24px 32px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.1);max-width:280px"><i class=\'fa-solid fa-crown\' style=\'color:#c19b4a;font-size:1.8rem;margin-bottom:10px;display:block\'></i><div style=\'font-weight:700;font-size:15px;margin-bottom:8px\'>Pro繝励Λ繝ｳ髯仙ｮ・/div><p style=\'font-size:12px;color:#888;line-height:1.6;margin-bottom:16px\'>繧ｯ繝ｭ繝ｼ繝ｩ繝ｼ騾夂衍縺ｯPro繝励Λ繝ｳ縺ｮ讖溯・縺ｧ縺・/p><button class=\'btn-dashboard btn-primary-action\' style=\'width:100%;padding:10px;font-size:13px\' onclick=\'window.app.navigate("plan")\'>繧｢繝・・繧ｰ繝ｬ繝ｼ繝峨☆繧・/button></div></div>';
+        const lockOverlayDeadline = '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(245,247,250,0.82);backdrop-filter:blur(2px);border-radius:8px;z-index:1"><div style="background:#fff;border-radius:10px;padding:24px 32px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.1);max-width:280px"><i class=\'fa-solid fa-crown\' style=\'color:#c19b4a;font-size:1.8rem;margin-bottom:10px;display:block\'></i><div style=\'font-weight:700;font-size:15px;margin-bottom:8px\'>Business / Pro繝励Λ繝ｳ髯仙ｮ・/div><p style=\'font-size:12px;color:#888;line-height:1.6;margin-bottom:16px\'>譛滄剞繧｢繝ｩ繝ｼ繝磯夂衍縺ｯBusiness繝励Λ繝ｳ莉･荳翫・讖溯・縺ｧ縺・/p><button class=\'btn-dashboard btn-primary-action\' style=\'width:100%;padding:10px;font-size:13px\' onclick=\'window.app.navigate("plan")\'>繧｢繝・・繧ｰ繝ｬ繝ｼ繝峨☆繧・/button></div></div>';
 
         const slackStatus = slackConnected
             ? `<div style="display:flex;align-items:center;gap:8px;margin-top:12px;padding:10px 14px;background:#f0faf4;border:1px solid #b7dfc7;border-radius:6px">
                 <i class="fa-brands fa-slack" style="color:#4a154b;font-size:16px"></i>
                 <i class="fa-solid fa-circle-check" style="color:#28a745;font-size:13px"></i>
                 <span style="font-size:13px;color:#1a6b35;font-weight:500">${channelName}</span>
-                <span style="font-size:12px;color:var(--text-muted)">${teamName ? `（${teamName}）` : ''}</span>
+                <span style="font-size:12px;color:var(--text-muted)">${teamName ? `・・{teamName}・荏 : ''}</span>
                 <button onclick="window.app.disconnectSlack()"
                     style="margin-left:auto;font-size:12px;color:var(--text-muted);background:none;border:none;cursor:pointer;padding:2px 8px;border-radius:4px;transition:background .15s"
                     onmouseover="this.style.background='#fee'" onmouseout="this.style.background='none'">
-                    連携解除
+                    騾｣謳ｺ隗｣髯､
                 </button>
                </div>`
             : '';
@@ -4421,21 +4452,21 @@ class DashboardApp {
             <div class="plan-section">
                 <div style="position:relative">
                 <div style="margin-bottom:28px">
-                    <h2 class="section-title" style="margin-bottom:6px">クローラー通知設定</h2>
-                    <p style="color:var(--text-muted);font-size:13px;margin:0">URLクローリングで変更が検知された際の通知先を設定します</p>
+                    <h2 class="section-title" style="margin-bottom:6px">繧ｯ繝ｭ繝ｼ繝ｩ繝ｼ騾夂衍險ｭ螳・/h2>
+                    <p style="color:var(--text-muted);font-size:13px;margin:0">URL繧ｯ繝ｭ繝ｼ繝ｪ繝ｳ繧ｰ縺ｧ螟画峩縺梧､懃衍縺輔ｌ縺滄圀縺ｮ騾夂衍蜈医ｒ險ｭ螳壹＠縺ｾ縺・/p>
                 </div>
 
                 <div style="display:flex;flex-direction:column;gap:12px;max-width:640px">
 
-                    <!-- メール通知 -->
+                    <!-- 繝｡繝ｼ繝ｫ騾夂衍 -->
                     <div style="background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:8px;padding:20px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px">
                         <div style="display:flex;align-items:center;gap:14px">
                             <div style="width:36px;height:36px;border-radius:8px;background:var(--color-primary-dim);display:flex;align-items:center;justify-content:center;flex-shrink:0">
                                 <i class="fa-solid fa-envelope" style="color:var(--color-primary);font-size:15px"></i>
                             </div>
                             <div>
-                                <div style="font-weight:600;font-size:14px;color:var(--text-main);margin-bottom:2px">メール通知</div>
-                                <div style="font-size:12px;color:var(--text-muted)">変更検知時に登録メールアドレスへ通知</div>
+                                <div style="font-weight:600;font-size:14px;color:var(--text-main);margin-bottom:2px">繝｡繝ｼ繝ｫ騾夂衍</div>
+                                <div style="font-size:12px;color:var(--text-muted)">螟画峩讀懃衍譎ゅ↓逋ｻ骭ｲ繝｡繝ｼ繝ｫ繧｢繝峨Ξ繧ｹ縺ｸ騾夂衍</div>
                             </div>
                         </div>
                         <label class="toggle-switch" style="flex-shrink:0">
@@ -4445,7 +4476,7 @@ class DashboardApp {
                         </label>
                     </div>
 
-                    <!-- Slack通知 -->
+                    <!-- Slack騾夂衍 -->
                     <div style="background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:8px;padding:20px 24px">
                         <div style="display:flex;align-items:center;justify-content:space-between;gap:16px">
                             <div style="display:flex;align-items:center;gap:14px">
@@ -4453,8 +4484,8 @@ class DashboardApp {
                                     <i class="fa-brands fa-slack" style="color:var(--color-primary);font-size:16px"></i>
                                 </div>
                                 <div>
-                                    <div style="font-weight:600;font-size:14px;color:var(--text-main);margin-bottom:2px">Slack通知</div>
-                                    <div style="font-size:12px;color:var(--text-muted)">変更検知時に指定チャンネルへ通知</div>
+                                    <div style="font-weight:600;font-size:14px;color:var(--text-main);margin-bottom:2px">Slack騾夂衍</div>
+                                    <div style="font-size:12px;color:var(--text-muted)">螟画峩讀懃衍譎ゅ↓謖・ｮ壹メ繝｣繝ｳ繝阪Ν縺ｸ騾夂衍</div>
                                 </div>
                             </div>
                             ${slackConnected
@@ -4466,7 +4497,7 @@ class DashboardApp {
                                 : `<button onclick="window.app.connectSlack()"
                                     style="display:inline-flex;align-items:center;gap:7px;padding:8px 16px;background:#4a154b;color:#fff;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:600;flex-shrink:0;transition:opacity .2s"
                                     onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
-                                    <i class="fa-brands fa-slack"></i>連携する
+                                    <i class="fa-brands fa-slack"></i>騾｣謳ｺ縺吶ｋ
                                 </button>`}
                         </div>
                         ${slackStatus}
@@ -4476,24 +4507,24 @@ class DashboardApp {
                 ${crawlerLocked ? lockOverlayCrawler : ''}
                 </div>
 
-                <!-- 期限アラート通知 -->
+                <!-- 譛滄剞繧｢繝ｩ繝ｼ繝磯夂衍 -->
                 <div style="position:relative;margin-top:36px">
                 <div style="margin-bottom:12px">
-                    <h2 class="section-title" style="margin-bottom:6px">期限アラート通知</h2>
-                    <p style="color:var(--text-muted);font-size:13px;margin:0">契約の期限（30日前・7日前・当日）に通知します</p>
+                    <h2 class="section-title" style="margin-bottom:6px">譛滄剞繧｢繝ｩ繝ｼ繝磯夂衍</h2>
+                    <p style="color:var(--text-muted);font-size:13px;margin:0">螂醍ｴ・・譛滄剞・・0譌･蜑阪・7譌･蜑阪・蠖捺律・峨↓騾夂衍縺励∪縺・/p>
                 </div>
 
                 <div style="display:flex;flex-direction:column;gap:12px;max-width:640px">
 
-                    <!-- 期限アラート: メール -->
+                    <!-- 譛滄剞繧｢繝ｩ繝ｼ繝・ 繝｡繝ｼ繝ｫ -->
                     <div style="background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:8px;padding:20px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px">
                         <div style="display:flex;align-items:center;gap:14px">
                             <div style="width:36px;height:36px;border-radius:8px;background:var(--color-primary-dim);display:flex;align-items:center;justify-content:center;flex-shrink:0">
                                 <i class="fa-solid fa-envelope" style="color:var(--color-primary);font-size:15px"></i>
                             </div>
                             <div>
-                                <div style="font-weight:600;font-size:14px;color:var(--text-main);margin-bottom:2px">メール通知（期限アラート）</div>
-                                <div style="font-size:12px;color:var(--text-muted)">契約期限の30日前・7日前・当日に登録メールへ送信</div>
+                                <div style="font-weight:600;font-size:14px;color:var(--text-main);margin-bottom:2px">繝｡繝ｼ繝ｫ騾夂衍・域悄髯舌い繝ｩ繝ｼ繝茨ｼ・/div>
+                                <div style="font-size:12px;color:var(--text-muted)">螂醍ｴ・悄髯舌・30譌･蜑阪・7譌･蜑阪・蠖捺律縺ｫ逋ｻ骭ｲ繝｡繝ｼ繝ｫ縺ｸ騾∽ｿ｡</div>
                             </div>
                         </div>
                         <label class="toggle-switch" style="flex-shrink:0">
@@ -4503,7 +4534,7 @@ class DashboardApp {
                         </label>
                     </div>
 
-                    <!-- 期限アラート: Slack -->
+                    <!-- 譛滄剞繧｢繝ｩ繝ｼ繝・ Slack -->
                     <div style="background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:8px;padding:20px 24px">
                         <div style="display:flex;align-items:center;justify-content:space-between;gap:16px">
                             <div style="display:flex;align-items:center;gap:14px">
@@ -4511,8 +4542,8 @@ class DashboardApp {
                                     <i class="fa-brands fa-slack" style="color:var(--color-primary);font-size:16px"></i>
                                 </div>
                                 <div>
-                                    <div style="font-weight:600;font-size:14px;color:var(--text-main);margin-bottom:2px">Slack通知（期限アラート）</div>
-                                    <div style="font-size:12px;color:var(--text-muted)">${slackConnected ? `連携済チャンネル（${channelName}）へ期限アラートを送信` : '期限アラートをSlackへ通知します'}</div>
+                                    <div style="font-weight:600;font-size:14px;color:var(--text-main);margin-bottom:2px">Slack騾夂衍・域悄髯舌い繝ｩ繝ｼ繝茨ｼ・/div>
+                                    <div style="font-size:12px;color:var(--text-muted)">${slackConnected ? `騾｣謳ｺ貂医メ繝｣繝ｳ繝阪Ν・・{channelName}・峨∈譛滄剞繧｢繝ｩ繝ｼ繝医ｒ騾∽ｿ｡` : '譛滄剞繧｢繝ｩ繝ｼ繝医ｒSlack縺ｸ騾夂衍縺励∪縺・}</div>
                                 </div>
                             </div>
                             ${slackConnected
@@ -4524,7 +4555,7 @@ class DashboardApp {
                                 : `<button onclick="window.app.connectSlack()"
                                     style="display:inline-flex;align-items:center;gap:7px;padding:8px 16px;background:#4a154b;color:#fff;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:600;flex-shrink:0;transition:opacity .2s"
                                     onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
-                                    <i class="fa-brands fa-slack"></i>連携する
+                                    <i class="fa-brands fa-slack"></i>騾｣謳ｺ縺吶ｋ
                                 </button>`}
                         </div>
                         ${slackConnected ? '' : ''}
@@ -4558,7 +4589,7 @@ class DashboardApp {
         try {
             const authModule = await import('./auth.js');
             const token = await authModule.getIdToken();
-            if (!token) return; // ローカル環境ではサイレントにスキップ
+            if (!token) return; // 繝ｭ繝ｼ繧ｫ繝ｫ迺ｰ蠅・〒縺ｯ繧ｵ繧､繝ｬ繝ｳ繝医↓繧ｹ繧ｭ繝・・
 
             const apiBase = (await import('./api-base.js')).getApiBaseUrl();
             const res = await fetch(`${apiBase}/api/notifications/settings`, {
@@ -4568,12 +4599,12 @@ class DashboardApp {
             });
             const data = await res.json();
             if (data.success) {
-                Notify.success('通知設定を保存しました');
+                Notify.success('騾夂衍險ｭ螳壹ｒ菫晏ｭ倥＠縺ｾ縺励◆');
             } else {
-                Notify.error(data.error || '保存に失敗しました');
+                Notify.error(data.error || '菫晏ｭ倥↓螟ｱ謨励＠縺ｾ縺励◆');
             }
         } catch (err) {
-            Notify.error('保存に失敗しました: ' + err.message);
+            Notify.error('菫晏ｭ倥↓螟ｱ謨励＠縺ｾ縺励◆: ' + err.message);
         }
     }
 
@@ -4582,7 +4613,7 @@ class DashboardApp {
             const authModule = await import('./auth.js');
             const token = await authModule.getIdToken();
             if (!token) {
-                Notify.error('ログインが必要です');
+                Notify.error('繝ｭ繧ｰ繧､繝ｳ縺悟ｿ・ｦ√〒縺・);
                 return;
             }
             const apiBase = (await import('./api-base.js')).getApiBaseUrl();
@@ -4596,15 +4627,15 @@ class DashboardApp {
             if (data.success && data.url) {
                 window.location.href = data.url;
             } else {
-                Notify.error(data.error || 'Slack連携の開始に失敗しました');
+                Notify.error(data.error || 'Slack騾｣謳ｺ縺ｮ髢句ｧ九↓螟ｱ謨励＠縺ｾ縺励◆');
             }
         } catch (err) {
-            Notify.error('Slack連携の開始に失敗しました: ' + err.message);
+            Notify.error('Slack騾｣謳ｺ縺ｮ髢句ｧ九↓螟ｱ謨励＠縺ｾ縺励◆: ' + err.message);
         }
     }
 
     async disconnectSlack() {
-        if (!await Notify.confirm('Slack連携を解除しますか？', { title: '確認', type: 'warning' })) return;
+        if (!await Notify.confirm('Slack騾｣謳ｺ繧定ｧ｣髯､縺励∪縺吶°・・, { title: '遒ｺ隱・, type: 'warning' })) return;
         try {
             const authModule = await import('./auth.js');
             const token = await authModule.getIdToken();
@@ -4614,10 +4645,10 @@ class DashboardApp {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            Notify.success('Slack連携を解除しました');
+            Notify.success('Slack騾｣謳ｺ繧定ｧ｣髯､縺励∪縺励◆');
             this.loadAndRenderNotificationSettings();
         } catch (err) {
-            Notify.error('解除に失敗しました: ' + err.message);
+            Notify.error('隗｣髯､縺ｫ螟ｱ謨励＠縺ｾ縺励◆: ' + err.message);
         }
     }
 
@@ -4631,20 +4662,20 @@ class DashboardApp {
             return;
         }
 
-        // Slack OAuth結果をチェック
+        // Slack OAuth邨先棡繧偵メ繧ｧ繝・け
         const urlParams = new URLSearchParams(window.location.search);
         const slackConnected = urlParams.get('slack_connected');
         const slackError = urlParams.get('slack_error');
         const slackChannel = urlParams.get('channel');
         if (slackConnected === '1') {
-            Notify.success('Slack連携が完了しました');
+            Notify.success('Slack騾｣謳ｺ縺悟ｮ御ｺ・＠縺ｾ縺励◆');
             history.replaceState(null, '', window.location.pathname);
         } else if (slackError) {
-            Notify.error(`Slack連携に失敗しました: ${decodeURIComponent(slackError)}`);
+            Notify.error(`Slack騾｣謳ｺ縺ｫ螟ｱ謨励＠縺ｾ縺励◆: ${decodeURIComponent(slackError)}`);
             history.replaceState(null, '', window.location.pathname);
         }
 
-        main.innerHTML = '<div style="padding:40px;color:#888;">読み込み中...</div>';
+        main.innerHTML = '<div style="padding:40px;color:#888;">隱ｭ縺ｿ霎ｼ縺ｿ荳ｭ...</div>';
 
         let apiBase = '';
         try {
@@ -4655,7 +4686,7 @@ class DashboardApp {
             const authModule = await import('./auth.js');
             const token = await authModule.getIdToken();
             if (!token) {
-                // ローカル開発環境などトークンなしの場合はデフォルト設定を表示
+                // 繝ｭ繝ｼ繧ｫ繝ｫ髢狗匱迺ｰ蠅・↑縺ｩ繝医・繧ｯ繝ｳ縺ｪ縺励・蝣ｴ蜷医・繝・ヵ繧ｩ繝ｫ繝郁ｨｭ螳壹ｒ陦ｨ遉ｺ
                 main.innerHTML = this.renderNotificationSettings({}, apiBase, plan);
                 return;
             }
@@ -4679,20 +4710,20 @@ class DashboardApp {
         <div class="modal-content" style="max-width:480px;">
             <div class="modal-header" style="background:#fef2f2; border-bottom:1px solid #fecaca;">
                 <h3 style="color:#991b1b; margin:0; font-size:1.1rem;">
-                    <i class="fa-solid fa-triangle-exclamation" style="margin-right:8px;"></i>プランのキャンセル
+                    <i class="fa-solid fa-triangle-exclamation" style="margin-right:8px;"></i>繝励Λ繝ｳ縺ｮ繧ｭ繝｣繝ｳ繧ｻ繝ｫ
                 </h3>
-                <button class="btn-close" onclick="document.getElementById('cancel-modal-overlay').remove()">×</button>
+                <button class="btn-close" onclick="document.getElementById('cancel-modal-overlay').remove()">ﾃ・/button>
             </div>
             <div class="modal-body" style="padding:24px;">
-                <p style="margin-bottom:16px; color:#333;">本当にプランをキャンセルしますか？</p>
+                <p style="margin-bottom:16px; color:#333;">譛ｬ蠖薙↓繝励Λ繝ｳ繧偵く繝｣繝ｳ繧ｻ繝ｫ縺励∪縺吶°・・/p>
                 <ul style="font-size:0.85rem; color:#666; margin-bottom:20px; padding-left:20px;">
-                    <li style="margin-bottom:6px;">サブスクリプションが停止されます</li>
-                    <li style="margin-bottom:6px;">Freeプラン（無料）に戻ります</li>
-                    <li style="margin-bottom:6px;">AI解析回数が月3回に制限されます</li>
+                    <li style="margin-bottom:6px;">繧ｵ繝悶せ繧ｯ繝ｪ繝励す繝ｧ繝ｳ縺悟●豁｢縺輔ｌ縺ｾ縺・/li>
+                    <li style="margin-bottom:6px;">Free繝励Λ繝ｳ・育┌譁呻ｼ峨↓謌ｻ繧翫∪縺・/li>
+                    <li style="margin-bottom:6px;">AI隗｣譫仙屓謨ｰ縺梧怦3蝗槭↓蛻ｶ髯舌＆繧後∪縺・/li>
                 </ul>
                 <div style="display:flex; gap:12px; justify-content:flex-end;">
-                    <button onclick="document.getElementById('cancel-modal-overlay').remove()" class="btn-dashboard" style="padding:8px 20px;">キャンセルしない</button>
-                    <button onclick="window.app.executeCancelSubscription()" class="btn-dashboard" style="background:#d73a49; color:#fff; border:none; padding:8px 20px;">解約する</button>
+                    <button onclick="document.getElementById('cancel-modal-overlay').remove()" class="btn-dashboard" style="padding:8px 20px;">繧ｭ繝｣繝ｳ繧ｻ繝ｫ縺励↑縺・/button>
+                    <button onclick="window.app.executeCancelSubscription()" class="btn-dashboard" style="background:#d73a49; color:#fff; border:none; padding:8px 20px;">隗｣邏・☆繧・/button>
                 </div>
             </div>
         </div>
@@ -4726,14 +4757,14 @@ class DashboardApp {
                 this.userPlan = 'free';
                 this.planViewBillingCycle = 'monthly';
                 this.updateSubscriptionUI();
-                Notify.success('プランがキャンセルされました。無料プランに移行しました。');
+                Notify.success('繝励Λ繝ｳ縺後く繝｣繝ｳ繧ｻ繝ｫ縺輔ｌ縺ｾ縺励◆縲ら┌譁吶・繝ｩ繝ｳ縺ｫ遘ｻ陦後＠縺ｾ縺励◆縲・);
                 this.navigate('plan');
             } else {
-                Notify.error('キャンセル処理でエラーが発生しました。');
+                Notify.error('繧ｭ繝｣繝ｳ繧ｻ繝ｫ蜃ｦ逅・〒繧ｨ繝ｩ繝ｼ縺檎匱逕溘＠縺ｾ縺励◆縲・);
             }
         } catch (error) {
             console.error('Cancel subscription error:', error);
-            Notify.error('キャンセル処理でエラーが発生しました。');
+            Notify.error('繧ｭ繝｣繝ｳ繧ｻ繝ｫ蜃ｦ逅・〒繧ｨ繝ｩ繝ｼ縺檎匱逕溘＠縺ｾ縺励◆縲・);
         }
     }
 
@@ -4753,33 +4784,33 @@ class DashboardApp {
 
         const usagePercent = Math.min(100, (sub.usageCount / sub.usageLimit) * 100);
         const planName = planNames[sub.plan] || sub.plan;
-        const billingCycleLabel = sub.billingCycle === 'annual' ? '年額' : '月額';
+        const billingCycleLabel = sub.billingCycle === 'annual' ? '蟷ｴ鬘・ : '譛磯｡・;
 
         let upgradeAdvice = '';
         if (sub.usageCount >= sub.usageLimit) {
             if (sub.plan === 'free') {
-                upgradeAdvice = '<div class="upgrade-advice">月間上限に達しました。Starter以上のプランにすると解析回数が増えます。</div>';
+                upgradeAdvice = '<div class="upgrade-advice">譛磯俣荳企剞縺ｫ驕斐＠縺ｾ縺励◆縲４tarter莉･荳翫・繝励Λ繝ｳ縺ｫ縺吶ｋ縺ｨ隗｣譫仙屓謨ｰ縺悟｢励∴縺ｾ縺吶・/div>';
             } else if (sub.plan === 'starter') {
-                upgradeAdvice = '<div class="upgrade-advice">月間上限に達しました。翌月まで待つか、Business以上のプランにすると回数が増えます。</div>';
+                upgradeAdvice = '<div class="upgrade-advice">譛磯俣荳企剞縺ｫ驕斐＠縺ｾ縺励◆縲らｿ梧怦縺ｾ縺ｧ蠕・▽縺九。usiness莉･荳翫・繝励Λ繝ｳ縺ｫ縺吶ｋ縺ｨ蝗樊焚縺悟｢励∴縺ｾ縺吶・/div>';
             } else if (sub.plan === 'business') {
-                upgradeAdvice = '<div class="upgrade-advice">月間上限に達しました。翌月まで待つか、Proプランにアップグレードすると回数が増えます。</div>';
+                upgradeAdvice = '<div class="upgrade-advice">譛磯俣荳企剞縺ｫ驕斐＠縺ｾ縺励◆縲らｿ梧怦縺ｾ縺ｧ蠕・▽縺九￣ro繝励Λ繝ｳ縺ｫ繧｢繝・・繧ｰ繝ｬ繝ｼ繝峨☆繧九→蝗樊焚縺悟｢励∴縺ｾ縺吶・/div>';
             } else if (sub.plan === 'pro') {
-                upgradeAdvice = '<div class="upgrade-advice">月間上限に達しました。翌月までお待ちいただくか、追加枠についてお問い合わせください。</div>';
+                upgradeAdvice = '<div class="upgrade-advice">譛磯俣荳企剞縺ｫ驕斐＠縺ｾ縺励◆縲らｿ梧怦縺ｾ縺ｧ縺雁ｾ・■縺・◆縺�縺上°縲∬ｿｽ蜉�譫�縺ｫ縺､縺・※縺雁撫縺・粋繧上○縺上□縺輔＞縲・/div>';
             }
         }
 
         let statusHtml = `
         <div class="plan-status-card">
-            <div class="plan-badge plan-badge-${sub.plan}">${planName}（${billingCycleLabel}）</div>
+            <div class="plan-badge plan-badge-${sub.plan}">${planName}・・{billingCycleLabel}・・/div>
             <div class="plan-info-text">
-                AI解析: <strong style="${(({'free':3,'starter':50,'business':120,'pro':400}[sub.plan] || sub.usageLimit) - sub.usageCount) <= 1 ? 'color:#f59e0b;' : ''}">${sub.usageCount}</strong> / ${{'free':3,'starter':50,'business':120,'pro':400}[sub.plan] || sub.usageLimit}回
-                <br>電子署名: <strong>${sub.signUsageCount || 0}</strong> / ${sub.plan === 'pro' ? '無制限' : `${{'free':10,'starter':25,'business':100}[sub.plan] || sub.signUsageLimit || 0}回`}
-                ${sub.renewalDate ? `<br><span style="font-size:0.75rem; opacity:0.8;">次回更新: <strong>${new Date(sub.renewalDate).toLocaleDateString('ja-JP')}</strong></span>` : ''}
+                AI隗｣譫・ <strong style="${(({'free':3,'starter':50,'business':120,'pro':400}[sub.plan] || sub.usageLimit) - sub.usageCount) <= 1 ? 'color:#f59e0b;' : ''}">${sub.usageCount}</strong> / ${{'free':3,'starter':50,'business':120,'pro':400}[sub.plan] || sub.usageLimit}蝗・
+                <br>髮ｻ蟄千ｽｲ蜷・ <strong>${sub.signUsageCount || 0}</strong> / ${sub.plan === 'pro' ? '辟｡蛻ｶ髯・ : `${{'free':10,'starter':25,'business':100}[sub.plan] || sub.signUsageLimit || 0}蝗杼}
+                ${sub.renewalDate ? `<br><span style="font-size:0.75rem; opacity:0.8;">谺｡蝗樊峩譁ｰ: <strong>${new Date(sub.renewalDate).toLocaleDateString('ja-JP')}</strong></span>` : ''}
             </div>
             ${upgradeAdvice}
             ${this.isSignLimitReached() ? `
                 <div style="margin-top:10px; padding:8px 10px; background:rgba(234,67,53,0.08); border:1px solid rgba(234,67,53,0.2); border-radius:6px; font-size:0.72rem; color:#c2410c;">
-                    今月の電子署名上限に達しました。翌月までお待ちいただくか、上位プランへのアップグレードをご検討ください。
+                    莉頑怦縺ｮ髮ｻ蟄千ｽｲ蜷堺ｸ企剞縺ｫ驕斐＠縺ｾ縺励◆縲らｿ梧怦縺ｾ縺ｧ縺雁ｾ・■縺・◆縺�縺上°縲∽ｸ贋ｽ阪・繝ｩ繝ｳ縺ｸ縺ｮ繧｢繝・・繧ｰ繝ｬ繝ｼ繝峨ｒ縺疲､懆ｨ弱￥縺�縺輔＞縲・
                 </div>
             ` : ''}
         </div>
@@ -4848,7 +4879,7 @@ class DashboardApp {
                 const urlInput = document.getElementById('new-version-url');
                 const url = urlInput ? urlInput.value.trim() : "";
                 if (!url) {
-                    Notify.warning('URLを入力してください');
+                    Notify.warning('URL繧貞・蜉帙＠縺ｦ縺上□縺輔＞');
                     return;
                 }
                 const contractId = submitUrlBtn.getAttribute('data-contract-id');
@@ -4869,7 +4900,7 @@ class DashboardApp {
         document.getElementById('app-sidebar')?.classList.remove('active');
         document.getElementById('sidebar-overlay')?.classList.remove('active');
 
-        if (viewId === 'diff' && !this.ensurePaymentAccess('差分機能')) {
+        if (viewId === 'diff' && !this.ensurePaymentAccess('蟾ｮ蛻・ｩ溯・')) {
             return;
         }
 
@@ -4923,7 +4954,7 @@ class DashboardApp {
             return;
         }
 
-        // RBAC: Protect team view - Business+のみ
+        // RBAC: Protect team view - Business+縺ｮ縺ｿ
         if (viewId === 'team' && this.subscription?.plan === 'starter') {
             const upgradeModal = document.getElementById('upgrade-modal');
             if (upgradeModal) {
@@ -4958,7 +4989,7 @@ class DashboardApp {
         if (viewId === 'diff') {
             const normalizedDiffId = normalizeDiffContractId(params);
             if (!normalizedDiffId) {
-                Notify.error('対象の契約IDを取得できませんでした。一覧から再度開いてください。');
+                Notify.error('蟇ｾ雎｡縺ｮ螂醍ｴИD繧貞叙蠕励〒縺阪∪縺帙ｓ縺ｧ縺励◆縲ゆｸ隕ｧ縺九ｉ蜀榊ｺｦ髢九＞縺ｦ縺上□縺輔＞縲・);
                 return;
             }
             renderParams = normalizedDiffId;
@@ -5037,14 +5068,14 @@ class DashboardApp {
                 this.mainContent.innerHTML = Views[viewId](renderParams);
 
                 const titles = {
-                    'dashboard': 'ダッシュボード',
-                    'plan': 'プラン管理',
-                    'contracts': '契約・規約管理',
-                    'diff': '解析詳細',
-                    'history': '履歴・ログ',
-                    'team': 'チーム設定',
-                    'sign': '署名管理',
-                    'sign-viewer': '署名ビューワー'
+                    'dashboard': '繝繝・す繝･繝懊・繝・,
+                    'plan': '繝励Λ繝ｳ邂｡逅・,
+                    'contracts': '螂醍ｴ・・隕冗ｴ・ｮ｡逅・,
+                    'diff': '隗｣譫占ｩｳ邏ｰ',
+                    'history': '螻･豁ｴ繝ｻ繝ｭ繧ｰ',
+                    'team': '繝√・繝�險ｭ螳・,
+                    'sign': '鄂ｲ蜷咲ｮ｡逅・,
+                    'sign-viewer': '鄂ｲ蜷阪ン繝･繝ｼ繝ｯ繝ｼ'
                 };
                 if (this.pageTitle) {
                     this.pageTitle.textContent = titles[viewId] || 'DIFFsense';
@@ -5078,9 +5109,9 @@ class DashboardApp {
                 if (viewId === 'diff') {
                     const contractId = typeof renderParams === 'object' ? renderParams?.id : renderParams;
                     const contract = dbService.getContractById(contractId);
-                    const safeTitle = escapeHtmlText(contract?.name || '解析詳細');
+                    const safeTitle = escapeHtmlText(contract?.name || '隗｣譫占ｩｳ邏ｰ');
                     const safeFile = escapeHtmlText(contract?.original_filename || '');
-                    const safeBody = escapeHtmlText(contentToComparableText(contract?.original_content || '') || '原本データがありません');
+                    const safeBody = escapeHtmlText(contentToComparableText(contract?.original_content || '') || '蜴滓悽繝・・繧ｿ縺後≠繧翫∪縺帙ｓ');
                     this.mainContent.innerHTML = `
                         <div class="detail-split-container">
                             <div class="detail-split-header flex justify-between items-center">
@@ -5090,13 +5121,13 @@ class DashboardApp {
                                 </div>
                             </div>
                             <div style="padding:24px;">
-                                <div style="margin-bottom:16px; color:#b42318; font-size:13px;">比較画面の描画でエラーが発生したため、安全表示に切り替えました。</div>
+                                <div style="margin-bottom:16px; color:#b42318; font-size:13px;">豈碑ｼ・判髱｢縺ｮ謠冗判縺ｧ繧ｨ繝ｩ繝ｼ縺檎匱逕溘＠縺溘◆繧√∝ｮ牙・陦ｨ遉ｺ縺ｫ蛻・ｊ譖ｿ縺医∪縺励◆縲・/div>
                                 <div style="background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:20px; white-space:pre-wrap; line-height:1.9;">${safeBody}</div>
                             </div>
                         </div>
                     `;
                 } else {
-                    this.mainContent.innerHTML = '<div class="p-md text-danger">画面の表示中にエラーが発生しました。</div>';
+                    this.mainContent.innerHTML = '<div class="p-md text-danger">逕ｻ髱｢縺ｮ陦ｨ遉ｺ荳ｭ縺ｫ繧ｨ繝ｩ繝ｼ縺檎匱逕溘＠縺ｾ縺励◆縲・/div>';
                 }
             }
         }
@@ -5108,10 +5139,10 @@ class DashboardApp {
 
         const titleEl = document.getElementById('dashboard-section-title');
         if (titleEl) {
-            let sectionTitle = "要確認アイテム (優先度順)";
-            if (filter === 'pending') sectionTitle = "未処理のアイテム (新着・変更検知)";
-            if (filter === 'risk') sectionTitle = "リスク要判定アイテム";
-            if (filter === 'total') sectionTitle = "全監視対象（最新順）";
+            let sectionTitle = "隕∫｢ｺ隱阪い繧､繝・Β (蜆ｪ蜈亥ｺｦ鬆・";
+            if (filter === 'pending') sectionTitle = "譛ｪ蜃ｦ逅・・繧｢繧､繝・Β (譁ｰ逹繝ｻ螟画峩讀懃衍)";
+            if (filter === 'risk') sectionTitle = "繝ｪ繧ｹ繧ｯ隕∝愛螳壹い繧､繝・Β";
+            if (filter === 'total') sectionTitle = "蜈ｨ逶｣隕門ｯｾ雎｡・域怙譁ｰ鬆・ｼ・;
             titleEl.textContent = sectionTitle;
         }
 
@@ -5124,14 +5155,14 @@ class DashboardApp {
                 else if (c.risk_level === 'Low') riskBadgeClass = 'badge-success';
 
                 let statusBadge = '';
-                if (c.status === '未解析') statusBadge = '<span class="badge badge-info">未解析 (新規)</span>';
-                else if (c.status === '未処理') statusBadge = '<span class="badge badge-info">未処理</span>';
-                else if (c.status === '未確認') statusBadge = '<span class="badge badge-warning">要確認 (変更)</span>';
-                else if (c.status === '確認済') statusBadge = '<span class="badge badge-neutral"><i class="fa-solid fa-check"></i> 確認済</span>';
+                if (c.status === '譛ｪ隗｣譫・) statusBadge = '<span class="badge badge-info">譛ｪ隗｣譫・(譁ｰ隕・</span>';
+                else if (c.status === '譛ｪ蜃ｦ逅・) statusBadge = '<span class="badge badge-info">譛ｪ蜃ｦ逅・/span>';
+                else if (c.status === '譛ｪ遒ｺ隱・) statusBadge = '<span class="badge badge-warning">隕∫｢ｺ隱・(螟画峩)</span>';
+                else if (c.status === '遒ｺ隱肴ｸ・) statusBadge = '<span class="badge badge-neutral"><i class="fa-solid fa-check"></i> 遒ｺ隱肴ｸ・/span>';
 
                 const actionBtn = window.app.can('operate_contract')
-                    ? `<button class="btn-dashboard">${c.status === '確認済' ? '履歴を見る' : '確認する'}</button>`
-                    : `<button class="btn-dashboard">詳細を見る</button>`;
+                    ? `<button class="btn-dashboard">${c.status === '遒ｺ隱肴ｸ・ ? '螻･豁ｴ繧定ｦ九ｋ' : '遒ｺ隱阪☆繧・}</button>`
+                    : `<button class="btn-dashboard">隧ｳ邏ｰ繧定ｦ九ｋ</button>`;
 
                 return `
         <tr onclick="window.app.navigate('diff', ${c.id})">
@@ -5142,15 +5173,15 @@ class DashboardApp {
             <td>${actionBtn}</td>
         </tr>
         `;
-            }).join('') : '<tr><td colspan="5" class="text-center text-muted" style="padding:40px;">該当するアイテムはありません</td></tr>';
+            }).join('') : '<tr><td colspan="5" class="text-center text-muted" style="padding:40px;">隧ｲ蠖薙☆繧九い繧､繝・Β縺ｯ縺ゅｊ縺ｾ縺帙ｓ</td></tr>';
             tableBody.innerHTML = rows;
         }
 
         document.querySelectorAll('.stat-card').forEach(card => {
             card.classList.remove('active');
-            const isActive = (filter === 'pending' && card.textContent.includes('未処理')) ||
-                (filter === 'risk' && card.textContent.includes('リスク要判定')) ||
-                (filter === 'total' && card.textContent.includes('監視中'));
+            const isActive = (filter === 'pending' && card.textContent.includes('譛ｪ蜃ｦ逅・)) ||
+                (filter === 'risk' && card.textContent.includes('繝ｪ繧ｹ繧ｯ隕∝愛螳・)) ||
+                (filter === 'total' && card.textContent.includes('逶｣隕紋ｸｭ'));
             if (isActive) card.classList.add('active');
         });
     }
@@ -5520,10 +5551,10 @@ class DashboardApp {
 
     confirmContract(id) {
         if (!this.can('operate_contract')) {
-            Notify.warning('閲覧のみの権限ではステータスを変更できません');
+            Notify.warning('髢ｲ隕ｧ縺ｮ縺ｿ縺ｮ讓ｩ髯舌〒縺ｯ繧ｹ繝・・繧ｿ繧ｹ繧貞､画峩縺ｧ縺阪∪縺帙ｓ');
             return;
         }
-        if (dbService.updateContractStatus(id, '確認済')) {
+        if (dbService.updateContractStatus(id, '遒ｺ隱肴ｸ・)) {
             // Switch to 'Monitoring' (Total) view and go back to dashboard
             this.dashboardFilter = 'total';
             this.navigate('dashboard');
@@ -5532,7 +5563,7 @@ class DashboardApp {
 
     async analyzeContract(id) {
         if (!this.can('operate_contract')) {
-            Notify.warning('閲覧のみの権限ではAI解析を実行できません');
+            Notify.warning('髢ｲ隕ｧ縺ｮ縺ｿ縺ｮ讓ｩ髯舌〒縺ｯAI隗｣譫舌ｒ螳溯｡後〒縺阪∪縺帙ｓ');
             return;
         }
         const count = Number(this.subscription?.usageCount || 0);
@@ -5541,59 +5572,59 @@ class DashboardApp {
             this.showAnalysisLimitError({ currentUsage: count, limit: limit });
             return;
         }
-        if (!this.ensurePaymentAccess('差分解析')) {
+        if (!this.ensurePaymentAccess('蟾ｮ蛻・ｧ｣譫・)) {
             return;
         }
         const contract = dbService.getContractById(id);
         if (!contract) {
-            Notify.error('契約が見つかりません');
+            Notify.error('螂醍ｴ・′隕九▽縺九ｊ縺ｾ縺帙ｓ');
             return;
         }
 
         if (!contract.original_content) {
-            Notify.error('元のテキストが見つかりません。再度登録してください。');
+            Notify.error('蜈・・繝・く繧ｹ繝医′隕九▽縺九ｊ縺ｾ縺帙ｓ縲ょ・蠎ｦ逋ｻ骭ｲ縺励※縺上□縺輔＞縲・);
             return;
         }
 
-        // 確認ダイアログ
-        if (!await Notify.confirm(`「${contract.name}」の差分解析を実行しますか？\n\nAI解析により、リスク判定と変更箇所の抽出を行います。`, { title: '確認', type: 'info' })) {
+        // 遒ｺ隱阪ム繧､繧｢繝ｭ繧ｰ
+        if (!await Notify.confirm(`縲・{contract.name}縲阪・蟾ｮ蛻・ｧ｣譫舌ｒ螳溯｡後＠縺ｾ縺吶°・歃n\nAI隗｣譫舌↓繧医ｊ縲√Μ繧ｹ繧ｯ蛻､螳壹→螟画峩邂・園縺ｮ謚ｽ蜃ｺ繧定｡後＞縺ｾ縺吶Ａ, { title: '遒ｺ隱・, type: 'info' })) {
             return;
         }
 
         try {
-            // ローディング表示
+            // 繝ｭ繝ｼ繝・ぅ繝ｳ繧ｰ陦ｨ遉ｺ
             const loadingMsg = document.createElement('div');
             loadingMsg.style.cssText = 'position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:white; padding:30px; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,0.3); z-index:10000; text-align:center;';
-            loadingMsg.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="font-size:32px; color:#4CAF50;"></i><br><br><strong>AI解析中...</strong><br><span style="font-size:12px; color:#666;">数秒お待ちください</span>';
+            loadingMsg.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="font-size:32px; color:#4CAF50;"></i><br><br><strong>AI隗｣譫蝉ｸｭ...</strong><br><span style="font-size:12px; color:#666;">謨ｰ遘偵♀蠕・■縺上□縺輔＞</span>';
             document.body.appendChild(loadingMsg);
 
-            // AI解析を実行（旧バージョンがあれば差分比較モード）
+            // AI隗｣譫舌ｒ螳溯｡鯉ｼ域立繝舌・繧ｸ繝ｧ繝ｳ縺後≠繧後・蟾ｮ蛻・ｯ碑ｼ・Δ繝ｼ繝会ｼ・
             const previousVersion = (contract.history && contract.history.length > 0)
                 ? contract.history[contract.history.length - 1].content
                 : null;
             const result = await aiService.analyzeContract(
                 id,
-                'text',  // テキストとして送信
+                'text',  // 繝・く繧ｹ繝医→縺励※騾∽ｿ｡
                 contract.original_content,
                 previousVersion
             );
 
-            // ローディング削除
+            // 繝ｭ繝ｼ繝・ぅ繝ｳ繧ｰ蜑企勁
             document.body.removeChild(loadingMsg);
 
             if (result.success) {
-                // 解析結果をDBに保存
+                // 隗｣譫千ｵ先棡繧奪B縺ｫ菫晏ｭ・
                 const analysisPayloadAi = {
-                    extractedText: contract.original_content,  // 既存のテキストを保持
+                    extractedText: contract.original_content,  // 譌｢蟄倥・繝・く繧ｹ繝医ｒ菫晄戟
                     changes: result.data.changes,
                     riskLevel: result.data.riskLevel,
                     riskReason: result.data.riskReason,
                     summary: result.data.summary,
                     isFallback: result.data.isFallback === true,
                     aiFailed: result.data.aiFailed === true,
-                    status: '未確認'  // 解析完了、確認待ち
+                    status: '譛ｪ遒ｺ隱・  // 隗｣譫仙ｮ御ｺ・∫｢ｺ隱榊ｾ・■
                 };
-                // contract_meta（期限情報）が返ってきた場合はマージして保存
+                // contract_meta・域悄髯先ュ蝣ｱ・峨′霑斐▲縺ｦ縺阪◆蝣ｴ蜷医・繝槭・繧ｸ縺励※菫晏ｭ・
                 if (result.data.contract_meta) {
                     const m = result.data.contract_meta;
                     analysisPayloadAi.expiry_date = m.expiry_date || null;
@@ -5606,43 +5637,43 @@ class DashboardApp {
                 }
                 dbService.updateContractAnalysis(id, analysisPayloadAi);
 
-                // サブスクリプション情報を再取得（使用回数を更新）
+                // 繧ｵ繝悶せ繧ｯ繝ｪ繝励す繝ｧ繝ｳ諠・�ｱ繧貞・蜿門ｾ暦ｼ井ｽｿ逕ｨ蝗樊焚繧呈峩譁ｰ・・
                 await this.refreshSubscriptionStatusSafe();
 
-                // 画面を再読み込み
+                // 逕ｻ髱｢繧貞・隱ｭ縺ｿ霎ｼ縺ｿ
                 this.navigate('diff', id);
 
-                // AI解析失敗チェック
+                // AI隗｣譫仙､ｱ謨励メ繧ｧ繝・け
                 if (result.data.aiFailed) {
-                    Notify.error('AI解析に失敗しました。利用回数は消費されていません。再度お試しください。');
+                    Notify.error('AI隗｣譫舌↓螟ｱ謨励＠縺ｾ縺励◆縲ょ茜逕ｨ蝗樊焚縺ｯ豸郁ｲｻ縺輔ｌ縺ｦ縺・∪縺帙ｓ縲ょ・蠎ｦ縺願ｩｦ縺励￥縺�縺輔＞縲・);
                 } else {
-                    Notify.success('AI解析が完了しました！リスク判定と差分抽出が完了しました。');
+                    Notify.success('AI隗｣譫舌′螳御ｺ・＠縺ｾ縺励◆・√Μ繧ｹ繧ｯ蛻､螳壹→蟾ｮ蛻・歓蜃ｺ縺悟ｮ御ｺ・＠縺ｾ縺励◆縲・);
                 }
             } else {
-                throw new Error(result.error || '解析に失敗しました');
+                throw new Error(result.error || '隗｣譫舌↓螟ｱ謨励＠縺ｾ縺励◆');
             }
 
         } catch (error) {
-            console.error('AI解析エラー:', error);
+            console.error('AI隗｣譫舌お繝ｩ繝ｼ:', error);
             if (error.code === 'ANALYSIS_LIMIT_EXCEEDED') {
                 this.showAnalysisLimitError(error);
             } else {
-                Notify.error(`AI解析中にエラーが発生しました: ${error.message}`);
+                Notify.error(`AI隗｣譫蝉ｸｭ縺ｫ繧ｨ繝ｩ繝ｼ縺檎匱逕溘＠縺ｾ縺励◆: ${error.message}`);
             }
         }
     }
 
     uploadNewVersion(id) {
-        if (!this.ensurePaymentAccess('新しいバージョン解析')) {
+        if (!this.ensurePaymentAccess('譁ｰ縺励＞繝舌・繧ｸ繝ｧ繝ｳ隗｣譫・)) {
             return;
         }
         const contract = dbService.getContractById(id);
         if (!contract) {
-            Notify.error('契約が見つかりません');
+            Notify.error('螂醍ｴ・′隕九▽縺九ｊ縺ｾ縺帙ｓ');
             return;
         }
 
-        // URL形式の場合はURL入力モーダルを表示
+        // URL蠖｢蠑上・蝣ｴ蜷医・URL蜈･蜉帙Δ繝ｼ繝繝ｫ繧定｡ｨ遉ｺ
         if (contract.source_url || contract.source_type === 'URL') {
             const urlModal = document.getElementById('url-input-modal');
             const urlInput = document.getElementById('new-version-url');
@@ -5656,12 +5687,12 @@ class DashboardApp {
             return;
         }
 
-        // それ以外（PDF/Word）はファイル選択ダイアログを表示
+        // 縺昴ｌ莉･螟厄ｼ・DF/Word・峨・繝輔ぃ繧､繝ｫ驕ｸ謚槭ム繧､繧｢繝ｭ繧ｰ繧定｡ｨ遉ｺ
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = '.pdf,.docx';
 
-        // input.click() をトリガーする前にイベントハンドラを設定
+        // input.click() 繧偵ヨ繝ｪ繧ｬ繝ｼ縺吶ｋ蜑阪↓繧､繝吶Φ繝医ワ繝ｳ繝峨Λ繧定ｨｭ螳・
         input.onchange = async (e) => {
             const file = e.target.files[0];
             if (!file) return;
@@ -5670,7 +5701,7 @@ class DashboardApp {
             const isDocx = file.name.toLowerCase().endsWith('.docx');
 
             if (!isPdf && !isDocx) {
-                Notify.warning('PDFまたはWordファイルを選択してください');
+                Notify.warning('PDF縺ｾ縺溘・Word繝輔ぃ繧､繝ｫ繧帝∈謚槭＠縺ｦ縺上□縺輔＞');
                 return;
             }
 
@@ -5682,14 +5713,14 @@ class DashboardApp {
 
             const performAnalysis = async (retryCount = 0) => {
                 try {
-                    // ローディング表示
+                    // 繝ｭ繝ｼ繝・ぅ繝ｳ繧ｰ陦ｨ遉ｺ
                     const loadingMsg = document.createElement('div');
                     loadingMsg.id = 'analysis-loading';
                     loadingMsg.style.cssText = 'position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:white; padding:30px; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,0.3); z-index:10000; text-align:center; min-width:300px;';
-                    loadingMsg.innerHTML = `<div class="custom-loader"></div><br><strong>${methodLabel}ドキュメントを解析中...${retryCount > 0 ? '(再試行中)' : ''}</strong><br><span style="font-size:12px; color:#666;">テキストデータとレイアウトを抽出しています<br>※スキャンデータなどは時間がかかる場合があります</span>`;
+                    loadingMsg.innerHTML = `<div class="custom-loader"></div><br><strong>${methodLabel}繝峨く繝･繝｡繝ｳ繝医ｒ隗｣譫蝉ｸｭ...${retryCount > 0 ? '(蜀崎ｩｦ陦御ｸｭ)' : ''}</strong><br><span style="font-size:12px; color:#666;">繝・く繧ｹ繝医ョ繝ｼ繧ｿ縺ｨ繝ｬ繧､繧｢繧ｦ繝医ｒ謚ｽ蜃ｺ縺励※縺・∪縺・br>窶ｻ繧ｹ繧ｭ繝｣繝ｳ繝・・繧ｿ縺ｪ縺ｩ縺ｯ譎る俣縺後°縺九ｋ蝣ｴ蜷医′縺ゅｊ縺ｾ縺・/span>`;
                     document.body.appendChild(loadingMsg);
 
-                    // 背景オーバーレイ
+                    // 閭梧勹繧ｪ繝ｼ繝舌・繝ｬ繧､
                     let overlay = document.getElementById('analysis-overlay');
                     if (!overlay) {
                         overlay = document.createElement('div');
@@ -5698,10 +5729,10 @@ class DashboardApp {
                         document.body.appendChild(overlay);
                     }
 
-                    // UI描画待ち
+                    // UI謠冗判蠕・■
                     await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 50)));
 
-                    // 事前にトークンをリフレッシュ（念のため）
+                    // 莠句燕縺ｫ繝医・繧ｯ繝ｳ繧偵Μ繝輔Ξ繝・す繝･・亥ｿｵ縺ｮ縺溘ａ・・
                     try {
                         const { getIdToken } = await import('./auth.js');
                         await getIdToken();
@@ -5710,14 +5741,14 @@ class DashboardApp {
                         console.warn("Token pre-refresh failed:", e);
                     }
 
-                    // PDFをBase64に変換
+                    // PDF繧達ase64縺ｫ螟画鋤
                     const base64Data = await aiService.convertFileToBase64(file);
 
-                    // 旧バージョンのテキストを取得
+                    // 譌ｧ繝舌・繧ｸ繝ｧ繝ｳ縺ｮ繝・く繧ｹ繝医ｒ蜿門ｾ・
                     const previousVersion = contract.original_content;
                     const isFirstUpload = !previousVersion;
 
-                    // AI解析を実行（前バージョンなし＝初回取り込みはAIをスキップ）
+                    // AI隗｣譫舌ｒ螳溯｡鯉ｼ亥燕繝舌・繧ｸ繝ｧ繝ｳ縺ｪ縺暦ｼ晏・蝗槫叙繧願ｾｼ縺ｿ縺ｯAI繧偵せ繧ｭ繝・・・・
                     const result = await aiService.analyzeContract(
                         id,
                         analysisMethod,
@@ -5726,16 +5757,16 @@ class DashboardApp {
                         isFirstUpload ? { skipAI: true } : {}
                     );
 
-                    // ローディング削除
+                    // 繝ｭ繝ｼ繝・ぅ繝ｳ繧ｰ蜑企勁
                     if (document.getElementById('analysis-loading')) document.getElementById('analysis-loading').remove();
                     if (document.getElementById('analysis-overlay')) document.getElementById('analysis-overlay').remove();
 
                     if (result.success) {
                         const extractedContent = resolveExtractedContentPayload(result.data);
                         if (!extractedContent) {
-                            throw new Error('解析結果に本文データが含まれていません');
+                            throw new Error('隗｣譫千ｵ先棡縺ｫ譛ｬ譁・ョ繝ｼ繧ｿ縺悟性縺ｾ繧後※縺・∪縺帙ｓ');
                         }
-                        // 解析結果をDBに保存
+                        // 隗｣譫千ｵ先棡繧奪B縺ｫ菫晏ｭ・
                         const analysisPayload = {
                             extractedText: extractedContent,
                             rawExtractedText: result.data.rawExtractedText,
@@ -5744,10 +5775,10 @@ class DashboardApp {
                             sourceType: result.data.sourceType,
                             pdfStoragePath: result.data.pdfStoragePath,
                             pdfUrl: result.data.pdfUrl,
-                            status: '未確認',
+                            status: '譛ｪ遒ｺ隱・,
                             originalFilename: file.name
                         };
-                        // 初回取り込みはAI結果なし、2回目以降は差分・リスク情報も保存
+                        // 蛻晏屓蜿悶ｊ霎ｼ縺ｿ縺ｯAI邨先棡縺ｪ縺励・蝗樒岼莉･髯阪・蟾ｮ蛻・・繝ｪ繧ｹ繧ｯ諠・�ｱ繧ゆｿ晏ｭ・
                         if (!isFirstUpload) {
                             analysisPayload.changes = result.data.changes;
                             analysisPayload.riskLevel = result.data.riskLevel;
@@ -5761,7 +5792,7 @@ class DashboardApp {
                             await this.refreshSubscriptionStatusSafe();
                         }
 
-                        // 初回取り込みは原本全文タブ、2回目以降（差分・履歴あり）は差分タブ
+                        // 蛻晏屓蜿悶ｊ霎ｼ縺ｿ縺ｯ蜴滓悽蜈ｨ譁・ち繝悶・蝗樒岼莉･髯搾ｼ亥ｷｮ蛻・・螻･豁ｴ縺ゅｊ・峨・蟾ｮ蛻・ち繝・
                         const updatedContract = dbService.getContractById(id);
                         const hasHistory = updatedContract && updatedContract.history && updatedContract.history.length > 0;
                         this.activeDetailTab = hasHistory ? 'diff' : 'original';
@@ -5769,24 +5800,24 @@ class DashboardApp {
                         this.navigate('diff', id);
 
                         if (isFirstUpload) {
-                            this.showToast('✅ 取り込みが完了しました', 'success', 5000);
+                            this.showToast('笨・蜿悶ｊ霎ｼ縺ｿ縺悟ｮ御ｺ・＠縺ｾ縺励◆', 'success', 5000);
                         } else {
-                            // 部分的な失敗（AI解析のみ失敗）のチェック
-                            const aiFailed = result.data.aiFailed || (result.data.riskReason && result.data.riskReason.includes("AI解析サーバーからの応答がありませんでした"));
+                            // 驛ｨ蛻・噪縺ｪ螟ｱ謨暦ｼ・I隗｣譫舌・縺ｿ螟ｱ謨暦ｼ峨・繝√ぉ繝・け
+                            const aiFailed = result.data.aiFailed || (result.data.riskReason && result.data.riskReason.includes("AI隗｣譫舌し繝ｼ繝舌・縺九ｉ縺ｮ蠢懃ｭ斐′縺ゅｊ縺ｾ縺帙ｓ縺ｧ縺励◆"));
                             if (aiFailed) {
-                                if (await Notify.confirm('AI解析に失敗しました。\n\nテキストデータの取り込みは完了しましたが、AIによるリスク判定ができませんでした。\n\n※ 解析失敗時は利用回数を消費しません。\nもう一度解析を試みますか？', { title: '確認', type: 'warning' })) {
+                                if (await Notify.confirm('AI隗｣譫舌↓螟ｱ謨励＠縺ｾ縺励◆縲・n\n繝・く繧ｹ繝医ョ繝ｼ繧ｿ縺ｮ蜿悶ｊ霎ｼ縺ｿ縺ｯ螳御ｺ・＠縺ｾ縺励◆縺後、I縺ｫ繧医ｋ繝ｪ繧ｹ繧ｯ蛻､螳壹′縺ｧ縺阪∪縺帙ｓ縺ｧ縺励◆縲・n\n窶ｻ 隗｣譫仙､ｱ謨玲凾縺ｯ蛻ｩ逕ｨ蝗樊焚繧呈ｶ郁ｲｻ縺励∪縺帙ｓ縲・n繧ゅ≧荳蠎ｦ隗｣譫舌ｒ隧ｦ縺ｿ縺ｾ縺吶°・・, { title: '遒ｺ隱・, type: 'warning' })) {
                                     await performAnalysis(retryCount + 1);
                                     return;
                                 } else {
-                                    this.showToast('⚠️ 解析は不完全ですが保存しました', 'warning', 5000);
+                                    this.showToast('笞�・・隗｣譫舌・荳榊ｮ悟・縺ｧ縺吶′菫晏ｭ倥＠縺ｾ縺励◆', 'warning', 5000);
                                 }
                             } else {
-                                this.showToast(isPdf ? '✅ PDFの取り込みと解析が完了しました' : '✅ 差分解析が完了しました', 'success', 5000);
+                                this.showToast(isPdf ? '笨・PDF縺ｮ蜿悶ｊ霎ｼ縺ｿ縺ｨ隗｣譫舌′螳御ｺ・＠縺ｾ縺励◆' : '笨・蟾ｮ蛻・ｧ｣譫舌′螳御ｺ・＠縺ｾ縺励◆', 'success', 5000);
                             }
                         }
 
                     } else {
-                        const err = new Error(result.error || '解析に失敗しました');
+                        const err = new Error(result.error || '隗｣譫舌↓螟ｱ謨励＠縺ｾ縺励◆');
                         if (result.error === 'ANALYSIS_LIMIT_EXCEEDED') {
                             err.code = 'ANALYSIS_LIMIT_EXCEEDED';
                             err.currentUsage = result.currentUsage;
@@ -5797,21 +5828,21 @@ class DashboardApp {
                     }
 
                 } catch (error) {
-                    console.error('AI解析エラー:', error);
+                    console.error('AI隗｣譫舌お繝ｩ繝ｼ:', error);
                     if (document.getElementById('analysis-loading')) document.getElementById('analysis-loading').remove();
                     if (document.getElementById('analysis-overlay')) document.getElementById('analysis-overlay').remove();
 
                     let friendlyMsg = error.message;
                     if (friendlyMsg.includes('ADM-ZIP') || friendlyMsg.includes('zip format')) {
-                        friendlyMsg = 'Wordファイルの解析に失敗しました。正常なWordドキュメント(.docx)であることを確認してください。';
-                    } else if (friendlyMsg.includes('時間がかかりすぎ') || friendlyMsg.includes('timeout') || friendlyMsg.includes('Timeout') || friendlyMsg.includes('Failed to fetch')) {
-                        friendlyMsg = '取り込みに時間がかかりすぎました。もう一度お試しください。';
-                    } else if (friendlyMsg.includes('バックエンドAPI') || friendlyMsg.includes('接続できません')) {
-                        friendlyMsg = '取り込みに失敗しました。もう一度お試しください。';
+                        friendlyMsg = 'Word繝輔ぃ繧､繝ｫ縺ｮ隗｣譫舌↓螟ｱ謨励＠縺ｾ縺励◆縲よｭ｣蟶ｸ縺ｪWord繝峨く繝･繝｡繝ｳ繝・.docx)縺ｧ縺ゅｋ縺薙→繧堤｢ｺ隱阪＠縺ｦ縺上□縺輔＞縲・;
+                    } else if (friendlyMsg.includes('譎る俣縺後°縺九ｊ縺吶℃') || friendlyMsg.includes('timeout') || friendlyMsg.includes('Timeout') || friendlyMsg.includes('Failed to fetch')) {
+                        friendlyMsg = '蜿悶ｊ霎ｼ縺ｿ縺ｫ譎る俣縺後°縺九ｊ縺吶℃縺ｾ縺励◆縲ゅｂ縺・ｸ蠎ｦ縺願ｩｦ縺励￥縺�縺輔＞縲・;
+                    } else if (friendlyMsg.includes('繝舌ャ繧ｯ繧ｨ繝ｳ繝陰PI') || friendlyMsg.includes('謗･邯壹〒縺阪∪縺帙ｓ')) {
+                        friendlyMsg = '蜿悶ｊ霎ｼ縺ｿ縺ｫ螟ｱ謨励＠縺ｾ縺励◆縲ゅｂ縺・ｸ蠎ｦ縺願ｩｦ縺励￥縺�縺輔＞縲・;
                     }
                     if (error.code === 'ANALYSIS_LIMIT_EXCEEDED') {
                         this.showAnalysisLimitError(error);
-                    } else if (await Notify.confirm(`解析中に問題が発生しました:\n${friendlyMsg}\n\nもう一度試しますか？`, { title: '解析エラー', type: 'error' })) {
+                    } else if (await Notify.confirm(`隗｣譫蝉ｸｭ縺ｫ蝠城｡後′逋ｺ逕溘＠縺ｾ縺励◆:\n${friendlyMsg}\n\n繧ゅ≧荳蠎ｦ隧ｦ縺励∪縺吶°・歔, { title: '隗｣譫舌お繝ｩ繝ｼ', type: 'error' })) {
                         await performAnalysis(retryCount + 1);
                     }
                 }
@@ -5820,19 +5851,19 @@ class DashboardApp {
             await performAnalysis();
         };
 
-        // ファイル選択ダイアログを表示
+        // 繝輔ぃ繧､繝ｫ驕ｸ謚槭ム繧､繧｢繝ｭ繧ｰ繧定｡ｨ遉ｺ
         input.click();
     }
 
     /**
-     * URL版の新しいバージョンを解析して保存
+     * URL迚医・譁ｰ縺励＞繝舌・繧ｸ繝ｧ繝ｳ繧定ｧ｣譫舌＠縺ｦ菫晏ｭ・
      */
     async handleUrlVersionSubmit(id, url) {
         if (!this.can('operate_contract')) {
-            Notify.warning('閲覧のみの権限ではバージョン更新を実行できません');
+            Notify.warning('髢ｲ隕ｧ縺ｮ縺ｿ縺ｮ讓ｩ髯舌〒縺ｯ繝舌・繧ｸ繝ｧ繝ｳ譖ｴ譁ｰ繧貞ｮ溯｡後〒縺阪∪縺帙ｓ');
             return;
         }
-        if (!this.ensurePaymentAccess('URL差分解析')) {
+        if (!this.ensurePaymentAccess('URL蟾ｮ蛻・ｧ｣譫・)) {
             return;
         }
         const urlModal = document.getElementById('url-input-modal');
@@ -5840,14 +5871,14 @@ class DashboardApp {
 
         const performUrlAnalysis = async (retryCount = 0) => {
             try {
-                // ローディング表示
+                // 繝ｭ繝ｼ繝・ぅ繝ｳ繧ｰ陦ｨ遉ｺ
                 const loadingMsg = document.createElement('div');
                 loadingMsg.id = 'analysis-loading';
                 loadingMsg.style.cssText = 'position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:white; padding:30px; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,0.3); z-index:10000; text-align:center; min-width:300px;';
-                loadingMsg.innerHTML = `<div class="custom-loader"></div><br><strong>指定されたURLを解析中...${retryCount > 0 ? '(再試行中)' : ''}</strong><br><span style="font-size:12px; color:#666;">最新のコンテンツを取得して差分を抽出しています</span>`;
+                loadingMsg.innerHTML = `<div class="custom-loader"></div><br><strong>謖・ｮ壹＆繧後◆URL繧定ｧ｣譫蝉ｸｭ...${retryCount > 0 ? '(蜀崎ｩｦ陦御ｸｭ)' : ''}</strong><br><span style="font-size:12px; color:#666;">譛譁ｰ縺ｮ繧ｳ繝ｳ繝・Φ繝・ｒ蜿門ｾ励＠縺ｦ蟾ｮ蛻・ｒ謚ｽ蜃ｺ縺励※縺・∪縺・/span>`;
                 document.body.appendChild(loadingMsg);
 
-                // 背景オーバーレイ
+                // 閭梧勹繧ｪ繝ｼ繝舌・繝ｬ繧､
                 let overlay = document.getElementById('analysis-overlay');
                 if (!overlay) {
                     overlay = document.createElement('div');
@@ -5858,27 +5889,27 @@ class DashboardApp {
 
                 if (urlModal) urlModal.classList.remove('active');
 
-                // UI描画待ち
+                // UI謠冗判蠕・■
                 await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 50)));
 
-                // AI解析を実行（URLメソッド）
+                // AI隗｣譫舌ｒ螳溯｡鯉ｼ・RL繝｡繧ｽ繝・ラ・・
                 const result = await aiService.analyzeContract(
                     id,
                     'url',
                     url,
-                    contract.original_content // 旧バージョンのテキスト
+                    contract.original_content // 譌ｧ繝舌・繧ｸ繝ｧ繝ｳ縺ｮ繝・く繧ｹ繝・
                 );
 
-                // ローディング削除
+                // 繝ｭ繝ｼ繝・ぅ繝ｳ繧ｰ蜑企勁
                 if (document.getElementById('analysis-loading')) document.getElementById('analysis-loading').remove();
                 if (document.getElementById('analysis-overlay')) document.getElementById('analysis-overlay').remove();
 
                 if (result.success) {
                     const extractedContent = resolveExtractedContentPayload(result.data);
                     if (!extractedContent) {
-                        throw new Error('解析結果に本文データが含まれていません');
+                        throw new Error('隗｣譫千ｵ先棡縺ｫ譛ｬ譁・ョ繝ｼ繧ｿ縺悟性縺ｾ繧後※縺・∪縺帙ｓ');
                     }
-                    // 解析結果をDBに保存
+                    // 隗｣譫千ｵ先棡繧奪B縺ｫ菫晏ｭ・
                     dbService.updateContractAnalysis(id, {
                         extractedText: extractedContent,
                         sourceUrl: url,
@@ -5889,13 +5920,13 @@ class DashboardApp {
                         summary: result.data.summary,
                         isFallback: result.data.isFallback === true,
                         aiFailed: result.data.aiFailed === true,
-                        status: '未確認'
+                        status: '譛ｪ遒ｺ隱・
                     });
 
-                    // サブスクリプション情報を再取得（使用回数を更新）
+                    // 繧ｵ繝悶せ繧ｯ繝ｪ繝励す繝ｧ繝ｳ諠・�ｱ繧貞・蜿門ｾ暦ｼ井ｽｿ逕ｨ蝗樊焚繧呈峩譁ｰ・・
                     await this.refreshSubscriptionStatusSafe();
 
-                    // 画面を再読み込み (履歴があれば差分、初回なら原本)
+                    // 逕ｻ髱｢繧貞・隱ｭ縺ｿ霎ｼ縺ｿ (螻･豁ｴ縺後≠繧後・蟾ｮ蛻・∝・蝗槭↑繧牙次譛ｬ)
                     const updatedContract = dbService.getContractById(id);
                     const hasHistory = updatedContract && updatedContract.history && updatedContract.history.length > 0;
                     this.activeDetailTab = hasHistory ? 'diff' : 'original';
@@ -5903,12 +5934,12 @@ class DashboardApp {
                     this.navigate('diff', id);
 
                     if (result.data.aiFailed) {
-                        Notify.error('AI解析に失敗しました。利用回数は消費されていません。再度お試しください。');
+                        Notify.error('AI隗｣譫舌↓螟ｱ謨励＠縺ｾ縺励◆縲ょ茜逕ｨ蝗樊焚縺ｯ豸郁ｲｻ縺輔ｌ縺ｦ縺・∪縺帙ｓ縲ょ・蠎ｦ縺願ｩｦ縺励￥縺�縺輔＞縲・);
                     } else {
-                        Notify.success('最新バージョンの取り込みとAI解析が完了しました！');
+                        Notify.success('譛譁ｰ繝舌・繧ｸ繝ｧ繝ｳ縺ｮ蜿悶ｊ霎ｼ縺ｿ縺ｨAI隗｣譫舌′螳御ｺ・＠縺ｾ縺励◆・・);
                     }
                 } else {
-                    const err = new Error(result.error || '解析に失敗しました');
+                    const err = new Error(result.error || '隗｣譫舌↓螟ｱ謨励＠縺ｾ縺励◆');
                     if (result.error === 'ANALYSIS_LIMIT_EXCEEDED') {
                         err.code = 'ANALYSIS_LIMIT_EXCEEDED';
                         err.currentUsage = result.currentUsage;
@@ -5925,11 +5956,11 @@ class DashboardApp {
 
                 let friendlyMsg = error.message;
                 if (friendlyMsg.includes('ADM-ZIP') || friendlyMsg.includes('zip format')) {
-                    friendlyMsg = 'Wordファイルの読み込みに失敗しました。ファイルが破損しているか、非対応の形式である可能性があります。';
+                    friendlyMsg = 'Word繝輔ぃ繧､繝ｫ縺ｮ隱ｭ縺ｿ霎ｼ縺ｿ縺ｫ螟ｱ謨励＠縺ｾ縺励◆縲ゅヵ繧｡繧､繝ｫ縺檎�ｴ謳阪＠縺ｦ縺・ｋ縺九・撼蟇ｾ蠢懊・蠖｢蠑上〒縺ゅｋ蜿ｯ閭ｽ諤ｧ縺後≠繧翫∪縺吶・;
                 }
                 if (error.code === 'ANALYSIS_LIMIT_EXCEEDED') {
                     this.showAnalysisLimitError(error);
-                } else if (await Notify.confirm(`解析中に問題が発生しました:\n${friendlyMsg}\n\nもう一度試しますか？`, { title: '解析エラー', type: 'error' })) {
+                } else if (await Notify.confirm(`隗｣譫蝉ｸｭ縺ｫ蝠城｡後′逋ｺ逕溘＠縺ｾ縺励◆:\n${friendlyMsg}\n\n繧ゅ≧荳蠎ｦ隧ｦ縺励∪縺吶°・歔, { title: '隗｣譫舌お繝ｩ繝ｼ', type: 'error' })) {
                     await performUrlAnalysis(retryCount + 1);
                 }
             }
@@ -5939,7 +5970,7 @@ class DashboardApp {
     }
 
     showSuccessModal(title, message) {
-        // 既存のモダルがあれば削除
+        // 譌｢蟄倥・繝｢繝繝ｫ縺後≠繧後・蜑企勁
         const existing = document.getElementById('success-modal');
         if (existing) existing.remove();
 
@@ -5959,7 +5990,7 @@ class DashboardApp {
                     `;
         document.body.appendChild(modal);
 
-        // アニメーション用スタイル定義（なければ追加）
+        // 繧｢繝九Γ繝ｼ繧ｷ繝ｧ繝ｳ逕ｨ繧ｹ繧ｿ繧､繝ｫ螳夂ｾｩ・医↑縺代ｌ縺ｰ霑ｽ蜉�・・
         if (!document.getElementById('modal-styles')) {
             const style = document.createElement('style');
             style.id = 'modal-styles';
@@ -5977,17 +6008,17 @@ class DashboardApp {
             const contract = dbService.getContractById(id);
             dbService.addActivityLog(`Memo: ${input.value}`, contract.name);
 
-            // モダル内のリストを更新
+            // 繝｢繝繝ｫ蜀・・繝ｪ繧ｹ繝医ｒ譖ｴ譁ｰ
             this.showHistoryModal(id);
         }
     }
 
     showHistoryModal(id) {
         const contract = dbService.getContractById(id);
-        // systemのログ（自動生成ログ）を除外し、ユーザーのメモやアクションのみを表示
+        // system縺ｮ繝ｭ繧ｰ・郁・蜍慕函謌舌Ο繧ｰ・峨ｒ髯､螟悶＠縲√Θ繝ｼ繧ｶ繝ｼ縺ｮ繝｡繝｢繧・い繧ｯ繧ｷ繝ｧ繝ｳ縺ｮ縺ｿ繧定｡ｨ遉ｺ
         const logs = dbService.getActivityLogs().filter(l => l.target_name === contract.name && l.actor !== 'system');
 
-        // 既存のモダルがあれば削除
+        // 譌｢蟄倥・繝｢繝繝ｫ縺後≠繧後・蜑企勁
         const existing = document.getElementById('history-modal');
         if (existing) existing.remove();
 
@@ -6003,12 +6034,12 @@ class DashboardApp {
                         </div>
                         <div style="font-size:13px; color:#555;">${l.action}</div>
                     </div>
-                    `).join('') : '<div style="padding:20px; text-align:center; color:#999;">履歴はありません</div>';
+                    `).join('') : '<div style="padding:20px; text-align:center; color:#999;">螻･豁ｴ縺ｯ縺ゅｊ縺ｾ縺帙ｓ</div>';
 
         modal.innerHTML = `
                     <div class="modal-content" style="max-width:600px;">
                         <div class="modal-header">
-                            <h3>メモ</h3>
+                            <h3>繝｡繝｢</h3>
                             <button class="btn-close" onclick="document.getElementById('history-modal').remove()">&times;</button>
                         </div>
                         <div class="modal-body" style="padding:0;">
@@ -6016,8 +6047,8 @@ class DashboardApp {
                                 ${logsHtml}
                             </div>
                             <div style="padding:16px; border-top:1px solid #ddd; background:#fff;">
-                                <textarea id="modal-memo-input" style="width:100%; border:1px solid #ddd; padding:10px; border-radius:4px; font-family:inherit; min-height:80px; resize:vertical; margin-bottom:10px;" placeholder="メモを入力..."></textarea>
-                                <button class="btn-dashboard btn-primary-action" style="width:100%;" onclick="window.app.addMemo(${id})">メモを記録</button>
+                                <textarea id="modal-memo-input" style="width:100%; border:1px solid #ddd; padding:10px; border-radius:4px; font-family:inherit; min-height:80px; resize:vertical; margin-bottom:10px;" placeholder="繝｡繝｢繧貞・蜉・.."></textarea>
+                                <button class="btn-dashboard btn-primary-action" style="width:100%;" onclick="window.app.addMemo(${id})">繝｡繝｢繧定ｨ倬鹸</button>
                             </div>
                         </div>
                     </div>
@@ -6046,48 +6077,48 @@ class DashboardApp {
         modal.style.zIndex = '12000';
 
         let statusColor = '#586069';
-        if (log.status === '成功') statusColor = '#28a745';
-        else if (log.status === '失敗') statusColor = '#d73a49';
-        else if (log.status === 'スキップ') statusColor = '#005cc5';
+        if (log.status === '謌仙粥') statusColor = '#28a745';
+        else if (log.status === '螟ｱ謨・) statusColor = '#d73a49';
+        else if (log.status === '繧ｹ繧ｭ繝・・') statusColor = '#005cc5';
 
         modal.innerHTML = `
                     <div class="modal-content" style="max-width: 500px; padding: 0; overflow: hidden; border-radius: 12px; border: none; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
                         <div style="background: #fafbfc; padding: 20px 24px; border-bottom: 1px solid #e1e4e8; display: flex; justify-content: space-between; align-items: center;">
-                            <h3 style="margin: 0; font-size: 16px; color: #24292e; font-weight: 700;">ログ詳細（閲覧専用）</h3>
+                            <h3 style="margin: 0; font-size: 16px; color: #24292e; font-weight: 700;">繝ｭ繧ｰ隧ｳ邏ｰ・磯夢隕ｧ蟆ら畑・・/h3>
                             <button class="btn-close" onclick="document.getElementById('${modalId}').remove()">&times;</button>
                         </div>
                         <div style="padding: 24px;">
                             <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
                                 <tr style="border-bottom: 1px solid #f6f8fa;">
-                                    <td style="padding: 12px 0; color: #586069; width: 120px;">日時</td>
+                                    <td style="padding: 12px 0; color: #586069; width: 120px;">譌･譎・/td>
                                     <td style="padding: 12px 0; font-weight: 600;">${log.created_at}</td>
                                 </tr>
                                 <tr style="border-bottom: 1px solid #f6f8fa;">
-                                    <td style="padding: 12px 0; color: #586069;">実行種別</td>
+                                    <td style="padding: 12px 0; color: #586069;">螳溯｡檎ｨｮ蛻･</td>
                                     <td style="padding: 12px 0; font-weight: 600;">${log.action}</td>
                                 </tr>
                                 <tr style="border-bottom: 1px solid #f6f8fa;">
-                                    <td style="padding: 12px 0; color: #586069;">対象</td>
+                                    <td style="padding: 12px 0; color: #586069;">蟇ｾ雎｡</td>
                                     <td style="padding: 12px 0; font-weight: 600;">${log.target_name}</td>
                                 </tr>
                                 <tr style="border-bottom: 1px solid #f6f8fa;">
-                                    <td style="padding: 12px 0; color: #586069;">実行者</td>
+                                    <td style="padding: 12px 0; color: #586069;">螳溯｡瑚・/td>
                                     <td style="padding: 12px 0; font-weight: 600;">${log.actor}</td>
                                 </tr>
                                 <tr>
-                                    <td style="padding: 12px 0; color: #586069;">結果ステータス</td>
+                                    <td style="padding: 12px 0; color: #586069;">邨先棡繧ｹ繝・・繧ｿ繧ｹ</td>
                                     <td style="padding: 12px 0; font-weight: 600; color: ${statusColor};">
-                                        <i class="fa-solid ${log.status === '成功' ? 'fa-circle-check' : (log.status === '失敗' ? 'fa-circle-xmark' : 'fa-circle-info')}" style="margin-right: 6px;"></i>
-                                        ${log.status || '成功'}
+                                        <i class="fa-solid ${log.status === '謌仙粥' ? 'fa-circle-check' : (log.status === '螟ｱ謨・ ? 'fa-circle-xmark' : 'fa-circle-info')}" style="margin-right: 6px;"></i>
+                                        ${log.status || '謌仙粥'}
                                     </td>
                                 </tr>
                             </table>
                             <div style="margin-top: 24px; padding: 12px; background: #f8f9fa; border-radius: 6px; font-size: 12px; color: #586069; line-height: 1.5;">
-                                <i class="fa-solid fa-circle-info"></i> ※この画面は証跡確認のみ可能です。AIの再実行、差分の再表示等の高コスト操作はこの画面からは行えません。必要な場合は各契約情報の詳細画面から操作してください。
+                                <i class="fa-solid fa-circle-info"></i> 窶ｻ縺薙・逕ｻ髱｢縺ｯ險ｼ霍｡遒ｺ隱阪・縺ｿ蜿ｯ閭ｽ縺ｧ縺吶・I縺ｮ蜀榊ｮ溯｡後∝ｷｮ蛻・・蜀崎｡ｨ遉ｺ遲峨・鬮倥さ繧ｹ繝域桃菴懊・縺薙・逕ｻ髱｢縺九ｉ縺ｯ陦後∴縺ｾ縺帙ｓ縲ょｿ・ｦ√↑蝣ｴ蜷医・蜷・･醍ｴ・ュ蝣ｱ縺ｮ隧ｳ邏ｰ逕ｻ髱｢縺九ｉ謫堺ｽ懊＠縺ｦ縺上□縺輔＞縲・
                             </div>
                         </div>
                         <div style="padding: 16px 24px; background: #fafbfc; border-top: 1px solid #e1e4e8; text-align: right;">
-                            <button class="btn-dashboard" onclick="document.getElementById('${modalId}').remove()" style="padding: 8px 24px;">閉じる</button>
+                            <button class="btn-dashboard" onclick="document.getElementById('${modalId}').remove()" style="padding: 8px 24px;">髢峨§繧・/button>
                         </div>
                     </div>
                     `;
@@ -6107,12 +6138,12 @@ class DashboardApp {
 
         if (users.length >= limit) {
             const upgradeMessage = (this.userPlan === 'pro')
-                ? 'さらにメンバーを追加するには、法人向け個別エンタープライズプランのご相談を承ります。サポートまでお問い合わせください。'
-                : 'さらにメンバーを追加するにはプランをアップグレードしてください。';
+                ? '縺輔ｉ縺ｫ繝｡繝ｳ繝舌・繧定ｿｽ蜉�縺吶ｋ縺ｫ縺ｯ縲∵ｳ穂ｺｺ蜷代￠蛟句挨繧ｨ繝ｳ繧ｿ繝ｼ繝励Λ繧､繧ｺ繝励Λ繝ｳ縺ｮ縺皮嶌隲・ｒ謇ｿ繧翫∪縺吶ゅし繝昴・繝医∪縺ｧ縺雁撫縺・粋繧上○縺上□縺輔＞縲・
+                : '縺輔ｉ縺ｫ繝｡繝ｳ繝舌・繧定ｿｽ蜉�縺吶ｋ縺ｫ縺ｯ繝励Λ繝ｳ繧偵い繝・・繧ｰ繝ｬ繝ｼ繝峨＠縺ｦ縺上□縺輔＞縲・;
 
             this.showAlertModal(
-                '人数制限',
-                `現在のプラン（${this.userPlan}）では、最大${limit}名までしか登録できません。<br>${upgradeMessage}`,
+                '莠ｺ謨ｰ蛻ｶ髯・,
+                `迴ｾ蝨ｨ縺ｮ繝励Λ繝ｳ・・{this.userPlan}・峨〒縺ｯ縲∵怙螟ｧ${limit}蜷阪∪縺ｧ縺励°逋ｻ骭ｲ縺ｧ縺阪∪縺帙ｓ縲・br>${upgradeMessage}`,
                 'warning'
             );
             return;
@@ -6120,7 +6151,7 @@ class DashboardApp {
 
         document.getElementById('invite-name').value = '';
         document.getElementById('invite-email').value = '';
-        document.getElementById('invite-role').value = '閲覧のみ';
+        document.getElementById('invite-role').value = '髢ｲ隕ｧ縺ｮ縺ｿ';
         document.getElementById('invite-member-modal').classList.add('active');
     }
 
@@ -6135,12 +6166,12 @@ class DashboardApp {
                 <div style="width:60px;height:60px;background:#f3f0ea;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;color:#c5a059;font-size:28px;">
                     <i class="fa-solid fa-crown"></i>
                 </div>
-                <div style="display:inline-block;background:#f3f0ea;color:#c5a059;border:1px solid #e8d9b8;border-radius:10px;padding:3px 12px;font-size:11px;font-weight:700;margin-bottom:12px;">Business / Proプラン限定</div>
-                <h3 style="margin:0 0 12px;color:#24292E;font-size:18px;font-weight:700;">期限・アラート管理</h3>
-                <p style="margin:0 0 24px;color:#586069;font-size:13px;line-height:1.7;">契約期限の自動抽出・アラート通知はBusinessプラン以上でご利用いただけます。</p>
+                <div style="display:inline-block;background:#f3f0ea;color:#c5a059;border:1px solid #e8d9b8;border-radius:10px;padding:3px 12px;font-size:11px;font-weight:700;margin-bottom:12px;">Business / Pro繝励Λ繝ｳ髯仙ｮ・/div>
+                <h3 style="margin:0 0 12px;color:#24292E;font-size:18px;font-weight:700;">譛滄剞繝ｻ繧｢繝ｩ繝ｼ繝育ｮ｡逅・/h3>
+                <p style="margin:0 0 24px;color:#586069;font-size:13px;line-height:1.7;">螂醍ｴ・悄髯舌・閾ｪ蜍墓歓蜃ｺ繝ｻ繧｢繝ｩ繝ｼ繝磯夂衍縺ｯBusiness繝励Λ繝ｳ莉･荳翫〒縺泌茜逕ｨ縺・◆縺�縺代∪縺吶・/p>
                 <div style="display:flex;gap:10px;">
-                    <button style="flex:1;padding:10px;border:1px solid #ddd;border-radius:8px;background:#fff;color:#666;font-size:13px;cursor:pointer;" onclick="document.getElementById('business-upgrade-modal').remove()">閉じる</button>
-                    <button style="flex:1;padding:10px;border:none;border-radius:8px;background:#c5a059;color:#fff;font-size:13px;font-weight:700;cursor:pointer;" onclick="document.getElementById('business-upgrade-modal').remove();window.app.navigate('plan')">プランを見る</button>
+                    <button style="flex:1;padding:10px;border:1px solid #ddd;border-radius:8px;background:#fff;color:#666;font-size:13px;cursor:pointer;" onclick="document.getElementById('business-upgrade-modal').remove()">髢峨§繧・/button>
+                    <button style="flex:1;padding:10px;border:none;border-radius:8px;background:#c5a059;color:#fff;font-size:13px;font-weight:700;cursor:pointer;" onclick="document.getElementById('business-upgrade-modal').remove();window.app.navigate('plan')">繝励Λ繝ｳ繧定ｦ九ｋ</button>
                 </div>
             </div>`;
         document.body.appendChild(modal);
@@ -6158,12 +6189,12 @@ class DashboardApp {
                 <div style="width:60px; height:60px; background:#f3f0ea; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 20px; color:#c5a059; font-size:28px;">
                     <i class="fa-solid fa-satellite-dish"></i>
                 </div>
-                <div style="display:inline-block; background:#f3f0ea; color:#c5a059; border:1px solid #e8d9b8; border-radius:10px; padding:3px 12px; font-size:11px; font-weight:700; margin-bottom:12px;">Proプラン限定</div>
-                <h3 style="margin:0 0 12px; color:#24292E; font-size:18px; font-weight:700;">定期URL監視・Slack／メール通知</h3>
+                <div style="display:inline-block; background:#f3f0ea; color:#c5a059; border:1px solid #e8d9b8; border-radius:10px; padding:3px 12px; font-size:11px; font-weight:700; margin-bottom:12px;">Pro繝励Λ繝ｳ髯仙ｮ・/div>
+                <h3 style="margin:0 0 12px; color:#24292E; font-size:18px; font-weight:700;">螳壽悄URL逶｣隕悶・Slack・上Γ繝ｼ繝ｫ騾夂衍</h3>
                 <p style="margin:0 0 24px; color:#586069; font-size:13px; line-height:1.7;">${message}</p>
                 <div style="display:flex; gap:10px;">
-                    <button style="flex:1; padding:10px; border:1px solid #ddd; border-radius:8px; background:#fff; color:#666; font-size:13px; cursor:pointer;" onclick="document.getElementById('pro-upgrade-modal').remove()">閉じる</button>
-                    <button style="flex:1; padding:10px; border:none; border-radius:8px; background:#c5a059; color:#fff; font-size:13px; font-weight:700; cursor:pointer;" onclick="document.getElementById('pro-upgrade-modal').remove(); window.app.registration?.close(); window.app.navigate('plan')">Proプランを見る</button>
+                    <button style="flex:1; padding:10px; border:1px solid #ddd; border-radius:8px; background:#fff; color:#666; font-size:13px; cursor:pointer;" onclick="document.getElementById('pro-upgrade-modal').remove()">髢峨§繧・/button>
+                    <button style="flex:1; padding:10px; border:none; border-radius:8px; background:#c5a059; color:#fff; font-size:13px; font-weight:700; cursor:pointer;" onclick="document.getElementById('pro-upgrade-modal').remove(); window.app.registration?.close(); window.app.navigate('plan')">Pro繝励Λ繝ｳ繧定ｦ九ｋ</button>
                 </div>
             </div>`;
         document.body.appendChild(modal);
@@ -6201,7 +6232,7 @@ class DashboardApp {
         const role = document.getElementById('invite-role').value;
 
         if (!name || !email) {
-            Notify.warning('名前とメールアドレスを入力してください');
+            Notify.warning('蜷榊燕縺ｨ繝｡繝ｼ繝ｫ繧｢繝峨Ξ繧ｹ繧貞・蜉帙＠縺ｦ縺上□縺輔＞');
             return;
         }
 
@@ -6215,29 +6246,29 @@ class DashboardApp {
             try {
                 const inviteResult = await aiService.sendInvite(email, name, role);
                 if (inviteResult.emailSent) {
-                    this.showSuccessModal('招待送信完了', 'メンバーを追加し、招待メールを送信しました。');
+                    this.showSuccessModal('諡帛ｾ・∽ｿ｡螳御ｺ・, '繝｡繝ｳ繝舌・繧定ｿｽ蜉�縺励∵魚蠕・Γ繝ｼ繝ｫ繧帝∽ｿ｡縺励∪縺励◆縲・);
                 } else {
-                    this.showSuccessModal('メンバー追加完了', `${name} さんをチームに追加しました。<br><br><small style="color:#888;">※ メール通知は現在設定されていません。<br>招待先に直接ダッシュボードURLをお伝えください。</small>`);
+                    this.showSuccessModal('繝｡繝ｳ繝舌・霑ｽ蜉�螳御ｺ・, `${name} 縺輔ｓ繧偵メ繝ｼ繝�縺ｫ霑ｽ蜉�縺励∪縺励◆縲・br><br><small style="color:#888;">窶ｻ 繝｡繝ｼ繝ｫ騾夂衍縺ｯ迴ｾ蝨ｨ險ｭ螳壹＆繧後※縺・∪縺帙ｓ縲・br>諡帛ｾ・・縺ｫ逶ｴ謗･繝繝・す繝･繝懊・繝蔚RL繧偵♀莨昴∴縺上□縺輔＞縲・/small>`);
                 }
             } catch (error) {
                 console.error('Email send failed:', error);
-                this.showSuccessModal('メンバー追加完了', `${name} さんをチームに追加しました。<br><br><small style="color:#888;">※ 招待メールの送信に失敗しました。<br>招待先に直接ダッシュボードURLをお伝えください。</small>`);
+                this.showSuccessModal('繝｡繝ｳ繝舌・霑ｽ蜉�螳御ｺ・, `${name} 縺輔ｓ繧偵メ繝ｼ繝�縺ｫ霑ｽ蜉�縺励∪縺励◆縲・br><br><small style="color:#888;">窶ｻ 諡帛ｾ・Γ繝ｼ繝ｫ縺ｮ騾∽ｿ｡縺ｫ螟ｱ謨励＠縺ｾ縺励◆縲・br>諡帛ｾ・・縺ｫ逶ｴ謗･繝繝・す繝･繝懊・繝蔚RL繧偵♀莨昴∴縺上□縺輔＞縲・/small>`);
             }
         } else {
             if (result.error === 'already_exists') {
-                this.showAlertModal('登録エラー', 'このメールアドレスは既に登録されています。<br>別のメールアドレスを使用するか、既存のメンバーを編集してください。');
+                this.showAlertModal('逋ｻ骭ｲ繧ｨ繝ｩ繝ｼ', '縺薙・繝｡繝ｼ繝ｫ繧｢繝峨Ξ繧ｹ縺ｯ譌｢縺ｫ逋ｻ骭ｲ縺輔ｌ縺ｦ縺・∪縺吶・br>蛻･縺ｮ繝｡繝ｼ繝ｫ繧｢繝峨Ξ繧ｹ繧剃ｽｿ逕ｨ縺吶ｋ縺九∵里蟄倥・繝｡繝ｳ繝舌・繧堤ｷｨ髮・＠縺ｦ縺上□縺輔＞縲・);
             } else if (result.error === 'limit_reached') {
                 const upgradeMsg = (this.userPlan === 'pro')
-                    ? 'さらにメンバーを追加するには、法人向け個別エンタープライズプランのご相談をお受けします。'
-                    : 'さらにメンバーを増やすには、上位プランへのアップグレードをご検討ください。';
+                    ? '縺輔ｉ縺ｫ繝｡繝ｳ繝舌・繧定ｿｽ蜉�縺吶ｋ縺ｫ縺ｯ縲∵ｳ穂ｺｺ蜷代￠蛟句挨繧ｨ繝ｳ繧ｿ繝ｼ繝励Λ繧､繧ｺ繝励Λ繝ｳ縺ｮ縺皮嶌隲・ｒ縺雁女縺代＠縺ｾ縺吶・
+                    : '縺輔ｉ縺ｫ繝｡繝ｳ繝舌・繧貞｢励ｄ縺吶↓縺ｯ縲∽ｸ贋ｽ阪・繝ｩ繝ｳ縺ｸ縺ｮ繧｢繝・・繧ｰ繝ｬ繝ｼ繝峨ｒ縺疲､懆ｨ弱￥縺�縺輔＞縲・;
 
                 this.showAlertModal(
-                    '登録エラー',
-                    `人数制限（${result.limit}名）に達しました。${upgradeMsg}`,
+                    '逋ｻ骭ｲ繧ｨ繝ｩ繝ｼ',
+                    `莠ｺ謨ｰ蛻ｶ髯撰ｼ・{result.limit}蜷搾ｼ峨↓驕斐＠縺ｾ縺励◆縲・{upgradeMsg}`,
                     'error'
                 );
             } else {
-                this.showAlertModal('登録エラー', 'メンバーの追加に失敗しました。');
+                this.showAlertModal('逋ｻ骭ｲ繧ｨ繝ｩ繝ｼ', '繝｡繝ｳ繝舌・縺ｮ霑ｽ蜉�縺ｫ螟ｱ謨励＠縺ｾ縺励◆縲・);
             }
         }
     }
@@ -6276,7 +6307,7 @@ class DashboardApp {
             document.getElementById('edit-member-modal').classList.remove('active');
             this.navigate('team');
         } else {
-            Notify.error('更新に失敗しました');
+            Notify.error('譖ｴ譁ｰ縺ｫ螟ｱ謨励＠縺ｾ縺励◆');
         }
     }
 
@@ -6285,7 +6316,7 @@ class DashboardApp {
 
         // Final safeguard against self-deletion
         if (this.currentUser && email === this.currentUser.email) {
-            Notify.warning('自分自身のアカウントは削除できません。');
+            Notify.warning('閾ｪ蛻・・霄ｫ縺ｮ繧｢繧ｫ繧ｦ繝ｳ繝医・蜑企勁縺ｧ縺阪∪縺帙ｓ縲・);
             return;
         }
 
@@ -6300,21 +6331,21 @@ class DashboardApp {
             document.getElementById('edit-member-modal').classList.remove('active');   // Close edit modal
             this.navigate('team');
         } else {
-            Notify.error('削除に失敗しました（管理者は削除できない場合があります）');
+            Notify.error('蜑企勁縺ｫ螟ｱ謨励＠縺ｾ縺励◆・育ｮ｡逅・・・蜑企勁縺ｧ縺阪↑縺・�ｴ蜷医′縺ゅｊ縺ｾ縺呻ｼ・);
             document.getElementById('delete-confirm-modal').classList.remove('active');
         }
     }
 
     /**
-     * 定期監視のON/OFFを切り替える
+     * 螳壽悄逶｣隕悶・ON/OFF繧貞・繧頑崛縺医ｋ
      */
     toggleMonitoring(id, enabled) {
         if (!this.can('operate_contract')) {
-            Notify.warning('閲覧のみの権限では監視設定を変更できません');
+            Notify.warning('髢ｲ隕ｧ縺ｮ縺ｿ縺ｮ讓ｩ髯舌〒縺ｯ逶｣隕冶ｨｭ螳壹ｒ螟画峩縺ｧ縺阪∪縺帙ｓ');
             return;
         }
         if (enabled && this.subscription?.plan !== 'pro') {
-            this.showAlertModal('プラン制限', '定期URL監視（自動チェック）はProプラン限定の機能です。', 'warning');
+            this.showAlertModal('繝励Λ繝ｳ蛻ｶ髯・, '螳壽悄URL逶｣隕厄ｼ郁・蜍輔メ繧ｧ繝・け・峨・Pro繝励Λ繝ｳ髯仙ｮ壹・讖溯・縺ｧ縺吶・, 'warning');
             return;
         }
         dbService.toggleMonitoring(id, enabled);
@@ -6322,7 +6353,7 @@ class DashboardApp {
     }
 
     /**
-     * 手動クローリングを実行
+     * 謇句虚繧ｯ繝ｭ繝ｼ繝ｪ繝ｳ繧ｰ繧貞ｮ溯｡・
      */
     async manualCrawl(id) {
         const contract = dbService.getContractById(id);
@@ -6334,7 +6365,7 @@ class DashboardApp {
             return;
         }
         try {
-            Notify.info('URLをチェックしています...');
+            Notify.info('URL繧偵メ繧ｧ繝・け縺励※縺・∪縺・..');
 
             const authModule = await import('./auth.js');
             const token = await authModule.getIdToken();
@@ -6358,30 +6389,30 @@ class DashboardApp {
                 dbService.updateCrawlResult(id, result);
 
                 if (result.changed) {
-                    if (await Notify.confirm('更新（差分）が検知されました。AI解析を実行して内容を確認しますか？\n（解析回数を1回消費します）', { title: '確認', type: 'info' })) {
+                    if (await Notify.confirm('譖ｴ譁ｰ・亥ｷｮ蛻・ｼ峨′讀懃衍縺輔ｌ縺ｾ縺励◆縲・I隗｣譫舌ｒ螳溯｡後＠縺ｦ蜀・ｮｹ繧堤｢ｺ隱阪＠縺ｾ縺吶°・歃n・郁ｧ｣譫仙屓謨ｰ繧・蝗樊ｶ郁ｲｻ縺励∪縺呻ｼ・, { title: '遒ｺ隱・, type: 'info' })) {
                         await this.performAIAnalysis(id);
                     } else {
                         this.navigate('diff', id);
                     }
                 } else {
-                    Notify.info('更新はありませんでした。');
+                    Notify.info('譖ｴ譁ｰ縺ｯ縺ゅｊ縺ｾ縺帙ｓ縺ｧ縺励◆縲・);
                     this.navigate('diff', id);
                 }
             } else {
-                throw new Error(result.error || 'クローリングに失敗しました');
+                throw new Error(result.error || '繧ｯ繝ｭ繝ｼ繝ｪ繝ｳ繧ｰ縺ｫ螟ｱ謨励＠縺ｾ縺励◆');
             }
         } catch (error) {
             // loading complete
             console.error('Manual Crawl Error:', error);
-            Notify.error('エラー: ' + error.message);
+            Notify.error('繧ｨ繝ｩ繝ｼ: ' + error.message);
         }
     }
 
     /**
-     * AI解析を実行（共通ロジック）
+     * AI隗｣譫舌ｒ螳溯｡鯉ｼ亥・騾壹Ο繧ｸ繝・け・・
      */
     async performAIAnalysis(id) {
-        if (!this.ensurePaymentAccess('差分解析')) {
+        if (!this.ensurePaymentAccess('蟾ｮ蛻・ｧ｣譫・)) {
             return;
         }
         const contract = dbService.getContractById(id);
@@ -6389,7 +6420,7 @@ class DashboardApp {
         const user = fbModule.auth.currentUser;
 
         if (!user) {
-            Notify.warning('セッションが切れました。再ログインしてください。');
+            Notify.warning('繧ｻ繝・す繝ｧ繝ｳ縺悟・繧後∪縺励◆縲ょ・繝ｭ繧ｰ繧､繝ｳ縺励※縺上□縺輔＞縲・);
             return;
         }
 
@@ -6401,10 +6432,10 @@ class DashboardApp {
         }
 
         try {
-            Notify.info('AI解析を実行中...');
+            Notify.info('AI隗｣譫舌ｒ螳溯｡御ｸｭ...');
             const idToken = await fbModule.auth.currentUser.getIdToken();
 
-            // 履歴用の前バージョン内容を取得
+            // 螻･豁ｴ逕ｨ縺ｮ蜑阪ヰ繝ｼ繧ｸ繝ｧ繝ｳ蜀・ｮｹ繧貞叙蠕・
             const previousVersion = contract.original_content;
 
             const response = await fetch(`${aiService.API_BASE}/contracts/analyze`, {
@@ -6429,7 +6460,7 @@ class DashboardApp {
                 await this.refreshSubscriptionStatusSafe();
                 this.navigate('diff', id);
             } else {
-                const err = new Error(resData.error || '解析に失敗しました');
+                const err = new Error(resData.error || '隗｣譫舌↓螟ｱ謨励＠縺ｾ縺励◆');
                 if (resData.error === 'ANALYSIS_LIMIT_EXCEEDED') {
                     err.code = 'ANALYSIS_LIMIT_EXCEEDED';
                     err.currentUsage = resData.currentUsage;
@@ -6443,7 +6474,7 @@ class DashboardApp {
             if (error.code === 'ANALYSIS_LIMIT_EXCEEDED') {
                 this.showAnalysisLimitError(error);
             } else {
-                Notify.error(`AI解析中にエラーが発生しました: ${error.message}`);
+                Notify.error(`AI隗｣譫蝉ｸｭ縺ｫ繧ｨ繝ｩ繝ｼ縺檎匱逕溘＠縺ｾ縺励◆: ${error.message}`);
             }
         }
     }
@@ -6461,17 +6492,17 @@ class DashboardApp {
         const previousLabel = buildComparisonLabel(
             historyItem.original_filename || contract.original_filename || contract.name,
             historyItem.date,
-            '比較元資料'
+            '豈碑ｼ・・雉・侭'
         );
         const currentLabel = buildComparisonLabel(
             contract.original_filename || contract.name,
             contract.last_analyzed_at || contract.last_updated_at,
-            'BASE資料'
+            'BASE雉・侭'
         );
 
         const confirmed = await Notify.confirm(
-            `BASE資料との比較解析を実行しますか？<br><br><strong>比較元:</strong> ${escapeHtmlText(previousLabel)}<br><strong>比較先:</strong> ${escapeHtmlText(currentLabel)}<br><br>解析後はこの比較専用の差分画面を表示します。`,
-            { title: '比較解析の確認', type: 'info', okText: '解析する', cancelText: 'キャンセル' }
+            `BASE雉・侭縺ｨ縺ｮ豈碑ｼ・ｧ｣譫舌ｒ螳溯｡後＠縺ｾ縺吶°・・br><br><strong>豈碑ｼ・・:</strong> ${escapeHtmlText(previousLabel)}<br><strong>豈碑ｼ・・:</strong> ${escapeHtmlText(currentLabel)}<br><br>隗｣譫仙ｾ後・縺薙・豈碑ｼ・ｰら畑縺ｮ蟾ｮ蛻・判髱｢繧定｡ｨ遉ｺ縺励∪縺吶Ａ,
+            { title: '豈碑ｼ・ｧ｣譫舌・遒ｺ隱・, type: 'info', okText: '隗｣譫舌☆繧・, cancelText: '繧ｭ繝｣繝ｳ繧ｻ繝ｫ' }
         );
         if (!confirmed) return;
 
@@ -6488,33 +6519,33 @@ class DashboardApp {
         const isWordSource = isWordDocumentFilename(contract?.original_filename || '');
 
         try {
-            Notify.info('比較解析を実行中...');
+            Notify.info('豈碑ｼ・ｧ｣譫舌ｒ螳溯｡御ｸｭ...');
             let requestedRemoteAnalysis = false;
 
             if (contract.source_url) {
                 requestedRemoteAnalysis = true;
                 const result = await aiService.analyzeContract(contractId, 'url', contract.source_url, historyItem.content);
-                if (!result.success) throw new Error(result.error || '比較解析に失敗しました');
+                if (!result.success) throw new Error(result.error || '豈碑ｼ・ｧ｣譫舌↓螟ｱ謨励＠縺ｾ縺励◆');
                 comparisonContext.analysis = result.data;
             } else if (isPdfSource) {
                 const pdfUrl = this.getRuntimePdfPreviewUrl(contractId) || contract.pdf_url;
                 if (!pdfUrl) {
-                    comparisonContext.analysisNotice = 'PDF原本が保持されていないため、AI再解析は行わず比較表示のみ行います。';
+                    comparisonContext.analysisNotice = 'PDF蜴滓悽縺御ｿ晄戟縺輔ｌ縺ｦ縺・↑縺・◆繧√、I蜀崎ｧ｣譫舌・陦後ｏ縺壽ｯ碑ｼ・｡ｨ遉ｺ縺ｮ縺ｿ陦後＞縺ｾ縺吶・;
                 } else {
                     const response = await fetch(pdfUrl);
-                    if (!response.ok) throw new Error('PDF原本の取得に失敗しました');
+                    if (!response.ok) throw new Error('PDF蜴滓悽縺ｮ蜿門ｾ励↓螟ｱ謨励＠縺ｾ縺励◆');
                     const blob = await response.blob();
                     const file = new File([blob], contract.original_filename || 'contract.pdf', { type: blob.type || 'application/pdf' });
                     const base64 = await aiService.convertFileToBase64(file);
                     requestedRemoteAnalysis = true;
                     const result = await aiService.analyzeContract(contractId, 'pdf', base64, historyItem.content);
-                    if (!result.success) throw new Error(result.error || '比較解析に失敗しました');
+                    if (!result.success) throw new Error(result.error || '豈碑ｼ・ｧ｣譫舌↓螟ｱ謨励＠縺ｾ縺励◆');
                     comparisonContext.analysis = result.data;
                 }
             } else if (isWordSource) {
-                comparisonContext.analysisNotice = 'Word原本は再取得できないため、AI再解析は行わず比較表示のみ行います。';
+                comparisonContext.analysisNotice = 'Word蜴滓悽縺ｯ蜀榊叙蠕励〒縺阪↑縺・◆繧√、I蜀崎ｧ｣譫舌・陦後ｏ縺壽ｯ碑ｼ・｡ｨ遉ｺ縺ｮ縺ｿ陦後＞縺ｾ縺吶・;
             } else {
-                comparisonContext.analysisNotice = 'この資料形式では再解析できないため、比較表示のみ行います。';
+                comparisonContext.analysisNotice = '縺薙・雉・侭蠖｢蠑上〒縺ｯ蜀崎ｧ｣譫舌〒縺阪↑縺・◆繧√∵ｯ碑ｼ・｡ｨ遉ｺ縺ｮ縺ｿ陦後＞縺ｾ縺吶・;
             }
 
             if (requestedRemoteAnalysis) {
@@ -6525,7 +6556,7 @@ class DashboardApp {
             await this.navigate('diff', contractId);
         } catch (error) {
             console.error('History comparison error:', error);
-            Notify.error(`比較解析に失敗しました: ${error.message}`);
+            Notify.error(`豈碑ｼ・ｧ｣譫舌↓螟ｱ謨励＠縺ｾ縺励◆: ${error.message}`);
         }
     }
 
@@ -6539,7 +6570,7 @@ class DashboardApp {
         };
 
         if (nextState.docAId && nextState.docAId === nextState.docBId) {
-            Notify.warning('比較元と比較先には別の文書を選択してください。');
+            Notify.warning('豈碑ｼ・・縺ｨ豈碑ｼ・・縺ｫ縺ｯ蛻･縺ｮ譁・嶌繧帝∈謚槭＠縺ｦ縺上□縺輔＞縲・);
             return;
         }
 
@@ -6554,7 +6585,7 @@ class DashboardApp {
         const sourceDoc = docs.find((doc) => doc.id === nextState.docAId);
         const targetDoc = docs.find((doc) => doc.id === nextState.docBId);
         if (!sourceDoc || !targetDoc) {
-            Notify.error('選択した文書が見つかりません。');
+            Notify.error('驕ｸ謚槭＠縺滓枚譖ｸ縺瑚ｦ九▽縺九ｊ縺ｾ縺帙ｓ縲・);
             return;
         }
 
@@ -6597,7 +6628,7 @@ class DashboardApp {
                     riskReason: structuredFallbackAnalysis.riskReason,
                     changes: structuredFallbackAnalysis.changes,
                     isFallback: true,
-                    status: '未確認'
+                    status: '譛ｪ遒ｺ隱・
                 });
             }
             dbService.saveDiffResult({
@@ -6605,7 +6636,7 @@ class DashboardApp {
                 docB_id: targetDoc.id,
                 diff_data: {
                     ...structuredFallbackAnalysis,
-                    riskReason: structuredFallbackAnalysis.riskReason || '変更点を表示しています',
+                    riskReason: structuredFallbackAnalysis.riskReason || '螟画峩轤ｹ繧定｡ｨ遉ｺ縺励※縺・∪縺・,
                     isFallback: true
                 },
                 created_at: new Date().toISOString()
@@ -6620,7 +6651,7 @@ class DashboardApp {
 
     async runSelectedPairAnalysis(contractId) {
         if (!this.can('operate_contract')) {
-            Notify.warning('閲覧のみの権限では解析を実行できません');
+            Notify.warning('髢ｲ隕ｧ縺ｮ縺ｿ縺ｮ讓ｩ髯舌〒縺ｯ隗｣譫舌ｒ螳溯｡後〒縺阪∪縺帙ｓ');
             return;
         }
         const docs = dbService.getDocumentsByContractId(contractId);
@@ -6631,13 +6662,13 @@ class DashboardApp {
         const targetDoc = docs.find((doc) => doc.id === compareState.docBId) || fallbackTargetDoc;
 
         if (!sourceDoc || !targetDoc || sourceDoc.id === targetDoc.id) {
-            Notify.warning('比較元と比較先を選択してください。');
+            Notify.warning('豈碑ｼ・・縺ｨ豈碑ｼ・・繧帝∈謚槭＠縺ｦ縺上□縺輔＞縲・);
             return;
         }
 
         const confirmed = await Notify.confirm(
-            `選択中の2文書に対してAI差分解析を実行しますか？<br><br><strong>比較元:</strong> ${escapeHtmlText(buildDocumentOptionLabel(sourceDoc))}<br><strong>比較先:</strong> ${escapeHtmlText(buildDocumentOptionLabel(targetDoc))}`,
-            { title: '解析開始', type: 'info', okText: '解析開始', cancelText: 'キャンセル' }
+            `驕ｸ謚樔ｸｭ縺ｮ2譁・嶌縺ｫ蟇ｾ縺励※AI蟾ｮ蛻・ｧ｣譫舌ｒ螳溯｡後＠縺ｾ縺吶°・・br><br><strong>豈碑ｼ・・:</strong> ${escapeHtmlText(buildDocumentOptionLabel(sourceDoc))}<br><strong>豈碑ｼ・・:</strong> ${escapeHtmlText(buildDocumentOptionLabel(targetDoc))}`,
+            { title: '隗｣譫宣幕蟋・, type: 'info', okText: '隗｣譫宣幕蟋・, cancelText: '繧ｭ繝｣繝ｳ繧ｻ繝ｫ' }
         );
         if (!confirmed) return;
 
@@ -6659,9 +6690,9 @@ class DashboardApp {
             && storedContractAnalysis?.isFallback !== true;
 
         const diffPayload = {
-            summary: '選択した2文書の差分結果です。',
+            summary: '驕ｸ謚槭＠縺・譁・嶌縺ｮ蟾ｮ蛻・ｵ先棡縺ｧ縺吶・,
             riskLevel: 1,
-            riskReason: '差分抽出済み',
+            riskReason: '蟾ｮ蛻・歓蜃ｺ貂医∩',
             changes: []
         };
         let requestedRemoteAnalysis = false;
@@ -6677,7 +6708,7 @@ class DashboardApp {
                 }
             }
             if (!silent) {
-                Notify.info('AI差分解析を実行中...');
+                Notify.info('AI蟾ｮ蛻・ｧ｣譫舌ｒ螳溯｡御ｸｭ...');
             }
 
             const sourceType = String(contract?.source_type || '').toUpperCase();
@@ -6688,22 +6719,22 @@ class DashboardApp {
             } else if (targetDoc.is_current && contract.source_url) {
                 requestedRemoteAnalysis = true;
                 const result = await aiService.analyzeContract(contractId, 'url', contract.source_url, sourceDoc.content);
-                if (!result.success) throw new Error(result.error || '差分解析に失敗しました');
+                if (!result.success) throw new Error(result.error || '蟾ｮ蛻・ｧ｣譫舌↓螟ｱ謨励＠縺ｾ縺励◆');
                 Object.assign(diffPayload, result.data || {});
             } else if (targetDoc.is_current && isPdfSource) {
                 const pdfUrl = this.getRuntimePdfPreviewUrl(contractId) || contract.pdf_url;
                 if (!pdfUrl) {
-                    diffPayload.summary = 'PDF原本が保持されていないため、AI差分解析は実行せず構造化比較のみ表示します。';
-                    diffPayload.riskReason = '原本未保持';
+                    diffPayload.summary = 'PDF蜴滓悽縺御ｿ晄戟縺輔ｌ縺ｦ縺・↑縺・◆繧√、I蟾ｮ蛻・ｧ｣譫舌・螳溯｡後○縺壽ｧ矩�蛹匁ｯ碑ｼ・・縺ｿ陦ｨ遉ｺ縺励∪縺吶・;
+                    diffPayload.riskReason = '蜴滓悽譛ｪ菫晄戟';
                 } else {
                     const response = await fetch(pdfUrl);
-                    if (!response.ok) throw new Error('PDF原本の取得に失敗しました');
+                    if (!response.ok) throw new Error('PDF蜴滓悽縺ｮ蜿門ｾ励↓螟ｱ謨励＠縺ｾ縺励◆');
                     const blob = await response.blob();
                     const file = new File([blob], targetDoc.document_name || contract.original_filename || 'contract.pdf', { type: blob.type || 'application/pdf' });
                     const base64 = await aiService.convertFileToBase64(file);
                     requestedRemoteAnalysis = true;
                     const result = await aiService.analyzeContract(contractId, 'pdf', base64, sourceDoc.content);
-                    if (!result.success) throw new Error(result.error || '差分解析に失敗しました');
+                    if (!result.success) throw new Error(result.error || '蟾ｮ蛻・ｧ｣譫舌↓螟ｱ謨励＠縺ｾ縺励◆');
                     Object.assign(diffPayload, result.data || {});
                 }
             } else {
@@ -6712,7 +6743,7 @@ class DashboardApp {
                     : contentToComparableText(targetDoc.content);
                 requestedRemoteAnalysis = true;
                 const result = await aiService.analyzeContract(contractId, 'text', currentPayload, sourceDoc.content);
-                if (!result.success) throw new Error(result.error || '差分解析に失敗しました');
+                if (!result.success) throw new Error(result.error || '蟾ｮ蛻・ｧ｣譫舌↓螟ｱ謨励＠縺ｾ縺励◆');
                 Object.assign(diffPayload, result.data || {});
             }
 
@@ -6727,7 +6758,7 @@ class DashboardApp {
                 ) {
                     diffPayload.summary = structuredFallbackAnalysis.summary;
                     diffPayload.riskLevel = structuredFallbackAnalysis.riskLevel;
-                    diffPayload.riskReason = structuredFallbackAnalysis.riskReason || '変更点を表示しています';
+                    diffPayload.riskReason = structuredFallbackAnalysis.riskReason || '螟画峩轤ｹ繧定｡ｨ遉ｺ縺励※縺・∪縺・;
                     diffPayload.isFallback = true;
                 } else {
                     diffPayload.isFallback = false;
@@ -6752,7 +6783,7 @@ class DashboardApp {
                     changes: Array.isArray(diffPayload.changes) ? diffPayload.changes : [],
                     isFallback: diffPayload.isFallback === true,
                     aiFailed: diffPayload.aiFailed === true,
-                    status: '未確認'
+                    status: '譛ｪ遒ｺ隱・
                 });
             }
             if (requestedRemoteAnalysis) {
@@ -6770,7 +6801,7 @@ class DashboardApp {
             if (error.code === 'ANALYSIS_LIMIT_EXCEEDED') {
                 this.showAnalysisLimitError(error);
             } else if (!silent) {
-                Notify.error(`AI解析中にエラーが発生しました: ${error.message}`);
+                Notify.error(`AI隗｣譫蝉ｸｭ縺ｫ繧ｨ繝ｩ繝ｼ縺檎匱逕溘＠縺ｾ縺励◆: ${error.message}`);
             }
         }
     }
@@ -6802,21 +6833,21 @@ class DashboardApp {
                     <div class="history-preview-copy">
                         <div class="history-preview-eyebrow">
                             <i class="fa-solid fa-clock-rotate-left"></i>
-                            履歴プレビュー
+                            螻･豁ｴ繝励Ξ繝薙Η繝ｼ
                         </div>
-                        <div class="history-preview-name" title="${escapeHtmlText(historyItem.original_filename || contract.original_filename || contract.name || '履歴資料')}">
-                            ${escapeHtmlText(historyItem.original_filename || contract.original_filename || contract.name || '履歴資料')}
+                        <div class="history-preview-name" title="${escapeHtmlText(historyItem.original_filename || contract.original_filename || contract.name || '螻･豁ｴ雉・侭')}">
+                            ${escapeHtmlText(historyItem.original_filename || contract.original_filename || contract.name || '螻･豁ｴ雉・侭')}
                         </div>
                         <div class="history-preview-meta">
-                            取込日時: ${escapeHtmlText(formatDisplayTimestamp(historyItem.date) || '-')}
+                            蜿冶ｾｼ譌･譎・ ${escapeHtmlText(formatDisplayTimestamp(historyItem.date) || '-')}
                         </div>
                     </div>
                     <div class="history-preview-actions">
                         <button class="btn-dashboard history-preview-primary" onclick="window.app.compareHistoryWithBase(${contractId}, ${version})">
-                            <i class="fa-solid fa-code-compare"></i> BASE資料と比較
+                            <i class="fa-solid fa-code-compare"></i> BASE雉・侭縺ｨ豈碑ｼ・
                         </button>
                         <button class="btn-dashboard history-preview-secondary" onclick="window.app.clearHistoryComparisonContext(${contractId}); window.app.navigate('diff', ${contractId})">
-                            <i class="fa-solid fa-rotate-left"></i> 最新版に戻す
+                            <i class="fa-solid fa-rotate-left"></i> 譛譁ｰ迚医↓謌ｻ縺・
                         </button>
                     </div>
                 </div>
@@ -6839,22 +6870,22 @@ class DashboardApp {
                 <div style="padding:18px;">
                     <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px; margin-bottom:16px;">
                         <div style="background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:14px;">
-                            <div style="font-size:11px; color:#7b8794; margin-bottom:6px;">履歴資料</div>
+                            <div style="font-size:11px; color:#7b8794; margin-bottom:6px;">螻･豁ｴ雉・侭</div>
                             <div style="font-size:14px; font-weight:700; color:#1f2937; word-break:break-word;">${escapeHtmlText(historyItem.original_filename || contract.original_filename || contract.name || '-')}</div>
                         </div>
                         <div style="background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:14px;">
-                            <div style="font-size:11px; color:#7b8794; margin-bottom:6px;">取込日時</div>
+                            <div style="font-size:11px; color:#7b8794; margin-bottom:6px;">蜿冶ｾｼ譌･譎・/div>
                             <div style="font-size:14px; font-weight:700; color:#1f2937;">${escapeHtmlText(formatDisplayTimestamp(historyItem.date) || '-')}</div>
                         </div>
                         <div style="background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:14px;">
-                            <div style="font-size:11px; color:#7b8794; margin-bottom:6px;">比較先(BASE)</div>
+                            <div style="font-size:11px; color:#7b8794; margin-bottom:6px;">豈碑ｼ・・(BASE)</div>
                             <div style="font-size:14px; font-weight:700; color:#1f2937; word-break:break-word;">${escapeHtmlText(contract.original_filename || contract.name || '-')}</div>
                         </div>
                     </div>
                     <div class="document-paper-container is-frameless">
                         <div class="document-content-full">
                             <div class="document-top-anchor" aria-hidden="true"></div>
-                            ${historyContentHtml || '<div class="text-center text-muted" style="padding:40px;">履歴データがありません</div>'}
+                            ${historyContentHtml || '<div class="text-center text-muted" style="padding:40px;">螻･豁ｴ繝・・繧ｿ縺後≠繧翫∪縺帙ｓ</div>'}
                         </div>
                     </div>
                 </div>
@@ -6889,7 +6920,7 @@ class DashboardApp {
         });
 
         // CSV Generation with Escaping
-        const headers = ["契約名", "ステータス", "リスクレベル", "最終更新日"];
+        const headers = ["螂醍ｴ・錐", "繧ｹ繝・・繧ｿ繧ｹ", "繝ｪ繧ｹ繧ｯ繝ｬ繝吶Ν", "譛邨よ峩譁ｰ譌･"];
         const rows = contracts.map(c => [
             c.name,
             c.status,
@@ -6914,7 +6945,7 @@ class DashboardApp {
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.setAttribute("href", url);
-        link.setAttribute("download", `契約一覧_${new Date().toISOString().split('T')[0]}.csv`);
+        link.setAttribute("download", `螂醍ｴ・ｸ隕ｧ_${new Date().toISOString().split('T')[0]}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -6926,13 +6957,13 @@ class DashboardApp {
         if (!contract) return;
 
         const riskLabel = contract.risk_level || 'Low';
-        const summary = contract.ai_summary || '解析データなし';
-        const name = contract.original_filename || contract.name || '契約書';
+        const summary = contract.ai_summary || '隗｣譫舌ョ繝ｼ繧ｿ縺ｪ縺・;
+        const name = contract.original_filename || contract.name || '螂醍ｴ・嶌';
         const shareUrl = `${window.location.origin}/dashboard.html#diff/${contractId}`;
 
-        const shareText = `【DIFFsense 解析レポート】\n📄 ${name}\n⚠️ リスク: ${riskLabel}\n\n${summary}\n\n${shareUrl}`;
+        const shareText = `縲織IFFsense 隗｣譫舌Ξ繝昴・繝医曾n�塘 ${name}\n笞�・・繝ｪ繧ｹ繧ｯ: ${riskLabel}\n\n${summary}\n\n${shareUrl}`;
 
-        // Web Share APIが使える場合はネイティブ共有
+        // Web Share API縺御ｽｿ縺医ｋ蝣ｴ蜷医・繝阪う繝・ぅ繝門・譛・
         if (navigator.share) {
             try {
                 await navigator.share({
@@ -6942,17 +6973,17 @@ class DashboardApp {
                 });
                 return;
             } catch (e) {
-                // ユーザーがキャンセルした場合は何もしない
+                // 繝ｦ繝ｼ繧ｶ繝ｼ縺後く繝｣繝ｳ繧ｻ繝ｫ縺励◆蝣ｴ蜷医・菴輔ｂ縺励↑縺・
                 if (e.name === 'AbortError') return;
             }
         }
 
-        // フォールバック: クリップボードにコピー
+        // 繝輔か繝ｼ繝ｫ繝舌ャ繧ｯ: 繧ｯ繝ｪ繝・・繝懊・繝峨↓繧ｳ繝斐・
         try {
             await navigator.clipboard.writeText(shareText);
-            Notify.success('レポート内容をクリップボードにコピーしました');
+            Notify.success('繝ｬ繝昴・繝亥・螳ｹ繧偵け繝ｪ繝・・繝懊・繝峨↓繧ｳ繝斐・縺励∪縺励◆');
         } catch (e) {
-            // clipboard APIも使えない場合
+            // clipboard API繧ゆｽｿ縺医↑縺・�ｴ蜷・
             const textarea = document.createElement('textarea');
             textarea.value = shareText;
             textarea.style.position = 'fixed';
@@ -6961,7 +6992,7 @@ class DashboardApp {
             textarea.select();
             document.execCommand('copy');
             document.body.removeChild(textarea);
-            Notify.success('レポート内容をクリップボードにコピーしました');
+            Notify.success('繝ｬ繝昴・繝亥・螳ｹ繧偵け繝ｪ繝・・繝懊・繝峨↓繧ｳ繝斐・縺励∪縺励◆');
         }
     }
 
@@ -6970,7 +7001,7 @@ class DashboardApp {
         const contract = dbService.getContractById(contractId);
         if (!contract) return;
 
-        this.showToast('PDFレポートを生成中...', 'info');
+        this.showToast('PDF繝ｬ繝昴・繝医ｒ逕滓・荳ｭ...', 'info');
 
         try {
             await this.ensurePdfLibraries();
@@ -7000,54 +7031,54 @@ class DashboardApp {
                             <div style="padding: 40px; line-height: 1.6;">
                                 <!-- Section: Header -->
                                 <div style="border-bottom: 2px solid #c19b4a; padding-bottom: 10px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end;">
-                                    <h1 style="margin: 0; color: #c19b4a; font-size: 24px;">DIFFsense AI解析レポート</h1>
-                                    <span style="font-size: 12px; color: #888;">出力日: ${analysisDate}</span>
+                                    <h1 style="margin: 0; color: #c19b4a; font-size: 24px;">DIFFsense AI隗｣譫舌Ξ繝昴・繝・/h1>
+                                    <span style="font-size: 12px; color: #888;">蜃ｺ蜉帶律: ${analysisDate}</span>
                                 </div>
 
                                 <!-- Section: Document Info -->
                                 <div style="margin-bottom: 20px; padding: 15px; background: #f9f9f9; border-radius: 4px;">
-                                    <div style="margin-bottom: 8px;"><strong>対象ドキュメント:</strong> ${contract.original_filename || contract.name}</div>
-                                    ${contract.source_url ? `<div style="margin-bottom: 8px;"><strong>対象URL:</strong> ${contract.source_url}</div>` : ''}
+                                    <div style="margin-bottom: 8px;"><strong>蟇ｾ雎｡繝峨く繝･繝｡繝ｳ繝・</strong> ${contract.original_filename || contract.name}</div>
+                                    ${contract.source_url ? `<div style="margin-bottom: 8px;"><strong>蟇ｾ雎｡URL:</strong> ${contract.source_url}</div>` : ''}
                                     <div style="display: flex; align-items: center; gap: 10px;">
-                                        <strong>AIリスク判定:</strong>
+                                        <strong>AI繝ｪ繧ｹ繧ｯ蛻､螳・</strong>
                                         <span style="padding: 2px 10px; border-radius: 4px; background: ${riskColor}; color: white; font-weight: bold;">${contract.risk_level || 'Low'}</span>
                                     </div>
                                 </div>
 
                                 <!-- Section: AI Summary -->
                                 <div style="margin-bottom: 20px;">
-                                    <h2 style="font-size: 18px; border-left: 4px solid #c19b4a; padding-left: 10px; margin: 0 0 15px;">【解析要約】</h2>
-                                    <div style="white-space: pre-wrap;">${contract.ai_summary || '解析データなし'}</div>
+                                    <h2 style="font-size: 18px; border-left: 4px solid #c19b4a; padding-left: 10px; margin: 0 0 15px;">縲占ｧ｣譫占ｦ∫ｴ・・/h2>
+                                    <div style="white-space: pre-wrap;">${contract.ai_summary || '隗｣譫舌ョ繝ｼ繧ｿ縺ｪ縺・}</div>
                                 </div>
 
                                 <!-- Section: Risk Reason -->
                                 <div style="margin-bottom: 20px;">
-                                    <h2 style="font-size: 18px; border-left: 4px solid #c19b4a; padding-left: 10px; margin: 0 0 15px;">【AIリスク判定結果・理由】</h2>
-                                    <div style="white-space: pre-wrap;">${contract.ai_risk_reason || '判定データなし'}</div>
+                                    <h2 style="font-size: 18px; border-left: 4px solid #c19b4a; padding-left: 10px; margin: 0 0 15px;">縲植I繝ｪ繧ｹ繧ｯ蛻､螳夂ｵ先棡繝ｻ逅・罰縲・/h2>
+                                    <div style="white-space: pre-wrap;">${contract.ai_risk_reason || '蛻､螳壹ョ繝ｼ繧ｿ縺ｪ縺・}</div>
                                 </div>
 
                                 <!-- Section: Each change as separate section -->
                                 <div style="margin-bottom: 10px;">
-                                    <h2 style="font-size: 18px; border-left: 4px solid #c19b4a; padding-left: 10px; margin: 0 0 15px;">【主要な差分箇所】</h2>
+                                    <h2 style="font-size: 18px; border-left: 4px solid #c19b4a; padding-left: 10px; margin: 0 0 15px;">縲蝉ｸｻ隕√↑蟾ｮ蛻・ｮ・園縲・/h2>
                                 </div>
                                 ${(contract.ai_changes || []).map(c => `
                     <div style="margin-bottom: 15px; border: 1px solid #eee; border-radius: 4px;">
                         <div style="background: #f5f5f5; padding: 8px 12px; font-weight: bold; border-bottom: 1px solid #eee;">${c.section}</div>
                         <div style="padding: 12px;">
-                            <div style="background: #fff5f5; padding: 8px; margin-bottom: 5px; border-radius: 2px;"><span style="color: #D73A49; font-weight:600;">原文:</span> ${c.old}</div>
-                            <div style="background: #f0fff4; padding: 8px; border-radius: 2px;"><span style="color: #2ecc71; font-weight:600;">修正後:</span> ${c.new}</div>
+                            <div style="background: #fff5f5; padding: 8px; margin-bottom: 5px; border-radius: 2px;"><span style="color: #D73A49; font-weight:600;">蜴滓枚:</span> ${c.old}</div>
+                            <div style="background: #f0fff4; padding: 8px; border-radius: 2px;"><span style="color: #2ecc71; font-weight:600;">菫ｮ豁｣蠕・</span> ${c.new}</div>
                             <div style="margin-top: 10px; font-size: 12px; color: #666;">
-                                <strong>法的影響:</strong> ${c.impact || '-'}<br>
-                                <strong>懸念点:</strong> ${c.concern || '-'}
+                                <strong>豕慕噪蠖ｱ髻ｿ:</strong> ${c.impact || '-'}<br>
+                                <strong>諛ｸ蠢ｵ轤ｹ:</strong> ${c.concern || '-'}
                             </div>
                         </div>
                     </div>
-                    `).join('') || '<div style="margin-bottom:20px;"><p style="color:#999;">差分データはありません</p></div>'}
+                    `).join('') || '<div style="margin-bottom:20px;"><p style="color:#999;">蟾ｮ蛻・ョ繝ｼ繧ｿ縺ｯ縺ゅｊ縺ｾ縺帙ｓ</p></div>'}
 
                                 <!-- Section: Original Content -->
                                 <div style="margin-bottom: 20px;">
-                                    <h2 style="font-size: 18px; border-left: 4px solid #c19b4a; padding-left: 10px; margin: 0 0 15px;">【原本（全文）】</h2>
-                                    <div style="white-space: pre-wrap; background: #fafafa; padding: 20px; font-size: 12px; border: 1px solid #eee;">${contract.original_content || '原本データはありません'}</div>
+                                    <h2 style="font-size: 18px; border-left: 4px solid #c19b4a; padding-left: 10px; margin: 0 0 15px;">縲仙次譛ｬ・亥・譁・ｼ峨・/h2>
+                                    <div style="white-space: pre-wrap; background: #fafafa; padding: 20px; font-size: 12px; border: 1px solid #eee;">${contract.original_content || '蜴滓悽繝・・繧ｿ縺ｯ縺ゅｊ縺ｾ縺帙ｓ'}</div>
                                 </div>
 
                                 <!-- Section: Footer -->
@@ -7133,11 +7164,11 @@ class DashboardApp {
             }
 
             pdf.save(`DIFFsense_Report_${contract.name}_${new Date().toISOString().split('T')[0]}.pdf`);
-            this.showToast('PDFを出力しました', 'success');
+            this.showToast('PDF繧貞・蜉帙＠縺ｾ縺励◆', 'success');
 
         } catch (error) {
             console.error('PDF Export Error:', error);
-            this.showToast('PDFの生成中にエラーが発生しました', 'error');
+            this.showToast('PDF縺ｮ逕滓・荳ｭ縺ｫ繧ｨ繝ｩ繝ｼ縺檎匱逕溘＠縺ｾ縺励◆', 'error');
         } finally {
             // Clean up off-screen container
             const el = document.getElementById('pdf-export-container');
@@ -7159,30 +7190,30 @@ class DashboardApp {
         if (!next) {
             const plan = this.subscription?.plan || 'free';
             const nextPlanMap = {
-                'free': { name: 'Starter', limit: 50, price: '¥1,480' },
-                'trial': { name: 'Starter', limit: 50, price: '¥1,480' },
-                'starter': { name: 'Business', limit: 120, price: '¥4,980' },
-                'business': { name: 'Pro', limit: 400, price: '¥9,800' },
+                'free': { name: 'Starter', limit: 50, price: 'ﾂ･1,480' },
+                'trial': { name: 'Starter', limit: 50, price: 'ﾂ･1,480' },
+                'starter': { name: 'Business', limit: 120, price: 'ﾂ･4,980' },
+                'business': { name: 'Pro', limit: 400, price: 'ﾂ･9,800' },
                 'pro': null
             };
             next = nextPlanMap[plan];
         }
         
-        let message = `今月のAI差分チェック回数の上限（${cu}/${lim}回）を使い切りました。`;
-        let okText = 'プランを表示';
+        let message = `莉頑怦縺ｮAI蟾ｮ蛻・メ繧ｧ繝・け蝗樊焚縺ｮ荳企剞・・{cu}/${lim}蝗橸ｼ峨ｒ菴ｿ縺・・繧翫∪縺励◆縲Ａ;
+        let okText = '繝励Λ繝ｳ繧定｡ｨ遉ｺ';
         
         if (next) {
-            message += `<br><br>${next.name}プラン（${next.price}/月）にアップグレードすると、月${next.limit}回まで解析できます。`;
-            okText = '今すぐアップグレード';
+            message += `<br><br>${next.name}繝励Λ繝ｳ・・{next.price}/譛茨ｼ峨↓繧｢繝・・繧ｰ繝ｬ繝ｼ繝峨☆繧九→縲∵怦${next.limit}蝗槭∪縺ｧ隗｣譫舌〒縺阪∪縺吶Ａ;
+            okText = '莉翫☆縺舌い繝・・繧ｰ繝ｬ繝ｼ繝・;
         } else {
-            message += `<br><br>来月までお待ちいただくか、より上位のプランについてお問い合わせください。`;
+            message += `<br><br>譚･譛医∪縺ｧ縺雁ｾ・■縺・◆縺�縺上°縲√ｈ繧贋ｸ贋ｽ阪・繝励Λ繝ｳ縺ｫ縺､縺・※縺雁撫縺・粋繧上○縺上□縺輔＞縲Ａ;
         }
 
         const confirmed = await Notify.confirm(message, {
-            title: '解析回数の上限に達しました',
+            title: '隗｣譫仙屓謨ｰ縺ｮ荳企剞縺ｫ驕斐＠縺ｾ縺励◆',
             type: 'warning',
             okText: okText,
-            cancelText: '閉じる',
+            cancelText: '髢峨§繧・,
             okStyle: 'primary'
         });
 
@@ -7194,7 +7225,7 @@ class DashboardApp {
 
     async startStripeCheckout(planId) {
         // Show loading toast or overlay if needed
-        const loadingNotify = Notify.info('決済ページへ移動中...', { duration: 0 });
+        const loadingNotify = Notify.info('豎ｺ貂医・繝ｼ繧ｸ縺ｸ遘ｻ蜍穂ｸｭ...', { duration: 0 });
 
         try {
             // Get ID Token
@@ -7235,11 +7266,11 @@ class DashboardApp {
                 sessionStorage.setItem('stripe_checkout_started', 'true');
                 window.location.href = result.data.url;
             } else {
-                throw new Error(result.error || '決済ページを開けませんでした');
+                throw new Error(result.error || '豎ｺ貂医・繝ｼ繧ｸ繧帝幕縺代∪縺帙ｓ縺ｧ縺励◆');
             }
         } catch (error) {
             console.error('Stripe Checkout Error:', error);
-            Notify.error(`決済ページの読み込みに失敗しました: ${error.message}`);
+            Notify.error(`豎ｺ貂医・繝ｼ繧ｸ縺ｮ隱ｭ縺ｿ霎ｼ縺ｿ縺ｫ螟ｱ謨励＠縺ｾ縺励◆: ${error.message}`);
             // Fallback to select-plan.html if API fails
             setTimeout(() => {
                 window.location.href = `/select-plan.html?plan=${planId}`;

@@ -1,47 +1,5 @@
 [
   {
-    "uid": "dev-user-001",
-    "lastResetDate": "2026-03-18T13:09:55.696Z",
-    "billingCycle": "monthly",
-    "trialStartedAt": "2026-03-18T13:09:55.696Z",
-    "plan": "pro",
-    "email": "dev@localhost",
-    "lastPaymentAt": "2026-03-22T03:58:27.044Z",
-    "stripeStatus": "",
-    "currentPeriodEnd": "2026-04-21",
-    "hasPaymentMethod": false,
-    "subscriptionState": "inactive",
-    "lastUsedAt": "2026-03-22T12:54:02.375Z",
-    "usageCount": 0,
-    "notificationSettings": {
-      "slack": {
-        "teamName": "Spacegleam",
-        "connectedAt": "2026-03-22T15:40:24.564Z",
-        "channelName": "@contact",
-        "channelId": "D0ALGK2TWRH",
-        "enabled": true,
-        "webhookUrl": ""
-      },
-      "email": {
-        "crawlAlert": true
-      }
-    },
-    "pendingPlan": "starter",
-    "pendingBillingCycle": "monthly",
-    "stripeCheckoutSessionId": "cs_live_b1vojyHveFg0kRGf3FLko5izLCEaIL821PW79nQ23RKr27tJWkyd1PsB4Y",
-    "stripeCheckoutCreatedAt": "2026-03-25T12:53:58.984Z"
-  },
-  {
-    "uid": "dev-uid",
-    "plan": "free",
-    "billingCycle": "monthly",
-    "hasPaymentMethod": false,
-    "usageCount": 0,
-    "lastResetDate": "2026-03-27T07:14:41.148Z",
-    "mcpApiKey": "mcp_eaba4e8fb0a24e3fb2afff79a5479152",
-    "mcp_updated_at": "2026-03-27T09:49:56.674Z"
-  },
-  {
     "uid": "QIExRrJJFxT17j3oMwD93O6Bw933",
     "lastResetDate": "2026-04-01T18:05:01.780Z",
     "billingCycle": "monthly",
