@@ -271,7 +271,11 @@ class CronService {
         const frontendUrl = (process.env.FRONTEND_URL || 'https://diffsense.spacegleam.co.jp').replace(/\/$/, '');
         const dashboardUrl = `${frontendUrl}/dashboard.html#deadlines`;
 
-        // Email alert (all plans)
+        // Freeプランは期限アラート通知なし
+        const plan = userProfile?.plan || 'free';
+        if (plan === 'free') return;
+
+        // Email alert (Starter以上)
         if (notifSettings?.email?.crawlAlert !== false && userProfile?.email) {
             try {
                 const mailer = require('./mailer');
@@ -289,9 +293,8 @@ class CronService {
             }
         }
 
-        // Slack alert (Business+ only)
-        const plan = userProfile?.plan || 'free';
-        const slackEligible = ['business', 'pro'].includes(plan);
+        // Slack alert (Starter以上)
+        const slackEligible = ['starter', 'business', 'pro'].includes(plan);
         if (slackEligible && notifSettings?.slack?.enabled && notifSettings?.slack?.webhookUrl && notifSettings?.slack?.deadlineAlert !== false) {
             try {
                 const slackService = require('./slackService');
