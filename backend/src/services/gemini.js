@@ -206,7 +206,8 @@ function normalizeAnalyzeResult(parsed) {
         riskLevel: finalLevel,
         riskReason: typeof parsed?.riskReason === 'string' ? parsed.riskReason : '',
         summary: (typeof parsed?.summary === 'string' && parsed.summary.trim()) ? parsed.summary.trim() : '解析完了',
-        isFallback: parsed?.isFallback === true
+        isFallback: parsed?.isFallback === true,
+        contract_meta: parsed?.contract_meta || null,
     };
 }
 
@@ -1167,13 +1168,23 @@ ${truncatedText}
       "impact": "この条項による法的な影響（50文字以内）",
       "concern": "この条項におけるリスクや注意点"
     }
-  ]
+  ],
+  "contract_meta": {
+    "expiry_date": "契約終了日（YYYY-MM-DD形式。不明な場合はnull）",
+    "renewal_deadline": "更新拒絶通知の期限（YYYY-MM-DD形式。不明な場合はnull）",
+    "contract_start": "契約開始日（YYYY-MM-DD形式。不明な場合はnull）",
+    "auto_renewal": true,
+    "notice_period_days": 30,
+    "contract_category": "契約種別（例: 業務委託、売買、賃貸借、秘密保持など）",
+    "date_confidence": "high/medium/low（日付抽出の確信度）"
+  }
 }
 
 重要:
 - summaryフィールドを先頭に含め、契約内容の丁寧な解説を行ってください。
 - changesには、リスクが高い条項や注意すべき条項を最大5つまで抽出してください。
-- riskLevelは1（低リスク）、2（中リスク）、3（高リスク）のいずれかに設定してください。`;
+- riskLevelは1（低リスク）、2（中リスク）、3（高リスク）のいずれかに設定してください。
+- contract_metaの日付は契約書本文から正確に読み取ってください。記載がない場合はnullにしてください。`;
         }
     }
 
