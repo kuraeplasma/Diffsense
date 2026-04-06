@@ -834,3 +834,9 @@
     cursor: pointer;
     box-shadow: 0 10px 22px rgba(197, 160, 89, 0.22);
 }
+
+/* Override Word theme colors in sign editor docx preview */
+.sign-editor-viewport .docx-wrapper *,
+.sign-editor-viewport .docx-virtual-page-layer * {
+    color: #1a1a1a !important;
+}
