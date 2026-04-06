@@ -1009,15 +1009,30 @@ router.post('/:id/reanalyze', rateLimit, async (req, res, next) => {
             return res.status(400).json({ success: false, error: '解析対象のテキストがありません' });
         }
 
-        // 単体解析（previousVersion = null）
-        const aiResult = await geminiService.analyzeContract(contractText, null);
-        const aiSucceeded = aiResult && aiResult.summary && aiResult.isFallback !== true;
+        // 単体解析（previousVersion = null）- 最大3回リトライ
+        let aiResult = null;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+                aiResult = await geminiService.analyzeContract(contractText, null);
+                if (aiResult && aiResult.summary && aiResult.isFallback !== true) break;
+                if (attempt < 3) {
+                    logger.warn(`Reanalyze attempt ${attempt} returned fallback, retrying...`);
+                    await new Promise(r => setTimeout(r, 1500 * attempt));
+                }
+            } catch (e) {
+                logger.warn(`Reanalyze attempt ${attempt} threw: ${e.message}`);
+                if (attempt < 3) await new Promise(r => setTimeout(r, 1500 * attempt));
+            }
+        }
 
-        if (!aiSucceeded) {
+        if (!aiResult || !aiResult.summary) {
             return res.status(500).json({ success: false, error: 'AI解析に失敗しました。しばらく後に再試行してください。' });
         }
 
-        await dbService.incrementUsage(uid);
+        // フォールバック結果でも解析回数は消費しない（完全なAI解析時のみ消費）
+        if (aiResult.isFallback !== true) {
+            await dbService.incrementUsage(uid);
+        }
 
         // contract_meta を Firestore に保存
         const meta = aiResult.contract_meta;
