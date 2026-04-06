@@ -1058,13 +1058,16 @@ router.post('/:id/reanalyze', rateLimit, async (req, res, next) => {
 
         logger.info(`Reanalysis complete for contract ${contractId}, risk=${aiResult.riskLevel}, expiry=${meta?.expiry_date}`);
 
+        // Freeプランは期限機能非対応のためcontract_metaを返さない
+        const responseMeta = (userProfile?.plan || 'free') === 'free' ? null : (meta || null);
+
         res.json({
             success: true,
             data: {
                 summary: aiResult.summary,
                 riskLevel: aiResult.riskLevel,
                 riskReason: aiResult.riskReason,
-                contract_meta: meta || null,
+                contract_meta: responseMeta,
             }
         });
     } catch (error) {
