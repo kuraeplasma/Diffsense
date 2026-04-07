@@ -1025,6 +1025,7 @@ export const SignEditor = {
                 const pageWrapper = document.createElement('div');
                 pageWrapper.className = 'editor-page-wrapper';
                 pageWrapper.style.position = 'relative';
+                pageWrapper.style.overflow = 'visible'; // field-marker badge (top:-14px) が見切れないよう明示
                 pageWrapper.style.width = baseViewport.width + 'px';
                 pageWrapper.dataset.baseWidth = String(baseViewport.width);
                 pageWrapper.dataset.baseHeight = String(baseViewport.height);

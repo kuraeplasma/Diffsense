@@ -5045,7 +5045,7 @@ class DashboardApp {
         
         if (viewId === 'sign-editor') {
             const { SignUI } = await import('./sign-ui.js?v=20260407_final_v10');
-            const { SignEditor } = await import('./sign-editor.js?v=20260407_pdfidb');
+            const { SignEditor } = await import('./sign-editor.js?v=20260407_overflow');
             this.mainContent.innerHTML = await SignUI.renderSignEditor(this, params);
             await SignEditor.init(this, params);
             return;
@@ -5053,7 +5053,7 @@ class DashboardApp {
 
         if (viewId === 'sign-recipient') {
             const { SignUI } = await import('./sign-ui.js?v=20260407_final_v10');
-            const { SignRecipient } = await import('./sign-recipient.js?v=20260407_final_v10');
+            const { SignRecipient } = await import('./sign-recipient.js?v=20260407_overflow');
             this.mainContent.innerHTML = await SignUI.renderSignRecipient(this, params);
             await SignRecipient.init(this, params);
             return;

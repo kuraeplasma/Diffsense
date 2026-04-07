@@ -503,7 +503,7 @@
     background: #fff;
     margin-bottom: 30px;
     border-radius: 4px;
-    overflow: hidden;
+    overflow: visible; /* field-marker badge (top:-14px) が見切れないようvisibleに統一 */
     user-select: none;
 }
 
