@@ -25,12 +25,19 @@ function resolveFrontendBase(req) {
 }
 
 function resolveSafeCancelUrl(req, frontendBase) {
+    const _isSafeUrl = (url, base) => {
+        try {
+            const parsed = new URL(url);
+            const baseParsed = new URL(base);
+            return parsed.origin === baseParsed.origin;
+        } catch (_) { return false; }
+    };
     const requestedCancelUrl = req.body?.cancelUrl;
-    if (typeof requestedCancelUrl === 'string' && requestedCancelUrl.startsWith(frontendBase)) {
+    if (typeof requestedCancelUrl === 'string' && _isSafeUrl(requestedCancelUrl, frontendBase)) {
         return requestedCancelUrl;
     }
     const referer = req.headers.referer;
-    if (typeof referer === 'string' && referer.startsWith(frontendBase)) {
+    if (typeof referer === 'string' && _isSafeUrl(referer, frontendBase)) {
         return referer;
     }
     return `${frontendBase}/`;

@@ -5,8 +5,18 @@ const axios = require('axios');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
+const rateLimit = require('express-rate-limit');
 const router = express.Router();
 const logger = require('../utils/logger');
+
+// リマインドメール専用レート制限: 10分間に3回まで
+const remindRateLimit = rateLimit({
+    windowMs: 10 * 60 * 1000,
+    max: 3,
+    message: { success: false, error: 'Too many remind requests, please try again later.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
 const firmaService = require('../services/firma');
 const dbService = require('../services/db');
 const mailer = require('../services/mailer');
@@ -1877,7 +1887,7 @@ router.patch('/:id', async (req, res) => {
     }
 });
 
-router.post('/:id/remind', async (req, res) => {
+router.post('/:id/remind', remindRateLimit, async (req, res) => {
     try {
         const { id } = req.params;
         const ownerUid = req.user.uid;

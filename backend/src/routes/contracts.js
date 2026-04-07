@@ -608,7 +608,7 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                     try {
                         const fs = require('fs');
                         const path = require('path');
-                        const filename = `contract-${contractId}-${Date.now()}.pdf`;
+                        const filename = `contract-${contractId}-${crypto.randomUUID()}.pdf`;
                         const uploadsDir = path.join(__dirname, '../../uploads');
                         if (!fs.existsSync(uploadsDir)) {
                             fs.mkdirSync(uploadsDir, { recursive: true });
@@ -833,7 +833,7 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
             const pathMod = require('path');
             const uploadsDir = pathMod.join(__dirname, '../../uploads');
             if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-            const filename = `docx-${contractId}-${Date.now()}.docx`;
+            const filename = `docx-${contractId}-${crypto.randomUUID()}.docx`;
             const savePath = pathMod.join(uploadsDir, filename);
             await fs.promises.writeFile(savePath, currentBuffer);
             originalFilePath = savePath;
