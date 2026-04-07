@@ -1168,31 +1168,42 @@ ul {
 }
 
 .price-effective {
-    margin: 0 0 0.15rem;
-    font-size: 0.95rem;
-    color: #3d3329;
-    font-weight: 700;
+    margin: 0 0 0.2rem;
+    font-size: 1.25rem;
+    color: #1a3a6e;
+    font-weight: 800;
+    letter-spacing: -0.01em;
 }
 
 .price-compare {
     margin: 0;
-    font-size: 0.76rem;
-    color: #7d7365;
+    font-size: 0.88rem;
+    color: #7a8090;
 }
 
 .price-regular {
     text-decoration: line-through;
-    color: #9c9385;
+    color: #bbb;
+}
+
+.price-compare [data-price-annual-total] {
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: #d94f00;
+    letter-spacing: -0.01em;
 }
 
 .price-discount {
     display: inline-block;
-    margin-top: 0.35rem;
-    padding: 0.1rem 0.55rem;
+    margin-top: 0.5rem;
+    padding: 0.3rem 1rem;
     border-radius: 999px;
-    background: rgba(161, 126, 26, 0.12);
-    color: #8f6e2d;
-    font-weight: 700;
+    background: linear-gradient(135deg, #f5a623, #e8a000);
+    color: #fff;
+    font-weight: 800;
+    font-size: 0.95rem;
+    letter-spacing: 0.03em;
+    box-shadow: 0 3px 10px rgba(232, 160, 0, 0.5);
 }
 
 .pricing-description {
