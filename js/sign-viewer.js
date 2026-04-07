@@ -162,7 +162,7 @@ export const SignViewer = {
                                     ${this.formatJstDateTime(ev.timestamp, true)}
                                 </div>
                                 <div>
-                                    <span>${eventLabels[ev.event] || ev.event}</span>
+                                    <span>${eventLabels[ev.event] || this.escapeHtml(ev.event)}</span>
                                     <span style="color:#888; margin-left:6px;">${this.escapeHtml(ev.actorEmail || '')}</span>
                                     ${ev.ipAddress ? `<span style="color:#aaa; margin-left:6px;">IP: ${this.escapeHtml(ev.ipAddress)}</span>` : ''}
                                 </div>

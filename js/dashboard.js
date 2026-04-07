@@ -1304,7 +1304,7 @@ const Views = {
             return `
                 <tr onclick="window.app.navigate('diff', ${c.id})">
                     <td><span class="badge ${riskBadgeClass}">${c.risk_level === 'High' ? 'High' : (c.risk_level === 'Medium' ? 'Medium' : (c.risk_level === 'Low' ? 'Low' : c.risk_level))}</span></td>
-                    <td class="col-name" title="${c.name}">${c.name}</td>
+                    <td class="col-name" title="${escapeHtmlText(c.name)}">${escapeHtmlText(c.name)}</td>
                     <td>${formatDisplayTimestamp(c.last_updated_at || c.last_analyzed_at || c.created_at)}</td>
                     <td>${statusBadge}</td>
                     <td>${actionBtn}</td>
@@ -1370,8 +1370,8 @@ const Views = {
 
             return `
                 <tr onclick="window.app.navigate('diff', ${c.id})">
-                    <td class="col-name" title="${c.name}">${c.name}</td>
-                    <td>${c.type}</td>
+                    <td class="col-name" title="${escapeHtmlText(c.name)}">${escapeHtmlText(c.name)}</td>
+                    <td>${escapeHtmlText(c.type)}</td>
                     <td>${formatDisplayTimestamp(c.last_updated_at || c.last_analyzed_at || c.created_at)}</td>
                     <td>${riskBadge}</td>
                     <td>${statusBadge}</td>
@@ -3103,8 +3103,8 @@ class DashboardApp {
                 <!-- Header -->
                 <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid #eee;flex-shrink:0;">
                     <div>
-                        <div style="font-size:15px;font-weight:700;color:#2b2623;">${c.name || '契約書'}</div>
-                        <div style="font-size:12px;color:#aaa;margin-top:2px;">${c.type || ''}${c.contract_category ? ' · ' + c.contract_category : ''}</div>
+                        <div style="font-size:15px;font-weight:700;color:#2b2623;">${escapeHtmlText(c.name) || '契約書'}</div>
+                        <div style="font-size:12px;color:#aaa;margin-top:2px;">${escapeHtmlText(c.type || '')}${c.contract_category ? ' · ' + escapeHtmlText(c.contract_category) : ''}</div>
                     </div>
                     <button onclick="document.getElementById('deadline-input-overlay').remove()" style="background:none;border:none;font-size:22px;color:#aaa;cursor:pointer;line-height:1;padding:4px 8px;">✕</button>
                 </div>
@@ -3523,7 +3523,7 @@ class DashboardApp {
                 <span class="toggle-slider"></span>
             </label>`;
             const categoryBadge = c.contract_category
-                ? `<span style="font-size:11px;background:#f0ede8;color:#7a6a5a;border-radius:4px;padding:2px 7px;">${c.contract_category}</span>`
+                ? `<span style="font-size:11px;background:#f0ede8;color:#7a6a5a;border-radius:4px;padding:2px 7px;">${escapeHtmlText(c.contract_category)}</span>`
                 : '';
             const daysBadge = noDate
                 ? `<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">
@@ -3539,7 +3539,7 @@ class DashboardApp {
                 : `<span style="display:inline-block;background:${badgeColor};color:#fff;border-radius:20px;padding:3px 12px;font-size:12px;font-weight:700;">${daysLabel}</span>`;
             const rowClick = `onclick="window.app.showDeadlineInputModal('${c.id}')"`;
             return `<tr style="cursor:pointer;" ${rowClick}>
-                <td><div style="font-weight:600;color:#2b2623;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.name || '—'}</div>${categoryBadge ? `<div style="margin-top:4px;">${categoryBadge}</div>` : ''}</td>
+                <td><div style="font-weight:600;color:#2b2623;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtmlText(c.name) || '—'}</div>${categoryBadge ? `<div style="margin-top:4px;">${categoryBadge}</div>` : ''}</td>
                 <td style="font-size:13px;color:#5e544d;white-space:nowrap;width:130px;">${targetDate ? this._formatDateJa(targetDate) : '—'}</td>
                 <td style="white-space:nowrap;width:140px;">${daysBadge}</td>
                 <td style="white-space:nowrap;width:90px;">${notifyToggle}</td>
@@ -5274,7 +5274,7 @@ class DashboardApp {
                 return `
         <tr onclick="window.app.navigate('diff', ${c.id})">
             <td><span class="badge ${riskBadgeClass}">${c.risk_level}</span></td>
-            <td class="col-name" title="${c.name}">${c.name}</td>
+            <td class="col-name" title="${escapeHtmlText(c.name)}">${escapeHtmlText(c.name)}</td>
             <td>${c.last_updated_at}</td>
             <td>${statusBadge}</td>
             <td>${actionBtn}</td>
