@@ -2715,9 +2715,10 @@ class DashboardApp {
         };
         this.userPlan = isLocal ? 'pro' : 'free';
 
-        // URLパラメータによるプラン強制 (検証用: ?forcePlan=free|starter|business|pro)
+        // URLパラメータによるプラン強制 (検証用: ?forcePlan=free|starter|business|pro) ローカル環境のみ有効
         const urlParams = new URLSearchParams(window.location.search);
-        const forcedPlan = urlParams.get('forcePlan');
+        const _isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const forcedPlan = _isLocalHost ? urlParams.get('forcePlan') : null;
         const forcedPlanData = {
             free:     { plan: 'free',     billingCycle: 'monthly', usageCount: 0, usageLimit: 999999, daysRemaining: null, planLimit: 999999, signUsageLimit: 999999 },
             starter:  { plan: 'starter',  billingCycle: 'monthly', usageCount: 0, usageLimit: 999999, daysRemaining: null, planLimit: 999999, signUsageLimit: 999999 },
@@ -3988,8 +3989,9 @@ class DashboardApp {
     }
 
     async fetchSubscriptionStatus(token) {
-        // forcePlan指定時はAPIフェッチをスキップし、強制プランを再適用
-        const forcedPlan = new URLSearchParams(window.location.search).get('forcePlan');
+        // forcePlan指定時はAPIフェッチをスキップし、強制プランを再適用（ローカル環境のみ有効）
+        const _isLocalEnv = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const forcedPlan = _isLocalEnv ? new URLSearchParams(window.location.search).get('forcePlan') : null;
         if (forcedPlan) {
             const forcedPlanMap = {
                 free:     { plan: 'free',     billingCycle: 'monthly', usageCount: 0, usageLimit: 999999, daysRemaining: null, planLimit: 999999, signUsageLimit: 999999 },
@@ -4028,9 +4030,9 @@ class DashboardApp {
             }
         } catch (error) {
             console.error('Failed to fetch subscription status:', error);
-            // API接続失敗時：proをデフォルトにする
-            this.subscription = { plan: 'pro', billingCycle: 'monthly', usageCount: 0, usageLimit: 999999, daysRemaining: null, planLimit: 999999 };
-            this.userPlan = 'pro';
+            // API接続失敗時：freeをデフォルトにする（セキュリティのため有料プランを与えない）
+            this.subscription = { plan: 'free', billingCycle: 'monthly', usageCount: 0, usageLimit: 3, daysRemaining: null, planLimit: 1, signUsageLimit: 10 };
+            this.userPlan = 'free';
             this.setCachedItem(DASHBOARD_CACHE_KEYS.SUBSCRIPTION, this.subscription);
             if (!this.planViewBillingCycle) {
                 this.planViewBillingCycle = 'monthly';
