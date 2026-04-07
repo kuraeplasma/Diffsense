@@ -1177,7 +1177,7 @@ router.get('/verify', async (req, res) => {
 
         const recipient = (signRequest.recipients || []).find((item) => String(item.email || '').trim() === String(payload.email || '').trim());
         if (!recipient) {
-            return res.status(403).json({ success: false, error: '署名者として登録されていません' });
+            return res.status(403).json({ success: false, error: '署名リンクが無効です' });
         }
         if (recipient.status === 'signed' || recipient.status === 'completed') {
             return res.status(410).json({ success: false, error: 'すでに署名済みです' });
@@ -1265,7 +1265,7 @@ router.get('/original-file', async (req, res) => {
 
         const recipient = (signRequest.recipients || []).find((item) => String(item.email || '').trim() === String(payload.email || '').trim());
         if (!recipient) {
-            return res.status(403).json({ success: false, error: '署名者として登録されていません' });
+            return res.status(403).json({ success: false, error: '署名リンクが無効です' });
         }
 
         let contract = null;
@@ -1465,7 +1465,7 @@ router.post('/decline', async (req, res) => {
         if (!actingRecipient) {
             return res.status(403).json({
                 success: false,
-                error: '署名者として登録されていません'
+                error: '署名リンクが無効です'
             });
         }
         const actingRecipientStatus = String(actingRecipient.status || '').toLowerCase();
@@ -1552,7 +1552,7 @@ router.post('/submit', async (req, res) => {
         if (!submitRecipient) {
             return res.status(403).json({
                 success: false,
-                error: '署名者として登録されていません'
+                error: '署名リンクが無効です'
             });
         }
         const submitRecipientStatus = String(submitRecipient.status || '').toLowerCase();

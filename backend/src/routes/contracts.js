@@ -824,6 +824,13 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
 
         const currentBuffer = decodeBase64Payload(source);
 
+        // MIMEタイプ検証: DOCXはZIP形式（magic bytes: PK\x03\x04）
+        if (!currentBuffer || currentBuffer.length < 4 ||
+            currentBuffer[0] !== 0x50 || currentBuffer[1] !== 0x4B ||
+            currentBuffer[2] !== 0x03 || currentBuffer[3] !== 0x04) {
+            return res.status(400).json({ success: false, error: '無効なファイル形式です。Word文書（.docx）をアップロードしてください。' });
+        }
+
         // ── 設計変更: 元のDOCXファイルをサーバーに保存 ──
         // テキスト抽出とは別に、原本ファイルを /uploads/ に保存する。
         // これによりdocx-previewで元のレイアウトを正確に再現できる。
