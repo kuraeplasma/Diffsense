@@ -145,11 +145,89 @@ function getDocxPageMetrics(page) {
     };
 }
 
+function createSmartDocxPageContainer(originalPage) {
+    const page = document.createElement('section');
+    if (originalPage) {
+        page.style.cssText = originalPage.style.cssText;
+    }
+    page.className = 'docx-section docx-smart-page';
+    page.style.background = '#fff';
+    page.style.width = '794px';
+    page.style.minHeight = '1123px';
+    page.style.padding = '80px 90px';
+    page.style.margin = '0 auto 32px auto';
+    page.style.boxSizing = 'border-box';
+    page.style.boxShadow = '0 8px 30px rgba(0,0,0,0.15)';
+    page.style.position = 'relative';
+    page.style.overflow = 'visible';
+    page.dataset.baseWidth = '794';
+    page.dataset.baseHeight = '1123';
+    return page;
+}
+
+function collectDocxLeafElements(root) {
+    const leaves = [];
+    const candidates = ['P', 'TABLE', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'UL', 'OL', 'PRE', 'DIV'];
+    
+    function walk(node) {
+        if (node.nodeType !== 1) return;
+        const isWrapper = /(^|\s)(docx-wrapper|docx-section)(\s|$)/i.test(node.className || '');
+        const isCandidate = candidates.includes(node.tagName.toUpperCase());
+        
+        if (isCandidate && !isWrapper) {
+            leaves.push(node);
+        } else {
+            Array.from(node.children).forEach(walk);
+        }
+    }
+    
+    walk(root);
+    return leaves;
+}
+
+async function smartChunkDocxPages(root) {
+    const docxWrapper = root.querySelector('.docx-wrapper');
+    if (!docxWrapper) return collectDocxPages(root);
+
+    const allElements = collectDocxLeafElements(docxWrapper);
+    if (allElements.length === 0) return collectDocxPages(root);
+
+    const originalSections = Array.from(docxWrapper.querySelectorAll('section'));
+    const baseStyleSection = originalSections[0] || null;
+
+    docxWrapper.innerHTML = '';
+    const pages = [];
+    let currentPage = createSmartDocxPageContainer(baseStyleSection);
+    docxWrapper.appendChild(currentPage);
+    pages.push(currentPage);
+
+    let currentHeight = 0;
+    const pageHeightThreshold = 960;
+
+    for (const el of allElements) {
+        if (el.nodeType !== 1) continue;
+        
+        currentPage.appendChild(el);
+        const elHeight = Math.max(10, el.getBoundingClientRect().height || el.offsetHeight || 20);
+
+        if (currentHeight + elHeight > pageHeightThreshold && currentPage.children.length > 1) {
+            currentPage = createSmartDocxPageContainer(baseStyleSection);
+            docxWrapper.appendChild(currentPage);
+            pages.push(currentPage);
+            currentPage.appendChild(el);
+            currentHeight = elHeight;
+        } else {
+            currentHeight += elHeight;
+        }
+    }
+
+    return pages;
+}
+
 function shouldVirtualizeDocxPage(page, metrics, pageCount) {
-    if (!page || !metrics) return false;
-    if (Number(pageCount || 0) !== 1) return false;
-    if (metrics.basePageHeight < 700) return false;
-    return metrics.totalHeight > (metrics.basePageHeight * 1.18);
+    // 従来のピクセル単位での強制分割（仮想ページ化）は、行の途中で文字が切れる原因となるため、現在は無効化しています。
+    // 「余計な実装」を削除し、Wordプレビューライブラリの自然な描画を優先します。
+    return false;
 }
 
 function normalizeExpectedDocxPageCount(expectedPageCount) {
@@ -242,7 +320,7 @@ export function wrapPreviewPageShell(page) {
     shell.style.margin = '0 auto 32px auto';
     shell.style.padding = '0';
     shell.style.boxSizing = 'border-box';
-    shell.style.overflow = 'hidden';
+    shell.style.overflow = 'visible';
     shell.style.flex = '0 0 auto';
 
     page.classList.add('editor-page-wrapper');
@@ -350,25 +428,14 @@ export async function renderDocxPreviewPages(container, source, options = {}) {
         docxWrapper.style.margin = '0 auto';
     }
 
-    const rawPages = collectDocxPages(renderRoot);
-    const pages = [];
+    const pages = await smartChunkDocxPages(renderRoot);
 
-    rawPages.forEach((page) => {
+    pages.forEach((page) => {
         const metrics = getDocxPageMetrics(page);
-        if (shouldVirtualizeDocxPage(page, metrics, rawPages.length)) {
-            const slices = createVirtualDocxPageSlices(page, metrics, expectedPageCount);
-            const parent = page.parentNode;
-            if (parent) {
-                slices.forEach((slice) => parent.insertBefore(slice, page));
-                parent.removeChild(page);
-            }
-            pages.push(...slices);
-            return;
-        }
-
         page.dataset.baseWidth = String(metrics.baseWidth);
-        page.dataset.baseHeight = String(metrics.totalHeight);
-        pages.push(page);
+        const renderedHeight = Math.max(metrics.basePageHeight, page.scrollHeight || page.offsetHeight || metrics.basePageHeight);
+        page.dataset.baseHeight = String(renderedHeight);
+        wrapPreviewPageShell(page);
     });
 
     if (expectedPageCount && pages.length === expectedPageCount + 1) {

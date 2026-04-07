@@ -841,14 +841,14 @@ const parseContractIntoClauses = (content) => {
             clauses.push({
                 title: '前文',
                 header: normalized.title || '',
-                paragraphs: String(normalized.preamble).split(/\n+/).filter(Boolean)
+                paragraphs: String(normalized.preamble).replace(/([\uFF21-\uFF5A\uFF10-\uFF19])\n([\uFF21-\uFF5A\uFF10-\uFF19])/g, '$1$2').split(/\n+/).filter(Boolean)
             });
         }
         normalized.articles.forEach((item, idx) => {
             const promoted = applyHeadingPromotion(
                 item.articleNumber || `第${idx + 1}条`,
                 item.title || '',
-                String(item.content || '').split(/\n+/).filter(Boolean)
+                String(item.content || '').replace(/([\uFF21-\uFF5A\uFF10-\uFF19])\n([\uFF21-\uFF5A\uFF10-\uFF19])/g, '$1$2').split(/\n+/).filter(Boolean)
             );
             clauses.push({
                 title: item.articleNumber || `第${idx + 1}条`,
@@ -2307,7 +2307,7 @@ class RegistrationFlow {
                         <div class="reg-method-icon"><i class="fa-solid fa-file-word"></i></div>
                         <div class="reg-method-info">
                             <h4>Wordをアップロード</h4>
-                            <p>Wordファイル(.docx)を解析・比較します</p>
+                            <p>ファイルをここにドロップするか、クリックして選択</p>
                         </div>
                     </div>
                     <div class="reg-method-card" id="reg-card-pdf">
@@ -2571,6 +2571,8 @@ class RegistrationFlow {
                 sourceData = await aiService.convertFileToBase64(this.tempData.fileData);
                 if (this.tempData.method === 'pdf') {
                     this.app?.setRuntimePdfPreviewUrl(contractId, this.tempData.fileData);
+                } else if (this.tempData.method === 'docx') {
+                    this.app?.setRuntimeOriginalPreviewFile(contractId, this.tempData.fileData);
                 }
             }
 
@@ -2602,7 +2604,8 @@ class RegistrationFlow {
                     isFallback: result.data.isFallback === true,
                     aiFailed: result.data.aiFailed === true,
                     status: '未確認',
-                    originalFilename: this.tempData.fileData?.name || ''
+                    originalFilename: this.tempData.fileData?.name || '',
+                    originalFilePath: result.data.originalFilePath || null
                 });
                 await this.app.refreshSubscriptionStatusSafe();
 
@@ -2672,6 +2675,7 @@ class DashboardApp {
         this.searchQuery = "";
         this.currentPage = 1;
         this.runtimePdfPreviewUrls = new Map();
+        this.runtimeOriginalDocxFiles = new Map();
         this.historyComparisonContext = null;
         this.documentCompareState = null;
         this.dashboardFilter = "pending";
@@ -2698,9 +2702,18 @@ class DashboardApp {
         this.stripeEnabled = false;
         this.stripePublishableKey = '';
 
-        // 初期表示を無料プランに設定 (チェック用)
-        this.subscription = { plan: 'free', billingCycle: 'monthly', usageCount: 0, usageLimit: 3, daysRemaining: null, planLimit: 10 };
-        this.userPlan = 'free';
+        // 初期表示をProプランに設定 (ローカル開発・テスト用ブースト)
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        this.subscription = { 
+            plan: isLocal ? 'pro' : 'free', 
+            billingCycle: 'monthly', 
+            usageCount: 0, 
+            usageLimit: 999999, 
+            daysRemaining: null, 
+            planLimit: 999999,
+            signUsageLimit: 999999
+        };
+        this.userPlan = isLocal ? 'pro' : 'free';
 
         // URLパラメータによるプラン強制 (検証用: ?forcePlan=free|starter|business|pro)
         const urlParams = new URLSearchParams(window.location.search);
@@ -2733,11 +2746,116 @@ class DashboardApp {
         }
         const blobUrl = URL.createObjectURL(file);
         this.runtimePdfPreviewUrls.set(key, blobUrl);
+        // Persist to IndexedDB so file survives page refresh
+        this._savePdfToIDB(contractId, file).catch(() => {});
     }
 
     getRuntimePdfPreviewUrl(contractId) {
         if (!contractId) return null;
         return this.runtimePdfPreviewUrls.get(String(contractId)) || null;
+    }
+
+    async getPdfFromIDB(contractId) {
+        if (!contractId) return null;
+        if (this.runtimePdfPreviewUrls.get(String(contractId))) return null; // already in memory
+        try {
+            const file = await this._loadPdfFromIDB(contractId);
+            if (file) {
+                const blobUrl = URL.createObjectURL(file);
+                this.runtimePdfPreviewUrls.set(String(contractId), blobUrl);
+            }
+        } catch (_) {}
+        return null;
+    }
+
+    async _savePdfToIDB(contractId, file) {
+        const db = await this._openDocxIDB();
+        const buf = await file.arrayBuffer();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('docx-files', 'readwrite');
+            tx.objectStore('docx-files').put({ contractId: `pdf-${contractId}`, name: file.name, data: buf, savedAt: Date.now() });
+            tx.oncomplete = resolve;
+            tx.onerror = (e) => reject(e.target.error);
+        });
+    }
+
+    async _loadPdfFromIDB(contractId) {
+        const db = await this._openDocxIDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('docx-files', 'readonly');
+            const req = tx.objectStore('docx-files').get(`pdf-${contractId}`);
+            req.onsuccess = (e) => {
+                const rec = e.target.result;
+                if (rec) resolve(new File([rec.data], rec.name, { type: 'application/pdf' }));
+                else resolve(null);
+            };
+            req.onerror = (e) => reject(e.target.error);
+        });
+    }
+
+    setRuntimeOriginalPreviewFile(contractId, file) {
+        if (!contractId || !file || !(file instanceof File)) return;
+        this.runtimeOriginalDocxFiles.set(String(contractId), file);
+        // Persist to IndexedDB so file survives page refresh
+        this._saveDocxToIDB(contractId, file).catch(() => {});
+    }
+
+    getRuntimeOriginalPreviewFile(contractId) {
+        if (!contractId) return null;
+        return this.runtimeOriginalDocxFiles.get(String(contractId)) || null;
+    }
+
+    async getDocxFromIDB(contractId) {
+        if (!contractId) return null;
+        // Check in-memory first
+        const mem = this.runtimeOriginalDocxFiles.get(String(contractId));
+        if (mem) return mem;
+        try {
+            const file = await this._loadDocxFromIDB(contractId);
+            if (file) this.runtimeOriginalDocxFiles.set(String(contractId), file);
+            return file;
+        } catch (_) { return null; }
+    }
+
+    async _saveDocxToIDB(contractId, file) {
+        const db = await this._openDocxIDB();
+        const buf = await file.arrayBuffer();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('docx-files', 'readwrite');
+            tx.objectStore('docx-files').put({ contractId: String(contractId), name: file.name, data: buf, savedAt: Date.now() });
+            tx.oncomplete = resolve;
+            tx.onerror = (e) => reject(e.target.error);
+        });
+    }
+
+    async _loadDocxFromIDB(contractId) {
+        const db = await this._openDocxIDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('docx-files', 'readonly');
+            const req = tx.objectStore('docx-files').get(String(contractId));
+            req.onsuccess = (e) => {
+                const rec = e.target.result;
+                if (rec) resolve(new File([rec.data], rec.name, { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }));
+                else resolve(null);
+            };
+            req.onerror = (e) => reject(e.target.error);
+        });
+    }
+
+    _openDocxIDB() {
+        if (this._docxIDBPromise) return this._docxIDBPromise;
+        this._docxIDBPromise = new Promise((resolve, reject) => {
+            const req = indexedDB.open('diffsense-docx-store', 1);
+            req.onupgradeneeded = (e) => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains('docx-files')) {
+                    db.createObjectStore('docx-files', { keyPath: 'contractId' });
+                }
+            };
+            req.onsuccess = (e) => resolve(e.target.result);
+            req.onerror = (e) => reject(e.target.error);
+        });
+        return this._docxIDBPromise;
     }
 
     setHistoryComparisonContext(context = null) {
@@ -4911,31 +5029,31 @@ class DashboardApp {
         if (viewId === 'sign') {
             await dbService.syncContractsFromApi();
             console.trace('Routing to sign');
-            const { SignUI } = await import('./sign-ui.js?v=20260321a');
+            const { SignUI } = await import('./sign-ui.js?v=20260407_final_v10');
             this.mainContent.innerHTML = await SignUI.renderSignView(this);
             SignUI.refreshList(this);
             return;
         }
 
         if (viewId === 'sign-viewer') {
-            const { SignUI } = await import('./sign-ui.js?v=20260321a');
-            const { SignViewer } = await import('./sign-viewer.js?v=20260321az');
+            const { SignUI } = await import('./sign-ui.js?v=20260407_final_v10');
+            const { SignViewer } = await import('./sign-viewer.js?v=20260407_final_v10');
             this.mainContent.innerHTML = await SignUI.renderSignViewer(this, params);
             await SignViewer.init(this, params);
             return;
         }
         
         if (viewId === 'sign-editor') {
-            const { SignUI } = await import('./sign-ui.js?v=20260321a');
-            const { SignEditor } = await import('./sign-editor.js?v=20260321b');
+            const { SignUI } = await import('./sign-ui.js?v=20260407_final_v10');
+            const { SignEditor } = await import('./sign-editor.js?v=20260407_pdfidb');
             this.mainContent.innerHTML = await SignUI.renderSignEditor(this, params);
             await SignEditor.init(this, params);
             return;
         }
 
         if (viewId === 'sign-recipient') {
-            const { SignUI } = await import('./sign-ui.js?v=20260321a');
-            const { SignRecipient } = await import('./sign-recipient.js?v=20260320aa');
+            const { SignUI } = await import('./sign-ui.js?v=20260407_final_v10');
+            const { SignRecipient } = await import('./sign-recipient.js?v=20260407_final_v10');
             this.mainContent.innerHTML = await SignUI.renderSignRecipient(this, params);
             await SignRecipient.init(this, params);
             return;
@@ -5696,6 +5814,8 @@ class DashboardApp {
             const methodLabel = isPdf ? 'PDF' : 'Word';
             if (isPdf) {
                 this.setRuntimePdfPreviewUrl(id, file);
+            } else if (isDocx) {
+                this.setRuntimeOriginalPreviewFile(id, file);
             }
 
             const performAnalysis = async (retryCount = 0) => {
@@ -5762,6 +5882,7 @@ class DashboardApp {
                             sourceType: result.data.sourceType,
                             pdfStoragePath: result.data.pdfStoragePath,
                             pdfUrl: result.data.pdfUrl,
+                            originalFilePath: result.data.originalFilePath || null,
                             status: '未確認',
                             originalFilename: file.name
                         };

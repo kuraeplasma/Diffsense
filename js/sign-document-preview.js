@@ -62,7 +62,7 @@ function buildPlainPreviewTextFromItem(item, index = 0) {
 }
 
 const renderPlainPreviewHtml = (text) => {
-    const normalized = String(text || '').replace(/\r/g, '').trim();
+    const normalized = String(text || '').replace(/\r/g, '').replace(/([\uFF21-\uFF5A\uFF10-\uFF19])\n([\uFF21-\uFF5A\uFF10-\uFF19])/g, '$1$2').trim();
     if (!normalized) {
         return '<div class="document-content-full is-frameless">表示できる本文データが見つかりません</div>';
     }

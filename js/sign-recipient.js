@@ -4,7 +4,7 @@
 import { Notify } from './notify.js';
 import { dbService } from './db-service.js';
 import { buildSignDocumentPreviewHtml } from './sign-document-preview.js?v=20260402_signpreview_plain1';
-import { isDocxFileName, renderDocxPreviewPages, wrapPreviewPageShell } from './sign-docx-preview.js?v=20260402_signdocxpreview20';
+import { isDocxFileName, renderDocxPreviewPages, wrapPreviewPageShell } from './sign-docx-preview.js?v=20260407_final_v10';
 import { getApiBaseUrl, resolveBackendAssetUrl, toApiUrl } from './api-base-safe.js?v=20260329_api_base_safe1';
 import { getIdToken } from './auth.js';
 
@@ -151,12 +151,16 @@ export const SignRecipient = {
             const fragment = document.createDocumentFragment();
             for (let i = 1; i <= this._pdf.numPages; i++) {
                 const page = await this._pdf.getPage(i);
-                const viewport = page.getViewport({ scale: 1.0 });
+                const renderScale = 2.0;
+                const viewport = page.getViewport({ scale: renderScale });
+                const baseViewport = page.getViewport({ scale: 1.0 });
                 
                 const canvas = document.createElement('canvas');
                 const context = canvas.getContext('2d');
                 canvas.height = viewport.height;
                 canvas.width = viewport.width;
+                canvas.style.width = baseViewport.width + 'px';
+                canvas.style.height = baseViewport.height + 'px';
                 canvas.style.display = 'block';
                 canvas.style.margin = '0 auto';
                 
@@ -165,9 +169,9 @@ export const SignRecipient = {
                 const pageWrapper = document.createElement('div');
                 pageWrapper.className = 'editor-page-wrapper';
                 pageWrapper.style.position = 'relative';
-                pageWrapper.style.width = viewport.width + 'px';
-                pageWrapper.dataset.baseWidth = String(viewport.width);
-                pageWrapper.dataset.baseHeight = String(viewport.height);
+                pageWrapper.style.width = baseViewport.width + 'px';
+                pageWrapper.dataset.baseWidth = String(baseViewport.width);
+                pageWrapper.dataset.baseHeight = String(baseViewport.height);
                 pageWrapper.appendChild(canvas);
 
                 const pageShell = wrapPreviewPageShell(pageWrapper);

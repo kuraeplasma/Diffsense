@@ -5,7 +5,7 @@
 import { dbService } from './db-service.js';
 import { Notify } from './notify.js';
 import { buildSignDocumentPreviewHtml } from './sign-document-preview.js?v=20260402_signpreview_plain1';
-import { isDocxFileName, renderDocxPreviewPages } from './sign-docx-preview.js?v=20260402_signdocxpreview20';
+import { isDocxFileName, renderDocxPreviewPages, wrapPreviewPageShell } from './sign-docx-preview.js?v=20260407_final_v10';
 import { getIdToken } from './auth.js';
 import { resolveBackendAssetUrl, toApiUrl } from './api-base-safe.js?v=20260329_api_base_safe1';
 
@@ -285,7 +285,10 @@ export const SignViewer = {
 
             for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
                 const page = await pdf.getPage(pageNum);
-                const viewport = page.getViewport({ scale: this._currentScale });
+                const baseScale = this._currentScale || 1.2;
+                const renderingScale = baseScale * 2; 
+                const viewport = page.getViewport({ scale: renderingScale });
+                const baseViewport = page.getViewport({ scale: baseScale });
 
                 const pageShell = document.createElement('div');
                 pageShell.style.position = 'relative';
@@ -301,6 +304,8 @@ export const SignViewer = {
                 canvas.style.borderRadius = '2px';
                 canvas.style.display = 'block';
                 canvas.style.background = '#fff';
+                canvas.style.width = baseViewport.width + 'px';
+                canvas.style.height = baseViewport.height + 'px';
                 const context = canvas.getContext('2d');
                 canvas.height = viewport.height;
                 canvas.width = viewport.width;
@@ -311,7 +316,7 @@ export const SignViewer = {
                 }).promise;
 
                 pageShell.appendChild(canvas);
-                pageShell.appendChild(this.createFieldOverlay(pageNum, viewport.width, viewport.height));
+                pageShell.appendChild(this.createFieldOverlay(pageNum, baseViewport.width, baseViewport.height));
                 pagesContainer.appendChild(pageShell);
             }
 

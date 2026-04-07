@@ -823,6 +823,25 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
         }
 
         const currentBuffer = decodeBase64Payload(source);
+
+        // ── 設計変更: 元のDOCXファイルをサーバーに保存 ──
+        // テキスト抽出とは別に、原本ファイルを /uploads/ に保存する。
+        // これによりdocx-previewで元のレイアウトを正確に再現できる。
+        let originalFilePath = null;
+        try {
+            const fs = require('fs');
+            const pathMod = require('path');
+            const uploadsDir = pathMod.join(__dirname, '../../uploads');
+            if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+            const filename = `docx-${contractId}-${Date.now()}.docx`;
+            const savePath = pathMod.join(uploadsDir, filename);
+            await fs.promises.writeFile(savePath, currentBuffer);
+            originalFilePath = savePath;
+            logger.info(`Original DOCX saved: ${savePath}`);
+        } catch (saveErr) {
+            logger.warn('DOCX file save failed (display will use fallback):', saveErr.message);
+        }
+
         const currentArticles = await docxService.parseDocx(currentBuffer);
         const structuredContract = fromLegacyArticleArray(currentArticles);
         const previousArticles = await resolvePreviousDocxArticles(previousVersion);
@@ -926,12 +945,78 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
                 summary: aiResult.summary,
                 extractedTextHash,
                 extractedTextLength: serialized.length,
+                originalFilePath,
                 aiFailed: Boolean(aiResult.isFallback === true || (aiResult.summary && isAiFailureSummary(aiResult.summary))),
                 isFallback: aiResult.isFallback === true
             }
         });
     } catch (error) {
         logger.error('DOCX upload error:', error);
+        next(error);
+    }
+});
+
+/**
+ * GET /api/contracts/:id/original-file
+ * 元のDOCX/PDFファイルをサーブする（認証済みオーナー向け）
+ * sign-editor.jsのloadDocx()が呼び出す
+ */
+router.get('/:id/original-file', async (req, res, next) => {
+    try {
+        const uid = req.user.uid;
+        const contractId = parseInt(req.params.id, 10);
+        if (isNaN(contractId)) {
+            return res.status(400).json({ success: false, error: '契約IDが不正です' });
+        }
+
+        const contracts = await dbService.getContracts(uid);
+        const contract = (Array.isArray(contracts) ? contracts : [])
+            .find(c => String(c.id) === String(contractId));
+        if (!contract) {
+            return res.status(404).json({ success: false, error: '契約が見つかりません' });
+        }
+
+        const fs = require('fs');
+        const pathMod = require('path');
+        const uploadsDir = pathMod.join(__dirname, '../../uploads');
+
+        let resolved = null;
+        if (contract.original_file_path) {
+            const candidate = pathMod.resolve(contract.original_file_path);
+            if (fs.existsSync(candidate)) resolved = candidate;
+        }
+
+        // Fallback: search /uploads/ for contract-{id}-*.docx or docx-{id}-*.docx
+        if (!resolved && fs.existsSync(uploadsDir)) {
+            const prefix1 = `contract-${contractId}-`;
+            const prefix2 = `docx-${contractId}-`;
+            const files = fs.readdirSync(uploadsDir)
+                .filter(f => (f.startsWith(prefix1) || f.startsWith(prefix2)) && /\.(docx?|pdf)$/i.test(f))
+                .map(f => ({ f, mtime: fs.statSync(pathMod.join(uploadsDir, f)).mtimeMs }))
+                .sort((a, b) => b.mtime - a.mtime);
+            if (files.length > 0) resolved = pathMod.join(uploadsDir, files[0].f);
+        }
+
+        if (!resolved) {
+            return res.status(404).json({ success: false, error: '原本ファイルが保存されていません' });
+        }
+
+        const originalName = contract.original_filename || pathMod.basename(resolved);
+        const ext = pathMod.extname(originalName).toLowerCase();
+        const contentTypeMap = {
+            '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            '.doc':  'application/msword',
+            '.pdf':  'application/pdf'
+        };
+        const contentType = contentTypeMap[ext] || 'application/octet-stream';
+
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(originalName)}`);
+        res.setHeader('Cache-Control', 'no-store');
+        fs.createReadStream(resolved).pipe(res);
+        logger.info(`Served original file for contract ${contractId}: ${resolved}`);
+    } catch (error) {
+        logger.error('Original file serve error:', error);
         next(error);
     }
 });

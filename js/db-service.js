@@ -747,6 +747,11 @@ export const dbService = {
                 contract.source_type = analysisData.sourceType || contract.source_type;
             }
 
+            // 元のDOCX/PDFファイルパスを保存（docx-preview/PDFビューア用）
+            if (analysisData.originalFilePath) {
+                contract.original_file_path = analysisData.originalFilePath;
+            }
+
             // ファイル名も更新（ある場合）
             if (analysisData.originalFilename) {
                 contract.original_filename = analysisData.originalFilename;

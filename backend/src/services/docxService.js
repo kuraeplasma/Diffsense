@@ -175,7 +175,7 @@ class DocxService {
                 } else if (el['w:tab']) {
                     text += "  "; // Tab as double space
                 } else if (el['w:br'] || el['w:cr']) {
-                    text += "\n";
+                    text += " ";
                 } else if (el['w:ins']) {
                     // Tracked insertion: Keep content
                     traverse(el['w:ins']);
