@@ -1823,7 +1823,7 @@ const Views = {
                                         <i class="fa-solid fa-calendar-check" style="color:#1976d2;"></i>
                                         <span style="font-size:14px;font-weight:700;color:#1976d2;">AIが検出した期限情報</span>
                                         ${confBadge}
-                                        ${contract.contract_category ? `<span style="font-size:11px;background:#e3f2fd;color:#1976d2;border-radius:4px;padding:2px 7px;margin-left:auto;">${contract.contract_category}</span>` : ''}
+                                        ${contract.contract_category ? `<span style="font-size:11px;background:#e3f2fd;color:#1976d2;border-radius:4px;padding:2px 7px;margin-left:auto;">${escapeHtmlText(contract.contract_category)}</span>` : ''}
                                     </div>
                                     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:10px;">
                                         ${contract.contract_start ? `<div style="background:#fff;border-radius:8px;padding:10px 14px;border:1px solid #e3f2fd;"><div style="font-size:11px;color:#8a7a6a;margin-bottom:2px;">契約開始日</div><div style="font-size:13px;font-weight:600;">${fmtDate(contract.contract_start)}</div></div>` : ''}
@@ -2170,7 +2170,7 @@ const Views = {
             return `
                 <tr>
                     <td>${h.created_at}</td>
-                    <td class="col-name" title="${h.target_name}">${h.target_name}</td>
+                    <td class="col-name" title="${escapeHtmlText(h.target_name)}">${escapeHtmlText(h.target_name)}</td>
                     <td><span class="badge ${statusBadge}">${h.status || '成功'}</span></td>
                     <td>${h.action}</td>
                     <td>${h.actor}</td>
@@ -6209,7 +6209,7 @@ class DashboardApp {
                                 </tr>
                                 <tr style="border-bottom: 1px solid #f6f8fa;">
                                     <td style="padding: 12px 0; color: #586069;">対象</td>
-                                    <td style="padding: 12px 0; font-weight: 600;">${log.target_name}</td>
+                                    <td style="padding: 12px 0; font-weight: 600;">${escapeHtmlText(log.target_name)}</td>
                                 </tr>
                                 <tr style="border-bottom: 1px solid #f6f8fa;">
                                     <td style="padding: 12px 0; color: #586069;">実行者</td>
