@@ -119,9 +119,10 @@ router.post('/select-plan', async (req, res) => {
         const uid = req.user.uid;
         const { plan, billingCycle, startTrial } = req.body;
 
-        const validPlans = ['starter', 'business', 'pro'];
+        // 有料プランは決済Webhook経由でのみ設定可能。このエンドポイントではfreeのみ許可。
+        const validPlans = ['free'];
         if (!plan || !validPlans.includes(plan)) {
-            return res.status(400).json({ success: false, error: 'Invalid plan' });
+            return res.status(403).json({ success: false, error: 'Paid plans require payment verification' });
         }
 
         const validBillingCycles = ['monthly', 'annual'];
