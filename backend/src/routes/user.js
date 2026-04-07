@@ -63,7 +63,7 @@ router.get('/subscription', async (req, res) => {
         const userProfile = await dbService.getUserProfile(uid);
         const localUnlimited = isLocalUnlimitedMode(req);
         
-        const plan = userProfile.plan || 'pro';
+        const plan = userProfile.plan || 'free';
         const billingCycle = userProfile.billingCycle || 'monthly';
         const limit = localUnlimited ? Number.MAX_SAFE_INTEGER : dbService.getUsageLimit(userProfile);
         const renewalDate = userProfile.currentPeriodEnd || userProfile.nextBillingDate || null;

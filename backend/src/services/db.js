@@ -8,7 +8,7 @@ const PLAN_LIMITS = {
     'trial': 1,
     'starter': 1,
     'business': 3,
-    'pro': 5
+    'pro': 10
 };
 
 const AI_USAGE_LIMITS = {
@@ -275,7 +275,7 @@ class DBService {
 
     async canAddMember(uid) {
         const user = await this.getUserProfile(uid);
-        const plan = user.plan || 'pro';
+        const plan = user.plan || 'free';
         const limit = PLAN_LIMITS[plan] || 1;
 
         // Count only team members invited by this user
