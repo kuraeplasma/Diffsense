@@ -20,6 +20,18 @@
     ],
     "hosting": {
         "public": ".",
+        "redirects": [
+            {
+                "source": "/news",
+                "destination": "/news.html",
+                "type": 301
+            },
+            {
+                "source": "/news/",
+                "destination": "/news.html",
+                "type": 301
+            }
+        ],
         "ignore": [
             "firebase.json",
             "**/.*",
