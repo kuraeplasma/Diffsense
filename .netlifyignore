@@ -4,13 +4,26 @@ backend/
 # Backups
 backups/
 _backup_*/
+_deploy_*/
+_restore_*/
+.deploy_*/
+.tmp_*/
 
 # Logs
 logs/
 
 # Dev files
 .claude/
+.agent/
+.agents/
+.firebase/
+.codex*/
+codex_*/
+docs/
+note-drafts/
+netlify/
 node_modules/
+**/node_modules/
 .env
 .env.local
 nul
