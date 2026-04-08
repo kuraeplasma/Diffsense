@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>お知らせ - DIFFsense</title>
+
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=AW-17941578077"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
+        gtag('config', 'AW-17941578077');
+    </script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Noto+Sans+JP:wght@300;400;500;700&family=Noto+Serif+JP:wght@400;500;700&family=Shippori+Mincho:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css?v=20260329_mcp_visuals8">
+    <link rel="icon" type="image/png" href="favicon2.png?v=2">
+
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+        }
+
+        html {
+            overflow-y: scroll;
+            scrollbar-gutter: stable;
+        }
+
+        body {
+            background: #f8f7f5;
+            overflow-x: hidden;
+        }
+
+        .news-page-wrap {
+            width: min(100%, 780px);
+            margin: 0 auto;
+            padding: 0 1.5rem;
+        }
+
+        .news-header {
+            padding-top: 120px;
+            padding-bottom: 48px;
+            border-bottom: 1px solid #e4e0d8;
+        }
+
+        .news-header-eyebrow {
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.18em;
+            color: #c9a84c;
+            text-transform: uppercase;
+            margin-bottom: 0.75rem;
+        }
+
+        .news-header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #1a1a2e;
+            margin-bottom: 0.5rem;
+            font-family: 'Shippori Mincho', serif;
+        }
+
+        .news-header p {
+            color: #888;
+            font-size: 0.88rem;
+        }
+
+        .news-controls {
+            width: 100%;
+            padding: 1.35rem 0 1rem;
+            border-bottom: 1px solid #e4e0d8;
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+        }
+
+        .news-controls-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.65rem;
+            flex-wrap: wrap;
+        }
+
+        .news-controls-row-filters {
+            justify-content: flex-start;
+        }
+
+        .news-search {
+            flex: 1 1 280px;
+        }
+
+        .news-search-input {
+            width: 100%;
+            border: 1px solid #ddd7cc;
+            border-radius: 10px;
+            background: #fff;
+            color: #1a1a2e;
+            font-size: 0.9rem;
+            padding: 0.72rem 0.95rem;
+            outline: none;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+
+        .news-search-input:focus {
+            border-color: #c9a84c;
+            box-shadow: 0 0 0 3px rgba(201, 168, 76, 0.14);
+        }
+
+        .news-year-select {
+            border: 1px solid #ddd7cc;
+            border-radius: 10px;
+            background: #fff;
+            color: #1a1a2e;
+            font-size: 0.85rem;
+            font-weight: 500;
+            padding: 0.72rem 0.8rem;
+            min-width: 126px;
+        }
+
+        .news-filter-group {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+
+        .news-filter-btn {
+            border: 1px solid #ddd7cc;
+            border-radius: 999px;
+            background: #fff;
+            color: #666;
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.03em;
+            padding: 0.46rem 0.8rem;
+            min-width: 5.3rem;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.15s, color 0.15s, background 0.15s;
+        }
+
+        .news-filter-btn.active {
+            border-color: #1a1a2e;
+            color: #1a1a2e;
+            background: #f2efe8;
+        }
+
+        .news-result-meta {
+            color: #8a8a8a;
+            font-size: 0.78rem;
+            letter-spacing: 0.02em;
+            margin-left: auto;
+            min-width: 7.5rem;
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .news-list {
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        .news-item {
+            display: grid;
+            grid-template-columns: 160px minmax(0, 1fr) auto;
+            align-items: center;
+            gap: 2rem;
+            padding: 2rem 0;
+            border-bottom: 1px solid #e4e0d8;
+            text-decoration: none;
+            color: inherit;
+            transition: opacity 0.15s;
+        }
+
+        .news-item:hover {
+            opacity: 0.7;
+        }
+
+        .news-item-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 0.6rem;
+        }
+
+        .news-item-date {
+            font-size: 0.8rem;
+            color: #aaa;
+            letter-spacing: 0.04em;
+        }
+
+        .news-badge {
+            display: inline-block;
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 2px;
+            letter-spacing: 0.08em;
+            width: fit-content;
+        }
+
+        .news-badge.media {
+            background: #1a1a2e;
+            border: 1px solid #1a1a2e;
+            color: #fff;
+        }
+
+        .news-badge.update {
+            background: transparent;
+            border: 1px solid #16a34a;
+            color: #16a34a;
+        }
+
+        .news-badge.column {
+            background: transparent;
+            border: 1px solid #6366f1;
+            color: #6366f1;
+        }
+
+        .news-item-body {
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+            min-width: 0;
+        }
+
+        .news-item-category {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.72rem;
+            color: #555;
+            letter-spacing: 0.04em;
+            font-weight: 500;
+        }
+
+        .news-item-category img {
+            width: 14px;
+            height: 14px;
+            object-fit: contain;
+            border-radius: 2px;
+        }
+
+        .news-item-category img[alt="note"] {
+            object-fit: cover;
+        }
+
+        .news-source-label {
+            font-size: 0.72rem;
+            font-weight: 500;
+            letter-spacing: 0.04em;
+            line-height: 1;
+        }
+
+        .news-item-title {
+            min-width: 0;
+            font-size: 0.97rem;
+            font-weight: 600;
+            color: #1a1a2e;
+            line-height: 1.6;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+
+        .news-item-arrow {
+            color: #c9a84c;
+            font-size: 0.8rem;
+            opacity: 0.6;
+            transition: opacity 0.15s, transform 0.15s;
+        }
+
+        .news-item:hover .news-item-arrow {
+            opacity: 1;
+            transform: translateX(3px);
+        }
+
+        .news-empty {
+            color: #888;
+            font-size: 0.9rem;
+            text-align: center;
+            padding: 2rem 0;
+            border-bottom: 1px solid #e4e0d8;
+        }
+
+        .news-pagination {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 0.45rem;
+            min-height: 2.3rem;
+            padding: 1.6rem 0 100px;
+        }
+
+        .news-page-btn {
+            min-width: 2.2rem;
+            height: 2.2rem;
+            padding: 0 0.55rem;
+            border: 1px solid #ddd7cc;
+            border-radius: 8px;
+            background: #fff;
+            color: #4f4f4f;
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: border-color 0.15s, color 0.15s, background 0.15s, opacity 0.15s;
+        }
+
+        .news-page-btn.active {
+            border-color: #1a1a2e;
+            color: #1a1a2e;
+            background: #f2efe8;
+        }
+
+        .news-page-btn:disabled {
+            opacity: 0.45;
+            cursor: default;
+        }
+
+        .news-page-ellipsis {
+            display: grid;
+            place-items: center;
+            width: 2.2rem;
+            color: #9b9b9b;
+            font-size: 0.78rem;
+        }
+
+        @media (max-width: 600px) {
+            .news-header {
+                padding-top: 100px;
+                padding-bottom: 32px;
+            }
+
+            .news-controls {
+                padding-top: 1rem;
+            }
+
+            .news-controls-row {
+                align-items: stretch;
+            }
+
+            .news-search,
+            .news-year-select {
+                width: 100%;
+            }
+
+            .news-year-select {
+                min-width: 0;
+            }
+
+            .news-result-meta {
+                width: 100%;
+                margin-left: 0;
+                min-width: 0;
+                text-align: left;
+            }
+
+            .news-item {
+                grid-template-columns: minmax(0, 1fr) auto;
+                grid-template-rows: auto auto;
+                gap: 0.6rem 1rem;
+                padding: 1.5rem 0;
+            }
+
+            .news-item-meta {
+                flex-direction: row;
+                align-items: center;
+                gap: 0.75rem;
+                grid-column: 1 / -1;
+            }
+
+            .news-item-body {
+                grid-column: 1;
+            }
+
+            .news-item-arrow {
+                grid-column: 2;
+                align-self: center;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="container header-container">
+            <a href="index.html" class="logo">
+                <i class="fa-solid fa-scale-balanced"></i>DIFFsense
+            </a>
+            <nav class="nav">
+                <a href="index.html#features">機能</a>
+                <a href="index.html#pricing">料金</a>
+                <a href="index.html#onboarding">導入サポート</a>
+                <a href="news.html" class="active">お知らせ</a>
+                <div class="auth-buttons">
+                    <a href="login.html?tab=login" class="btn-login">ログイン</a>
+                    <a href="login.html?mode=signup" class="btn btn-primary btn-sm btn-start-now">今すぐ無料で始める</a>
+                </div>
+            </nav>
+            <button class="menu-toggle" aria-label="メニューを開く">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </header>
+
+    <div class="news-page-wrap" style="min-height: calc(100vh - 300px);">
+        <div class="news-header">
+            <div class="news-header-eyebrow">News</div>
+            <h1>お知らせ</h1>
+            <p>DIFFsenseの最新情報・メディア掲載情報をお届けします。</p>
+        </div>
+
+        <div class="news-controls">
+            <div class="news-controls-row">
+                <div class="news-search">
+                    <input class="news-search-input" id="newsSearchInput" type="search" placeholder="記事タイトルで検索" autocomplete="off">
+                </div>
+                <select class="news-year-select" id="newsYearSelect" aria-label="年で絞り込み">
+                    <option value="all">すべての年</option>
+                </select>
+            </div>
+            <div class="news-controls-row news-controls-row-filters">
+                <div class="news-filter-group" role="tablist" aria-label="カテゴリで絞り込み">
+                    <button class="news-filter-btn active" type="button" data-news-type="all">すべて</button>
+                    <button class="news-filter-btn" type="button" data-news-type="media">メディア掲載</button>
+                    <button class="news-filter-btn" type="button" data-news-type="update">アップデート</button>
+                    <button class="news-filter-btn" type="button" data-news-type="column">コラム</button>
+                </div>
+                <div class="news-result-meta" id="newsResultMeta" aria-live="polite"></div>
+            </div>
+        </div>
+
+        <div class="news-list">
+            <!-- PR TIMES -->
+            <a class="news-item" href="https://prtimes.jp/main/html/rd/p/000000001.000178766.html" target="_blank" rel="noopener noreferrer">
+                <div class="news-item-meta">
+                    <span class="news-item-date">2026.04.08</span>
+                    <span class="news-badge media">メディア掲載</span>
+                </div>
+                <div class="news-item-body">
+                    <div class="news-item-category">
+                        <img src="https://prtimes.jp/favicon.ico" alt="PR TIMES" onerror="this.style.display='none'">
+                        PR TIMES
+                    </div>
+                    <div class="news-item-title">契約書の変更箇所とリスクをAIが自動検出『DIFFsense』提供開始</div>
+                </div>
+                <div class="news-item-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+            </a>
+
+            <!-- note.com コラム記事 -->
+            <a class="news-item" href="https://note.com/diffsense/n/nc4b7243e231f" target="_blank" rel="noopener noreferrer">
+                <div class="news-item-meta">
+                    <span class="news-item-date">2026.04.08</span>
+                    <span class="news-badge column">コラム</span>
+                </div>
+                <div class="news-item-body">
+                    <div class="news-item-category">
+                        <img src="https://note.com/favicon.ico" alt="note" onerror="this.style.display='none'">
+                        <span class="news-source-label">note</span>
+                    </div>
+                    <div class="news-item-title">中小企業の法務コストを月1万円以下に抑える方法</div>
+                </div>
+                <div class="news-item-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+            </a>
+
+            <a class="news-item" href="https://note.com/diffsense/n/nd51607ee1090" target="_blank" rel="noopener noreferrer">
+                <div class="news-item-meta">
+                    <span class="news-item-date">2026.04.06</span>
+                    <span class="news-badge column">コラム</span>
+                </div>
+                <div class="news-item-body">
+                    <div class="news-item-category">
+                        <img src="https://note.com/favicon.ico" alt="note" onerror="this.style.display='none'">
+                        <span class="news-source-label">note</span>
+                    </div>
+                    <div class="news-item-title">契約書の差分チェックを手作業でやっている会社が危ない理由</div>
+                </div>
+                <div class="news-item-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+            </a>
+
+            <a class="news-item" href="https://note.com/diffsense/n/ne09cf0f7d3be" target="_blank" rel="noopener noreferrer">
+                <div class="news-item-meta">
+                    <span class="news-item-date">2026.04.03</span>
+                    <span class="news-badge column">コラム</span>
+                </div>
+                <div class="news-item-body">
+                    <div class="news-item-category">
+                        <img src="https://note.com/favicon.ico" alt="note" onerror="this.style.display='none'">
+                        <span class="news-source-label">note</span>
+                    </div>
+                    <div class="news-item-title">契約書の「更新忘れ」で起きた企業トラブル実例と防止策</div>
+                </div>
+                <div class="news-item-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+            </a>
+
+            <a class="news-item" href="https://note.com/diffsense/n/n9d55dc41d365" target="_blank" rel="noopener noreferrer">
+                <div class="news-item-meta">
+                    <span class="news-item-date">2026.04.01</span>
+                    <span class="news-badge column">コラム</span>
+                </div>
+                <div class="news-item-body">
+                    <div class="news-item-category">
+                        <img src="https://note.com/favicon.ico" alt="note" onerror="this.style.display='none'">
+                        <span class="news-source-label">note</span>
+                    </div>
+                    <div class="news-item-title">AIに契約書を全文送ってはいけない理由（情報漏洩リスク）</div>
+                </div>
+                <div class="news-item-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+            </a>
+
+            <a class="news-item" href="https://note.com/diffsense/n/n814dbca9b9be" target="_blank" rel="noopener noreferrer">
+                <div class="news-item-meta">
+                    <span class="news-item-date">2026.03.30</span>
+                    <span class="news-badge update">アップデート</span>
+                </div>
+                <div class="news-item-body">
+                    <div class="news-item-category">
+                        <img src="https://note.com/favicon.ico" alt="note" onerror="this.style.display='none'">
+                        <span class="news-source-label">note</span>
+                    </div>
+                    <div class="news-item-title">DIFFsenseがMCPに対応しました｜契約チェックをダッシュボードを開かずに実行できるように</div>
+                </div>
+                <div class="news-item-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+            </a>
+
+            <a class="news-item" href="https://note.com/diffsense/n/nd7af1beb0299" target="_blank" rel="noopener noreferrer">
+                <div class="news-item-meta">
+                    <span class="news-item-date">2026.03.30</span>
+                    <span class="news-badge column">コラム</span>
+                </div>
+                <div class="news-item-body">
+                    <div class="news-item-category">
+                        <img src="https://note.com/favicon.ico" alt="note" onerror="this.style.display='none'">
+                        <span class="news-source-label">note</span>
+                    </div>
+                    <div class="news-item-title">中小企業の法務コスト、SaaSで月1万以下に抑える方法</div>
+                </div>
+                <div class="news-item-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+            </a>
+
+            <a class="news-item" href="https://note.com/diffsense/n/n49b2b789c7bd" target="_blank" rel="noopener noreferrer">
+                <div class="news-item-meta">
+                    <span class="news-item-date">2026.03.27</span>
+                    <span class="news-badge column">コラム</span>
+                </div>
+                <div class="news-item-body">
+                    <div class="news-item-category">
+                        <img src="https://note.com/favicon.ico" alt="note" onerror="this.style.display='none'">
+                        <span class="news-source-label">note</span>
+                    </div>
+                    <div class="news-item-title">契約書の差分チェックを手作業でやってる会社が危ない理由</div>
+                </div>
+                <div class="news-item-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+            </a>
+
+            <a class="news-item" href="https://note.com/diffsense/n/n7f8a784357b7" target="_blank" rel="noopener noreferrer">
+                <div class="news-item-meta">
+                    <span class="news-item-date">2026.03.26</span>
+                    <span class="news-badge column">コラム</span>
+                </div>
+                <div class="news-item-body">
+                    <div class="news-item-category">
+                        <img src="https://note.com/favicon.ico" alt="note" onerror="this.style.display='none'">
+                        <span class="news-source-label">note</span>
+                    </div>
+                    <div class="news-item-title">電子署名ツール比較：大手サービスとDIFFsenseの違い</div>
+                </div>
+                <div class="news-item-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+            </a>
+
+            <a class="news-item" href="https://note.com/diffsense/n/n85ed103175c8" target="_blank" rel="noopener noreferrer">
+                <div class="news-item-meta">
+                    <span class="news-item-date">2026.03.25</span>
+                    <span class="news-badge column">コラム</span>
+                </div>
+                <div class="news-item-body">
+                    <div class="news-item-category">
+                        <img src="https://note.com/favicon.ico" alt="note" onerror="this.style.display='none'">
+                        <span class="news-source-label">note</span>
+                    </div>
+                    <div class="news-item-title">「更新忘れ」で起きた契約トラブル実例5</div>
+                </div>
+                <div class="news-item-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+            </a>
+
+            <a class="news-item" href="https://note.com/diffsense/n/nf860fda4c180" target="_blank" rel="noopener noreferrer">
+                <div class="news-item-meta">
+                    <span class="news-item-date">2026.03.24</span>
+                    <span class="news-badge column">コラム</span>
+                </div>
+                <div class="news-item-body">
+                    <div class="news-item-category">
+                        <img src="https://note.com/favicon.ico" alt="note" onerror="this.style.display='none'">
+                        <span class="news-source-label">note</span>
+                    </div>
+                    <div class="news-item-title">DIFFsenseは何ができるの？</div>
+                </div>
+                <div class="news-item-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+            </a>
+
+            <a class="news-item" href="https://note.com/diffsense/n/nab55ece0155b" target="_blank" rel="noopener noreferrer">
+                <div class="news-item-meta">
+                    <span class="news-item-date">2026.03.23</span>
+                    <span class="news-badge column">コラム</span>
+                </div>
+                <div class="news-item-body">
+                    <div class="news-item-category">
+                        <img src="https://note.com/favicon.ico" alt="note" onerror="this.style.display='none'">
+                        <span class="news-source-label">note</span>
+                    </div>
+                    <div class="news-item-title">ChatGPTに契約書を貼り付けるのは今すぐやめた方がいい理由</div>
+                </div>
+                <div class="news-item-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+            </a>
+
+        </div>
+        <div class="news-empty" id="newsEmpty" hidden>条件に一致する記事はありません。</div>
+        <div class="news-pagination" id="newsPagination"></div>
+    </div><!-- /.news-page-wrap -->
+
+    <!-- Footer -->
+    <footer class="site-footer">
+        <div class="container footer-container">
+            <div class="footer-brand">
+                <a href="index.html" class="footer-logo"><i class="fa-solid fa-scale-balanced"></i> DIFFsense</a>
+                <p class="footer-tagline">契約書の変更を、<br>見落とさない。</p>
+                <a href="https://x.com/DIFFsense_jp" class="footer-x" target="_blank" rel="noopener" aria-label="DIFFsense公式X" title="DIFFsense公式X">
+                    <span class="x-icon" aria-hidden="true">𝕏</span> @DIFFsense_jp
+                </a>
+            </div>
+            <div class="footer-links">
+                <div class="footer-column">
+                    <h3>サービス</h3>
+                    <a href="index.html#features">機能</a>
+                    <a href="index.html#pricing">料金</a>
+                    <a href="index.html#onboarding">導入サポート</a>
+                </div>
+                <div class="footer-column">
+                    <h3>サポート</h3>
+                    <a href="index.html#faq">よくある質問</a>
+                    <a href="mailto:contact@spacegleam.co.jp">お問い合わせ</a>
+                </div>
+                <div class="footer-column">
+                    <h3>会社情報</h3>
+                    <a href="company.html">会社概要</a>
+                    <a href="law.html">特定商取引法</a>
+                    <a href="terms.html">利用規約</a>
+                    <a href="privacy.html">プライバシーポリシー</a>
+                </div>
+            </div>
+        </div>
+        <div class="footer-copy">
+            <span>© 2026 SpaceGleam Inc.</span>
+            <span>All Rights Reserved.</span>
+        </div>
+    </footer>
+
+    <script>
+        (function () {
+            const listEl = document.querySelector('.news-list');
+            if (!listEl) return;
+
+            const searchInput = document.getElementById('newsSearchInput');
+            const yearSelect = document.getElementById('newsYearSelect');
+            const filterButtons = Array.from(document.querySelectorAll('.news-filter-btn'));
+            const resultMeta = document.getElementById('newsResultMeta');
+            const emptyState = document.getElementById('newsEmpty');
+            const paginationEl = document.getElementById('newsPagination');
+            const perPage = 8;
+            let fixedListHeight = 0;
+
+            const allEntries = Array.from(listEl.querySelectorAll('.news-item')).map((node, index) => {
+                const title = (node.querySelector('.news-item-title')?.textContent || '').trim();
+                const dateText = (node.querySelector('.news-item-date')?.textContent || '').trim();
+                const year = /^\d{4}/.test(dateText) ? dateText.slice(0, 4) : '';
+                const badge = node.querySelector('.news-badge');
+                let type = 'column';
+                if (badge?.classList.contains('media')) type = 'media';
+                if (badge?.classList.contains('update')) type = 'update';
+                const source = (node.querySelector('.news-item-category')?.textContent || '').trim();
+
+                return {
+                    node,
+                    index,
+                    title,
+                    dateText,
+                    year,
+                    type,
+                    searchText: (title + ' ' + source + ' ' + dateText).toLowerCase()
+                };
+            });
+
+            const state = {
+                keyword: '',
+                type: 'all',
+                year: 'all',
+                page: 1
+            };
+
+            const years = Array.from(new Set(allEntries.map((entry) => entry.year).filter(Boolean))).sort((a, b) => Number(b) - Number(a));
+            years.forEach((year) => {
+                const option = document.createElement('option');
+                option.value = year;
+                option.textContent = year + '年';
+                yearSelect.appendChild(option);
+            });
+
+            function pageTokens(totalPages, currentPage) {
+                if (totalPages <= 7) {
+                    return Array.from({ length: totalPages }, (_, i) => i + 1);
+                }
+
+                const tokens = [1];
+                const start = Math.max(2, currentPage - 1);
+                const end = Math.min(totalPages - 1, currentPage + 1);
+
+                if (start > 2) tokens.push('...');
+                for (let page = start; page <= end; page++) {
+                    tokens.push(page);
+                }
+                if (end < totalPages - 1) tokens.push('...');
+                tokens.push(totalPages);
+                return tokens;
+            }
+
+            function mountItems(items) {
+                listEl.innerHTML = '';
+                items.forEach((entry) => {
+                    listEl.appendChild(entry.node);
+                });
+            }
+
+            function estimateFixedListHeight() {
+                const types = ['all', 'media', 'update', 'column'];
+                const yearValues = ['all'].concat(years);
+                let maxHeight = 0;
+
+                types.forEach((type) => {
+                    yearValues.forEach((year) => {
+                        const filtered = allEntries.filter((entry) => {
+                            const typeMatch = type === 'all' || entry.type === type;
+                            const yearMatch = year === 'all' || entry.year === year;
+                            return typeMatch && yearMatch;
+                        });
+
+                        const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+                        for (let page = 1; page <= totalPages; page++) {
+                            const start = (page - 1) * perPage;
+                            const pageItems = filtered.slice(start, start + perPage);
+                            mountItems(pageItems);
+                            maxHeight = Math.max(maxHeight, listEl.offsetHeight);
+                        }
+                    });
+                });
+
+                if (maxHeight > 0) {
+                    fixedListHeight = maxHeight;
+                    listEl.style.minHeight = fixedListHeight + 'px';
+                }
+            }
+
+            function renderPagination(totalPages) {
+                paginationEl.innerHTML = '';
+
+                const prevButton = document.createElement('button');
+                prevButton.type = 'button';
+                prevButton.className = 'news-page-btn';
+                prevButton.textContent = '前へ';
+                prevButton.disabled = totalPages <= 1 || state.page === 1;
+                prevButton.addEventListener('click', function () {
+                    if (state.page > 1) {
+                        state.page -= 1;
+                        render();
+                    }
+                });
+                paginationEl.appendChild(prevButton);
+
+                pageTokens(Math.max(1, totalPages), state.page).forEach((token) => {
+                    if (token === '...') {
+                        const ellipsis = document.createElement('span');
+                        ellipsis.className = 'news-page-ellipsis';
+                        ellipsis.textContent = '...';
+                        paginationEl.appendChild(ellipsis);
+                        return;
+                    }
+
+                    const pageButton = document.createElement('button');
+                    pageButton.type = 'button';
+                    pageButton.className = 'news-page-btn';
+                    if (token === state.page) {
+                        pageButton.classList.add('active');
+                    }
+                    pageButton.textContent = String(token);
+                    pageButton.addEventListener('click', function () {
+                        state.page = token;
+                        render();
+                    });
+                    paginationEl.appendChild(pageButton);
+                });
+
+                const nextButton = document.createElement('button');
+                nextButton.type = 'button';
+                nextButton.className = 'news-page-btn';
+                nextButton.textContent = '次へ';
+                nextButton.disabled = totalPages <= 1 || state.page === totalPages;
+                nextButton.addEventListener('click', function () {
+                    if (state.page < totalPages) {
+                        state.page += 1;
+                        render();
+                    }
+                });
+                paginationEl.appendChild(nextButton);
+            }
+
+            function render() {
+                const keyword = state.keyword.trim().toLowerCase();
+                const filtered = allEntries.filter((entry) => {
+                    const typeMatch = state.type === 'all' || entry.type === state.type;
+                    const yearMatch = state.year === 'all' || entry.year === state.year;
+                    const keywordMatch = !keyword || entry.searchText.includes(keyword);
+                    return typeMatch && yearMatch && keywordMatch;
+                });
+
+                const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+                if (state.page > totalPages) {
+                    state.page = totalPages;
+                }
+
+                const start = (state.page - 1) * perPage;
+                const currentItems = filtered.slice(start, start + perPage);
+                mountItems(currentItems);
+
+                emptyState.hidden = filtered.length !== 0;
+                resultMeta.textContent = filtered.length + '件 / 全' + allEntries.length + '件';
+                renderPagination(totalPages);
+            }
+
+            searchInput.addEventListener('input', function () {
+                state.keyword = searchInput.value;
+                state.page = 1;
+                render();
+            });
+
+            yearSelect.addEventListener('change', function () {
+                state.year = yearSelect.value;
+                state.page = 1;
+                render();
+            });
+
+            filterButtons.forEach((button) => {
+                button.addEventListener('click', function () {
+                    filterButtons.forEach((el) => el.classList.remove('active'));
+                    button.classList.add('active');
+                    state.type = button.dataset.newsType || 'all';
+                    state.page = 1;
+                    render();
+                });
+            });
+
+            estimateFixedListHeight();
+            render();
+        })();
+    </script>
+    <script src="js/main.js"></script>
+</body>
+
+</html>
+
+
