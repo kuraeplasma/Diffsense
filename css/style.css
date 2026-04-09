@@ -5314,3 +5314,18 @@ ul {
         gap: 1rem;
     }
 }
+
+/* iPhone fix: allow hero heading to wrap naturally on narrow real devices */
+.hero-title .hero-title-line {
+    display: inline-block;
+    white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+    .hero-title .hero-title-line {
+        display: inline !important;
+        white-space: normal !important;
+        word-break: normal;
+        overflow-wrap: anywhere;
+    }
+}
