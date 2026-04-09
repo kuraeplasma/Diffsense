@@ -1105,7 +1105,9 @@
             <a href="#" class="footer-logo"><i class="fa-solid fa-scale-balanced"></i> DIFFsense</a>
             <p class="footer-tagline">契約書の変更を、<br>見落とさない。</p>
             <a href="https://x.com/DIFFsense_jp" class="footer-x" target="_blank" rel="noopener" aria-label="DIFFsense公式X" title="DIFFsense公式X">
-                <span class="x-icon" aria-hidden="true">𝕏</span> @DIFFsense_jp
+                <svg class="x-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path fill="currentColor" d="M18.901 1.153h3.68l-8.037 9.188 9.455 12.507h-7.406l-5.8-7.584-6.63 7.584H.48l8.595-9.826L0 1.154h7.594l5.243 6.932zm-1.29 19.491h2.039L6.486 3.735H4.298z"/>
+                </svg>
             </a>
         </div>
         <div class="footer-links">
@@ -1138,6 +1140,10 @@
 <div class="mobile-sticky-cta" aria-label="モバイル固定CTA">
     <a href="login.html?mode=signup" class="btn btn-primary">今すぐ無料で始める</a>
 </div>
+
+<button class="back-to-top-btn" type="button" aria-label="ページ上部に戻る" title="ページ上部に戻る">
+    <i class="fa-solid fa-arrow-up" aria-hidden="true"></i>
+</button>
 
 <script src="js/main.js?v=20260310annualfix2"></script>
 <script>
@@ -1230,6 +1236,38 @@
     }
 
     handleLayoutChange();
+})();
+
+(function() {
+    var footer = document.querySelector('.site-footer');
+    var backToTopBtn = document.querySelector('.back-to-top-btn');
+    if (!footer || !backToTopBtn) return;
+
+    backToTopBtn.addEventListener('click', function() {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    function setFooterVisibleState(isVisible) {
+        document.body.classList.toggle('footer-in-view', isVisible);
+    }
+
+    if ('IntersectionObserver' in window) {
+        var observer = new IntersectionObserver(function(entries) {
+            setFooterVisibleState(entries.some(function(entry) { return entry.isIntersecting; }));
+        }, { threshold: 0.12 });
+        observer.observe(footer);
+        return;
+    }
+
+    function fallbackCheck() {
+        var rect = footer.getBoundingClientRect();
+        var isVisible = rect.top < window.innerHeight && rect.bottom > 0;
+        setFooterVisibleState(isVisible);
+    }
+
+    window.addEventListener('scroll', fallbackCheck, { passive: true });
+    window.addEventListener('resize', fallbackCheck);
+    fallbackCheck();
 })();
 </script>
 </body>

@@ -1707,21 +1707,52 @@ ul {
 .footer-x {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
     margin-top: 4px;
-    color: rgba(197,160,89,0.65);
-    font-size: 14px;
+    color: rgba(255,255,255,0.78);
     text-decoration: none;
     transition: color 0.2s;
 }
 
 .footer-x:hover {
-    color: #EDD060;
+    color: #ffffff;
 }
 
 .x-icon {
-    display: inline-block;
-    font-size: 16px;
+    display: block;
+    width: 18px;
+    height: 18px;
+}
+
+.back-to-top-btn {
+    position: fixed;
+    right: 16px;
+    bottom: calc(env(safe-area-inset-bottom) + 16px);
+    width: 44px;
+    height: 44px;
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.92);
+    color: #f9fafb;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 10px 24px rgba(2, 6, 23, 0.36);
+    cursor: pointer;
+    z-index: 1001;
+    opacity: 0;
+    transform: translateY(12px);
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease, background 0.2s ease;
+}
+
+.back-to-top-btn:hover {
+    background: rgba(15, 23, 42, 1);
+}
+
+body.footer-in-view .back-to-top-btn {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
 }
 
 .footer-copy {
@@ -5186,6 +5217,10 @@ body.has-ticker .header {
         opacity: 1;
         transform: translateY(0);
         pointer-events: auto;
+    }
+
+    body.footer-in-view.has-mobile-sticky-cta.mobile-sticky-cta-visible .back-to-top-btn {
+        bottom: calc(env(safe-area-inset-bottom) + 94px);
     }
 }
 
