@@ -5014,6 +5014,27 @@ body.has-ticker .header {
     background: #c9a84c;
     padding: 3px 9px;
     border-radius: 3px;
+    animation: news-ticker-badge-blink 1s steps(2, end) infinite;
+    box-shadow: 0 0 0 rgba(201, 168, 76, 0);
+}
+
+@keyframes news-ticker-badge-blink {
+    0%,
+    45% {
+        opacity: 1;
+        box-shadow: 0 0 10px rgba(201, 168, 76, 0.65);
+    }
+    50%,
+    100% {
+        opacity: 0.3;
+        box-shadow: 0 0 0 rgba(201, 168, 76, 0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .news-ticker-badge {
+        animation: none;
+    }
 }
 
 /* PC用 */
@@ -5049,6 +5070,10 @@ body.has-ticker .header {
     font-size: 0.65rem;
 }
 
+.news-ticker-link--mobile {
+    display: none;
+}
+
 /* スマホ用スクロールアニメーション */
 .news-ticker-scroll-wrap {
     display: none;
@@ -5081,8 +5106,33 @@ body.has-ticker .header {
     .news-ticker-link--pc {
         display: none;
     }
+    .news-ticker-inner {
+        gap: 0.5rem;
+        padding: 0 0.6rem;
+    }
     .news-ticker-scroll-wrap {
         display: block;
+    }
+    .news-ticker-scroll-track > span {
+        display: inline-block;
+        padding-right: 0.65rem;
+    }
+    .news-ticker-link--mobile {
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.22rem;
+        border: 1.2px solid #1a1a2e;
+        border-radius: 999px;
+        padding: 2px 8px;
+        font-size: 0.68rem;
+        font-weight: 700;
+        color: #1a1a2e;
+        text-decoration: none;
+        white-space: nowrap;
+    }
+    .news-ticker-link--mobile i {
+        font-size: 0.56rem;
     }
 }
 
@@ -5102,6 +5152,41 @@ body.has-ticker .header {
     opacity: 0.75;
     transition: opacity 0.2s;
     z-index: 10;
+}
+
+.mobile-sticky-cta {
+    display: none;
+}
+
+@media (max-width: 767px) {
+    .mobile-sticky-cta {
+        position: fixed;
+        left: 12px;
+        right: 12px;
+        bottom: calc(env(safe-area-inset-bottom) + 10px);
+        z-index: 1002;
+        display: block;
+        opacity: 0;
+        transform: translateY(14px);
+        pointer-events: none;
+        transition: opacity 0.22s ease, transform 0.22s ease;
+    }
+
+    .mobile-sticky-cta .btn {
+        width: 100%;
+        justify-content: center;
+        box-shadow: 0 10px 28px rgba(17, 24, 39, 0.28);
+    }
+
+    body.has-mobile-sticky-cta {
+        padding-bottom: 86px;
+    }
+
+    body.has-mobile-sticky-cta.mobile-sticky-cta-visible .mobile-sticky-cta {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+    }
 }
 
 .hero-scroll-indicator:hover {

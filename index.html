@@ -68,24 +68,27 @@
     <link rel="stylesheet" href="css/dashboard-mockup.css?v=1">
 </head>
 
-<body class="has-ticker">
+<body class="has-ticker has-mobile-sticky-cta">
 
 <!-- News Banner -->
 <div class="news-ticker-bar">
     <div class="news-ticker-inner">
         <span class="news-ticker-badge">NEW</span>
         <!-- PC: 静的テキスト + ボタン -->
-        <span class="news-ticker-text news-ticker-text--pc">PR TIMES掲載：契約書の変更箇所とリスクをAIが自動検出『DIFFsense』提供開始</span>
+        <span class="news-ticker-text news-ticker-text--pc">PR TIMESに掲載されました</span>
         <a href="https://prtimes.jp/main/html/rd/p/000000001.000178766.html" target="_blank" rel="noopener noreferrer" class="news-ticker-link news-ticker-link--pc">
             記事を読む <i class="fa-solid fa-arrow-right"></i>
         </a>
         <!-- スマホ: スクロールアニメーション -->
         <div class="news-ticker-scroll-wrap">
             <a href="https://prtimes.jp/main/html/rd/p/000000001.000178766.html" target="_blank" rel="noopener noreferrer" class="news-ticker-scroll-track">
-                <span>PR TIMES掲載：契約書の変更箇所とリスクをAIが自動検出『DIFFsense』提供開始　　→　　</span>
-                <span aria-hidden="true">PR TIMES掲載：契約書の変更箇所とリスクをAIが自動検出『DIFFsense』提供開始　　→　　</span>
+                <span>PR TIMESに掲載されました → </span>
+                <span aria-hidden="true">PR TIMESに掲載されました → </span>
             </a>
         </div>
+        <a href="https://prtimes.jp/main/html/rd/p/000000001.000178766.html" target="_blank" rel="noopener noreferrer" class="news-ticker-link--mobile">
+            記事を見る <i class="fa-solid fa-arrow-right"></i>
+        </a>
     </div>
 </div>
 
@@ -1132,6 +1135,10 @@
     </div>
 </footer>
 
+<div class="mobile-sticky-cta" aria-label="モバイル固定CTA">
+    <a href="login.html?mode=signup" class="btn btn-primary">今すぐ無料で始める</a>
+</div>
+
 <script src="js/main.js?v=20260310annualfix2"></script>
 <script>
 (function() {
@@ -1188,6 +1195,41 @@
             indicator.style.pointerEvents = '';
         }
     }, { passive: true });
+})();
+
+(function() {
+    var stickyCta = document.querySelector('.mobile-sticky-cta');
+    if (!stickyCta) return;
+
+    var mobileMq = window.matchMedia('(max-width: 767px)');
+    var showAfter = 240;
+
+    function calcShowAfter() {
+        var hero = document.querySelector('.hero');
+        if (!hero) return 240;
+        return Math.max(180, Math.round(hero.offsetHeight * 0.45));
+    }
+
+    function updateStickyCtaVisibility() {
+        var shouldShow = mobileMq.matches && window.scrollY > showAfter;
+        document.body.classList.toggle('mobile-sticky-cta-visible', shouldShow);
+    }
+
+    function handleLayoutChange() {
+        showAfter = calcShowAfter();
+        updateStickyCtaVisibility();
+    }
+
+    window.addEventListener('scroll', updateStickyCtaVisibility, { passive: true });
+    window.addEventListener('resize', handleLayoutChange);
+
+    if (mobileMq.addEventListener) {
+        mobileMq.addEventListener('change', handleLayoutChange);
+    } else if (mobileMq.addListener) {
+        mobileMq.addListener(handleLayoutChange);
+    }
+
+    handleLayoutChange();
 })();
 </script>
 </body>
