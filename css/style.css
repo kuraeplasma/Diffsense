@@ -395,9 +395,7 @@ ul {
 /* Hero Section */
 .hero {
     position: relative;
-    padding: clamp(5.2rem, 8vh, 7rem) 0 clamp(1.6rem, 3.5vh, 2.6rem);
-    min-height: 100vh;
-    min-height: 100dvh;
+    padding: 130px 0 clamp(3rem, 5vh, 4rem);
     display: flex;
     align-items: stretch;
     background: var(--color-bg);
@@ -436,7 +434,7 @@ ul {
     padding-right: clamp(12px, 1.4vw, 30px);
     gap: clamp(0.5rem, 1vw, 1rem);
     justify-content: center;
-    align-items: stretch;
+    align-items: center;
 }
 
 .hero-container.lp-static-layout .hero-content {
@@ -445,7 +443,7 @@ ul {
 
 @media (min-width: 992px) {
     .hero-container.lp-static-layout .hero-content {
-        margin-top: 26px;
+        margin-top: -40px;
     }
 }
 
@@ -461,7 +459,7 @@ ul {
     .hero {
         min-height: auto;
         align-items: flex-start;
-        padding: clamp(4.8rem, 7vh, 5.8rem) 0 clamp(1.8rem, 3vh, 2.6rem);
+        padding: 130px 0 clamp(1.8rem, 3vh, 2.6rem);
     }
 
     /* Single-column layout for 769-1400px: prevents flex overflow */
@@ -521,6 +519,11 @@ ul {
 
     .hero-support-panel {
         min-height: auto;
+    }
+
+    .hero-support-shot .lp-dashboard-screenshot {
+        height: auto;
+        object-fit: contain;
     }
 }
 
@@ -4084,10 +4087,20 @@ ul {
         display: inline !important;
     }
 
-    .hero-support-panel,
-    .hero-support-shot,
+    .hero-support-panel {
+        display: block !important;
+        min-height: auto !important;
+    }
+
+    .hero-support-shot {
+        display: block !important;
+    }
+
     .hero-support-shot .lp-dashboard-screenshot {
-        display: none !important;
+        display: block !important;
+        width: 100% !important;
+        height: auto !important;
+        object-fit: contain !important;
     }
 
     .hero-support-visual.hero-visual.lp-static-visual {
@@ -4886,20 +4899,25 @@ ul {
     }
 }
 
-/* Fix: 1025-1400px hero-support-panel has base min-height:960px causing giant whitespace.
-   Hide the tall panel (same as 769-1024px) and show the hero-visual instead.
+/* Fix: 1025-1400px hero-support-panel: show video with auto height (was hidden to prevent 960px whitespace).
    Also widen the container so the hero title fits on one line. */
 @media (max-width: 1400px) and (min-width: 1025px) {
-    .hero-support-panel,
-    .hero-support-shot,
+    .hero-support-panel {
+        display: block !important;
+        min-height: auto !important;
+    }
+    .hero-support-shot {
+        display: block !important;
+    }
     .hero-support-shot .lp-dashboard-screenshot {
-        display: none !important;
+        display: block !important;
+        height: auto !important;
+        width: 100% !important;
+        object-fit: contain !important;
     }
     .hero-support-visual.hero-visual.lp-static-visual {
         display: block !important;
         min-height: auto !important;
-        max-height: 480px;
-        overflow: hidden;
     }
     /* Widen container and fix font size so 13-char title fits on one line.
        Base .hero-title style comes later in file and overrides the media query
@@ -4955,5 +4973,174 @@ ul {
     .security-grid {
         grid-template-columns: 1fr !important;
         gap: 3rem !important;
+    }
+}
+
+/* ティッカーがある場合のみヘッダーを46px下げる (index.htmlのみ) */
+body.has-ticker .header {
+    top: 46px;
+}
+
+/* News Ticker Banner */
+.news-ticker-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1001;
+    background: #fff;
+    border-bottom: 1px solid #e8e4dc;
+    height: 46px;
+    display: flex;
+    align-items: center;
+}
+
+.news-ticker-inner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 0 1rem;
+    width: 100%;
+    overflow: hidden;
+}
+
+.news-ticker-badge {
+    flex-shrink: 0;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: #fff;
+    background: #c9a84c;
+    padding: 3px 9px;
+    border-radius: 3px;
+}
+
+/* PC用 */
+.news-ticker-text--pc {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: #1a1a2e;
+    white-space: nowrap;
+}
+
+.news-ticker-link--pc {
+    flex-shrink: 0;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #1a1a2e;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    border: 1.5px solid #1a1a2e;
+    padding: 4px 13px;
+    border-radius: 20px;
+    transition: background 0.15s, color 0.15s;
+    white-space: nowrap;
+}
+
+.news-ticker-link--pc:hover {
+    background: #1a1a2e;
+    color: #fff;
+}
+
+.news-ticker-link--pc i {
+    font-size: 0.65rem;
+}
+
+/* スマホ用スクロールアニメーション */
+.news-ticker-scroll-wrap {
+    display: none;
+    flex: 1;
+    overflow: hidden;
+}
+
+@keyframes ticker-scroll {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+}
+
+.news-ticker-scroll-track {
+    display: flex;
+    width: max-content;
+    animation: ticker-scroll 18s linear infinite;
+    text-decoration: none;
+    color: #1a1a2e;
+    font-size: 0.88rem;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.news-ticker-scroll-track:hover {
+    animation-play-state: paused;
+}
+
+@media (max-width: 768px) {
+    .news-ticker-text--pc,
+    .news-ticker-link--pc {
+        display: none;
+    }
+    .news-ticker-scroll-wrap {
+        display: block;
+    }
+}
+
+/* Hero Scroll Indicator */
+.hero-scroll-indicator {
+    position: absolute;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    opacity: 0.75;
+    transition: opacity 0.2s;
+    z-index: 10;
+}
+
+.hero-scroll-indicator:hover {
+    opacity: 1;
+}
+
+.hero-scroll-mouse {
+    width: 26px;
+    height: 40px;
+    border: 2px solid #1a1a2e;
+    border-radius: 13px;
+    display: flex;
+    justify-content: center;
+    padding-top: 6px;
+}
+
+.hero-scroll-dot {
+    width: 4px;
+    height: 8px;
+    background: #c9a84c;
+    border-radius: 2px;
+    animation: scroll-dot 1.6s ease-in-out infinite;
+}
+
+@keyframes scroll-dot {
+    0%   { transform: translateY(0); opacity: 1; }
+    80%  { transform: translateY(12px); opacity: 0; }
+    100% { transform: translateY(0); opacity: 0; }
+}
+
+.hero-scroll-label {
+    font-size: 0.6rem;
+    letter-spacing: 0.18em;
+    color: #1a1a2e;
+    font-weight: 600;
+}
+
+@media (max-width: 1440px) {
+    .hero-scroll-indicator {
+        display: none;
     }
 }

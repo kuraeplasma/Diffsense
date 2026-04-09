@@ -64,9 +64,30 @@
     <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
 
     <!-- Styles -->
-    <link rel="stylesheet" href="css/style.css?v=20260329_mcp_visuals8">
+    <link rel="stylesheet" href="css/style.css?v=20260408_video_resp">
     <link rel="stylesheet" href="css/dashboard-mockup.css?v=1">
 </head>
+
+<body class="has-ticker">
+
+<!-- News Banner -->
+<div class="news-ticker-bar">
+    <div class="news-ticker-inner">
+        <span class="news-ticker-badge">NEW</span>
+        <!-- PC: 静的テキスト + ボタン -->
+        <span class="news-ticker-text news-ticker-text--pc">PR TIMES掲載：契約書の変更箇所とリスクをAIが自動検出『DIFFsense』提供開始</span>
+        <a href="https://prtimes.jp/main/html/rd/p/000000001.000178766.html" target="_blank" rel="noopener noreferrer" class="news-ticker-link news-ticker-link--pc">
+            記事を読む <i class="fa-solid fa-arrow-right"></i>
+        </a>
+        <!-- スマホ: スクロールアニメーション -->
+        <div class="news-ticker-scroll-wrap">
+            <a href="https://prtimes.jp/main/html/rd/p/000000001.000178766.html" target="_blank" rel="noopener noreferrer" class="news-ticker-scroll-track">
+                <span>PR TIMES掲載：契約書の変更箇所とリスクをAIが自動検出『DIFFsense』提供開始　　→　　</span>
+                <span aria-hidden="true">PR TIMES掲載：契約書の変更箇所とリスクをAIが自動検出『DIFFsense』提供開始　　→　　</span>
+            </a>
+        </div>
+    </div>
+</div>
 
 <!-- Header -->
 <header class="header">
@@ -157,6 +178,12 @@
             </div>
         </div>
     </div>
+    <button class="hero-scroll-indicator" onclick="document.getElementById('problem').scrollIntoView({behavior:'smooth'})" aria-label="下にスクロール">
+        <span class="hero-scroll-mouse">
+            <span class="hero-scroll-dot"></span>
+        </span>
+        <span class="hero-scroll-label">SCROLL</span>
+    </button>
 </section>
 
 <!-- Problem & Solution -->
@@ -1147,6 +1174,20 @@
     } else {
         initAccordion();
     }
+})();
+
+(function() {
+    var indicator = document.querySelector('.hero-scroll-indicator');
+    if (!indicator) return;
+    window.addEventListener('scroll', function() {
+        if (window.scrollY > 80) {
+            indicator.style.opacity = '0';
+            indicator.style.pointerEvents = 'none';
+        } else {
+            indicator.style.opacity = '';
+            indicator.style.pointerEvents = '';
+        }
+    }, { passive: true });
 })();
 </script>
 </body>
