@@ -76,6 +76,15 @@ body {
     display: none !important;
 }
 
+.sp-br {
+    display: none;
+}
+@media (max-width: 768px) {
+    .sp-br {
+        display: inline;
+    }
+}
+
 @media (max-width: 768px) {
     .mobile-only {
         display: block !important;
@@ -5194,7 +5203,7 @@ body.has-ticker .header {
         position: fixed;
         left: 12px;
         right: 12px;
-        bottom: calc(env(safe-area-inset-bottom) + 10px);
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 10px + var(--vv-offset, 0px));
         z-index: 1002;
         display: block;
         opacity: 0;
@@ -5220,7 +5229,7 @@ body.has-ticker .header {
     }
 
     body.footer-in-view.has-mobile-sticky-cta.mobile-sticky-cta-visible .back-to-top-btn {
-        bottom: calc(env(safe-area-inset-bottom) + 94px);
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 94px + var(--vv-offset, 0px));
     }
 }
 
