@@ -1713,23 +1713,53 @@ ul {
     color: #EDD060;
 }
 
-.footer-x {
+.footer-social {
     display: inline-flex;
     align-items: center;
+    gap: 14px;
     margin-top: 4px;
+}
+
+.footer-social-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     color: rgba(255,255,255,0.78);
     text-decoration: none;
-    transition: color 0.2s;
+    transition: color 0.2s, opacity 0.2s;
+}
+
+.footer-social-link:hover {
+    color: #ffffff;
+    opacity: 1;
+}
+
+.footer-x {
+    opacity: 0.9;
 }
 
 .footer-x:hover {
-    color: #ffffff;
+    opacity: 1;
 }
 
 .x-icon {
     display: block;
     width: 18px;
     height: 18px;
+}
+
+.footer-note {
+    opacity: 0.9;
+}
+
+.footer-note:hover {
+    opacity: 1;
+}
+
+.note-icon {
+    display: block;
+    width: 24px;
+    height: 24px;
 }
 
 .back-to-top-btn {
