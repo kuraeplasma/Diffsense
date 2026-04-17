@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>プラン選択 - DIFFsense</title>
+    <script src="js/attribution.js?v=20260417a"></script>
 
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=AW-17941578077"></script>
@@ -426,6 +427,24 @@
         let authResolved = false;
         let authResolvePromise = null;
         let authResolveFunc = null;
+        const appendAttributionParams = (url) => {
+            if (window.DiffsenseAttribution && typeof window.DiffsenseAttribution.appendAttributionParams === 'function') {
+                return window.DiffsenseAttribution.appendAttributionParams(url, ['gclid', 'wbraid', 'gbraid']);
+            }
+
+            const targetUrl = new URL(url, window.location.origin);
+            ['gclid', 'wbraid', 'gbraid'].forEach((key) => {
+                const storageKey = `attr_${key}`;
+                const value =
+                    targetUrl.searchParams.get(key) ||
+                    localStorage.getItem(storageKey) ||
+                    sessionStorage.getItem(storageKey);
+                if (value) {
+                    targetUrl.searchParams.set(key, value);
+                }
+            });
+            return targetUrl.toString();
+        };
 
         authResolvePromise = new Promise(resolve => {
             authResolveFunc = resolve;
@@ -472,7 +491,7 @@
 
             if (selectedPlan === 'free') {
                 // Freeプランなら決済不要なのでサンクスへ
-                window.location.replace(`${window.location.origin}/thanks-signup.html?next=dashboard`);
+                window.location.replace(appendAttributionParams(`${window.location.origin}/thanks-signup.html?next=dashboard`));
             } else {
                 try {
                     const apiBase = getApiBaseUrl();

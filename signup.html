@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Redirecting...</title>
     <link rel="icon" type="image/png" href="favicon2.png?v=2">
+    <script src="js/attribution.js?v=20260417a"></script>
 
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=AW-17941578077"></script>
@@ -18,6 +19,25 @@
 
     <script>
         // 無料登録導線はFree開始に変更
+        const appendAttributionParams = (url) => {
+            if (window.DiffsenseAttribution && typeof window.DiffsenseAttribution.appendAttributionParams === 'function') {
+                return window.DiffsenseAttribution.appendAttributionParams(url, ['gclid', 'wbraid', 'gbraid']);
+            }
+
+            const targetUrl = new URL(url, window.location.origin);
+            ['gclid', 'wbraid', 'gbraid'].forEach((key) => {
+                const storageKey = `attr_${key}`;
+                const value =
+                    targetUrl.searchParams.get(key) ||
+                    localStorage.getItem(storageKey) ||
+                    sessionStorage.getItem(storageKey);
+                if (value) {
+                    targetUrl.searchParams.set(key, value);
+                }
+            });
+            return targetUrl.toString();
+        };
+
         const params = new URLSearchParams(window.location.search);
         const billing = params.get('billing') === 'annual' ? 'annual' : 'monthly';
         localStorage.setItem('diffsense_selected_plan', 'free');
@@ -25,7 +45,7 @@
         localStorage.setItem('diffsense_signup_flow', '1');
         localStorage.removeItem('diffsense_trial_expired_flow');
         localStorage.removeItem('diffsense_trial_expired');
-        window.location.replace("login.html?tab=signup");
+        window.location.replace(appendAttributionParams(`login.html?tab=signup&billing=${billing}`));
     </script>
 </head>
 

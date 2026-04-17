@@ -35,6 +35,38 @@ function normalizeBillingCycle(value) {
     return value === 'annual' ? 'annual' : 'monthly';
 }
 
+function getStoredAttributionValue(key) {
+    const storageKey = `attr_${key}`;
+    try {
+        const localValue = localStorage.getItem(storageKey);
+        if (localValue) return localValue;
+    } catch (_) {
+        // Ignore localStorage access errors.
+    }
+    try {
+        const sessionValue = sessionStorage.getItem(storageKey);
+        if (sessionValue) return sessionValue;
+    } catch (_) {
+        // Ignore sessionStorage access errors.
+    }
+    return '';
+}
+
+function appendAttributionParams(url) {
+    if (window.DiffsenseAttribution && typeof window.DiffsenseAttribution.appendAttributionParams === 'function') {
+        return window.DiffsenseAttribution.appendAttributionParams(url, ['gclid', 'wbraid', 'gbraid']);
+    }
+
+    const targetUrl = new URL(url, window.location.origin);
+    ['gclid', 'wbraid', 'gbraid'].forEach((key) => {
+        const value = targetUrl.searchParams.get(key) || getStoredAttributionValue(key);
+        if (value) {
+            targetUrl.searchParams.set(key, value);
+        }
+    });
+    return targetUrl.toString();
+}
+
 function getPasswordResetContinueUrl() {
     return `${window.location.origin}/login.html?tab=login`;
 }
@@ -181,9 +213,9 @@ function redirectToThanksSignup() {
     const selectedBillingCycle = normalizeBillingCycle(localStorage.getItem('diffsense_selected_billing_cycle'));
     
     if (selectedPlan === 'free') {
-        window.location.replace(`thanks-signup.html?next=dashboard&billing=${selectedBillingCycle}`);
+        window.location.replace(appendAttributionParams(`thanks-signup.html?next=dashboard&billing=${selectedBillingCycle}`));
     } else {
-        window.location.replace(`thanks-plan.html?plan=${selectedPlan}&billing=${selectedBillingCycle}`);
+        window.location.replace(appendAttributionParams(`thanks-plan.html?plan=${selectedPlan}&billing=${selectedBillingCycle}`));
     }
 }
 
