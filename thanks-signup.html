@@ -279,10 +279,12 @@
     <!-- Google Ads Conversion Tag (Double-firing prevention) -->
     <script>
         (function () {
-            const KEY = 'ads_conversion_fired';
+            const params = new URLSearchParams(window.location.search);
+            const clickId = params.get('gclid') || params.get('wbraid') || params.get('gbraid') || 'no_click_id';
+            const KEY = `ads_conversion_fired_${clickId}`;
 
             if (sessionStorage.getItem(KEY)) {
-                console.log('already fired');
+                console.log('already fired for click id:', clickId);
                 return;
             }
 
@@ -297,7 +299,7 @@
                 'currency': 'JPY'
             });
 
-            console.log('Google Ads conversion tag fired.');
+            console.log('Google Ads conversion tag fired. click id:', clickId);
 
             sessionStorage.setItem(KEY, 'true');
         })();
