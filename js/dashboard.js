@@ -744,19 +744,22 @@ const renderStructuredDiffView = (previousContent, currentContent, options = {})
         const clauseId = `${idPrefix}-clause-${index}`;
 
         return `
-            <article class="clause-card diff-card structured-diff-card" id="${clauseId}">
-                <div class="clause-header diff-header">
+            <details class="clause-card diff-card structured-diff-card" id="${clauseId}" open>
+                <summary class="clause-header diff-header">
                     <span class="clause-num">${escapeHtmlText(fullClauseTitle)}</span>
-                </div>
+                    <span class="clause-toggle-icon"><i class="fa-solid fa-chevron-down"></i></span>
+                </summary>
                 <div class="diff-compare structured-diff-grid">
                     <div class="diff-old structured-diff-pane">
+                        <div class="version-label">変更前</div>
                         <div class="diff-text structured-diff-text">${previousHtml}</div>
                     </div>
                     <div class="diff-new structured-diff-pane">
+                        <div class="version-label">変更後</div>
                         <div class="diff-text structured-diff-text">${currentHtml}</div>
                     </div>
                 </div>
-            </article>
+            </details>
         `;
     };
 
@@ -787,11 +790,15 @@ const renderStructuredDiffView = (previousContent, currentContent, options = {})
         </div>
     `;
 
-    return `
-        <div class="contract-structured-container structured-diff-shell">
-            ${navHtml}
-            <div class="clause-cards-container structured-diff-stack">
-                ${cards}
+        return `
+            <div class="contract-structured-container structured-diff-shell">
+                <button class="mobile-clause-nav-fab mobile-only" type="button" onclick="window.app?.toggleMobileClauseNav(this)" aria-label="条文目次">
+                    <i class="fa-solid fa-list-ul"></i>
+                    <span>条文</span>
+                </button>
+                ${navHtml}
+                <div class="clause-cards-container structured-diff-stack">
+                    ${cards}
                 <div style="height: 40px; flex-shrink: 0;"></div>
             </div>
         </div>
@@ -1013,12 +1020,13 @@ const renderStructuredView = (content, idPrefix = 'clause') => {
 
             const fullClauseTitle = composeClauseHeading(c.title, c.header);
             return `
-                        <article class="clause-card" id="${idPrefix}-clause-${i}">
-                            <div class="clause-header">
+                        <details class="clause-card" id="${idPrefix}-clause-${i}" open>
+                            <summary class="clause-header">
                                 <span class="clause-num">${fullClauseTitle}</span>
-                            </div>
+                                <span class="clause-toggle-icon"><i class="fa-solid fa-chevron-down"></i></span>
+                            </summary>
                             <div class="clause-body">${pTags}</div>
-                        </article>
+                        </details>
                     `;
         }).join('')}
                 <div style="height: 40px; flex-shrink: 0;"></div> <!-- Bottom spacer -->
@@ -1027,6 +1035,10 @@ const renderStructuredView = (content, idPrefix = 'clause') => {
 
         return `
             <div class="contract-structured-container">
+                <button class="mobile-clause-nav-fab mobile-only" type="button" onclick="window.app?.toggleMobileClauseNav(this)" aria-label="条文目次">
+                    <i class="fa-solid fa-list-ul"></i>
+                    <span>条文</span>
+                </button>
                 ${navHtml}
                 ${cardsHtml}
             </div>
@@ -1709,35 +1721,75 @@ const Views = {
                 ? mergeStructuredChangesWithAnalysis(structuredFallbackAnalysis?.changes, diffData.changes)
                 : diffData.changes
         );
-        const changesHtml = (displayChanges.length > 0 ? displayChanges : []).map(c => `
-            <div style="margin-bottom: 24px; border:1px solid #eee; border-radius:4px; overflow:hidden;">
-                <div style="background:#f0f0f0; padding:8px 12px; font-weight:600; font-size:12px; border-bottom:1px solid #eee;">
-                    ${c.section} <span style="font-weight:normal; color:#666; margin-left:8px;">(${(() => {
+        const changesHtml = (displayChanges.length > 0 ? displayChanges : []).map((c) => {
+            const changeType = (() => {
                 const t = String(c.type || '').toUpperCase();
                 if (t === 'ADD') return '追加';
                 if (t === 'DELETE') return '削除';
                 return '変更';
-            })()})</span>
+            })();
+            const oldText = escapeHtmlText(typeof c.old === 'string' ? c.old : JSON.stringify(c.old || ''));
+            const newText = escapeHtmlText(typeof c.new === 'string' ? c.new : JSON.stringify(c.new || ''));
+            return `
+            <article class="mobile-change-card">
+                <div class="mobile-change-card-header">
+                    <span>${escapeHtmlText(c.section || '変更点')}</span>
+                    <span>${changeType}</span>
                 </div>
-                <div class="diff-container" style="height:auto; min-height:100px;">
-                    <div class="diff-pane diff-left"><span class="diff-del">${typeof c.old === 'string' ? c.old : JSON.stringify(c.old)}</span></div>
-                    <div class="diff-pane diff-right"><span class="diff-add">${typeof c.new === 'string' ? c.new : JSON.stringify(c.new)}</span></div>
+                <div class="diff-container mobile-diff-stack" style="height:auto; min-height:100px;">
+                    <div class="diff-pane diff-left">
+                        <div class="diff-pane-label">変更前</div>
+                        <span class="diff-del">${oldText || '（該当なし）'}</span>
+                    </div>
+                    <div class="diff-pane diff-right">
+                        <div class="diff-pane-label">変更後</div>
+                        <span class="diff-add">${newText || '（該当なし）'}</span>
+                    </div>
                 </div>
                 ${(c.impact || c.concern) ? `
-                <div style="background:#fff8e1; padding:10px 12px; border-top:1px solid #ffeeba; font-size:12px; color:#5c3a00;">
-                    ${c.impact ? `<div style="margin-bottom:4px;"><strong><i class="fa-solid fa-scale-balanced"></i> 法的影響:</strong> ${c.impact}</div>` : ''}
-                    ${c.concern ? `<div><strong><i class="fa-solid fa-triangle-exclamation"></i> 懸念点:</strong> ${c.concern}</div>` : ''}
+                <div class="mobile-change-impact">
+                    ${c.impact ? `<div><strong><i class="fa-solid fa-scale-balanced"></i> 法的影響:</strong> ${escapeHtmlText(c.impact)}</div>` : ''}
+                    ${c.concern ? `<div><strong><i class="fa-solid fa-triangle-exclamation"></i> 懸念点:</strong> ${escapeHtmlText(c.concern)}</div>` : ''}
                 </div>
                 ` : ''}
-            </div>
-    `).join('');
+            </article>
+        `;
+        }).join('');
+
+        const mobileRiskTone = diffData.riskLevel >= 3 ? 'high' : (diffData.riskLevel >= 2 ? 'medium' : 'low');
+        const mobileRiskLabel = diffData.riskLevel >= 3 ? 'High' : (diffData.riskLevel >= 2 ? 'Medium' : 'Low');
+        const mobilePrimaryAction = (() => {
+            if (!window.app.can('operate_contract')) return null;
+            if (!hasAIResults && contract.status === '未解析') {
+                return {
+                    label: 'リスク解析する',
+                    icon: 'fa-wand-magic-sparkles',
+                    action: `window.app.confirmReanalyze('${contract.id}')`
+                };
+            }
+            if (contract.status === '未確認') {
+                return {
+                    label: '確認済みにする',
+                    icon: 'fa-check',
+                    action: `window.app.confirmContract(${id})`
+                };
+            }
+            return {
+                label: '署名判断へ',
+                icon: 'fa-file-signature',
+                action: "window.app.navigate('sign')"
+            };
+        })();
 
         return `
             <div class="detail-split-container">
                 <!-- Breadcrumb & Top Actions -->
+                <div class="mobile-only" style="padding:8px 14px;background:#fff;border-bottom:1px solid #eee;">
+                    <button onclick="window.app.navigate('contracts')" style="display:inline-flex;align-items:center;gap:6px;background:none;border:none;color:#5e544d;font-size:13px;cursor:pointer;padding:6px 0;font-weight:600;"><i class="fa-solid fa-chevron-left"></i> 書類一覧へ戻る</button>
+                </div>
                 <div class="detail-split-header flex justify-between items-center">
                     <div class="detail-header-main">
-                        <a onclick="window.app.navigate('dashboard')" style="color:#666; font-size:12px; cursor:pointer;" title="戻る">
+                        <a onclick="window.app.navigate('contracts')" style="color:#666; font-size:12px; cursor:pointer;" title="戻る">
                             <i class="fa-solid fa-arrow-left"></i>
                         </a>
                         <div class="detail-header-title-wrap">
@@ -1762,36 +1814,42 @@ const Views = {
                     </div>
                 </div>
 
+                <section class="mobile-risk-sticky mobile-risk-${mobileRiskTone} mobile-only" aria-label="リスク判定">
+                    <div class="mobile-risk-row">
+                        <span class="mobile-risk-pill">${mobileRiskLabel}</span>
+                        <span class="mobile-risk-reason">${escapeHtmlText(diffData.riskReason || 'リスク判定を確認してください')}</span>
+                    </div>
+                    <div class="mobile-risk-summary-label">AI要約</div>
+                    <div class="mobile-risk-summary">${escapeHtmlText(diffData.summary || 'AI要約はまだありません。')}</div>
+                </section>
+
                 <div class="detail-split-body">
                     <!-- Left Pane: Analysis & Diffs -->
                     <div class="pane">
                         <div class="pane-header" style="min-height:56px; box-sizing:border-box;">
                             <span><i class="fa-solid fa-magnifying-glass-chart"></i> AI解析・差分判定</span>
                             <button id="btn-reanalyze" class="btn-upload-version" onclick="window.app.confirmReanalyze('${contract.id}')">
-                                <i class="fa-solid fa-wand-magic-sparkles"></i>リスク解析をする
+                                <i class="fa-solid fa-wand-magic-sparkles"></i>リスク解析
                             </button>
                         </div>
                         <div class="pane-scroll-area">
-                            ${hasAIResults ? `
-                            <div class="analysis-section-title" style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
-                                <span><i class="fa-solid fa-robot text-primary"></i> AIリスク要約</span>
-                                ${canTriggerPairAnalysis && shouldAutoPairAnalysis ? `
-                                    <span style="font-size:12px; color:${isAutoPairAnalysisPending ? '#0f766e' : '#64748b'};">
-                                        <i class="fa-solid ${isAutoPairAnalysisPending ? 'fa-spinner fa-spin' : 'fa-circle-check'}"></i>
-                                        ${isAutoPairAnalysisPending ? '自動解析を実行中...' : '自動解析キュー済み'}
-                                    </span>
+                            <!-- Desktop Analysis visibility -->
+                            <div class="desktop-only">
+                                ${hasAIResults ? `
+                                <div class="analysis-section-title">
+                                    <span><i class="fa-solid fa-robot text-primary"></i> AIリスク要約</span>
+                                </div>
+                                <div style="margin-bottom:24px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:16px;">
+                                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+                                        <span class="badge ${diffData.riskLevel >= 3 ? 'badge-danger' : diffData.riskLevel >= 2 ? 'badge-warning' : 'badge-success'}">
+                                            ${diffData.riskLevel >= 3 ? 'High' : diffData.riskLevel >= 2 ? 'Medium' : 'Low'}
+                                        </span>
+                                        <span style="font-size:12px; color:#666;">${diffData.riskReason || ''}</span>
+                                    </div>
+                                    <div style="font-size:13px; color:#333; line-height:1.7; white-space:pre-wrap;">${diffData.summary || 'AI解析結果がありません'}</div>
+                                </div>
                                 ` : ''}
                             </div>
-                            <div style="margin-bottom:24px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:16px;">
-                                <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
-                                    <span class="badge ${diffData.riskLevel >= 3 ? 'badge-danger' : diffData.riskLevel >= 2 ? 'badge-warning' : 'badge-success'}">
-                                        ${diffData.riskLevel >= 3 ? 'High' : diffData.riskLevel >= 2 ? 'Medium' : 'Low'}
-                                    </span>
-                                    <span style="font-size:12px; color:#666;">${diffData.riskReason || ''}</span>
-                                </div>
-                                <div style="font-size:13px; color:#333; line-height:1.7; white-space:pre-wrap;">${diffData.summary || 'AI解析結果がありません'}</div>
-                            </div>
-                            ` : ''}
 
                             ${hasComparableVersion ? `
 
@@ -2045,10 +2103,10 @@ const Views = {
                             const renderDualFullDiff = () => {
                                 const lhsText = isPdfSource ? normalizePdfDisplayText(previousVersionText) : previousVersionText;
                                 const rhsText = isPdfSource ? normalizePdfDisplayText(currentVersionText) : currentVersionText;
-                                if (!window.Diff || typeof window.Diff.diffWordsWithSpace !== 'function') {
-                                    return `
+                            if (!window.Diff || typeof window.Diff.diffWordsWithSpace !== 'function') {
+                                return `
                                     <div class="document-content-diff-wrap">
-                                        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:12px;">
+                                        <div class="dual-full-diff-grid">
                                             <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px;">
                                                 <div style="font-size:12px; font-weight:700; color:#b42318; margin-bottom:8px;">変更前（旧版全文）</div>
                                                 <div style="white-space:pre-wrap; line-height:1.9;">${escapeHtmlText(lhsText)}</div>
@@ -2080,7 +2138,7 @@ const Views = {
 
                                 return `
                                 <div class="document-content-diff-wrap">
-                                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:12px;">
+                                    <div class="dual-full-diff-grid">
                                         <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px;">
                                             <div style="font-size:12px; font-weight:700; color:#b42318; margin-bottom:8px;">変更前（旧版全文）</div>
                                             <div style="white-space:pre-wrap; line-height:1.9;">${oldHtml}</div>
@@ -2130,7 +2188,7 @@ const Views = {
                                 : (comparisonContext?.currentLabel || '比較先資料');
                             return `
                                 <div class="document-content-diff-wrap">
-                                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:12px;">
+                                    <div class="dual-full-diff-grid">
                                         <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px;">
                                             <div style="font-size:12px; font-weight:700; color:#667085; margin-bottom:8px;">${escapeHtmlText(fallbackPreviousLabel)}</div>
                                             <div style="white-space:pre-wrap; line-height:1.9;">${escapeHtmlText(fallbackPreviousText || '比較元データなし')}</div>
@@ -2152,6 +2210,14 @@ const Views = {
                 </div>`
             }
             </div>
+            ${mobilePrimaryAction ? `
+                <div class="mobile-decision-bar mobile-only">
+                    <button class="mobile-decision-primary" type="button" onclick="${mobilePrimaryAction.action}">
+                        <i class="fa-solid ${mobilePrimaryAction.icon}"></i>
+                        <span>${mobilePrimaryAction.label}</span>
+                    </button>
+                </div>
+            ` : ''}
         </div>
 `;
     },
@@ -3648,7 +3714,7 @@ class DashboardApp {
     updateActiveMenu(viewId = this.currentView) {
         const groupedViewId = ['sign', 'sign-editor', 'sign-recipient', 'sign-viewer'].includes(viewId)
             ? 'sign'
-            : viewId;
+            : viewId === 'diff' ? 'contracts' : viewId;
         const navItems = document.querySelectorAll('.nav-item');
         navItems.forEach((item) => item.classList.remove('active'));
         navItems.forEach((item) => {
@@ -3656,6 +3722,46 @@ class DashboardApp {
             if (onclick.includes(`navigate('${groupedViewId}')`)) {
                 item.classList.add('active');
             }
+        });
+
+        document.querySelectorAll('.mobile-bottom-nav .bottom-nav-item').forEach((item) => {
+            const targetView = item.getAttribute('data-mobile-view');
+            item.classList.toggle('active', targetView === groupedViewId);
+        });
+    }
+
+    toggleMobileMenu(forceOpen = null) {
+        const panel = document.getElementById('mobile-menu-panel');
+        if (!panel) return;
+
+        const shouldOpen = typeof forceOpen === 'boolean'
+            ? forceOpen
+            : !panel.classList.contains('is-open');
+
+        panel.classList.toggle('is-open', shouldOpen);
+        document.querySelectorAll('.mobile-menu-button, #bnav-menu').forEach((button) => {
+            button.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+        });
+    }
+
+    closeMobileMenu() {
+        this.toggleMobileMenu(false);
+    }
+
+    syncContractsInBackground(onSynced) {
+        if (!this.contractSyncPromise) {
+            this.contractSyncPromise = dbService.syncContractsFromApi()
+                .catch((error) => {
+                    console.warn('Background contract sync failed:', error);
+                    return null;
+                })
+                .finally(() => {
+                    this.contractSyncPromise = null;
+                });
+        }
+
+        this.contractSyncPromise.then((contracts) => {
+            if (contracts) onSynced?.(contracts);
         });
     }
 
@@ -4979,6 +5085,44 @@ class DashboardApp {
             overlay.addEventListener('click', closeSidebar);
         }
 
+        if (!this.mobileBottomNavBound) {
+            this.mobileBottomNavBound = true;
+            document.addEventListener('click', (event) => {
+                const button = event.target?.closest?.('.mobile-bottom-nav .bottom-nav-item');
+                if (!button) return;
+
+                const view = button.getAttribute('data-mobile-view');
+                const action = button.getAttribute('data-mobile-action');
+                if (!view && !action) return;
+
+                event.preventDefault();
+                event.stopPropagation();
+
+                if (view) {
+                    this.closeMobileMenu();
+                    this.navigate(view);
+                    return;
+                }
+
+                if (action === 'register') {
+                    if (!this.can('operate_contract')) {
+                        Notify.warning('閲覧のみの権限では新規登録できません');
+                        return;
+                    }
+                    if (this.registration && typeof this.registration.open === 'function') {
+                        this.registration.open();
+                        return;
+                    }
+                    document.getElementById('open-registration-btn')?.click();
+                    return;
+                }
+
+                if (action === 'menu') {
+                    this.toggleMobileMenu();
+                }
+            });
+        }
+
         // URL Modal Submit Binding
         const submitUrlBtn = document.getElementById('submit-url-btn');
         if (submitUrlBtn) {
@@ -5029,11 +5173,16 @@ class DashboardApp {
         }
 
         if (viewId === 'sign') {
-            await dbService.syncContractsFromApi();
+            this.renderInitialSkeleton('sign');
             console.trace('Routing to sign');
             const { SignUI } = await import('./sign-ui.js?v=20260407_final_v10');
             this.mainContent.innerHTML = await SignUI.renderSignView(this);
             SignUI.refreshList(this);
+            this.syncContractsInBackground(() => {
+                if (this.currentView === 'sign') {
+                    SignUI.refreshList(this);
+                }
+            });
             return;
         }
 
@@ -5071,9 +5220,14 @@ class DashboardApp {
         }
 
         if (viewId === 'deadlines') {
-            await dbService.syncContractsFromApi();
-            this.mainContent.innerHTML = this.renderDeadlinesView(params && typeof params === 'object' ? params : {});
+            const deadlineParams = params && typeof params === 'object' ? params : {};
+            this.mainContent.innerHTML = this.renderDeadlinesView(deadlineParams);
             this.updateDeadlinesBadge();
+            this.syncContractsInBackground(() => {
+                if (this.currentView !== 'deadlines') return;
+                this.mainContent.innerHTML = this.renderDeadlinesView(deadlineParams);
+                this.updateDeadlinesBadge();
+            });
             return;
         }
 
@@ -5083,9 +5237,6 @@ class DashboardApp {
         }
 
         let renderParams = params;
-        if (viewId === 'dashboard' || viewId === 'contracts') {
-            await dbService.syncContractsFromApi();
-        }
         if (viewId === 'contracts') {
             renderParams = {
                 page: this.currentPage,
@@ -5122,6 +5273,7 @@ class DashboardApp {
                 .then(() => {
                     if (this.currentView === 'diff' && this.activeDetailTab === 'diff') {
                         try {
+                            window.scrollTo(0, 0);
                             this.mainContent.innerHTML = Views.diff(this.currentViewParams);
                             this.resetDetailPaneScroll();
                             this.enforceDetailScrollLayout();
@@ -5202,6 +5354,19 @@ class DashboardApp {
                 }
                 if (viewId === 'dashboard' || viewId === 'history') {
                     this.cacheRecentHistorySnapshot();
+                }
+
+                if (viewId === 'dashboard' || viewId === 'contracts') {
+                    const syncedViewId = viewId;
+                    const syncedRenderParams = renderParams;
+                    this.syncContractsInBackground(() => {
+                        if (this.currentView !== syncedViewId || !Views[syncedViewId]) return;
+                        this.mainContent.innerHTML = Views[syncedViewId](syncedRenderParams);
+                        this.enforceDetailScrollLayout();
+                        if (syncedViewId === 'dashboard') {
+                            this.cacheRecentHistorySnapshot();
+                        }
+                    });
                 }
 
                 if (viewId === 'contracts' && this.filters.query) {
@@ -5478,6 +5643,10 @@ class DashboardApp {
         const behavior = options.behavior || 'smooth';
         const target = document.getElementById(clauseId);
         if (!target) return;
+        document.querySelectorAll('.clause-nav.is-open').forEach((nav) => nav.classList.remove('is-open'));
+        document.querySelectorAll('.mobile-clause-nav-fab[aria-expanded="true"]').forEach((button) => {
+            button.setAttribute('aria-expanded', 'false');
+        });
         // Cancel pending auto-reset timers once user explicitly navigates by clause.
         this.detailResetToken = 0;
         this.clauseNavManualTargetId = clauseId;
@@ -5503,6 +5672,23 @@ class DashboardApp {
         this.setActiveClauseNavItem(clauseId);
     }
 
+    toggleMobileClauseNav(trigger) {
+        const root = trigger?.closest('.contract-structured-container') || document.querySelector('.contract-structured-container');
+        const nav = root ? root.querySelector('.clause-nav') : null;
+        if (!nav) return;
+
+        const willOpen = !nav.classList.contains('is-open');
+        document.querySelectorAll('.clause-nav.is-open').forEach((openNav) => {
+            if (openNav !== nav) openNav.classList.remove('is-open');
+        });
+        document.querySelectorAll('.mobile-clause-nav-fab[aria-expanded="true"]').forEach((button) => {
+            if (button !== trigger) button.setAttribute('aria-expanded', 'false');
+        });
+
+        nav.classList.toggle('is-open', willOpen);
+        if (trigger) trigger.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+    }
+
     enforceDetailScrollLayout() {
         if (!this.mainContent) return;
 
@@ -5513,6 +5699,58 @@ class DashboardApp {
             this.mainContent.style.height = '';
             this.mainContent.style.overflowY = '';
             this.mainContent.style.overflowX = '';
+            return;
+        }
+
+        const isMobileDetailLayout = typeof window.matchMedia === 'function'
+            && window.matchMedia('(max-width: 1024px)').matches;
+        if (isMobileDetailLayout) {
+            this.mainContent.style.display = 'block';
+            this.mainContent.style.flexDirection = '';
+            this.mainContent.style.minHeight = '';
+            this.mainContent.style.height = 'auto';
+            this.mainContent.style.overflowY = 'visible';
+            this.mainContent.style.overflowX = 'hidden';
+
+            const detailContainer = this.mainContent.querySelector('.detail-split-container');
+            if (detailContainer) {
+                detailContainer.style.display = 'block';
+                detailContainer.style.flexDirection = '';
+                detailContainer.style.flex = '';
+                detailContainer.style.minHeight = '';
+                detailContainer.style.height = 'auto';
+            }
+
+            const detailBody = this.mainContent.querySelector('.detail-split-body');
+            if (detailBody) {
+                detailBody.style.display = 'block';
+                detailBody.style.flex = '';
+                detailBody.style.minHeight = '';
+                detailBody.style.height = 'auto';
+                detailBody.style.overflow = 'visible';
+            }
+
+            this.mainContent.querySelectorAll('.detail-split-body .pane').forEach((pane) => {
+                pane.style.display = 'flex';
+                pane.style.flexDirection = 'column';
+                pane.style.flex = 'none';
+                pane.style.minHeight = '';
+                pane.style.overflow = 'visible';
+            });
+
+            this.mainContent.querySelectorAll('.pane-scroll-area').forEach((area) => {
+                area.style.display = 'block';
+                area.style.flex = 'none';
+                area.style.overflowY = 'visible';
+                area.style.overflowX = 'hidden';
+                area.style.minHeight = '';
+                area.style.height = 'auto';
+                area.style.scrollPaddingTop = '120px';
+            });
+
+            this.mainContent.querySelectorAll('.clause-card').forEach((card) => {
+                card.style.scrollMarginTop = '150px';
+            });
             return;
         }
 
