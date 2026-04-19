@@ -12,23 +12,15 @@ const DASHBOARD_CACHE_KEYS = {
 };
 
 // MCP: URL Resolution helper for Claude/Cursor
-const PROD_API_BASE_URL = 'https://api-qf37m5ba2q-an.a.run.app';
+// The OAuth discovery (.well-known/oauth-authorization-server) issuer is https://diffsense.spacegleam.co.jp/
+// So the correct MCP URL for Claude must always be https://diffsense.spacegleam.co.jp/mcp
+const PROD_MCP_PUBLIC_URL = 'https://diffsense.spacegleam.co.jp/mcp';
 
-function resolveDashboardMcpUrl(apiBase) {
-    const currentHost = (typeof window !== 'undefined' && window.location)
-        ? window.location.hostname
-        : '';
-    const isLocal = currentHost === 'localhost' || currentHost === '127.0.0.1';
-    
-    let base = apiBase || '';
-    if (isLocal || !base || base.includes('localhost')) {
-        // LocalhostではClaude Webが接続できないため、常に本番APIベースを使用する（本番同様の動作）
-        base = PROD_API_BASE_URL;
-    }
-    
-    // Specifications: Claude Web requires HTTPS. Force upgrade protocol.
-    const url = base.replace(/^http:/, 'https:');
-    return `${url.replace(/\/$/, '')}/api/mcp`;
+function resolveDashboardMcpUrl() {
+    // Always return the public production URL.
+    // Netlify proxies /mcp/* to the backend API transparently.
+    // This must match the OAuth issuer in /.well-known/oauth-authorization-server.
+    return PROD_MCP_PUBLIC_URL;
 }
 
 const SCRIPT_LOAD_CACHE = new Map();
