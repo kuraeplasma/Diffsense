@@ -83,8 +83,20 @@
   force = true
 
 [[redirects]]
+  from = "/authorize/*"
+  to = "https://api-qf37m5ba2q-an.a.run.app/authorize/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/token"
   to = "https://api-qf37m5ba2q-an.a.run.app/token"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/token/*"
+  to = "https://api-qf37m5ba2q-an.a.run.app/token/:splat"
   status = 200
   force = true
 
@@ -110,4 +122,28 @@
   from = "/mcp/*"
   to = "https://api-qf37m5ba2q-an.a.run.app/mcp/:splat"
   status = 200
+  force = true
+
+[[redirects]]
+  from = "/package.json"
+  to = "/404.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/package-lock.json"
+  to = "/404.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/.env"
+  to = "/404.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/.git/*"
+  to = "/404.html"
+  status = 404
   force = true
