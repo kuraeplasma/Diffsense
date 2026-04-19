@@ -28,113 +28,32 @@
         rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
     <style>
-        /* Document/Binder Style Override */
+        *, *::before, *::after { box-sizing: border-box; }
+
         body {
-            background-color: #f7f3f0;
-            background-image: none;
-            /* Removed pattern as requested */
+            background-color: #f4f1ed;
             font-family: var(--font-body);
+            min-height: 100vh;
+            margin: 0;
         }
 
-        /* The "Binder" Card */
         .auth-card {
             background: #fff;
-            padding: 3.2rem 2.6rem 2.6rem 4.6rem;
-            border-radius: 4px 12px 12px 4px;
-            box-shadow:
-                -1px 0 0 #e2ddd9,
-                -2px 0 0 #fcfaf7,
-                -3px 0 5px rgba(0, 0, 0, 0.05),
-                10px 20px 40px rgba(0, 0, 0, 0.08);
+            padding: 2.8rem 2.6rem 2.4rem;
+            border-radius: 16px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
             width: 100%;
-            max-width: 480px;
-            min-height: 760px;
-            height: 760px;
-            /* Keep login/signup card size stable on desktop */
-            border-right: 2px solid rgba(197, 160, 89, 0.2);
+            max-width: 440px;
             position: relative;
             display: flex;
             flex-direction: column;
-            overflow: hidden;
-            filter: drop-shadow(0 8px 16px rgba(23, 20, 15, 0.08));
         }
 
-        /* Binder Spine (Black/Dark Grey for Professional Look) */
-        .auth-card::before {
-            content: "";
-            position: absolute;
-            left: 0;
-            top: 0;
-            bottom: 0;
-            width: 45px;
-            background: linear-gradient(to right, #2a2a2a, #1a1a1a);
-            border-radius: 4px 0 0 4px;
-            box-shadow: inset -1px 0 2px rgba(255, 255, 255, 0.1), inset -2px 0 5px rgba(0, 0, 0, 0.5);
-            border-left: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        /* Binder Holes */
-        .binder-holes {
-            position: absolute;
-            left: 12px;
-            top: 0;
-            bottom: 0;
-            display: flex;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-evenly;
-            height: 100%;
-            z-index: 2;
-        }
-
-        /* Realistic 3D Rings */
-        .hole {
-            width: 50px;
-            /* Span across spine and paper */
-            height: 10px;
-            /* Thickness of the ring wire */
-            background: linear-gradient(to bottom, #9fa4a7 0%, #f5f5f5 40%, #f5f5f5 60%, #7f8c8d 100%);
-            /* Metallic Gradient */
-            border-radius: 2px;
-            box-shadow: 0 3px 5px rgba(0, 0, 0, 0.4);
-            position: relative;
-            margin-left: 0;
-            z-index: 5;
-        }
-
-        /* Hole in the Spine (Dark) */
-        .hole::before {
-            content: "";
-            position: absolute;
-            left: -4px;
-            top: -3px;
-            width: 16px;
-            height: 16px;
-            background: #111;
-            /* Dark hole */
-            border-radius: 50%;
-            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.8), 0 1px 0 rgba(255, 255, 255, 0.1);
-            z-index: -1;
-        }
-
-        /* Hole in the Paper (White) */
-        .hole::after {
-            content: "";
-            position: absolute;
-            right: -4px;
-            top: -3px;
-            width: 16px;
-            height: 16px;
-            background: #fdfcfb;
-            /* Match paper bg */
-            border-radius: 50%;
-            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.15), 0 1px 0 #fff;
-            z-index: -1;
-        }
+        .auth-card::before { display: none; }
+        .binder-holes { display: none; }
 
         /* Center the Auth Card */
         .auth-container {
-            flex: 1;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -397,51 +316,58 @@
             }
         }
 
+        /* ── 全サイズ共通：上下中央 ── */
+        .auth-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 2rem 1.2rem;
+        }
+
+        /* ── Tablet (〜768px) ── */
+        @media (max-width: 768px) {
+            .auth-card { max-width: 400px; }
+        }
+
+        /* ── Mobile (〜640px) ── */
         @media (max-width: 640px) {
             .auth-card {
-                height: auto;
-                min-height: 650px;
-                padding: 3.2rem 1.6rem 2.4rem 3.8rem;
+                padding: 2rem 1.4rem 1.8rem;
+                border-radius: 14px;
+                box-shadow: 0 2px 16px rgba(0, 0, 0, 0.07);
             }
-
-            .auth-tabs {
-                gap: 1.1rem;
-            }
-
-            .signup-trust-inline {
-                font-size: 0.68rem;
-            }
-        }
-        .tos-agreement {
-            margin: 1.2rem 0;
-            display: flex;
-            align-items: flex-start;
-            gap: 10px;
-            font-size: 0.82rem;
-            color: #6e6254;
-            cursor: pointer;
-            user-select: none;
-            line-height: 1.5;
-            text-align: left;
+            .auth-tabs { gap: 1.1rem; }
+            .auth-logo { font-size: 1.5rem; margin-bottom: 1.4rem; }
+            .form-input { font-size: 16px; padding: 0.75rem; }
+            .google-auth-btn { padding: 0.75rem; font-size: 0.9rem; }
+            .signup-trust-inline { font-size: 0.68rem; }
         }
 
-        .tos-agreement input {
-            margin-top: 3px;
-            cursor: pointer;
-            accent-color: #c5a059;
-            width: 16px;
-            height: 16px;
-            flex-shrink: 0;
+        /* ── Small Mobile (〜390px) ── */
+        @media (max-width: 390px) {
+            .auth-card { padding: 1.6rem 1.1rem 1.4rem; border-radius: 12px; }
+            .auth-logo { font-size: 1.3rem; margin-bottom: 1.1rem; }
+            .form-group { margin-bottom: 1.1rem; }
         }
 
-        .tos-agreement a {
+        /* タブ切り替え時にカード高さが変わらないよう固定 */
+        .auth-views-wrapper {
+            position: relative;
+            min-height: 390px; /* 新規登録ビュー（より背が高い方）に合わせる */
+        }
+        #view-login, #view-signup { width: 100%; }
+
+        .tos-note {
+            margin-top: 0.7rem;
+            font-size: 0.75rem;
+            color: #999;
+            text-align: center;
+            line-height: 1.6;
+        }
+        .tos-note a {
             color: #c5a059;
             text-decoration: underline;
-            font-weight: 600;
-        }
-
-        .tos-agreement a:hover {
-            color: #8a6a2d;
         }
     </style>
     <meta name="description" content="DIFFsenseにログインして、契約書・利用規約の変更をAIで自動検知。">
@@ -477,71 +403,64 @@
                 <div class="auth-tab active" id="tab-signup" onclick="switchTab('signup')">新規登録</div>
             </div>
 
-            <!-- LOGIN VIEW -->
-            <div id="view-login" style="display: none;">
-                <form id="login-form">
-                    <div class="form-group">
-                        <label class="form-label" for="login-email">メールアドレス</label>
-                        <div class="input-wrapper">
-                            <input type="email" id="login-email" class="form-input" required
-                                placeholder="example@email.com">
+            <div class="auth-views-wrapper">
+                <!-- LOGIN VIEW -->
+                <div id="view-login" style="display: none;">
+                    <form id="login-form">
+                        <div class="form-group">
+                            <label class="form-label" for="login-email">メールアドレス</label>
+                            <div class="input-wrapper">
+                                <input type="email" id="login-email" class="form-input" required>
+                            </div>
                         </div>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label" for="login-password">パスワード</label>
-                        <div class="input-wrapper">
-                            <input type="password" id="login-password" class="form-input" required
-                                placeholder="••••••••">
-                            <i class="fa-solid fa-eye-slash toggle-password" data-target="login-password"></i>
+                        <div class="form-group">
+                            <label class="form-label" for="login-password">パスワード</label>
+                            <div class="input-wrapper">
+                                <input type="password" id="login-password" class="form-input" required>
+                                <i class="fa-solid fa-eye-slash toggle-password" data-target="login-password"></i>
+                            </div>
+                            <div style="margin-top: 0.55rem; text-align: right;">
+                                <a href="#" id="forgot-password-link"
+                                    style="font-size: 0.82rem; color: #8a6a2d; text-decoration: underline;">パスワードをお忘れですか？</a>
+                            </div>
                         </div>
-                        <div style="margin-top: 0.55rem; text-align: right;">
-                            <a href="#" id="forgot-password-link"
-                                style="font-size: 0.82rem; color: #8a6a2d; text-decoration: underline;">パスワードをお忘れですか？</a>
-                        </div>
-                    </div>
-                    <button type="button" class="google-auth-btn" id="login-google-btn">
-                        <i class="fa-brands fa-google"></i> Googleでログイン
-                    </button>
-                    <button type="submit" class="btn full-width" id="login-btn"
-                        style="margin-top: 0.7rem; border-radius: 8px; padding: 0.98rem 1rem; background: #c5a059; color: #fff; border: none; font-weight: 700;">ログイン</button>
-                </form>
-            </div>
+                        <button type="button" class="google-auth-btn" id="login-google-btn">
+                            <i class="fa-brands fa-google"></i> Googleでログイン
+                        </button>
+                        <button type="submit" class="btn full-width" id="login-btn"
+                            style="margin-top: 0.7rem; border-radius: 8px; padding: 0.98rem 1rem; background: #c5a059; color: #fff; border: none; font-weight: 700;">ログイン</button>
+                    </form>
+                </div>
 
-            <!-- SIGNUP VIEW -->
-            <div id="view-signup">
-                <form id="signup-form">
-                    <div class="form-group">
-                        <label class="form-label" for="signup-email">メールアドレス</label>
-                        <div class="input-wrapper">
-                            <input type="email" id="signup-email" class="form-input" required
-                                placeholder="example@email.com">
+                <!-- SIGNUP VIEW -->
+                <div id="view-signup">
+                    <form id="signup-form">
+                        <div class="form-group">
+                            <label class="form-label" for="signup-email">メールアドレス</label>
+                            <div class="input-wrapper">
+                                <input type="email" id="signup-email" class="form-input" required>
+                            </div>
                         </div>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label" for="signup-password">パスワード</label>
-                        <div class="input-wrapper">
-                            <input type="password" id="signup-password" class="form-input" required placeholder="6文字以上"
-                                minlength="6">
-                            <i class="fa-solid fa-eye-slash toggle-password" data-target="signup-password"></i>
+                        <div class="form-group">
+                            <label class="form-label" for="signup-password">パスワード</label>
+                            <div class="input-wrapper">
+                                <input type="password" id="signup-password" class="form-input" required minlength="6">
+                                <i class="fa-solid fa-eye-slash toggle-password" data-target="signup-password"></i>
+                            </div>
                         </div>
-                    </div>
-                    <button type="button" class="google-auth-btn" id="signup-google-btn">
-                        <i class="fa-brands fa-google"></i> Googleで無料登録
-                    </button>
-                    <div class="tos-agreement">
-                        <input type="checkbox" id="signup-tos" required>
-                        <label for="signup-tos">
-                            <a href="terms.html" target="_blank">利用規約</a> と <a href="privacy.html" target="_blank">プライバシーポリシー</a> に同意して、DIFFsenseを利用します。
-                        </label>
-                    </div>
-                    <button type="submit" class="btn full-width" id="signup-btn"
-                        style="margin-top: 0.7rem; border-radius: 8px; padding: 0.98rem 1rem; background: #c5a059; color: #fff; border: none; font-weight: 700;">無料で始める</button>
-                    <p class="signup-trust-inline">ずっと無料 ・ カード不要 ・ いつでも解約可能 ・ AI学習不使用</p>
-                </form>
+                        <button type="button" class="google-auth-btn" id="signup-google-btn">
+                            <i class="fa-brands fa-google"></i> Googleで今すぐ始める
+                        </button>
+                        <button type="submit" class="btn full-width" id="signup-btn"
+                            style="margin-top: 0.7rem; border-radius: 8px; padding: 0.98rem 1rem; background: #c5a059; color: #fff; border: none; font-weight: 700;">無料で使ってみる</button>
+                        <p class="tos-note">登録することで<a href="terms.html" target="_blank">利用規約</a>と<a href="privacy.html" target="_blank">プライバシーポリシー</a>に同意したことになります</p>
+                        <p class="signup-trust-inline">ずっと無料 ・ カード不要 ・ いつでも解約可能 ・ AI学習不使用</p>
+                    </form>
+                </div>
             </div>
 
             <div class="auth-links">
-                <a href="index.html" class="back-link">← 書類を閉じてトップページへ</a>
+                <a href="index.html" class="back-link">← サービス紹介ページへ戻る</a>
             </div>
         </div>
     </div>
@@ -631,16 +550,6 @@
             const btn = document.getElementById('signup-btn');
             const email = document.getElementById('signup-email').value;
             const password = document.getElementById('signup-password').value;
-            const tosCheckbox = document.getElementById('signup-tos');
-
-            if (!tosCheckbox.checked) {
-                if (typeof Notify !== 'undefined') {
-                    Notify.error('利用規約とプライバシーポリシーへの同意が必要です');
-                } else {
-                    alert('利用規約とプライバシーポリシーに同意してください');
-                }
-                return;
-            }
 
             btn.classList.add('btn-loading');
             try {
@@ -655,15 +564,6 @@
         });
 
         document.getElementById('signup-google-btn').addEventListener('click', async () => {
-            const tosCheckbox = document.getElementById('signup-tos');
-            if (!tosCheckbox.checked) {
-                if (typeof Notify !== 'undefined') {
-                    Notify.error('利用規約とプライバシーポリシーへの同意が必要です');
-                } else {
-                    alert('利用規約とプライバシーポリシーに同意してください');
-                }
-                return;
-            }
             await handleGoogleLogin('signup');
         });
 
