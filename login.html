@@ -524,6 +524,9 @@
             document.getElementById('view-signup').style.display = 'none';
         } else if (urlParams.get('mode') === 'signup' || urlParams.get('tab') === 'signup') {
             switchTab('signup');
+            // 新規登録専用モード：タブを非表示にして新規登録のみ表示
+            document.querySelector('.auth-tabs').style.display = 'none';
+            document.getElementById('view-login').style.display = 'none';
         }
     </script>
     <!-- Auth Logic -->
