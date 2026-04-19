@@ -2355,7 +2355,7 @@ const Views = {
                         </div>
 
                         <div style="margin-bottom:18px; padding:14px 16px; border-radius:14px; background:linear-gradient(135deg,#f8fafc 0%,#ffffff 100%); border:1px solid #e2e8f0;">
-                            <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:12px;">
+                            <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:16px;">
                                 ${[
             { step: '1', title: '残数確認', text: '上限枠と利用残数を確認' },
             { step: '2', title: '一覧取得', text: 'ID と契約名を確認' },
@@ -2373,7 +2373,7 @@ const Views = {
                                     <div style="display:flex; align-items:center; gap:8px;">
                                         <div style="flex-shrink:0; width:28px; height:28px; border-radius:50%; background:${c.bg}; color:${c.color}; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">${item.step}</div>
                                         <div style="min-width:0;">
-                                            <div style="font-size:12px; font-weight:800; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${item.title}</div>
+                                            <div style="font-size:12px; font-weight:800; color:#0f172a;">${item.title}</div>
                                             <div style="font-size:10px; color:#64748b; line-height:1.3; margin-top:2px;">${item.text}</div>
                                         </div>
                                     </div>
