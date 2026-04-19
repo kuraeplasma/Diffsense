@@ -91,13 +91,13 @@
 [[redirects]]
   from = "/token"
   to = "https://api-qf37m5ba2q-an.a.run.app/token"
-  status = 200
+  status = 307
   force = true
 
 [[redirects]]
   from = "/token/*"
   to = "https://api-qf37m5ba2q-an.a.run.app/token/:splat"
-  status = 200
+  status = 307
   force = true
 
 [[redirects]]

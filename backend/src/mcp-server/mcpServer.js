@@ -305,7 +305,7 @@ function createMcpAuthRouter() {
     return mcpAuthRouter({
         provider: oauthProvider,
         issuerUrl: publicMcpOrigin,
-        baseUrl: publicMcpOrigin,
+        baseUrl: backendBaseUrl,
         resourceServerUrl,
         scopesSupported: ['mcp:tools'],
         resourceName: 'DIFFsense MCP',
