@@ -2350,7 +2350,7 @@ const Views = {
                         <div style="margin-bottom:18px;">
                             <div>
                                 <h4 style="margin:0 0 6px; font-size:14px; font-weight:800; color:#0f172a; text-transform:uppercase; letter-spacing:0.05em;">利用可能なツール（AIが実行可能）</h4>
-                                <p style="margin:0; font-size:12px; line-height:1.6; color:#64748b;">Claude や Cursor から呼ばれるのはこの4機能だけです。</p>
+                                <p style="margin:0; font-size:12px; line-height:1.6; color:#64748b;">Claude や Cursor から呼ばれるのはこの4機能です。</p>
                             </div>
                         </div>
 
