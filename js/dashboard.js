@@ -2350,16 +2350,17 @@ const Views = {
                         <div style="margin-bottom:18px;">
                             <div>
                                 <h4 style="margin:0 0 6px; font-size:14px; font-weight:800; color:#0f172a; text-transform:uppercase; letter-spacing:0.05em;">利用可能なツール（AIが実行可能）</h4>
-                                <p style="margin:0; font-size:12px; line-height:1.6; color:#64748b;">Claude や Cursor から呼ばれるのはこの3機能だけです。</p>
+                                <p style="margin:0; font-size:12px; line-height:1.6; color:#64748b;">Claude や Cursor から呼ばれるのはこの4機能だけです。</p>
                             </div>
                         </div>
 
                         <div style="margin-bottom:18px; padding:14px 16px; border-radius:14px; background:linear-gradient(135deg,#f8fafc 0%,#ffffff 100%); border:1px solid #e2e8f0;">
-                            <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:12px;">
+                            <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:12px;">
                                 ${[
             { step: '1', title: '一覧を取る', text: 'ID と契約名を確認' },
             { step: '2', title: '単体解析', text: '1通だけのリスクを確認' },
-            { step: '3', title: '差分比較', text: '変更点を確認' }
+            { step: '3', title: '差分比較', text: '変更点を確認' },
+            { step: '4', title: '残数確認', text: '上限枠と利用残数を確認' }
         ].map(item => `
                                     <div style="display:flex; align-items:center; gap:10px;">
                                         <div style="width:28px; height:28px; border-radius:50%; background:#1e293b; color:#fff; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800;">${item.step}</div>
