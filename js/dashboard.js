@@ -2361,15 +2361,24 @@ const Views = {
             { step: '2', title: '一覧取得', text: 'ID と契約名を確認' },
             { step: '3', title: '単体解析', text: '1通だけのリスクを確認' },
             { step: '4', title: '差分比較', text: '変更点を確認' }
-        ].map(item => `
-                                    <div style="display:flex; align-items:center; gap:10px;">
-                                        <div style="width:28px; height:28px; border-radius:50%; background:#1e293b; color:#fff; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800;">${item.step}</div>
-                                        <div>
-                                            <div style="font-size:12px; font-weight:800; color:#0f172a;">${item.title}</div>
-                                            <div style="font-size:11px; color:#64748b;">${item.text}</div>
+        ].map((item, i) => {
+            const colors = [
+                { bg: '#fee2e2', color: '#b91c1c' }, // 赤系（残数）
+                { bg: '#dbeafe', color: '#1d4ed8' }, // 青系（一覧）
+                { bg: '#dcfce7', color: '#15803d' }, // 緑系（単体）
+                { bg: '#ffedd5', color: '#c2410c' }  // 橙系（差分）
+            ];
+            const c = colors[i];
+            return `
+                                    <div style="display:flex; align-items:center; gap:8px;">
+                                        <div style="flex-shrink:0; width:28px; height:28px; border-radius:50%; background:${c.bg}; color:${c.color}; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">${item.step}</div>
+                                        <div style="min-width:0;">
+                                            <div style="font-size:12px; font-weight:800; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${item.title}</div>
+                                            <div style="font-size:10px; color:#64748b; line-height:1.3; margin-top:2px;">${item.text}</div>
                                         </div>
                                     </div>
-                                `).join('')}
+                                `;
+        }).join('')}
                             </div>
                         </div>
                     </div>
