@@ -1799,13 +1799,10 @@ const Views = {
         return `
             <div class="detail-split-container">
                 <!-- Breadcrumb & Top Actions -->
-                <div class="mobile-only" style="padding:8px 14px;background:#fff;border-bottom:1px solid #eee;">
-                    <button onclick="window.app.navigate('contracts')" style="display:inline-flex;align-items:center;gap:6px;background:none;border:none;color:#5e544d;font-size:13px;cursor:pointer;padding:6px 0;font-weight:600;"><i class="fa-solid fa-chevron-left"></i> 書類一覧へ戻る</button>
-                </div>
                 <div class="detail-split-header flex justify-between items-center">
                     <div class="detail-header-main">
-                        <a onclick="window.app.navigate('contracts')" style="color:#666; font-size:12px; cursor:pointer;" title="戻る">
-                            <i class="fa-solid fa-arrow-left"></i>
+                        <a onclick="window.app.navigate('contracts')" style="display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:50%; background:#f8fafc; color:#5e544d; font-size:14px; cursor:pointer;" title="戻る">
+                            <i class="fa-solid fa-chevron-left"></i>
                         </a>
                         <div class="detail-header-title-wrap">
                             <h2 style="font-size:18px; font-weight:700; color:var(--text-main); margin:0;">${diffData.title}</h2>
@@ -1845,7 +1842,8 @@ const Views = {
                     <div class="pane">
                         <div class="pane-header" style="min-height:56px; box-sizing:border-box;">
                             <span><i class="fa-solid fa-magnifying-glass-chart"></i> AI解析・差分判定</span>
-                            <button id="btn-reanalyze" class="btn-upload-version" onclick="window.app.confirmReanalyze('${contract.id}')">
+                            ${mobilePrimaryAction ? `<button class="btn-dashboard btn-primary-action mobile-only" onclick="${mobilePrimaryAction.action}" style="padding:6px 12px; font-size:12px; margin-left:auto;"><i class="fa-solid ${mobilePrimaryAction.icon}"></i> ${mobilePrimaryAction.label}</button>` : ''}
+                            <button id="btn-reanalyze" class="btn-upload-version desktop-only" onclick="window.app.confirmReanalyze('${contract.id}')" style="margin-left: ${mobilePrimaryAction ? '8px' : 'auto'}">
                                 <i class="fa-solid fa-wand-magic-sparkles"></i>リスク解析
                             </button>
                         </div>
@@ -1868,7 +1866,7 @@ const Views = {
                                 ` : ''}
                             </div>
 
-                            ${hasComparableVersion ? `
+                            ${(hasComparableVersion || hasAIResults) ? `
 
                             ${(contract.expiry_date || contract.renewal_deadline || contract.contract_category) ? (() => {
                                 const fmtDate = (d) => {
@@ -1912,18 +1910,18 @@ const Views = {
                                 </div>`;
                             })() : ''}
 
-                            <div class="analysis-section-title">
-                                <i class="fa-solid fa-circle-exclamation text-warning"></i> 検知された重要な変更点
-                            </div>
-                            <div style="margin-bottom:32px;">
-                                ${changesHtml || `<div style="padding:20px; text-align:center; color:#999; font-size:13px;">変更点は検知されませんでした</div>`}
-                            </div>
                             ` : `
-                            <div style="padding:32px 20px; text-align:center; color:#999;">
-                                <i class="fa-solid fa-code-compare" style="font-size:32px; margin-bottom:12px; display:block; opacity:0.3;"></i>
-                                <div style="font-size:14px;">差分はまだありません</div>
-                                <div style="font-size:12px; margin-top:6px;">新バージョンをアップロードすると差分解析とリスク解析と期限取得が開始されます</div>
-                                <div style="font-size:12px; margin-top:4px;">「リスク解析をする」をクリックでリスク解析と期限取得が開始されます</div>
+                            <div style="padding:40px 20px; text-align:center; color:#999;">
+                                <i class="fa-solid fa-file-invoice" style="font-size:32px; margin-bottom:16px; display:block; opacity:0.1;"></i>
+                                <div style="font-size:14px; color:#666;">ドキュメントを読み込みました</div>
+                                ${!hasComparableVersion ? `
+                                <div style="font-size:12px; margin-top:8px; line-height:1.6; color:#999;">
+                                    この書類の新しいバージョンをアップロードすると、<br>
+                                    AIが自動的に差分を解析し、リスクや変更点を抽出します。
+                                </div>
+                                ` : `
+                                <div style="font-size:12px; margin-top:8px;">AI解析データがありません</div>
+                                `}
                             </div>
                             `}
                         </div>
@@ -2227,14 +2225,7 @@ const Views = {
                 </div>`
             }
             </div>
-            ${mobilePrimaryAction ? `
-                <div class="mobile-decision-bar mobile-only">
-                    <button class="mobile-decision-primary" type="button" onclick="${mobilePrimaryAction.action}">
-                        <i class="fa-solid ${mobilePrimaryAction.icon}"></i>
-                        <span>${mobilePrimaryAction.label}</span>
-                    </button>
-                </div>
-            ` : ''}
+            </div>
         </div>
 `;
     },

@@ -107,6 +107,30 @@
         <i class="fa-solid fa-plus"></i> 新規登録
     </button>
 
+    <!-- Mobile Header (スマホ専用) -->
+    <header class="mobile-header mobile-only">
+        <button class="mobile-menu-button" id="bnav-menu" onclick="window.app?.toggleMobileMenu()" aria-expanded="false" aria-label="メニュー">
+            <i class="fa-solid fa-bars"></i>
+        </button>
+        <span class="mobile-header-logo"><i class="fa-solid fa-scale-balanced"></i> DIFFsense</span>
+        <button class="mobile-register-btn" onclick="if(window.app?.can('operate_contract')){window.app.registration?.open()}else{window.Notify?.warning('閲覧のみの権限では新規登録できません')}" aria-label="新規登録">
+            <i class="fa-solid fa-plus"></i> 新規登録
+        </button>
+    </header>
+
+    <!-- Mobile Menu Panel (スマホ専用) -->
+    <div id="mobile-menu-panel" class="mobile-menu-panel mobile-only" aria-hidden="true">
+        <div class="mobile-menu-inner">
+            <div class="mobile-menu-item" onclick="window.app?.navigate('history');window.app?.closeMobileMenu()"><i class="fa-solid fa-clock-rotate-left"></i> 解析履歴</div>
+            <div class="mobile-menu-item" onclick="window.app?.navigate('deadlines');window.app?.closeMobileMenu()"><i class="fa-solid fa-calendar-days"></i> 期限・アラート管理</div>
+            <div class="mobile-menu-item" onclick="window.app?.navigate('plan');window.app?.closeMobileMenu()"><i class="fa-solid fa-credit-card"></i> プラン管理</div>
+            <div class="mobile-menu-item" onclick="window.app?.navigate('notifications');window.app?.closeMobileMenu()"><i class="fa-solid fa-bell"></i> 通知設定</div>
+            <div class="mobile-menu-item" onclick="window.app?.navigate('mcp');window.app?.closeMobileMenu()"><i class="fa-solid fa-plug"></i> MCP連携</div>
+            <div class="mobile-menu-divider"></div>
+            <div class="mobile-menu-item" id="mobile-logout-btn"><i class="fa-solid fa-arrow-right-from-bracket"></i> ログアウト</div>
+        </div>
+    </div>
+
     <!-- Main Content -->
     <main id="app-main">
         <!-- Dynamic Content Area -->
@@ -300,6 +324,7 @@
 
         // Logout Binding
         document.getElementById('logout-btn').addEventListener('click', handleLogout);
+        document.getElementById('mobile-logout-btn')?.addEventListener('click', handleLogout);
     </script>
     <!-- Signature Upload Modal -->
     <div id="sign-upload-overlay" class="sign-modal-overlay" style="display:none;" onclick="window.signUI.closeSignUploadModal()"></div>
@@ -344,6 +369,30 @@
             </div>
         </div>
     </div>
+
+    <!-- Mobile Bottom Nav (スマホ専用) -->
+    <nav class="mobile-bottom-nav mobile-only" aria-label="ボトムナビゲーション">
+        <button class="bottom-nav-item" data-mobile-view="dashboard">
+            <i class="fa-solid fa-house"></i>
+            <span>ホーム</span>
+        </button>
+        <button class="bottom-nav-item" data-mobile-view="contracts">
+            <i class="fa-solid fa-file-lines"></i>
+            <span>書類</span>
+        </button>
+        <button class="bottom-nav-item bottom-nav-fab" data-mobile-action="register">
+            <span class="bottom-nav-fab-inner"><i class="fa-solid fa-plus"></i></span>
+            <span>登録</span>
+        </button>
+        <button class="bottom-nav-item" data-mobile-view="sign">
+            <i class="fa-solid fa-file-signature"></i>
+            <span>著名</span>
+        </button>
+        <button class="bottom-nav-item" id="bnav-menu-bottom" data-mobile-action="menu">
+            <i class="fa-solid fa-ellipsis"></i>
+            <span>メニュー</span>
+        </button>
+    </nav>
 </body>
 
 </html>
