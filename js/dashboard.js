@@ -1580,7 +1580,7 @@ const Views = {
             && selectedTargetDoc
             && hasStructuredDifferences
         );
-        const activeTab = window.app ? window.app.activeDetailTab : 'diff';
+        const requestedActiveTab = window.app ? window.app.activeDetailTab : 'diff';
         const runtimePdfUrl = window.app?.getRuntimePdfPreviewUrl(id) || null;
         const resolvedPdfPreviewUrl = resolvePdfPreviewUrl(contract, runtimePdfUrl);
         const sourceType = String(contract?.source_type || '').toUpperCase();
@@ -1592,6 +1592,9 @@ const Views = {
         // AI解析結果があればそれを使用、なければ静的コンテンツまたはデフォルト
         const hasComparableVersion = documentOptions.length >= 2;
         const hasAIResults = Boolean(contract.ai_summary || contract.summary || (Array.isArray(contract.ai_changes) && contract.ai_changes.length > 0));
+        // 単独ドキュメント（比較なし・AI未解析）はdiffタブを非表示にする（commit 2f88c39の修正を復元）
+        const shouldHideDiffTab = !comparisonContext && !hasComparableVersion && !hasAIResults;
+        const activeTab = shouldHideDiffTab ? 'original' : requestedActiveTab;
         const canTriggerPairAnalysis = Boolean(selectedSourceDoc && selectedTargetDoc && window.app?.can('operate_contract'));
 
         let diffData;
@@ -1772,7 +1775,7 @@ const Views = {
         const mobileRiskLabel = diffData.riskLevel >= 3 ? 'High' : (diffData.riskLevel >= 2 ? 'Medium' : 'Low');
         const mobilePrimaryAction = (() => {
             if (!window.app.can('operate_contract')) return null;
-            if (!hasAIResults && contract.status === '未解析') {
+            if (!hasAIResults) {
                 return {
                     label: 'リスク解析する',
                     icon: 'fa-wand-magic-sparkles',
@@ -1826,6 +1829,7 @@ const Views = {
                     </div>
                 </div>
 
+                ${hasAIResults ? `
                 <section class="mobile-risk-sticky mobile-risk-${mobileRiskTone} mobile-only" aria-label="リスク判定">
                     <div class="mobile-risk-row">
                         <span class="mobile-risk-pill">${mobileRiskLabel}</span>
@@ -1834,6 +1838,7 @@ const Views = {
                     <div class="mobile-risk-summary-label">AI要約</div>
                     <div class="mobile-risk-summary">${escapeHtmlText(diffData.summary || 'AI要約はまだありません。')}</div>
                 </section>
+                ` : ''}
 
                 <div class="detail-split-body">
                     <!-- Left Pane: Analysis & Diffs -->
@@ -1984,7 +1989,7 @@ const Views = {
                             </button>` : ''}
                         </div>
                         <div class="tabs-row">
-                            <button class="tab-item ${activeTab === 'diff' ? 'active' : ''}" onclick="window.app.setDetailTab('diff')">差分表示</button>
+                            ${!shouldHideDiffTab ? `<button class="tab-item ${activeTab === 'diff' ? 'active' : ''}" onclick="window.app.setDetailTab('diff')">差分表示</button>` : ''}
                             <button class="tab-item ${activeTab === 'original' ? 'active' : ''}" onclick="window.app.setDetailTab('original')">原本全文</button>
                         </div>
                         <div class="pane-scroll-area ${showPdfViewerInRightPane ? '' : 'document-pane-bg is-frameless'}" style="padding:0; flex:1; display:flex; flex-direction:column; overflow-y:auto;">
