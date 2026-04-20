@@ -2626,7 +2626,7 @@ class RegistrationFlow {
                 
 <div class="reg-actions">
     <button class="btn-dashboard" onclick="window.app.registration.nextStep(1)">戻る</button>
-    <button class="btn-dashboard btn-primary-action" onclick="window.app.registration.submit()">解析・登録する</button>
+    <button class="btn-dashboard btn-primary-action" onclick="window.app.registration.submit()">登録する</button>
 </div>
 `;
         } else if (this.currentStep === 3) {
