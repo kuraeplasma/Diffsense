@@ -11,6 +11,7 @@ const dbService = require('../services/db');
 const { toLegacyArticleArray, fromLegacyArticleArray } = require('../services/contractStructure');
 const logger = require('../utils/logger');
 const crypto = require('crypto');
+const stringSimilarity = require('string-similarity');
 
 router.get('/', async (req, res, next) => {
     try {
