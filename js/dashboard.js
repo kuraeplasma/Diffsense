@@ -1660,7 +1660,7 @@ const Views = {
                         <div class="pane-scroll-area">
                             <!-- Desktop Analysis visibility -->
                             <div class="desktop-only">
-                                ${contract.ai_limited ? `
+                                ${contract.ai_limited === true ? `
                                 <div style="background: linear-gradient(135deg, #fffcf5 0%, #fff8e6 100%); border: 1px solid #e8d9b8; border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(197, 160, 89, 0.08);">
                                     <i class="fa-solid fa-crown" style="color: #c5a059; font-size: 2rem; margin-bottom: 12px; display: block;"></i>
                                     <h3 style="color: #2b2623; margin: 0 0 8px; font-size: 16px;">AI詳細解析（制限中）</h3>
@@ -1672,7 +1672,7 @@ const Views = {
                                         アップグレードを検討する
                                     </button>
                                 </div>
-                                ` : (contract.ai_succeeded ? `
+                                ` : (contract.ai_succeeded === true ? `
                                 <div class="analysis-section-title">
                                     <span><i class="fa-solid fa-robot text-primary"></i> AIリスク要約</span>
                                 </div>
@@ -1685,7 +1685,7 @@ const Views = {
                                     </div>
                                     <div style="font-size:13px; color:#333; line-height:1.7; white-space:pre-wrap;">${diffData.summary || 'AI解析結果がありません'}</div>
                                 </div>
-                                ` : (hasAIResults ? `
+                                ` : (contract.last_analyzed_at ? `
                                 <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 16px; margin-bottom: 24px; color: #991b1b; font-size: 13px;">
                                     <i class="fa-solid fa-triangle-exclamation" style="margin-right: 8px;"></i>
                                     AI解析結果を読み込めませんでした。再解析を試行してください。
@@ -3371,10 +3371,7 @@ class DashboardApp {
 
             // updateContractAnalysis で ai_summary/ai_risk_reason/ai_changes を正しく保存
             dbService.updateContractAnalysis(contractId, {
-                summary: data.data.summary,
-                riskLevel: data.data.riskLevel,
-                riskReason: data.data.riskReason,
-                changes: data.data.changes || [],
+                ...data.data,
                 status: '未確認',
             });
             // contract_meta（期限情報）を追加保存
@@ -6233,7 +6230,7 @@ class DashboardApp {
                             analysisPayload.isFallback = result.data.isFallback === true;
                             analysisPayload.aiFailed = result.data.aiFailed === true;
                         }
-                        dbService.updateContractAnalysis(id, analysisPayload);
+                        dbService.updateContractAnalysis(id, analysisPayload, { isAnalysisUpdate: !isFirstUpload });
                         if (!isFirstUpload) {
                             await this.refreshSubscriptionStatusSafe();
                         }

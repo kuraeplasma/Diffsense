@@ -709,7 +709,7 @@ export const dbService = {
     /**
      * AI解析結果を契約に反映
      */
-    updateContractAnalysis(id, analysisData) {
+    updateContractAnalysis(id, analysisData, options = {}) {
         const contracts = this.getContracts();
         const contract = contracts.find(c => String(c.id) === String(id));
         if (contract) {
@@ -768,17 +768,19 @@ export const dbService = {
             // ステータスを更新
             contract.status = analysisData.status || '未確認';
 
-            // AI解析結果を保存（新規フィールド）
+            // AI解析結果を保存
             contract.ai_summary = analysisData.summary || '';
             contract.ai_risk_reason = analysisData.riskReason || '';
             contract.ai_changes = analysisData.changes || [];
             contract.ai_is_fallback = analysisData.isFallback === true;
-            contract.ai_succeeded = analysisData.aiSucceeded === true;
-            contract.ai_limited = analysisData.isLimited === true;
             
-            // AI解析が実行された（成功・制限・失敗のいずれか）場合のみ、解析日時を更新する
-            // 初回取り込み（skipAI=true）などの場合は更新しない
-            if (analysisData.aiSucceeded !== undefined || analysisData.isLimited === true || analysisData.aiFailed === true) {
+            // フラグの強制Boolean化
+            contract.ai_succeeded = Boolean(analysisData.aiSucceeded);
+            contract.ai_limited = Boolean(analysisData.isLimited);
+            
+            // 解析タイムスタンプの更新
+            // isAnalysisUpdate が false でない限り（解析APIが呼ばれたとみなされる場合）は必ず更新する
+            if (options.isAnalysisUpdate !== false) {
                 contract.last_analyzed_at = this.nowIso();
             }
             contract.last_updated_at = this.nowIso();
