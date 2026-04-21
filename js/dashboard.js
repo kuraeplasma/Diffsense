@@ -3986,8 +3986,7 @@ class DashboardApp {
             if ('scrollRestoration' in window.history) {
                 window.history.scrollRestoration = 'manual';
             }
-            this.renderInitialSkeleton('dashboard');
-            setTimeout(() => this.recoverStuckDashboardSkeleton(), 5000);
+            this.mainContent.innerHTML = renderDashboardOverview(this);
             const planNav = document.getElementById('nav-plan');
             if (planNav) planNav.style.display = '';
 
