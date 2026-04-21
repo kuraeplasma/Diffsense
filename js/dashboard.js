@@ -1681,6 +1681,8 @@ const Views = {
         const mobileRiskTone = diffData.riskLevel >= 3 ? 'high' : (diffData.riskLevel >= 2 ? 'medium' : 'low');
         const mobileRiskLabel = diffData.riskLevel >= 3 ? 'High' : (diffData.riskLevel >= 2 ? 'Medium' : 'Low');
         const isAnalyzingContract = Boolean(window.app?.analyzingContractIds?.has(Number(contract.id)));
+        const hasAnalysisPayload = Boolean(diffData.summary || diffData.riskReason || (Array.isArray(diffData.changes) && diffData.changes.length > 0));
+        const shouldShowAnalysis = Boolean(contract.ai_succeeded || diffData.isFallback || (hasAIResults && hasAnalysisPayload));
         const mobilePrimaryAction = (() => {
             if (!window.app.can('operate_contract')) return null;
             if (!hasAIResults) {
@@ -1749,7 +1751,7 @@ const Views = {
                         <a onclick="window.app.navigate('plan')" style="margin-left:auto; font-size:11px; color:#c5a059; font-weight:700; text-decoration:underline;">詳細</a>
                     </div>
                 </section>
-                ` : (contract.ai_succeeded ? `
+                ` : (shouldShowAnalysis ? `
                 <section class="mobile-risk-sticky mobile-risk-${mobileRiskTone} mobile-only" aria-label="リスク判定">
                     <div class="mobile-risk-row">
                         <span class="mobile-risk-pill">${mobileRiskLabel}</span>
@@ -1783,7 +1785,7 @@ const Views = {
                                 <div class="skeleton-analysis" style="margin-bottom:24px;">
                                     <div class="analysis-section-title">
                                         <i class="fa-solid fa-spinner fa-spin text-primary"></i>
-                                        <span id="analysis-status-text">AIがリスクを解析中です（通常3〜10秒）</span>
+                                        <span id="analysis-status-text">AIがリスクを解析中です（通常30〜90秒）</span>
                                     </div>
                                     <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:16px;">
                                         <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
@@ -1796,7 +1798,8 @@ const Views = {
                                             <div style="width:75%; height:14px; background:#f1f5f9; border-radius:4px; animation: pulse 1.5s infinite; animation-delay: 0.4s;"></div>
                                         </div>
                                     </div>
-                                ` : (contract.ai_succeeded ? `
+                                </div>
+                                ` : (shouldShowAnalysis ? `
                                 <div class="analysis-section-title">
                                     <span><i class="fa-solid fa-robot text-primary"></i> AIリスク要約</span>
                                 </div>
@@ -1818,7 +1821,7 @@ const Views = {
 
                             </div>
 
-                            ${(hasComparableVersion || hasAIResults) ? `
+                            ${(hasComparableVersion || hasAIResults || isAnalyzingContract) ? `
 
                             ${(contract.expiry_date || contract.renewal_deadline || contract.contract_category) ? (() => {
                                 const fmtDate = (d) => {
@@ -3464,22 +3467,7 @@ class DashboardApp {
         const c = dbService.getContractById(contractId);
         if (!c) { Notify.error('契約が見つかりません'); return; }
 
-        let contractText = '';
-        if (c.original_content && typeof c.original_content === 'object') {
-            const oc = c.original_content;
-            const parts = [];
-            if (oc.preamble) parts.push(oc.preamble);
-            if (Array.isArray(oc.articles)) {
-                for (const a of oc.articles) {
-                    if (a.articleNumber || a.title) parts.push(`${a.articleNumber || ''} ${a.title || ''}`.trim());
-                    if (a.content) parts.push(a.content);
-                }
-            }
-            contractText = parts.join('\n\n').trim();
-        }
-        if (!contractText) {
-            contractText = (typeof c.original_content === 'string' ? c.original_content : (c.extracted_text || '')).trim();
-        }
+        const contractText = contentToComparableText(c.original_content || c.extracted_text || '').trim();
         if (!contractText || contractText.length < 10) {
             Notify.warning('書類の本文データがありません。差分チェックで取り込んでください。');
             return;
@@ -3540,7 +3528,7 @@ class DashboardApp {
                         localStorage.setItem(dbService.KEYS.CONTRACTS, JSON.stringify(allContracts));
                     }
                 }
-                await this.refreshSubscriptionStatusSafe();
+                this.refreshSubscriptionStatusSafe();
 
                 const meta = data.data.contract_meta;
                 const hasDeadline = meta && (meta.expiry_date || meta.renewal_deadline || meta.contract_start);
