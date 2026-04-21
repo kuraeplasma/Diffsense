@@ -1660,7 +1660,39 @@ const Views = {
                         <div class="pane-scroll-area">
                             <!-- Desktop Analysis visibility -->
                             <div class="desktop-only">
-                                ${contract.ai_limited === true ? `
+                                ${this.analyzingContractIds.has(Number(contract.id)) ? `
+                                <div class="skeleton-analysis" style="margin-bottom:24px;">
+                                    <div class="analysis-section-title">
+                                        <i class="fa-solid fa-spinner fa-spin text-primary"></i>
+                                        <span id="analysis-status-text">AIがリスクを解析中です（通常3〜10秒）</span>
+                                    </div>
+                                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:16px;">
+                                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+                                            <div style="width:60px; height:20px; background:#e2e8f0; border-radius:4px; animation: pulse 1.5s infinite;"></div>
+                                            <div style="width:140px; height:16px; background:#f1f5f9; border-radius:4px; animation: pulse 1.5s infinite;"></div>
+                                        </div>
+                                        <div style="space-y:8px;">
+                                            <div style="width:100%; height:14px; background:#f1f5f9; border-radius:4px; margin-bottom:6px; animation: pulse 1.5s infinite;"></div>
+                                            <div style="width:90%; height:14px; background:#f1f5f9; border-radius:4px; margin-bottom:6px; animation: pulse 1.5s infinite; animation-delay: 0.2s;"></div>
+                                            <div style="width:75%; height:14px; background:#f1f5f9; border-radius:4px; animation: pulse 1.5s infinite; animation-delay: 0.4s;"></div>
+                                        </div>
+                                    </div>
+                                    <script>
+                                        (function() {
+                                            const statuses = ["差分を抽出しています...", "リスク要因を分析しています...", "要約を生成しています..."];
+                                            let idx = 0;
+                                            const el = document.getElementById('analysis-status-text');
+                                            if (el) {
+                                                const timer = setInterval(() => {
+                                                    if (!document.getElementById('analysis-status-text')) { clearInterval(timer); return; }
+                                                    idx = (idx + 1) % statuses.length;
+                                                    el.innerText = statuses[idx];
+                                                }, 2500);
+                                            }
+                                        })();
+                                    </script>
+                                </div>
+                                ` : (contract.ai_limited === true ? `
                                 <div style="background: linear-gradient(135deg, #fffcf5 0%, #fff8e6 100%); border: 1px solid #e8d9b8; border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(197, 160, 89, 0.08);">
                                     <i class="fa-solid fa-crown" style="color: #c5a059; font-size: 2rem; margin-bottom: 12px; display: block;"></i>
                                     <h3 style="color: #2b2623; margin: 0 0 8px; font-size: 16px;">AI詳細解析（制限中）</h3>
@@ -1690,7 +1722,7 @@ const Views = {
                                     <i class="fa-solid fa-triangle-exclamation" style="margin-right: 8px;"></i>
                                     AI解析結果を読み込めませんでした。再解析を試行してください。
                                 </div>
-                                ` : ''))}
+                                ` : '')))}
                             </div>
 
                             ${(hasComparableVersion || hasAIResults) ? `
@@ -2746,6 +2778,7 @@ class DashboardApp {
         this.memoryCache = new Map();
         this.pendingPairAnalysisKeys = new Set();
         this.attemptedAutoPairAnalysisKeys = new Set();
+        this.analyzingContractIds = new Set();
         this.bootstrapCompleted = false;
         this.hydrateCachedState();
     }
@@ -3314,12 +3347,10 @@ class DashboardApp {
     /**
      * Execute single-doc reanalysis (risk + deadline) via API.
      */
-    async runReanalyze(contractId) {
-        const contracts = dbService.getContracts();
-        const c = contracts.find(x => String(x.id) === String(contractId));
+    runReanalyze(contractId) {
+        const c = dbService.getContractById(contractId);
         if (!c) { Notify.error('契約が見つかりません'); return; }
 
-        // original_content がオブジェクト（構造化JSON）の場合はテキストに変換
         let contractText = '';
         if (c.original_content && typeof c.original_content === 'object') {
             const oc = c.original_content;
@@ -3341,76 +3372,87 @@ class DashboardApp {
             return;
         }
 
-        // Show loading state on button
-        const btn = document.getElementById('btn-reanalyze');
-        if (btn) {
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right:6px;"></i>解析中...';
-        }
+        // 1. Immediate UI Response
+        this.analyzingContractIds.add(Number(contractId));
+        this.navigate('diff', contractId); // Trigger re-render to show skeleton
 
-        try {
-            const authModule = await import('./auth.js');
-            const token = await authModule.getIdToken();
-            const apiBase = (await import('./api-base.js')).getApiBaseUrl();
-
-            const res = await fetch(`${apiBase}/api/contracts/${contractId}/reanalyze`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ contractText })
-            });
-            const data = await res.json();
-
-            if (!data.success) {
-                Notify.error(data.error || '解析に失敗しました');
-                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i>AIリスク解析'; }
-                return;
+        // 2. Async process
+        (async () => {
+            const start = Date.now();
+            const btn = document.getElementById('btn-reanalyze');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right:6px;"></i>解析中...';
             }
 
-            // updateContractAnalysis で ai_summary/ai_risk_reason/ai_changes を正しく保存
-            dbService.updateContractAnalysis(contractId, {
-                ...data.data,
-                status: '未確認',
-            });
-            // contract_meta（期限情報）を追加保存
-            if (data.data.contract_meta) {
-                const meta = data.data.contract_meta;
-                const allContracts = dbService.getContracts();
-                const idx = allContracts.findIndex(x => String(x.id) === String(contractId));
-                if (idx !== -1) {
-                    Object.assign(allContracts[idx], {
-                        expiry_date: meta.expiry_date || null,
-                        renewal_deadline: meta.renewal_deadline || null,
-                        contract_start: meta.contract_start || null,
-                        auto_renewal: meta.auto_renewal,
-                        contract_category: meta.contract_category || null,
-                        date_confidence: meta.date_confidence || 'unknown',
-                    });
-                    localStorage.setItem(dbService.KEYS.CONTRACTS, JSON.stringify(allContracts));
+            try {
+                const authModule = await import('./auth.js');
+                const token = await authModule.getIdToken();
+                const apiBase = (await import('./api-base.js')).getApiBaseUrl();
+
+                const res = await fetch(`${apiBase}/api/contracts/${contractId}/reanalyze`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ contractText })
+                });
+                const data = await res.json();
+
+                if (!data.success) {
+                    Notify.error(data.error || '解析に失敗しました');
+                    return;
                 }
-            }
-            await this.refreshSubscriptionStatusSafe();
 
-            // 期限情報の取得結果を通知
-            const meta = data.data.contract_meta;
-            const hasDeadline = meta && (meta.expiry_date || meta.renewal_deadline || meta.contract_start);
-            if (hasDeadline) {
-                Notify.success('解析完了。期限情報を期限・アラート管理に格納しました');
-            } else {
-                Notify.success('解析が完了しました');
-                setTimeout(() => {
-                    Notify.info('期限情報を取得できませんでした。「期限・アラート管理」から手動入力すると、スラック・メールで通知が届きます', { duration: 6000 });
-                }, 800);
-            }
-            // Re-render detail view
-            this.navigate('diff', contractId);
+                // updateContractAnalysis で保存
+                dbService.updateContractAnalysis(contractId, {
+                    ...data.data,
+                    status: '未確認',
+                });
+                // contract_meta（期限情報）を追加保存
+                if (data.data.contract_meta) {
+                    const meta = data.data.contract_meta;
+                    const allContracts = dbService.getContracts();
+                    const idx = allContracts.findIndex(x => String(x.id) === String(contractId));
+                    if (idx !== -1) {
+                        Object.assign(allContracts[idx], {
+                            expiry_date: meta.expiry_date || null,
+                            renewal_deadline: meta.renewal_deadline || null,
+                            contract_start: meta.contract_start || null,
+                            auto_renewal: meta.auto_renewal,
+                            contract_category: meta.contract_category || null,
+                            date_confidence: meta.date_confidence || 'unknown',
+                        });
+                        localStorage.setItem(dbService.KEYS.CONTRACTS, JSON.stringify(allContracts));
+                    }
+                }
+                await this.refreshSubscriptionStatusSafe();
 
-        } catch (err) {
-            Notify.error('解析エラー: ' + err.message);
-            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i>AIリスク解析'; }
-        }
+                const meta = data.data.contract_meta;
+                const hasDeadline = meta && (meta.expiry_date || meta.renewal_deadline || meta.contract_start);
+                if (hasDeadline) {
+                    Notify.success('解析完了。期限情報を期限・アラート管理に格納しました');
+                } else {
+                    Notify.success('解析が完了しました');
+                }
+            } catch (err) {
+                Notify.error('解析エラー: ' + err.message);
+            } finally {
+                this.analyzingContractIds.delete(Number(contractId));
+                this.navigate('diff', contractId); // Final re-render
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i>AIリスク解析';
+                }
+                console.log({
+                    type: 'reanalyze_performance',
+                    contractId,
+                    duration: Date.now() - start,
+                    timestamp: Date.now()
+                });
+            }
+        })();
     }
 
     /**
@@ -6031,76 +6073,83 @@ class DashboardApp {
             return;
         }
 
-        try {
-            // ローディング表示
-            const loadingMsg = document.createElement('div');
-            loadingMsg.style.cssText = 'position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:white; padding:30px; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,0.3); z-index:10000; text-align:center;';
-            loadingMsg.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="font-size:32px; color:#4CAF50;"></i><br><br><strong>AI解析中...</strong><br><span style="font-size:12px; color:#666;">数秒お待ちください</span>';
-            document.body.appendChild(loadingMsg);
+        // 1. Immediate UI Response
+        this.analyzingContractIds.add(Number(id));
+        this.navigate('diff', id); // Trigger re-render to show skeleton
 
-            // AI解析を実行（旧バージョンがあれば差分比較モード）
-            const previousVersion = (contract.history && contract.history.length > 0)
-                ? contract.history[contract.history.length - 1].content
-                : null;
-            const result = await aiService.analyzeContract(
-                id,
-                'text',  // テキストとして送信
-                contract.original_content,
-                previousVersion
-            );
+        // 2. Async process
+        (async () => {
+            const start = Date.now();
+            try {
+                // AI解析を実行（旧バージョンがあれば差分比較モード）
+                const previousVersion = (contract.history && contract.history.length > 0)
+                    ? contract.history[contract.history.length - 1].content
+                    : null;
+                
+                const result = await aiService.analyzeContract(
+                    id,
+                    'text',  // テキストとして送信
+                    contract.original_content,
+                    previousVersion
+                );
 
-            // ローディング削除
-            document.body.removeChild(loadingMsg);
+                if (result.success) {
+                    // 解析結果をDBに保存
+                    const analysisPayloadAi = {
+                        extractedText: contract.original_content,  // 既存のテキストを保持
+                        changes: result.data.changes,
+                        riskLevel: result.data.riskLevel,
+                        riskReason: result.data.riskReason,
+                        summary: result.data.summary,
+                        aiSucceeded: result.data.aiSucceeded === true,
+                        isLimited: result.data.isLimited === true,
+                        isFallback: result.data.isFallback === true,
+                        aiFailed: result.data.aiFailed === true,
+                        status: '未確認'  // 解析完了、確認待ち
+                    };
+                    // contract_meta（期限情報）が返ってきた場合はマージして保存
+                    if (result.data.contract_meta) {
+                        const m = result.data.contract_meta;
+                        analysisPayloadAi.expiry_date = m.expiry_date || null;
+                        analysisPayloadAi.renewal_deadline = m.renewal_deadline || null;
+                        analysisPayloadAi.contract_start = m.contract_start || null;
+                        analysisPayloadAi.auto_renewal = m.auto_renewal === true;
+                        analysisPayloadAi.notice_period_days = m.notice_period_days || null;
+                        analysisPayloadAi.contract_category = m.contract_category || null;
+                        analysisPayloadAi.date_confidence = m.date_confidence || 'unknown';
+                    }
+                    dbService.updateContractAnalysis(id, analysisPayloadAi);
 
-            if (result.success) {
-                // 解析結果をDBに保存
-                const analysisPayloadAi = {
-                    extractedText: contract.original_content,  // 既存のテキストを保持
-                    changes: result.data.changes,
-                    riskLevel: result.data.riskLevel,
-                    riskReason: result.data.riskReason,
-                    summary: result.data.summary,
-                    isFallback: result.data.isFallback === true,
-                    aiFailed: result.data.aiFailed === true,
-                    status: '未確認'  // 解析完了、確認待ち
-                };
-                // contract_meta（期限情報）が返ってきた場合はマージして保存
-                if (result.data.contract_meta) {
-                    const m = result.data.contract_meta;
-                    analysisPayloadAi.expiry_date = m.expiry_date || null;
-                    analysisPayloadAi.renewal_deadline = m.renewal_deadline || null;
-                    analysisPayloadAi.contract_start = m.contract_start || null;
-                    analysisPayloadAi.auto_renewal = m.auto_renewal === true;
-                    analysisPayloadAi.notice_period_days = m.notice_period_days || null;
-                    analysisPayloadAi.contract_category = m.contract_category || null;
-                    analysisPayloadAi.date_confidence = m.date_confidence || 'unknown';
-                }
-                dbService.updateContractAnalysis(id, analysisPayloadAi);
+                    // サブスクリプション情報を再取得（使用回数を更新）
+                    await this.refreshSubscriptionStatusSafe();
 
-                // サブスクリプション情報を再取得（使用回数を更新）
-                await this.refreshSubscriptionStatusSafe();
-
-                // 画面を再読み込み
-                this.navigate('diff', id);
-
-                // AI解析失敗チェック
-                if (result.data.aiFailed) {
-                    Notify.error('AI解析に失敗しました。利用回数は消費されていません。再度お試しください。');
+                    // AI解析失敗チェック
+                    if (result.data.aiFailed) {
+                        Notify.error('AI解析に失敗しました。利用回数は消費されていません。再度お試しください。');
+                    } else {
+                        Notify.success('AI解析が完了しました！');
+                    }
                 } else {
-                    Notify.success('AI解析が完了しました！リスク判定と差分抽出が完了しました。');
+                    throw new Error(result.error || '解析に失敗しました');
                 }
-            } else {
-                throw new Error(result.error || '解析に失敗しました');
+            } catch (error) {
+                console.error('AI解析エラー:', error);
+                if (error.code === 'ANALYSIS_LIMIT_EXCEEDED') {
+                    this.showAnalysisLimitError(error);
+                } else {
+                    Notify.error(`AI解析中にエラーが発生しました: ${error.message}`);
+                }
+            } finally {
+                this.analyzingContractIds.delete(Number(id));
+                this.navigate('diff', id); // Final re-render
+                console.log({
+                    type: 'analyze_performance',
+                    id,
+                    duration: Date.now() - start,
+                    timestamp: Date.now()
+                });
             }
-
-        } catch (error) {
-            console.error('AI解析エラー:', error);
-            if (error.code === 'ANALYSIS_LIMIT_EXCEEDED') {
-                this.showAnalysisLimitError(error);
-            } else {
-                Notify.error(`AI解析中にエラーが発生しました: ${error.message}`);
-            }
-        }
+        })();
     }
 
     uploadNewVersion(id) {

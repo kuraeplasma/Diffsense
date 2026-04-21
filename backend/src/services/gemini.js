@@ -189,6 +189,18 @@ function parseGeminiJsonResponse(aiText) {
     throw lastError || new Error('Gemini response JSON parse failed');
 }
 
+function normalizeChanges(rawChanges) {
+    const changes = Array.isArray(rawChanges) ? rawChanges : [];
+    return changes.map(c => ({
+        section: String(c?.section || c?.clause || '本文').trim() || '本文',
+        type: String(c?.type || c?.changeType || 'modification').toLowerCase(),
+        old: String(c?.old || c?.before || '').trim(),
+        new: String(c?.new || c?.after || '').trim(),
+        impact: String(c?.impact || '').trim(),
+        concern: String(c?.concern || c?.risk || '').trim()
+    }));
+}
+
 function normalizeAnalyzeResult(parsed) {
     // 1. Normalize summary (優先順位: summary > changeSummary > fallback)
     const summary = String(parsed?.summary || parsed?.changeSummary || parsed?.change_summary || '').trim() || '解析完了';
@@ -750,6 +762,20 @@ class GeminiService {
             ? null
             : (typeof previousVersion === 'string' ? previousVersion : JSON.stringify(previousVersion));
 
+        // 修正4：差分なしスキップ（AI APIを呼ばない）
+        if (previousText && currentText && previousText.trim() === currentText.trim()) {
+            logger.info('No changes detected, skipping AI analysis');
+            return {
+                summary: "前バージョンからの変更は検出されませんでした。契約内容は維持されています。",
+                riskLevel: 1,
+                riskReason: "変更なし",
+                changes: [],
+                aiSucceeded: true,
+                isLimited: false,
+                isFallback: false
+            };
+        }
+
         if (shouldUseLocalAiFallback()) {
             if (!GEMINI_API_KEY || process.env.LOCAL_AI_ONLY === 'true') {
                 logger.info('Using local AI fallback analysis');
@@ -763,34 +789,54 @@ class GeminiService {
             throw new Error('Gemini API key is not configured');
         }
 
-        const prompt = this.buildPrompt(currentText, previousText);
-        logger.info('Starting Gemini analyzeContract request');
+        // 修正5：並列処理
+        logger.info('Starting parallel Gemini analysis tasks');
+        const start = Date.now();
+        
+        // 1. 要約・リスク判定プロンプト
+        const summaryPrompt = this.buildSummaryPrompt(currentText, previousText);
+        // 2. 詳細・メタ情報プロンプト
+        const detailsPrompt = this.buildDetailsPrompt(currentText, previousText);
 
         try {
-            const primary = await this.requestGeminiJson(prompt, true);
-            return {
-                ...normalizeAnalyzeResult(primary),
+            const [summaryRes, detailsRes] = await Promise.all([
+                this.requestGeminiJson(summaryPrompt, true),
+                this.requestGeminiJson(detailsPrompt, true)
+            ]);
+
+            const result = {
+                ...normalizeAnalyzeResult(summaryRes),
+                changes: normalizeChanges(detailsRes?.changes),
+                contract_meta: detailsRes?.contract_meta || null,
+                aiSucceeded: true,
+                isLimited: false,
                 isFallback: false
             };
+
+            logger.info(`Parallel analysis complete. duration=${Date.now() - start}ms`);
+            return result;
+
         } catch (error) {
-            logger.warn('Gemini analyzeContract primary request failed, retrying without JSON mime type:', error.message);
+            logger.warn('Parallel analysis failed, falling back to monolithic request:', error.message);
+            // 失敗時は従来の一括プロンプトでリトライ
+            const monolithicPrompt = this.buildPrompt(currentText, previousText);
             try {
-                const fallback = await this.requestGeminiJson(prompt, false);
+                const monolithicRes = await this.requestGeminiJson(monolithicPrompt, true);
                 return {
-                    ...normalizeAnalyzeResult(fallback),
+                    ...normalizeAnalyzeResult(monolithicRes),
+                    aiSucceeded: true,
+                    isLimited: false,
                     isFallback: false
                 };
-            } catch (retryError) {
-                logger.error('Gemini analyzeContract failed:', retryError);
+            } catch (monolithicError) {
+                logger.error('Gemini monolithic fallback failed:', monolithicError);
+                if (shouldUseLocalAiFallback()) {
+                    return previousText
+                        ? buildLocalDiffAnalysis(currentText, previousText)
+                        : buildLocalSingleAnalysis(currentText);
+                }
+                return buildHeuristicFallbackAnalysis(currentText, previousText);
             }
-            if (shouldUseLocalAiFallback()) {
-                logger.warn('Falling back to local AI analysis');
-                return previousText
-                    ? buildLocalDiffAnalysis(currentText, previousText)
-                    : buildLocalSingleAnalysis(currentText);
-            }
-            logger.warn('Returning heuristic fallback analysis instead of AI failure');
-            return buildHeuristicFallbackAnalysis(currentText, previousText);
         }
     }
 
@@ -1141,6 +1187,56 @@ ${truncatedText}
 - riskLevelは1（低リスク）、2（中リスク）、3（高リスク）のいずれかに設定してください。
 - contract_metaの日付は契約書本文から正確に読み取ってください。記載がない場合はnullにしてください。`;
         }
+    }
+
+    buildSummaryPrompt(contractText, previousVersion) {
+        const truncatedText = contractText.substring(0, 30000);
+        const truncatedPrev = previousVersion ? previousVersion.substring(0, 30000) : null;
+        
+        let context = previousVersion 
+            ? `以下の2つの契約書を比較し、変更の意義とリスク状況を要約してください。\n【旧版】\n${truncatedPrev}\n\n【新版】\n${truncatedText}`
+            : `以下の契約書を解析し、内容とリスク状況を要約してください。\n【契約書】\n${truncatedText}`;
+
+        return `${context}
+        
+        以下のJSON形式で回答してください:
+        {
+          "summary": "日本語で200〜300文字程度で詳しく解説・要約してください。",
+          "riskLevel": 3,
+          "riskReason": "リスク判定の理由（100文字以内）"
+        }`;
+    }
+
+    buildDetailsPrompt(contractText, previousVersion) {
+        const truncatedText = contractText.substring(0, 30000);
+        const truncatedPrev = previousVersion ? previousVersion.substring(0, 30000) : null;
+
+        let context = previousVersion
+            ? `以下の2つの契約書の具体的な変更条項と期限情報を抽出してください。\n【旧版】\n${truncatedPrev}\n\n【新版】\n${truncatedText}`
+            : `以下の契約書の重要な条項（リスク・注意点）と期限情報を抽出してください。\n【契約書】\n${truncatedText}`;
+
+        return `${context}
+        
+        以下のJSON形式で回答してください:
+        {
+          "changes": [
+            {
+              "section": "条項名",
+              "type": "modification",
+              "old": "前の文言（単体解析時は原文引用）",
+              "new": "後の文言（単体解析時はリスク解説/修正案）",
+              "impact": "法的影響",
+              "concern": "注意点"
+            }
+          ],
+          "contract_meta": {
+            "expiry_date": "YYYY-MM-DD",
+            "renewal_deadline": "YYYY-MM-DD",
+            "contract_start": "YYYY-MM-DD",
+            "auto_renewal": true,
+            "contract_category": "契約種別"
+          }
+        }`;
     }
 
     /**
