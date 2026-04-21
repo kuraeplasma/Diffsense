@@ -315,7 +315,7 @@ function mergeStructuredAndGeneralAnalysis(structuredPairAnalysis, genericAnalys
         return structuredPairAnalysis;
     }
 
-    return {
+    return geminiService.normalizeAnalyzeResult({
         changes: structuredChanges.length > 0
             ? structuredChanges
             : (Array.isArray(genericAnalysis.changes) ? genericAnalysis.changes : []),
@@ -323,7 +323,7 @@ function mergeStructuredAndGeneralAnalysis(structuredPairAnalysis, genericAnalys
         riskReason: String(genericAnalysis.riskReason || structuredPairAnalysis.riskReason || '').trim(),
         summary: String(genericAnalysis.summary || structuredPairAnalysis.summary || '').trim(),
         isFallback: genericAnalysis.isFallback === true && structuredPairAnalysis.isFallback === true
-    };
+    });
 }
 
 function hasStructuredChanges(analysis) {
@@ -754,43 +754,22 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
         const isFree = plan === 'free';
         const isStarter = plan === 'starter';
 
-        if (isFree) {
-            // Freeプランは詳細解説なし（リスク度のみ）
-            gatedChanges = gatedChanges.map(c => ({
-                ...c,
-                impact: "スタータープラン以上で閲覧可能です。",
-                concern: "スタータープラン以上で閲覧可能です。"
-            }));
-        } else if (isStarter) {
-            // Starterプランは一部制限（以前の仕様を維持）
-            gatedChanges = gatedChanges.map(c => ({
-                ...c,
-                impact: "ビジネスプラン以上で閲覧可能です。",
-                concern: "ビジネスプラン以上で閲覧可能です。"
-            }));
-        }
+        const isLimited = isFree || isStarter || aiResult.isLimited === true;
 
-        const aiFailed = !aiResult.summary || isAiFailureSummary(aiResult.summary) || aiResult.isFallback === true;
-
-        logger.info(`analyze response contractId=${contractId} pdfUrl=${pdfUrl || 'null'} pdfStoragePath=${pdfStoragePath || 'null'}`);
+        logger.info(`analyze response contractId=${contractId} success=${aiResult.success} aiSucceeded=${aiResult.aiSucceeded} isLimited=${isLimited}`);
         res.json({
             success: true,
             data: {
+                ...aiResult,
                 extractedText,
                 extractedTextHash,
                 extractedTextLength,
                 sourceType: method.toUpperCase(),
                 pdfStoragePath,
                 pdfUrl,
-                changes: gatedChanges,
-                riskLevel: aiResult.riskLevel,
-                riskReason: aiResult.riskReason,
-                summary: aiResult.summary,
-                contract_meta: aiResult.contract_meta || null,
+                isLimited,
                 structuredContract,
-                rawExtractedText,
-                aiFailed: aiFailed,
-                isFallback: aiResult.isFallback === true
+                rawExtractedText
             }
         });
     } catch (error) {
@@ -926,36 +905,20 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
         const isFree = plan === 'free';
         const isStarter = plan === 'starter';
 
-        if (isFree) {
-            gatedChanges = gatedChanges.map(c => ({
-                ...c,
-                impact: "スタータープラン以上で閲覧可能です。",
-                concern: "スタータープラン以上で閲覧可能です。"
-            }));
-        } else if (isStarter) {
-            gatedChanges = gatedChanges.map(c => ({
-                ...c,
-                impact: "ビジネスプラン以上で閲覧可能です。",
-                concern: "ビジネスプラン以上で閲覧可能です。"
-            }));
-        }
+        const isLimited = isFree || isStarter || aiResult.isLimited === true;
 
         res.json({
             success: true,
             data: {
+                ...aiResult,
                 sourceType: 'DOCX',
                 extractedText: currentArticles,
                 structuredContract,
                 previousArticles,
-                changes: gatedChanges,
-                riskLevel: aiResult.riskLevel,
-                riskReason: aiResult.riskReason,
-                summary: aiResult.summary,
+                isLimited,
                 extractedTextHash,
                 extractedTextLength: serialized.length,
-                originalFilePath,
-                aiFailed: Boolean(aiResult.isFallback === true || (aiResult.summary && isAiFailureSummary(aiResult.summary))),
-                isFallback: aiResult.isFallback === true
+                originalFilePath
             }
         });
     } catch (error) {
@@ -1134,6 +1097,8 @@ router.post('/:id/reanalyze', rateLimit, async (req, res, next) => {
             risk_level: aiResult.riskLevel || null,
             risk_reason: aiResult.riskReason || null,
             last_analyzed_at: new Date().toISOString(),
+            ai_succeeded: aiResult.aiSucceeded === true,
+            ai_limited: aiResult.isLimited === true,
             ...(meta ? {
                 expiry_date: meta.expiry_date || null,
                 renewal_deadline: meta.renewal_deadline || null,
@@ -1157,9 +1122,7 @@ router.post('/:id/reanalyze', rateLimit, async (req, res, next) => {
         res.json({
             success: true,
             data: {
-                summary: aiResult.summary,
-                riskLevel: aiResult.riskLevel,
-                riskReason: aiResult.riskReason,
+                ...aiResult,
                 contract_meta: responseMeta,
             }
         });

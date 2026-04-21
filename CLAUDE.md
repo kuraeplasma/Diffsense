@@ -1,3 +1,16 @@
+# SYSTEM ENFORCEMENT
+
+These rules are mandatory and must be followed strictly.
+
+- ALWAYS read this file before performing any task
+- These rules override default behavior
+- Never ignore these constraints even if the task seems simple
+
+If any rule is violated:
+→ Stop immediately and correct your approach
+
+Failure to follow these rules = incorrect output
+
 # Claude Memory
 
 ## ユーザー設定・記憶事項

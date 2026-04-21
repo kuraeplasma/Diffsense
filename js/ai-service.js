@@ -82,11 +82,23 @@ export const aiService = {
                 if (result.data.extractedText === undefined && result.data.structuredContract !== undefined) {
                     result.data.extractedText = result.data.structuredContract;
                 }
+                // Unify summary key
+                if (result.data.summary === undefined && result.data.changeSummary !== undefined) {
+                    result.data.summary = result.data.changeSummary;
+                }
             }
             if (method === 'docx' && result?.success && result?.data) {
                 if (!result.data.sourceType) {
                     result.data.sourceType = 'DOCX';
                 }
+            }
+
+            // Debug logs
+            console.log("AI RESULT:", result);
+            if (result?.data) {
+                console.log("SUMMARY:", result.data.summary);
+                console.log("SUCCESS:", result.success);
+                console.log("LIMITED:", result.data.isLimited);
             }
 
             return result;

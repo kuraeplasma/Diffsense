@@ -202,85 +202,20 @@ const renderClauseParagraphs = (text) => {
     return lines.map((line) => `<p class="clause-p">${escapeHtmlText(line)}</p>`).join('');
 };
 
-const isMeaningfulAnalysisPayload = (payload) => {
-    if (!payload || typeof payload !== 'object') return false;
-    const summary = String(payload.summary || '').trim();
-    const riskReason = String(payload.riskReason || '').trim();
-    const changes = Array.isArray(payload.changes) ? payload.changes.filter(Boolean) : [];
-
-    if (changes.length > 0) return true;
-    if (!summary) return false;
-    if (/まだ解析されていません|比較先を選択すると|AI解析がありません|解析データなし|ローカルテストモード|ローカル差分要約|ローカル要約|補完解析を返しました|補完要約|補完差分要約|AI差分要約を取得できませんでした/.test(summary)) return false;
-    if (/ローカルテストモード|本番AI解析ではありません|Gemini応答不安定/.test(riskReason)) return false;
-    return true;
-};
-
 const hasAnalysisRecord = (payload) => {
     if (!payload || typeof payload !== 'object') return false;
-    const summary = String(payload.summary || '').trim();
-    const riskReason = String(payload.riskReason || '').trim();
-    const changes = Array.isArray(payload.changes) ? payload.changes.filter(Boolean) : [];
-    return Boolean(summary || riskReason || changes.length > 0 || payload.isFallback === true || payload.aiFailed === true);
+    return payload.aiSucceeded === true || payload.ai_succeeded === true || payload.isLimited === true || payload.ai_limited === true;
 };
 
 const sanitizeAnalysisPayload = (payload) => {
-    const base = (payload && typeof payload === 'object') ? payload : {};
-    const changes = Array.isArray(base.changes) ? base.changes.filter(Boolean) : [];
-    const summaryRaw = String(base.summary || '').trim();
-    const reasonRaw = String(base.riskReason || '').trim();
-    const hasFallbackPhrase = /ローカルテストモード|ローカル差分要約|ローカル要約|本番AI解析ではありません|Gemini応答不安定|補完解析を返しました|補完要約|補完差分要約|AI評価を一部補完表示しています|AI評価を取得できなかったため補完解析を表示しています|AI評価を取得できなかったため補完差分を表示しています|AI評価を取得できなかったため補完要約を表示しています|AI差分要約を取得できませんでした|AI差分要約未取得/.test(`${summaryRaw} ${reasonRaw}`);
-    const isFallback = base.isFallback === true || hasFallbackPhrase;
-
-    if (!isFallback) {
-        return {
-            ...base,
-            changes,
-            isFallback
-        };
-    }
-
-    const impactSnippets = changes
-        .map((c) => String(c.impact || '').trim())
-        .filter(Boolean)
-        .slice(0, 2);
-    const canKeepOriginalSummary = Boolean(
-        summaryRaw
-        && !/AI差分要約を取得できませんでした|AI差分要約未取得|差分は検出されませんでした|変更点は検出されませんでした|変更点を確認してください/.test(summaryRaw)
-        && !/\d+件の変更点?を検出しました/.test(summaryRaw)
-    );
-    const sectionLabels = changes
-        .map((c) => String(c.section || '').trim())
-        .filter(Boolean)
-        .slice(0, 3);
-    const sectionHint = sectionLabels.length > 0 ? `（${sectionLabels.join('、')}）` : '';
-    const summary = canKeepOriginalSummary
-        ? summaryRaw
-        : (impactSnippets.length > 0
-            ? `${impactSnippets.join(' ')}${changes.length > impactSnippets.length ? ` ほか${changes.length - impactSnippets.length}件の変更があります。` : ''}`.trim()
-            : (changes.length > 0
-                ? `${changes.length}件の変更点を検出しました${sectionHint}。`
-                : '変更点を確認してください。'));
-
+    if (!payload || typeof payload !== 'object') return {};
     return {
-        ...base,
-        summary,
-        riskReason: '変更点を要確認',
-        changes,
-        isFallback
+        ...payload,
+        changes: Array.isArray(payload.changes) ? payload.changes.filter(Boolean) : []
     };
 };
 
-const hasMeaningfulAiSummary = (payload) => {
-    if (!payload || typeof payload !== 'object') return false;
-    const summary = String(payload.summary || '').trim();
-    const riskReason = String(payload.riskReason || '').trim();
-    if (!summary) return false;
-    const combined = `${summary} ${riskReason}`;
-    if (/AI差分要約を取得できませんでした|AI差分要約未取得|AI差分未保存|まだ保存されていません|差分は検出されませんでした|変更点は検出されませんでした|解析データなし/.test(combined)) {
-        return false;
-    }
-    return true;
-};
+// hasMeaningfulAiSummary was removed
 
 const mergeStructuredChangesWithAnalysis = (structuredChanges, analysisChanges) => {
     const baseChanges = Array.isArray(structuredChanges) ? structuredChanges.filter(Boolean) : [];
@@ -312,7 +247,7 @@ const mergeStructuredChangesWithAnalysis = (structuredChanges, analysisChanges) 
 
 const isReusableAnalysisPayload = (payload) => {
     const normalized = sanitizeAnalysisPayload(payload);
-    return isMeaningfulAnalysisPayload(normalized) && normalized.isFallback !== true;
+    return hasAnalysisRecord(normalized) && normalized.isFallback !== true;
 };
 
 const buildStoredContractAnalysis = (contract) => {
@@ -1371,7 +1306,6 @@ const Views = {
             && (
                 selectedDiffPayload.isFallback === true
                 || selectedDiffPayload.aiFailed === true
-                || !isMeaningfulAnalysisPayload(selectedDiffPayload)
                 || (Array.isArray(selectedDiffPayload.changes) ? selectedDiffPayload.changes.filter(Boolean).length === 0 : true)
             )
         );
@@ -1387,7 +1321,6 @@ const Views = {
                 || shouldPreferStructuredFallback
                 || hasExplicitNoDiffResult
                 || selectedDiffPayload?.isFallback === true
-                || !isMeaningfulAnalysisPayload(selectedDiffPayload)
             )
         );
         const effectiveSelectedDiffData = shouldPreferStoredContractAnalysis
@@ -1405,7 +1338,6 @@ const Views = {
             && (
                 selectedDiffPayload.isFallback === true
                 || selectedDiffPayload.aiFailed === true
-                || !isMeaningfulAnalysisPayload(selectedDiffPayload)
                 || hasExplicitNoDiffResult
             )
         );
@@ -1450,7 +1382,7 @@ const Views = {
 
         // AI解析結果があればそれを使用、なければ静的コンテンツまたはデフォルト
         const hasComparableVersion = documentOptions.length >= 2;
-        const hasAIResults = Boolean(contract.ai_summary || contract.summary || (Array.isArray(contract.ai_changes) && contract.ai_changes.length > 0));
+        const hasAIResults = !!contract.last_analyzed_at;
         // 単独ドキュメント（比較なし・AI未解析）はdiffタブを非表示にする（commit 2f88c39の修正を復元）
         const shouldHideDiffTab = !comparisonContext && !hasComparableVersion && !hasAIResults;
         const activeTab = shouldHideDiffTab ? 'original' : requestedActiveTab;
@@ -1473,7 +1405,9 @@ const Views = {
                 riskLevel: cached.riskLevel ?? 1,
                 riskReason: cached.riskReason || '保存済みの差分結果を表示しています。',
                 changes: cached.changes || [],
-                isFallback: cached.isFallback === true
+                isFallback: cached.isFallback === true,
+                aiSucceeded: cached.aiSucceeded ?? contract.ai_succeeded,
+                isLimited: cached.isLimited ?? contract.ai_limited
             };
         } else if (shouldShowStructuredFallbackPanel && structuredFallbackAnalysis) {
             diffData = {
@@ -1535,7 +1469,9 @@ const Views = {
                 riskLevel: normalizedStored.riskLevel ?? 1,
                 riskReason: normalizedStored.riskReason || 'リスク判定が完了しました',
                 changes: normalizedStored.changes || [],
-                isFallback: normalizedStored.isFallback === true
+                isFallback: normalizedStored.isFallback === true,
+                aiSucceeded: contract.ai_succeeded === true,
+                isLimited: contract.ai_limited === true
             };
         } else {
             // デフォルトデータ
@@ -1685,7 +1621,15 @@ const Views = {
                     </div>
                 </div>
 
-                ${hasAIResults ? `
+                ${contract.ai_limited ? `
+                <section class="mobile-risk-sticky mobile-only" style="background:#fffcf5; border-top:1px solid #e8d9b8;" aria-label="アップグレード案内">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <i class="fa-solid fa-crown" style="color:#c5a059;"></i>
+                        <span style="font-size:12px; color:#2b2623; font-weight:700;">AI詳細解析はアップグレードが必要です</span>
+                        <a onclick="window.app.navigate('plan')" style="margin-left:auto; font-size:11px; color:#c5a059; font-weight:700; text-decoration:underline;">詳細</a>
+                    </div>
+                </section>
+                ` : (contract.ai_succeeded ? `
                 <section class="mobile-risk-sticky mobile-risk-${mobileRiskTone} mobile-only" aria-label="リスク判定">
                     <div class="mobile-risk-row">
                         <span class="mobile-risk-pill">${mobileRiskLabel}</span>
@@ -1694,7 +1638,14 @@ const Views = {
                     <div class="mobile-risk-summary-label">AI要約</div>
                     <div class="mobile-risk-summary">${escapeHtmlText(diffData.summary || 'AI要約はまだありません。')}</div>
                 </section>
-                ` : ''}
+                ` : (contract.last_analyzed_at ? `
+                <section class="mobile-risk-sticky mobile-only" style="background:#fff2f2; border-top:1px solid #fecaca; padding:12px;" aria-label="解析失敗">
+                    <div style="display:flex; align-items:center; gap:10px; color:#991b1b; font-size:12px;">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        <span>AI解析に失敗しました。再解析を試してください。</span>
+                    </div>
+                </section>
+                ` : ''))}
 
                 <div class="detail-split-body">
                     <!-- Left Pane: Analysis & Diffs -->
@@ -1709,7 +1660,19 @@ const Views = {
                         <div class="pane-scroll-area">
                             <!-- Desktop Analysis visibility -->
                             <div class="desktop-only">
-                                ${hasAIResults ? `
+                                ${contract.ai_limited ? `
+                                <div style="background: linear-gradient(135deg, #fffcf5 0%, #fff8e6 100%); border: 1px solid #e8d9b8; border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(197, 160, 89, 0.08);">
+                                    <i class="fa-solid fa-crown" style="color: #c5a059; font-size: 2rem; margin-bottom: 12px; display: block;"></i>
+                                    <h3 style="color: #2b2623; margin: 0 0 8px; font-size: 16px;">AI詳細解析（制限中）</h3>
+                                    <p style="color: #8a7a6a; font-size: 13px; line-height: 1.6; margin-bottom: 16px;">
+                                        現在のプランではAIによる詳細な条文要約が制限されています。<br>
+                                        スタータープラン以上へのアップグレードで、全解析機能をご利用いただけます。
+                                    </p>
+                                    <button onclick="window.app.navigate('plan')" class="btn-dashboard btn-primary-action" style="padding: 10px 24px; background: #c5a059; border: none; border-radius: 8px; color: #fff; font-weight: 700; cursor: pointer;">
+                                        アップグレードを検討する
+                                    </button>
+                                </div>
+                                ` : (contract.ai_succeeded ? `
                                 <div class="analysis-section-title">
                                     <span><i class="fa-solid fa-robot text-primary"></i> AIリスク要約</span>
                                 </div>
@@ -1722,7 +1685,12 @@ const Views = {
                                     </div>
                                     <div style="font-size:13px; color:#333; line-height:1.7; white-space:pre-wrap;">${diffData.summary || 'AI解析結果がありません'}</div>
                                 </div>
-                                ` : ''}
+                                ` : (hasAIResults ? `
+                                <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 16px; margin-bottom: 24px; color: #991b1b; font-size: 13px;">
+                                    <i class="fa-solid fa-triangle-exclamation" style="margin-right: 8px;"></i>
+                                    AI解析結果を読み込めませんでした。再解析を試行してください。
+                                </div>
+                                ` : ''))}
                             </div>
 
                             ${(hasComparableVersion || hasAIResults) ? `
@@ -7079,7 +7047,7 @@ class DashboardApp {
             && isExplicitNoDiffAnalysis(cached?.diff_data);
         const storedAnalysis = buildStoredContractAnalysis(dbService.getContractById(contractId));
         const canHydrateFromStoredAnalysis = isCurrentVsLatestHistoryPair(docs, sourceDoc, targetDoc)
-            && isMeaningfulAnalysisPayload(storedAnalysis)
+            && hasAnalysisRecord(storedAnalysis)
             && storedAnalysis?.isFallback !== true;
         if (isLocalDashboardMode()) {
             await this.analyzeDocumentPair(contractId, sourceDoc, targetDoc, { force: true, silent: true, auto: true });
@@ -7168,7 +7136,7 @@ class DashboardApp {
         const hasStructuredDifferences = Boolean(structuredFallbackAnalysis?.changes?.length);
         const canReuseStoredAnalysis = !force
             && isCurrentVsLatestHistoryPair(docs, sourceDoc, targetDoc)
-            && isMeaningfulAnalysisPayload(storedContractAnalysis)
+            && hasAnalysisRecord(storedContractAnalysis)
             && storedContractAnalysis?.isFallback !== true;
 
         const diffPayload = {
@@ -7247,7 +7215,7 @@ class DashboardApp {
                 }
             }
 
-            if (!isMeaningfulAnalysisPayload(diffPayload) && canReuseStoredAnalysis) {
+            if (!hasAnalysisRecord(diffPayload) && canReuseStoredAnalysis) {
                 Object.assign(diffPayload, storedContractAnalysis);
             }
 

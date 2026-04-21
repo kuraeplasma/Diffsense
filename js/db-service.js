@@ -773,6 +773,8 @@ export const dbService = {
             contract.ai_risk_reason = analysisData.riskReason || '';
             contract.ai_changes = analysisData.changes || [];
             contract.ai_is_fallback = analysisData.isFallback === true;
+            contract.ai_succeeded = analysisData.aiSucceeded === true;
+            contract.ai_limited = analysisData.isLimited === true;
             contract.last_analyzed_at = this.nowIso();
             contract.last_updated_at = this.nowIso();
 

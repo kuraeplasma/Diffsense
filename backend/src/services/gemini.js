@@ -190,24 +190,47 @@ function parseGeminiJsonResponse(aiText) {
 }
 
 function normalizeAnalyzeResult(parsed) {
-    const riskLevelNum = Number(parsed?.riskLevel);
-    const levelArr = [1, 2, 3];
-    let finalLevel = 1;
-    if (levelArr.includes(riskLevelNum)) {
-        finalLevel = riskLevelNum;
-    } else if (typeof parsed?.riskLevel === 'string') {
-        const val = parsed.riskLevel.toUpperCase();
-        if (val.includes('HIGH') || val === '3') finalLevel = 3;
-        else if (val.includes('MEDIUM') || val === '2') finalLevel = 2;
+    // 1. Normalize summary (優先順位: summary > changeSummary > fallback)
+    const summary = String(parsed?.summary || parsed?.changeSummary || parsed?.change_summary || '').trim() || '解析完了';
+
+    // 2. Normalize riskLevel (1, 2, 3 の文字列)
+    const rawLevel = parsed?.riskLevel || parsed?.risk_level || parsed?.risk;
+    let riskLevel = "1";
+    const levelNum = Number(rawLevel);
+    if ([1, 2, 3].includes(levelNum)) {
+        riskLevel = String(levelNum);
+    } else if (typeof rawLevel === 'string') {
+        const val = rawLevel.toUpperCase();
+        if (val.includes('HIGH') || val === '3') riskLevel = "3";
+        else if (val.includes('MEDIUM') || val === '2') riskLevel = "2";
     }
 
+    // 3. Normalize riskReason
+    const riskReason = String(parsed?.riskReason || parsed?.risk_reason || parsed?.latestRegulatoryAlignment || parsed?.latest_regulatory_alignment || '').trim() || '主要な注意点を確認してください。';
+
+    // 4. Normalize changes
+    const changes = Array.isArray(parsed?.changes || parsed?.materialChanges || parsed?.material_changes || parsed?.risks || parsed?.items) 
+        ? (parsed?.changes || parsed?.materialChanges || parsed?.material_changes || parsed?.risks || parsed?.items) 
+        : [];
+
+    // 状態判定フラグ
+    const isFallback = parsed?.isFallback === true;
+    const isLimited = parsed?.isLimited === true;
+    
+    // aiSucceeded: 
+    // - フォールバックでなく、かつサマリーがエラー文言でない場合に true
+    const aiSucceeded = !isFallback && !isLimited && summary.length > 0 && 
+                        !/AI解析に失敗しました|エラーが発生しました|取得できませんでした/.test(summary);
+
     return {
-        changes: Array.isArray(parsed?.changes) ? parsed.changes : [],
-        riskLevel: finalLevel,
-        riskReason: typeof parsed?.riskReason === 'string' ? parsed.riskReason : '',
-        summary: (typeof parsed?.summary === 'string' && parsed.summary.trim()) ? parsed.summary.trim() : '解析完了',
-        isFallback: parsed?.isFallback === true,
-        contract_meta: parsed?.contract_meta || null,
+        success: true, // APIとしての成功
+        aiSucceeded: aiSucceeded,
+        isLimited: isLimited,
+        summary,
+        riskLevel,
+        riskReason,
+        changes,
+        isFallback,
     };
 }
 
@@ -229,20 +252,22 @@ function buildLocalSingleAnalysis(contractText) {
     const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
     const sections = lines.filter((line) => /^第\s*[0-9０-９一二三四五六七八九十百]+\s*条/.test(line));
     const preview = lines.slice(0, 3).join(' / ').slice(0, 160);
-    return {
-        changes: sections.slice(0, 5).map((section) => ({
-            section,
-            type: 'risk',
-            old: section,
-            new: '当該条項の文言を確認してください。',
-            impact: '要点を簡易的に抽出しました',
-            concern: 'AIサービスへの接続が制限されている、または解析エラーのため簡易表示となっています。'
-        })),
+    const changes = sections.slice(0, 5).map((section) => ({
+        section,
+        type: 'risk',
+        old: section,
+        new: '当該条項の文言を確認してください。',
+        impact: '要点を簡易的に抽出しました',
+        concern: 'AIサービスへの接続が制限されている、または解析エラーのため簡易表示となっています。'
+    }));
+
+    return normalizeAnalyzeResult({
+        changes,
         riskLevel: 1,
         riskReason: 'AI評価を取得できなかったため補完要約を表示しています',
         summary: preview ? `補完要約: ${preview}` : '補完要約を表示しています',
         isFallback: true
-    };
+    });
 }
 
 function buildLocalDiffAnalysis(currentText, previousText) {
@@ -256,7 +281,7 @@ function buildLocalDiffAnalysis(currentText, previousText) {
         ? `${section} を含む差分を検出しました。変更点を確認してください。`
         : '目立つ変更は検出されませんでした。';
 
-    return {
+    return normalizeAnalyzeResult({
         changes: [{
             section,
             type: 'modification',
@@ -269,21 +294,22 @@ function buildLocalDiffAnalysis(currentText, previousText) {
         riskReason: 'AI評価を取得できなかったため補完差分を表示しています',
         summary,
         isFallback: true
-    };
+    });
 }
 
 function buildHeuristicFallbackAnalysis(currentText, previousText = null) {
     const base = previousText
         ? buildLocalDiffAnalysis(currentText, previousText)
         : buildLocalSingleAnalysis(currentText);
-    return {
+    
+    return normalizeAnalyzeResult({
         ...base,
         riskReason: 'AI評価を一部補完表示しています',
         summary: String(base.summary || '補完解析を返しました')
             .replace(/^ローカル差分要約:/, '補完差分要約:')
             .replace(/^ローカル要約:/, '補完要約:'),
         isFallback: true
-    };
+    });
 }
 
 function normalizeRiskLevelValue(value) {
@@ -501,28 +527,10 @@ function normalizeMcpRegulatorySearch(value, changes) {
 }
 
 function normalizeMcpComparisonResult(parsed, changes) {
-    const riskLevel = normalizeRiskLevelValue(parsed?.riskLevel || parsed?.risk_level || parsed?.risk);
-    const recommendedActions = normalizeRecommendedActions(parsed?.recommendedActions || parsed?.recommended_actions);
-    const changeSummary = String(parsed?.changeSummary || parsed?.change_summary || '').trim()
-        || `${Array.isArray(changes) ? changes.length : 0}件の差分を検出しました。`;
-    const latestRegulatoryAlignment = String(parsed?.latestRegulatoryAlignment || parsed?.latest_regulatory_alignment || '').trim()
-        || '最新法規制との整合性は要確認です。必要に応じて一般化キーワードで追加確認してください。';
-    const materialChanges = normalizeMcpMaterialChanges(parsed?.materialChanges || parsed?.material_changes);
-    return {
-        changeSummary,
-        riskLevel,
-        riskEvaluation: buildMcpRiskEvaluation(riskLevel, parsed?.riskEvaluation || parsed?.risk_evaluation),
-        latestRegulatoryAlignment,
-        recommendedActions: recommendedActions.length > 0
-            ? recommendedActions
-            : ['重要条項の変更理由と自社影響を法務担当に確認してください。'],
-        materialChanges,
-        regulatorySearch: normalizeMcpRegulatorySearch(parsed?.regulatorySearch || parsed?.regulatory_search, changes),
-        summary: changeSummary,
-        riskReason: latestRegulatoryAlignment,
-        changes: materialChanges,
-        isFallback: parsed?.isFallback === true
-    };
+    return normalizeAnalyzeResult({
+        ...parsed,
+        changes: changes
+    });
 }
 
 function normalizeMcpSingleRiskItems(value) {
@@ -544,23 +552,7 @@ function normalizeMcpSingleRiskItems(value) {
 }
 
 function normalizeMcpSingleAnalysisResult(parsed) {
-    const riskLevel = normalizeRiskLevelValue(parsed?.riskLevel || parsed?.risk_level || parsed?.risk);
-    const risks = normalizeMcpSingleRiskItems(parsed?.risks || parsed?.items || parsed?.changes);
-    return {
-        summary: String(parsed?.summary || '').trim() || '解析結果を返しました。',
-        riskLevel,
-        riskReason: String(parsed?.riskReason || parsed?.risk_reason || '').trim()
-            || '主要な注意点を確認してください。',
-        risks: risks.length > 0
-            ? risks
-            : [{
-                section: '本文',
-                level: riskLevelToLabel(riskLevel),
-                reason: String(parsed?.riskReason || parsed?.risk_reason || '主要な注意点を確認してください。').trim(),
-                action: '重要条項を法務観点で確認してください。'
-            }],
-        isFallback: parsed?.isFallback === true
-    };
+    return normalizeAnalyzeResult(parsed);
 }
 
 function buildLocalMcpDiffAnalysis(changes) {
@@ -568,10 +560,10 @@ function buildLocalMcpDiffAnalysis(changes) {
     const regulatorySearch = buildSanitizedRegulatorySearch(changes);
     const hasHighRiskKeyword = prioritized.some((change) => /損害賠償|免責|解除|知的財産|個人情報/u.test(`${change?.section || ''}\n${change?.old || ''}\n${change?.new || ''}`));
     const riskLevel = hasHighRiskKeyword ? 3 : (prioritized.length > 0 ? 2 : 1);
-    const changeSummary = prioritized.length > 0
+    const summary = prioritized.length > 0
         ? `${prioritized.length}件の主要差分を抽出しました。全文ではなく差分箇所だけをもとに確認しています。`
         : '実質的な差分は検出されませんでした。';
-    const latestRegulatoryAlignment = regulatorySearch.required
+    const riskReason = regulatorySearch.required
         ? '最新法規制との整合性は未確認です。返却された一般化キーワードで追加確認してください。'
         : '現時点で直近法改正の確認が必要な主要キーワードは目立ちません。';
     const materialChanges = prioritized.map((change) => ({
@@ -581,50 +573,22 @@ function buildLocalMcpDiffAnalysis(changes) {
         summary: `${String(change?.type || 'MODIFY').toUpperCase()} の差分を検出しました。`,
         risk: buildMcpRiskEvaluation(riskLevel)
     }));
-    return {
-        changeSummary,
+    
+    return normalizeAnalyzeResult({
+        summary,
         riskLevel,
-        riskEvaluation: buildMcpRiskEvaluation(riskLevel),
-        latestRegulatoryAlignment,
-        recommendedActions: prioritized.length > 0
-            ? [
-                '損害賠償・解除・知的財産・個人情報に関する変更有無を優先確認してください。',
-                '差分が自社に有利か不利かを相手方ひな型との関係で再確認してください。'
-            ]
-            : ['差分なしとして扱ってよいか、最新版の体裁変更有無だけ最終確認してください。'],
-        materialChanges,
-        regulatorySearch,
-        summary: changeSummary,
-        riskReason: latestRegulatoryAlignment,
+        riskReason,
         changes: materialChanges,
         isFallback: true
-    };
+    });
 }
 
 function buildLocalMcpSingleAnalysis(contractText) {
     const base = buildLocalSingleAnalysis(contractText);
-    const risks = Array.isArray(base?.changes)
-        ? base.changes.map((item) => ({
-            section: String(item?.section || '本文').trim() || '本文',
-            level: riskLevelToLabel(base?.riskLevel || 1),
-            reason: String(item?.concern || item?.impact || '主要な注意点を確認してください。').trim(),
-            action: '重要条項をダッシュボード上でも確認してください。'
-        })).filter((item) => item.reason).slice(0, 5)
-        : [];
-    return {
-        summary: base.summary,
-        riskLevel: base.riskLevel,
-        riskReason: base.riskReason,
-        risks: risks.length > 0
-            ? risks
-            : [{
-                section: '本文',
-                level: riskLevelToLabel(base?.riskLevel || 1),
-                reason: base.riskReason || '主要な注意点を確認してください。',
-                action: '重要条項をダッシュボード上でも確認してください。'
-            }],
+    return normalizeAnalyzeResult({
+        ...base,
         isFallback: true
-    };
+    });
 }
 
 function buildMcpDiffPrompt(changes, options = {}) {
@@ -954,45 +918,36 @@ class GeminiService {
         const successfulResults = clauseResults.filter(Boolean);
         const changedResults = successfulResults.filter((item) => item.change === true);
         if (successfulResults.length === 0 || (successfulResults.length < modifiedChanges.length && changedResults.length === 0)) {
-            return {
+            return normalizeAnalyzeResult({
                 summary: 'AI差分要約を取得できませんでした。再解析を実行してください。',
                 riskLevel: 1,
                 riskReason: 'AI差分要約未取得',
-                results: [],
+                changes: [],
                 isFallback: true
-            };
+            });
         }
 
-        return {
+        return normalizeAnalyzeResult({
             summary: buildStructuredResultsSummary(successfulResults, modifiedChanges),
             riskLevel: changedResults.length > 0
                 ? Math.max(...changedResults.map((item) => normalizeRiskLevelValue(item.riskLevel)))
                 : 1,
             riskReason: buildStructuredResultsRiskReason(successfulResults),
-            results: successfulResults,
+            changes: successfulResults,
             isFallback: false
-        };
+        });
     }
 
     async analyzeMcpDiff(changes, options = {}) {
         const normalizedChanges = Array.isArray(changes) ? changes.filter(Boolean) : [];
         if (normalizedChanges.length === 0) {
-            return {
-                changeSummary: '実質的な差分は検出されませんでした。',
-                riskLevel: 1,
-                riskEvaluation: '🟢 改善',
-                latestRegulatoryAlignment: '現時点で直近法改正との追加照合が必要な主要差分は見当たりません。',
-                recommendedActions: ['差分なしとして扱ってよいか、念のため最終確認してください。'],
-                materialChanges: [],
-                regulatorySearch: {
-                    required: false,
-                    keywords: []
-                },
+            return normalizeAnalyzeResult({
                 summary: '実質的な差分は検出されませんでした。',
+                riskLevel: 1,
                 riskReason: '現時点で直近法改正との追加照合が必要な主要差分は見当たりません。',
                 changes: [],
                 isFallback: false
-            };
+            });
         }
 
         if (shouldUseLocalAiFallback()) {

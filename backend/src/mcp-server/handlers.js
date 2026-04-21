@@ -194,15 +194,13 @@ function filterContractsByQuery(contracts, query) {
 }
 
 function buildComparisonReport(result) {
-    const actions = Array.isArray(result?.recommendedActions) && result.recommendedActions.length > 0
-        ? result.recommendedActions.map((item) => `- ${item}`).join('\n')
-        : '- 主要差分を確認してください。';
     return [
-        `【変更点概要】 ${String(result?.changeSummary || '').trim()}`,
-        `【リスク評価】 ${String(result?.riskEvaluation || '').trim()}`,
-        `【最新法規制との整合性】 ${String(result?.latestRegulatoryAlignment || '').trim()}`,
+        `【変更点概要】 ${String(result?.summary || '').trim()}`,
+        `【リスク判定】 ${String(result?.riskReason || '').trim()}`,
         '【推奨アクション】',
-        actions
+        Array.isArray(result?.changes) && result.changes.length > 0
+            ? result.changes.map(c => `- ${c.section || '本文'}: ${c.summary || c.action || '要確認'}`).join('\n')
+            : '- 詳細な変更点を確認してください。'
     ].join('\n');
 }
 
@@ -325,12 +323,16 @@ async function analyzeContract(user, contractId) {
         return {
             id: contract.id,
             name: contract.name,
-            risk_level: result.riskLabel,
-            risk_display: result.riskDisplay,
+            success: result.success,
+            aiSucceeded: result.aiSucceeded,
+            isLimited: result.isLimited,
+            riskLevel: result.riskLevel,
+            riskLabel: result.riskLabel,
+            riskDisplay: result.riskDisplay,
             summary: result.summary,
-            risk_reason: result.riskReason,
+            riskReason: result.riskReason,
             risks,
-            recommended_actions: buildSafeMcpRecommendedActions(risks)
+            recommendedActions: buildSafeMcpRecommendedActions(risks)
         };
     } catch (error) {
         logger.error(`MCP analyzeContract error: ${error.message}`);
@@ -394,15 +396,16 @@ async function compareContracts(user, contractIdA, contractIdB) {
         return {
             contractA: contractA.name,
             contractB: contractB.name,
-            risk_level: result.riskLabel,
-            risk_display: result.riskDisplay,
-            change_summary: result.changeSummary,
-            risk_evaluation: result.riskEvaluation,
-            latest_regulatory_alignment: result.latestRegulatoryAlignment,
-            recommended_actions: result.recommendedActions,
-            material_changes: result.materialChanges,
-            regulatory_search: result.regulatorySearch,
-            diff_preview: diffPreview,
+            success: result.success,
+            aiSucceeded: result.aiSucceeded,
+            isLimited: result.isLimited,
+            riskLevel: result.riskLevel,
+            riskLabel: result.riskLabel,
+            riskDisplay: result.riskDisplay,
+            summary: result.summary,
+            riskReason: result.riskReason,
+            changes: result.changes,
+            diffPreview: diffPreview,
             report,
             comparison: result
         };
