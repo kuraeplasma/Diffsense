@@ -1765,7 +1765,7 @@ const Views = {
                         <span>AI解析に失敗しました。再解析を試してください。</span>
                     </div>
                 </section>
-                ` : ''))}
+                ` : '')))}
 
                 <div class="detail-split-body">
                     <!-- Left Pane: Analysis & Diffs -->
@@ -1814,7 +1814,7 @@ const Views = {
                                     <i class="fa-solid fa-triangle-exclamation" style="margin-right: 8px;"></i>
                                     AI解析結果を読み込めませんでした。再解析を試行してください。
                                 </div>
-                                ` : '')))}
+                                ` : ''))}
 
                             </div>
 
@@ -2170,7 +2170,9 @@ const Views = {
                         : '<div class="text-center text-muted" style="padding:40px;">原本データがありません</div>')
                 }
                     </div>
-                </div>
+                </div>`
+            }
+            </div>
             </div>
         </div>
         `;
