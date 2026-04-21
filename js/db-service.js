@@ -775,7 +775,12 @@ export const dbService = {
             contract.ai_is_fallback = analysisData.isFallback === true;
             contract.ai_succeeded = analysisData.aiSucceeded === true;
             contract.ai_limited = analysisData.isLimited === true;
-            contract.last_analyzed_at = this.nowIso();
+            
+            // AI解析が実行された（成功・制限・失敗のいずれか）場合のみ、解析日時を更新する
+            // 初回取り込み（skipAI=true）などの場合は更新しない
+            if (analysisData.aiSucceeded !== undefined || analysisData.isLimited === true || analysisData.aiFailed === true) {
+                contract.last_analyzed_at = this.nowIso();
+            }
             contract.last_updated_at = this.nowIso();
 
             localStorage.setItem(this.KEYS.CONTRACTS, JSON.stringify(contracts));

@@ -1741,14 +1741,10 @@ const Views = {
                             <div style="padding:40px 20px; text-align:center; color:#999;">
                                 <i class="fa-solid fa-file-invoice" style="font-size:32px; margin-bottom:16px; display:block; opacity:0.1;"></i>
                                 <div style="font-size:14px; color:#666;">ドキュメントを読み込みました</div>
-                                ${!hasComparableVersion ? `
                                 <div style="font-size:12px; margin-top:8px; line-height:1.6; color:#999;">
-                                    この書類の新しいバージョンをアップロードすると、<br>
-                                    AIが自動的に差分を解析し、リスクや変更点を抽出します。
+                                    右上の「リスク解析」ボタンをクリックすると、AIがリスクを判定します。<br>
+                                    新しいバージョンをアップロードすれば、差分を自動解析します。
                                 </div>
-                                ` : `
-                                <div style="font-size:12px; margin-top:8px;">AI解析データがありません</div>
-                                `}
                             </div>
                             `}
                         </div>
