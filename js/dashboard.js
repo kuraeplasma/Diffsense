@@ -1064,6 +1064,81 @@ const renderStructuredView = (content, idPrefix = 'clause') => {
     }
 };
 
+const renderDashboardOverview = (app) => {
+    const stats = dbService.getStats();
+    const currentFilter = app ? app.dashboardFilter : 'pending';
+    const filteredItems = dbService.getFilteredContracts(currentFilter);
+
+    let sectionTitle = "要確認アイテム (優先度順)";
+    if (currentFilter === 'pending') sectionTitle = "未処理のアイテム (新着・変更検知)";
+    if (currentFilter === 'risk') sectionTitle = "リスク要判定アイテム";
+    if (currentFilter === 'total') sectionTitle = "全監視対象（最新順）";
+
+    const canOperateContract = typeof app?.can === 'function' && app.can('operate_contract');
+    const tableRows = filteredItems.length > 0 ? filteredItems.slice(0, 10).map(c => {
+        let riskBadgeClass = 'badge-neutral';
+        if (c.risk_level === 'High') riskBadgeClass = 'badge-danger';
+        else if (c.risk_level === 'Medium') riskBadgeClass = 'badge-warning';
+        else if (c.risk_level === 'Low') riskBadgeClass = 'badge-success';
+
+        let statusBadge = '';
+        if (c.status === '未解析') statusBadge = '<span class="badge badge-info">未解析 (新規)</span>';
+        else if (c.status === '未処理') statusBadge = '<span class="badge badge-info">未処理</span>';
+        else if (c.status === '未確認') statusBadge = '<span class="badge badge-warning">要確認 (変更)</span>';
+        else if (c.status === '確認済') statusBadge = '<span class="badge badge-neutral"><i class="fa-solid fa-check"></i> 確認済</span>';
+
+        const actionBtn = canOperateContract
+            ? `<button class="btn-dashboard">${c.status === '確認済' ? '履歴を見る' : '確認する'}</button>`
+            : `<button class="btn-dashboard">詳細を見る</button>`;
+
+        return `
+                <tr onclick="window.app.navigate('diff', ${c.id})">
+                    <td><span class="badge ${riskBadgeClass}">${c.risk_level === 'High' ? 'High' : (c.risk_level === 'Medium' ? 'Medium' : (c.risk_level === 'Low' ? 'Low' : c.risk_level))}</span></td>
+                    <td class="col-name" title="${escapeHtmlText(c.name)}">${escapeHtmlText(c.name)}</td>
+                    <td>${formatDisplayTimestamp(c.last_updated_at || c.last_analyzed_at || c.created_at)}</td>
+                    <td>${statusBadge}</td>
+                    <td>${actionBtn}</td>
+                </tr>
+            `;
+    }).join('') : '<tr><td colspan="5" class="text-center text-muted" style="padding:40px;">該当するアイテムはありません</td></tr>';
+
+    return `
+            <div class="page-title">ダッシュボード</div>
+            <div class="stats-grid">
+                <div class="stat-card ${currentFilter === 'pending' ? 'active' : ''}" onclick="window.app.setDashboardFilter('pending')">
+                    <div class="stat-label ${currentFilter === 'pending' ? 'text-warning' : ''}"><i class="fa-regular fa-square-check"></i> 未処理</div>
+                    <div class="stat-value">${stats.pending}件</div>
+                </div>
+                <div class="stat-card ${currentFilter === 'risk' ? 'active' : ''}" onclick="window.app.setDashboardFilter('risk')">
+                    <div class="stat-label ${currentFilter === 'risk' ? 'text-danger' : ''}"><i class="fa-solid fa-triangle-exclamation"></i> リスク要判定</div>
+                    <div class="stat-value">${stats.highRisk}件</div>
+                </div>
+                <div class="stat-card ${currentFilter === 'total' ? 'active' : ''}" onclick="window.app.setDashboardFilter('total')">
+                    <div class="stat-label"><i class="fa-solid fa-satellite-dish"></i> 監視中</div>
+                    <div class="stat-value text-muted">${stats.total}</div>
+                </div>
+            </div>
+
+            <h3 id="dashboard-section-title" style="font-size:16px; margin-bottom:16px; font-weight:600;">${sectionTitle}</h3>
+            <div class="table-container">
+                <table class="data-table dashboard-table">
+                    <thead>
+                        <tr>
+                            <th>リスク</th>
+                            <th>契約・規約名</th>
+                            <th>日付</th>
+                            <th>ステータス</th>
+                            <th>アクション</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dashboard-table-body">
+                        ${tableRows}
+                    </tbody>
+                </table>
+            </div>
+        `;
+};
+
 const Views = {
     loading: (viewId = 'dashboard') => {
         const titleMap = {
@@ -3198,6 +3273,26 @@ class DashboardApp {
         this.mainContent.innerHTML = Views.loading(viewId);
     }
 
+    recoverStuckDashboardSkeleton() {
+        if (this.currentView !== 'dashboard') return false;
+        if (!this.mainContent?.querySelector('.shell-skeleton')) return false;
+        try {
+            dbService.init();
+            this.mainContent.classList.remove('is-detail-view');
+            this.mainContent.innerHTML = renderDashboardOverview(this);
+            this.updateActiveMenu('dashboard');
+            this.updateRegistrationButtonVisibility('dashboard');
+            this.enforceDetailScrollLayout();
+            this.cacheRecentHistorySnapshot();
+            console.warn('Recovered dashboard from stuck loading skeleton');
+            return true;
+        } catch (error) {
+            console.error('Dashboard skeleton recovery failed:', error);
+            this.mainContent.innerHTML = '<div class="p-md text-danger">ダッシュボードの表示に失敗しました。ページを再読み込みしてください。</div>';
+            return false;
+        }
+    }
+
     cacheRecentHistorySnapshot() {
         try {
             const logs = dbService.getActivityLogs();
@@ -3892,6 +3987,7 @@ class DashboardApp {
                 window.history.scrollRestoration = 'manual';
             }
             this.renderInitialSkeleton('dashboard');
+            setTimeout(() => this.recoverStuckDashboardSkeleton(), 5000);
             const planNav = document.getElementById('nav-plan');
             if (planNav) planNav.style.display = '';
 
@@ -5249,6 +5345,11 @@ class DashboardApp {
     }
 
     async renderViewContent(viewId, renderParams = null) {
+        if (viewId === 'dashboard') {
+            this.mainContent.innerHTML = renderDashboardOverview(this);
+            return true;
+        }
+
         if (routes[viewId]) {
             const html = await navigateLazy(viewId, {
                 app: this,
