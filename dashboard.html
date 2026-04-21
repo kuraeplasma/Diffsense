@@ -174,18 +174,37 @@
     <main id="app-main">
         <!-- Dynamic Content Area -->
         <div id="app-content">
-            <div class="page-title">ダッシュボードを読み込み中</div>
-            <div class="shell-skeleton">
-                <div class="skeleton-block" style="width:42%"></div>
-                <div class="skeleton-block" style="width:66%"></div>
-                <div style="display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px;">
-                    <div class="skeleton-card"></div>
-                    <div class="skeleton-card"></div>
-                    <div class="skeleton-card"></div>
+            <div class="page-title">ダッシュボード</div>
+            <div class="stats-grid">
+                <div class="stat-card active">
+                    <div class="stat-label text-warning"><i class="fa-regular fa-square-check"></i> 未処理</div>
+                    <div class="stat-value">0件</div>
                 </div>
-                <div class="skeleton-row"></div>
-                <div class="skeleton-row"></div>
-                <div class="skeleton-row"></div>
+                <div class="stat-card">
+                    <div class="stat-label text-danger"><i class="fa-solid fa-triangle-exclamation"></i> リスク要判定</div>
+                    <div class="stat-value">0件</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label"><i class="fa-solid fa-satellite-dish"></i> 監視中</div>
+                    <div class="stat-value text-muted">0</div>
+                </div>
+            </div>
+            <h3 id="dashboard-section-title" style="font-size:16px; margin-bottom:16px; font-weight:600;">未処理のアイテム (新着・変更検知)</h3>
+            <div class="table-container">
+                <table class="data-table dashboard-table">
+                    <thead>
+                        <tr>
+                            <th>リスク</th>
+                            <th>契約・規約名</th>
+                            <th>日付</th>
+                            <th>ステータス</th>
+                            <th>アクション</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dashboard-table-body">
+                        <tr><td colspan="5" class="text-center text-muted" style="padding:40px;">該当するアイテムはありません</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </main>
@@ -354,7 +373,7 @@
     </div>
 
     <!-- App Logic -->
-    <script type="module" src="js/dashboard.js?v=20260422_no_skeleton"></script>
+    <script type="module" src="js/dashboard.js?v=20260422_static_dashboard"></script>
     <script type="module">
         import { requireAuth, handleLogout } from './js/auth.js?v=20260422_auth_timeout';
 
