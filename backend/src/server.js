@@ -1,6 +1,6 @@
 const path = require('path');
-// Load .env first (local development fallback)
-require('dotenv').config({ path: path.resolve(__dirname, '..', '.env'), override: true });
+// Load .env as a local development fallback without overriding production env vars.
+require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
 
 const express = require('express');
 const cors = require('cors');

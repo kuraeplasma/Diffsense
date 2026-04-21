@@ -255,13 +255,18 @@ const buildStoredContractAnalysis = (contract) => {
     const changes = Array.isArray(contract.ai_changes) ? contract.ai_changes.filter(Boolean) : [];
     const summary = String(contract.ai_summary || '').trim();
     const riskReason = String(contract.ai_risk_reason || '').trim();
-    if (!summary && changes.length === 0) return null;
+
+    // 解析成功フラグがある場合は、サマリーが空でもオブジェクトを返す
+    if (!summary && changes.length === 0 && !contract.ai_succeeded) return null;
+
     return {
-        summary: summary || 'AI解析が完了しました',
+        summary: summary || (contract.ai_succeeded ? 'AI解析が完了しました（要約なし）' : 'AI解析結果がありません'),
         riskLevel: contract.risk_level === 'High' ? 3 : (contract.risk_level === 'Medium' ? 2 : 1),
-        riskReason: riskReason || 'リスク判定が完了しました',
+        riskReason: riskReason || (contract.ai_succeeded ? 'リスク判定完了' : '未判定'),
         changes,
-        isFallback: contract.ai_is_fallback === true
+        isFallback: contract.ai_is_fallback === true,
+        aiSucceeded: contract.ai_succeeded === true,
+        isLimited: contract.ai_limited === true
     };
 };
 
@@ -1294,7 +1299,7 @@ const Views = {
             : null;
         const hasStructuredDifferences = Boolean(structuredFallbackAnalysis?.changes?.length);
         const latestCurrentPair = isCurrentVsLatestHistoryPair(documentOptions, selectedSourceDoc, selectedTargetDoc);
-        const storedContractAnalysis = latestCurrentPair ? buildStoredContractAnalysis(contract) : null;
+        const storedContractAnalysis = (latestCurrentPair || (documentOptions.length === 1 && selectedTargetDoc?.is_current)) ? buildStoredContractAnalysis(contract) : null;
         const hasExplicitNoDiffResult = hasStructuredDifferences
             && Boolean(selectedDiffPayload)
             && isExplicitNoDiffAnalysis(selectedDiffPayload);
@@ -1377,120 +1382,121 @@ const Views = {
         const sourceType = String(contract?.source_type || '').toUpperCase();
         const isPdfSource = sourceType === 'PDF' || (contract?.original_filename || '').toLowerCase().endsWith('.pdf');
         const hasPdfPreview = Boolean(resolvedPdfPreviewUrl);
-        // Align with production expectation: keep "原本全文" as structured text view even for PDF.
         const showPdfViewerInRightPane = false;
 
-        // AI解析結果があればそれを使用、なければ静的コンテンツまたはデフォルト
         const hasComparableVersion = documentOptions.length >= 2;
         const hasAIResults = !!contract.last_analyzed_at;
-        // 単独ドキュメント（比較なし・AI未解析）はdiffタブを非表示にする（commit 2f88c39の修正を復元）
         const shouldHideDiffTab = !comparisonContext && !hasComparableVersion && !hasAIResults;
         const activeTab = shouldHideDiffTab ? 'original' : requestedActiveTab;
         const canTriggerPairAnalysis = Boolean(selectedSourceDoc && selectedTargetDoc && window.app?.can('operate_contract'));
 
-        let diffData;
-        if (effectiveSelectedDiffData) {
-            const cached = effectiveSelectedDiffData?.isFallback === true
-                ? {
-                    summary: String(effectiveSelectedDiffData.summary || 'AI差分要約を取得できませんでした。再解析を実行してください。').trim() || 'AI差分要約を取得できませんでした。再解析を実行してください。',
-                    riskLevel: effectiveSelectedDiffData.riskLevel ?? 1,
-                    riskReason: String(effectiveSelectedDiffData.riskReason || 'AI差分要約未取得').trim() || 'AI差分要約未取得',
-                    changes: Array.isArray(effectiveSelectedDiffData.changes) ? effectiveSelectedDiffData.changes.filter(Boolean) : [],
+        let diffData = {
+            summary: '',
+            riskLevel: 1,
+            riskReason: '',
+            changes: [],
+            aiSucceeded: !!contract.ai_succeeded,
+            isLimited: !!contract.ai_limited
+        };
+
+        try {
+            console.log(`[DEBUG] Preparing diffData for contract ${id}, activeTab=${activeTab}`);
+            if (effectiveSelectedDiffData) {
+                const cached = effectiveSelectedDiffData?.isFallback === true
+                    ? {
+                        summary: String(effectiveSelectedDiffData.summary || 'AI差分要約を取得できませんでした。再解析を実行してください。').trim() || 'AI差分要約を取得できませんでした。再解析を実行してください。',
+                        riskLevel: effectiveSelectedDiffData.riskLevel ?? 1,
+                        riskReason: String(effectiveSelectedDiffData.riskReason || 'AI差分要約未取得').trim() || 'AI差分要約未取得',
+                        changes: Array.isArray(effectiveSelectedDiffData.changes) ? effectiveSelectedDiffData.changes.filter(Boolean) : [],
+                        isFallback: true
+                    }
+                    : sanitizeAnalysisPayload(effectiveSelectedDiffData);
+                diffData = {
+                    title: `${contract.name} - 文書比較`,
+                    summary: cached.summary || '選択した2文書の差分結果を表示しています。',
+                    riskLevel: cached.riskLevel ?? 1,
+                    riskReason: cached.riskReason || '保存済みの差分結果を表示しています。',
+                    changes: cached.changes || [],
+                    isFallback: cached.isFallback === true,
+                    aiSucceeded: cached.aiSucceeded ?? contract.ai_succeeded,
+                    isLimited: cached.isLimited ?? contract.ai_limited
+                };
+            } else if (shouldShowStructuredFallbackPanel && structuredFallbackAnalysis) {
+                diffData = {
+                    title: `${contract.name} - 文書比較`,
+                    summary: structuredFallbackAnalysis.summary || '変更点を表示しています。',
+                    riskLevel: structuredFallbackAnalysis.riskLevel ?? 1,
+                    riskReason: structuredFallbackAnalysis.riskReason || '変更点を表示しています',
+                    changes: Array.isArray(structuredFallbackAnalysis.changes) ? structuredFallbackAnalysis.changes : [],
+                    isFallback: false
+                };
+            } else if (hasFallbackNoDiffResult) {
+                diffData = {
+                    title: `${contract.name} - 文書比較`,
+                    summary: 'AI差分要約を取得できませんでした。再解析を実行してください。',
+                    riskLevel: 1,
+                    riskReason: 'AI差分要約未取得',
+                    changes: [],
                     isFallback: true
-                }
-                : sanitizeAnalysisPayload(effectiveSelectedDiffData);
-            diffData = {
-                title: `${contract.name} - 文書比較`,
-                summary: cached.summary || '選択した2文書の差分結果を表示しています。',
-                riskLevel: cached.riskLevel ?? 1,
-                riskReason: cached.riskReason || '保存済みの差分結果を表示しています。',
-                changes: cached.changes || [],
-                isFallback: cached.isFallback === true,
-                aiSucceeded: cached.aiSucceeded ?? contract.ai_succeeded,
-                isLimited: cached.isLimited ?? contract.ai_limited
-            };
-        } else if (shouldShowStructuredFallbackPanel && structuredFallbackAnalysis) {
-            diffData = {
-                title: `${contract.name} - 文書比較`,
-                summary: structuredFallbackAnalysis.summary || '変更点を表示しています。',
-                riskLevel: structuredFallbackAnalysis.riskLevel ?? 1,
-                riskReason: structuredFallbackAnalysis.riskReason || '変更点を表示しています',
-                changes: Array.isArray(structuredFallbackAnalysis.changes) ? structuredFallbackAnalysis.changes : [],
-                isFallback: false
-            };
-        } else if (hasFallbackNoDiffResult) {
-            diffData = {
-                title: `${contract.name} - 文書比較`,
-                summary: 'AI差分要約を取得できませんでした。再解析を実行してください。',
-                riskLevel: 1,
-                riskReason: 'AI差分要約未取得',
-                changes: [],
-                isFallback: true
-            };
-        } else if (selectedSourceDoc && selectedTargetDoc) {
-            diffData = {
-                title: `${contract.name} - 文書比較`,
-                summary: 'この文書ペアのAI差分要約はまだ保存されていません。必要に応じてAI差分解析を実行してください。',
-                riskLevel: 1,
-                riskReason: 'AI差分未保存',
-                changes: [],
-                isFallback: false
-            };
-        } else if (comparisonContext?.analysis) {
-            diffData = {
-                title: `${contract.name} - 比較解析`,
-                summary: comparisonContext.analysis.summary || '選択した履歴との差分比較を表示しています。',
-                riskLevel: comparisonContext.analysis.riskLevel ?? 1,
-                riskReason: comparisonContext.analysis.riskReason || '選択した履歴との差分を解析しました。',
-                changes: comparisonContext.analysis.changes || [],
-                isFallback: comparisonContext.analysis.isFallback === true
-            };
-        } else if (comparisonContext?.analysisNotice) {
-            diffData = {
-                title: `${contract.name} - 比較表示`,
-                summary: comparisonContext.analysisNotice,
-                riskLevel: 1,
-                riskReason: '比較表示のみ',
-                changes: [],
-                isFallback: false
-            };
-        } else if (hasAIResults) {
-            const normalizedStored = sanitizeAnalysisPayload({
-                summary: contract.ai_summary || contract.summary || '',
-                riskLevel: contract.risk_level === 'High' ? 3 : (contract.risk_level === 'Medium' ? 2 : 1),
-                riskReason: contract.ai_risk_reason || contract.risk_reason || '',
-                changes: contract.ai_changes || [],
-                isFallback: contract.ai_is_fallback === true
-            });
-            // AI解析結果を使用
-            diffData = {
-                title: `${contract.name} - AI解析結果`,
-                summary: normalizedStored.summary || 'AI解析が完了しました',
-                riskLevel: normalizedStored.riskLevel ?? 1,
-                riskReason: normalizedStored.riskReason || 'リスク判定が完了しました',
-                changes: normalizedStored.changes || [],
-                isFallback: normalizedStored.isFallback === true,
-                aiSucceeded: contract.ai_succeeded === true,
-                isLimited: contract.ai_limited === true
-            };
-        } else {
-            // デフォルトデータ
-            diffData = {
-                title: `${contract.name} - 詳細分析`,
-                summary: contract.status === '未解析'
-                    ? 'このドキュメントはまだAI解析されていません。新規登録から解析を実行してください。'
-                    : (!hasComparableVersion
-                        ? '比較対象の旧バージョンがないため、差分要約は表示されません。'
-                        : 'このドキュメントの最新の変更要約をAIが生成しています...'),
-                riskLevel: contract.risk_level === 'High' ? 3 : (contract.risk_level === 'Medium' ? 2 : 1),
-                riskReason: contract.status === '未解析'
-                    ? 'AI解析が未実行です'
-                    : (!hasComparableVersion
-                        ? '旧バージョンが未登録のため差分判定は未実行です'
-                        : '特定の変更箇所において、リスク要因が検知されました。詳細を確認してください。'),
-                changes: [],
-                isFallback: false
-            };
+                };
+            } else if (selectedSourceDoc && selectedTargetDoc) {
+                diffData = {
+                    title: `${contract.name} - 文書比較`,
+                    summary: 'この文書ペアのAI差分要約はまだ保存されていません。必要に応じてAI差分解析を実行してください。',
+                    riskLevel: 1,
+                    riskReason: 'AI差分未保存',
+                    changes: [],
+                    isFallback: false
+                };
+            } else if (comparisonContext?.analysis) {
+                diffData = {
+                    title: `${contract.name} - 比較解析`,
+                    summary: comparisonContext.analysis.summary || '選択した履歴との差分比較を表示しています。',
+                    riskLevel: comparisonContext.analysis.riskLevel ?? 1,
+                    riskReason: comparisonContext.analysis.riskReason || '選択した履歴との差分を解析しました。',
+                    changes: comparisonContext.analysis.changes || [],
+                    isFallback: comparisonContext.analysis.isFallback === true
+                };
+            } else if (comparisonContext?.analysisNotice) {
+                diffData = {
+                    title: `${contract.name} - 比較表示`,
+                    summary: comparisonContext.analysisNotice,
+                    riskLevel: 1,
+                    riskReason: '比較表示のみ',
+                    changes: [],
+                    isFallback: false
+                };
+            } else if (hasAIResults) {
+                const normalizedStored = sanitizeAnalysisPayload({
+                    summary: contract.ai_summary || contract.summary || '',
+                    riskLevel: contract.risk_level === 'High' ? 3 : (contract.risk_level === 'Medium' ? 2 : 1),
+                    riskReason: contract.ai_risk_reason || contract.risk_reason || '',
+                    changes: contract.ai_changes || [],
+                    isFallback: contract.ai_is_fallback === true
+                });
+                diffData = {
+                    title: `${contract.name} - AIリスク解析`,
+                    summary: normalizedStored.summary || 'AI解析結果を表示しています。',
+                    riskLevel: normalizedStored.riskLevel ?? 1,
+                    riskReason: normalizedStored.riskReason || 'AIリスク解析結果',
+                    changes: normalizedStored.changes || [],
+                    isFallback: normalizedStored.isFallback === true,
+                    aiSucceeded: !!contract.ai_succeeded,
+                    isLimited: !!contract.ai_limited
+                };
+            } else {
+                diffData = {
+                    title: `${contract.name} - 解析`,
+                    summary: 'AI解析結果がありません。',
+                    riskLevel: 1,
+                    riskReason: '未解析',
+                    changes: [],
+                    isFallback: false
+                };
+            }
+        } catch (e) {
+            console.error(`[ERROR] Views.diff data preparation failed:`, e);
+            throw e;
         }
 
         // デバッグ情報（開発時のみ表示）
@@ -1568,6 +1574,7 @@ const Views = {
 
         const mobileRiskTone = diffData.riskLevel >= 3 ? 'high' : (diffData.riskLevel >= 2 ? 'medium' : 'low');
         const mobileRiskLabel = diffData.riskLevel >= 3 ? 'High' : (diffData.riskLevel >= 2 ? 'Medium' : 'Low');
+        const isAnalyzingContract = Boolean(window.app?.analyzingContractIds?.has(Number(contract.id)));
         const mobilePrimaryAction = (() => {
             if (!window.app.can('operate_contract')) return null;
             if (!hasAIResults) {
@@ -1621,7 +1628,14 @@ const Views = {
                     </div>
                 </div>
 
-                ${contract.ai_limited ? `
+                ${isAnalyzingContract ? `
+                <section class="mobile-risk-sticky mobile-only" style="background:#f8fafc; border-top:1px solid #e2e8f0; padding:12px;" aria-label="解析中">
+                    <div style="display:flex; align-items:center; gap:10px; font-size:12px; color:#1a73e8;">
+                        <i class="fa-solid fa-spinner fa-spin"></i>
+                        <span style="font-weight:700;">AIが解析中です...</span>
+                    </div>
+                </section>
+                ` : (contract.ai_limited ? `
                 <section class="mobile-risk-sticky mobile-only" style="background:#fffcf5; border-top:1px solid #e8d9b8;" aria-label="アップグレード案内">
                     <div style="display:flex; align-items:center; gap:10px;">
                         <i class="fa-solid fa-crown" style="color:#c5a059;"></i>
@@ -1658,9 +1672,8 @@ const Views = {
                             </button>
                         </div>
                         <div class="pane-scroll-area">
-                            <!-- Desktop Analysis visibility -->
                             <div class="desktop-only">
-                                ${this.analyzingContractIds.has(Number(contract.id)) ? `
+                                ${isAnalyzingContract ? `
                                 <div class="skeleton-analysis" style="margin-bottom:24px;">
                                     <div class="analysis-section-title">
                                         <i class="fa-solid fa-spinner fa-spin text-primary"></i>
@@ -1677,34 +1690,7 @@ const Views = {
                                             <div style="width:75%; height:14px; background:#f1f5f9; border-radius:4px; animation: pulse 1.5s infinite; animation-delay: 0.4s;"></div>
                                         </div>
                                     </div>
-                                    <script>
-                                        (function() {
-                                            const statuses = ["差分を抽出しています...", "リスク要因を分析しています...", "要約を生成しています..."];
-                                            let idx = 0;
-                                            const el = document.getElementById('analysis-status-text');
-                                            if (el) {
-                                                const timer = setInterval(() => {
-                                                    if (!document.getElementById('analysis-status-text')) { clearInterval(timer); return; }
-                                                    idx = (idx + 1) % statuses.length;
-                                                    el.innerText = statuses[idx];
-                                                }, 2500);
-                                            }
-                                        })();
-                                    </script>
-                                </div>
-                                ` : (contract.ai_limited === true ? `
-                                <div style="background: linear-gradient(135deg, #fffcf5 0%, #fff8e6 100%); border: 1px solid #e8d9b8; border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(197, 160, 89, 0.08);">
-                                    <i class="fa-solid fa-crown" style="color: #c5a059; font-size: 2rem; margin-bottom: 12px; display: block;"></i>
-                                    <h3 style="color: #2b2623; margin: 0 0 8px; font-size: 16px;">AI詳細解析（制限中）</h3>
-                                    <p style="color: #8a7a6a; font-size: 13px; line-height: 1.6; margin-bottom: 16px;">
-                                        現在のプランではAIによる詳細な条文要約が制限されています。<br>
-                                        スタータープラン以上へのアップグレードで、全解析機能をご利用いただけます。
-                                    </p>
-                                    <button onclick="window.app.navigate('plan')" class="btn-dashboard btn-primary-action" style="padding: 10px 24px; background: #c5a059; border: none; border-radius: 8px; color: #fff; font-weight: 700; cursor: pointer;">
-                                        アップグレードを検討する
-                                    </button>
-                                </div>
-                                ` : (contract.ai_succeeded === true ? `
+                                ` : (contract.ai_succeeded ? `
                                 <div class="analysis-section-title">
                                     <span><i class="fa-solid fa-robot text-primary"></i> AIリスク要約</span>
                                 </div>
@@ -1723,6 +1709,7 @@ const Views = {
                                     AI解析結果を読み込めませんでした。再解析を試行してください。
                                 </div>
                                 ` : '')))}
+
                             </div>
 
                             ${(hasComparableVersion || hasAIResults) ? `
@@ -2077,12 +2064,10 @@ const Views = {
                         : '<div class="text-center text-muted" style="padding:40px;">原本データがありません</div>')
                 }
                     </div>
-                </div>`
-            }
-            </div>
+                </div>
             </div>
         </div>
-`;
+        `;
     },
 
     // 4. History is lazy-loaded from js/modules/history.js.
@@ -5514,7 +5499,9 @@ class DashboardApp {
                     }
                 }
             } catch (error) {
-                console.error(`View Render Error (${viewId}):`, error);
+                console.error(`[FATAL] View Render Error (${viewId}):`, error);
+                if (error.stack) console.error(error.stack);
+                Notify.error(`画面の描画に失敗しました: ${error.message}`);
                 if (viewId === 'diff') {
                     const contractId = typeof renderParams === 'object' ? renderParams?.id : renderParams;
                     const contract = dbService.getContractById(contractId);
