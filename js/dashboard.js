@@ -4,6 +4,38 @@ import { aiService } from './ai-service.js?v=20260309h2';
 import { getApiBaseUrl, shouldUseLocalDevAuthBypass } from './api-base.js';
 import { auth } from './firebase-config.js';
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+// =========================================================================
+// Lazy route loader (additive scaffolding).
+// Does NOT replace App.navigate(). Intended for future incremental
+// module extraction. See /js/modules/.
+// =========================================================================
+const routes = {
+    dashboard: () => import('./modules/dashboard.js'),
+    contracts: () => import('./modules/contracts.js'),
+    history: () => import('./modules/history.js'),
+    team: () => import('./modules/team.js'),
+};
+
+async function navigateLazy(page, renderOptions = {}) {
+    const loader = routes[page];
+    if (!loader) return;
+    try {
+        const module = await loader();
+        if (module && module.render) {
+            return module.render(renderOptions);
+        }
+    } catch (e) {
+        console.error("lazy load error:", e);
+    }
+    return null;
+}
+
+// Expose for future call sites (no existing code depends on this yet).
+if (typeof window !== 'undefined') {
+    window.__diffsenseNavigateLazy = navigateLazy;
+    window.__diffsenseRoutes = routes;
+}
 const LOCAL_UI_CACHE_VERSION = '20260310v3';
 const DASHBOARD_CACHE_KEYS = {
     USER_META: `diffsense_cache_user_meta_${LOCAL_UI_CACHE_VERSION}`,
@@ -1298,184 +1330,11 @@ const Views = {
             </div>
         `;
     },
-    // 1. Dashboard Overview
-    dashboard: () => {
-        const stats = dbService.getStats();
-        const currentFilter = window.app ? window.app.dashboardFilter : 'pending';
-        const filteredItems = dbService.getFilteredContracts(currentFilter);
+    // 1. Dashboard Overview is lazy-loaded from js/modules/dashboard.js.
+    dashboard: null,
 
-        let sectionTitle = "要確認アイテム (優先度順)";
-        if (currentFilter === 'pending') sectionTitle = "未処理のアイテム (新着・変更検知)";
-        if (currentFilter === 'risk') sectionTitle = "リスク要判定アイテム";
-        if (currentFilter === 'total') sectionTitle = "全監視対象（最新順）";
-
-        const tableRows = filteredItems.length > 0 ? filteredItems.slice(0, 10).map(c => {
-            let riskBadgeClass = 'badge-neutral';
-            if (c.risk_level === 'High') riskBadgeClass = 'badge-danger';
-            else if (c.risk_level === 'Medium') riskBadgeClass = 'badge-warning';
-            else if (c.risk_level === 'Low') riskBadgeClass = 'badge-success';
-
-            let statusBadge = '';
-            if (c.status === '未解析') statusBadge = '<span class="badge badge-info">未解析 (新規)</span>';
-            else if (c.status === '未処理') statusBadge = '<span class="badge badge-info">未処理</span>';
-            else if (c.status === '未確認') statusBadge = '<span class="badge badge-warning">要確認 (変更)</span>';
-            else if (c.status === '確認済') statusBadge = '<span class="badge badge-neutral"><i class="fa-solid fa-check"></i> 確認済</span>';
-
-            const actionBtn = window.app.can('operate_contract')
-                ? `<button class="btn-dashboard">${c.status === '確認済' ? '履歴を見る' : '確認する'}</button>`
-                : `<button class="btn-dashboard">詳細を見る</button>`;
-
-            return `
-                <tr onclick="window.app.navigate('diff', ${c.id})">
-                    <td><span class="badge ${riskBadgeClass}">${c.risk_level === 'High' ? 'High' : (c.risk_level === 'Medium' ? 'Medium' : (c.risk_level === 'Low' ? 'Low' : c.risk_level))}</span></td>
-                    <td class="col-name" title="${escapeHtmlText(c.name)}">${escapeHtmlText(c.name)}</td>
-                    <td>${formatDisplayTimestamp(c.last_updated_at || c.last_analyzed_at || c.created_at)}</td>
-                    <td>${statusBadge}</td>
-                    <td>${actionBtn}</td>
-                </tr>
-            `;
-        }).join('') : '<tr><td colspan="5" class="text-center text-muted" style="padding:40px;">該当するアイテムはありません</td></tr>';
-
-        return `
-            <div class="page-title">ダッシュボード</div>
-            <div class="stats-grid">
-                <div class="stat-card ${currentFilter === 'pending' ? 'active' : ''}" onclick="window.app.setDashboardFilter('pending')">
-                    <div class="stat-label ${currentFilter === 'pending' ? 'text-warning' : ''}"><i class="fa-regular fa-square-check"></i> 未処理</div>
-                    <div class="stat-value">${stats.pending}件</div>
-                </div>
-                <div class="stat-card ${currentFilter === 'risk' ? 'active' : ''}" onclick="window.app.setDashboardFilter('risk')">
-                    <div class="stat-label ${currentFilter === 'risk' ? 'text-danger' : ''}"><i class="fa-solid fa-triangle-exclamation"></i> リスク要判定</div>
-                    <div class="stat-value">${stats.highRisk}件</div>
-                </div>
-                <div class="stat-card ${currentFilter === 'total' ? 'active' : ''}" onclick="window.app.setDashboardFilter('total')">
-                    <div class="stat-label"><i class="fa-solid fa-satellite-dish"></i> 監視中</div>
-                    <div class="stat-value text-muted">${stats.total}</div>
-                </div>
-            </div>
-
-            <h3 id="dashboard-section-title" style="font-size:16px; margin-bottom:16px; font-weight:600;">${sectionTitle}</h3>
-            <div class="table-container">
-                <table class="data-table dashboard-table">
-                    <thead>
-                        <tr>
-                            <th>リスク</th>
-                            <th>契約・規約名</th>
-                            <th>日付</th>
-                            <th>ステータス</th>
-                            <th>アクション</th>
-                        </tr>
-                    </thead>
-                    <tbody id="dashboard-table-body">
-                        ${tableRows}
-                    </tbody>
-                </table>
-            </div>
-        `;
-    },
-
-    // 2. Contract List
-    contracts: (params) => {
-        const page = params?.page || 1;
-        const pageSize = 10;
-        const appFilters = window.app ? window.app.filters : {};
-
-        const { items, totalPages, totalItems } = dbService.getPaginatedContracts(page, pageSize, params);
-
-        const rows = items.map(c => {
-            let riskBadge = '';
-            if (c.risk_level === 'High') riskBadge = '<span class="badge badge-danger">High</span>';
-            else if (c.risk_level === 'Medium') riskBadge = '<span class="badge badge-warning">Medium</span>';
-            else if (c.risk_level === 'Low') riskBadge = '<span class="badge badge-success">Low</span>';
-            else riskBadge = '<span class="badge badge-neutral">-</span>';
-
-            const statusBadge = c.status === '確認済'
-                ? '<span class="badge badge-neutral"><i class="fa-solid fa-check"></i> 確認済</span>'
-                : '<span class="badge badge-warning">未確認</span>';
-
-            return `
-                <tr onclick="window.app.navigate('diff', ${c.id})">
-                    <td class="col-name" title="${escapeHtmlText(c.name)}">${escapeHtmlText(c.name)}</td>
-                    <td>${escapeHtmlText(c.type)}</td>
-                    <td>${formatDisplayTimestamp(c.last_updated_at || c.last_analyzed_at || c.created_at)}</td>
-                    <td>${riskBadge}</td>
-                    <td>${statusBadge}</td>
-                    <td>${c.assignee_name}</td>
-                </tr>
-            `;
-        }).join('');
-
-        return `
-            <div class="flex justify-between items-center mb-md">
-                <h2 class="page-title" style="margin-bottom:0;">契約・規約管理</h2>
-                <div class="flex gap-sm">
-                </div>
-            </div>
-
-            <div class="filter-bar mb-md">
-                <div class="flex flex-wrap gap-md items-center">
-                    <div style="position:relative; flex:1; min-width:250px;">
-                        <i class="fa-solid fa-magnifying-glass" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:#999;"></i>
-                        <input type="text" id="contract-search" placeholder="契約名・種別・担当者で検索..." 
-                               value="${appFilters.query || ''}"
-                               style="padding:8px 12px 8px 36px; border:1px solid #ddd; border-radius:4px; width:100%; font-size:13px;"
-                               oninput="window.app.updateFilter('query', this.value)">
-                    </div>
-                    
-                    <div class="flex gap-sm items-center">
-                        <span class="text-muted" style="font-size:12px;">リスク:</span>
-                        <select onchange="window.app.updateFilter('risk', this.value)" style="padding:6px 8px; border:1px solid #ddd; border-radius:4px; font-size:13px;">
-                            <option value="all" ${appFilters.risk === 'all' ? 'selected' : ''}>すべて</option>
-                            <option value="High" ${appFilters.risk === 'High' ? 'selected' : ''}>High</option>
-                            <option value="Medium" ${appFilters.risk === 'Medium' ? 'selected' : ''}>Medium</option>
-                            <option value="Low" ${appFilters.risk === 'Low' ? 'selected' : ''}>Low</option>
-                        </select>
-                    </div>
-
-                    <div class="flex gap-sm items-center">
-                        <span class="text-muted" style="font-size:12px;">状態:</span>
-                        <select onchange="window.app.updateFilter('status', this.value)" style="padding:6px 8px; border:1px solid #ddd; border-radius:4px; font-size:13px;">
-                            <option value="all" ${appFilters.status === 'all' ? 'selected' : ''}>すべて</option>
-                            <option value="未確認" ${appFilters.status === '未確認' ? 'selected' : ''}>未確認</option>
-                            <option value="確認済" ${appFilters.status === '確認済' ? 'selected' : ''}>確認済</option>
-                        </select>
-                    </div>
-
-                    <div class="flex gap-sm items-center">
-                        <span class="text-muted" style="font-size:12px;">種別:</span>
-                        <select onchange="window.app.updateFilter('type', this.value)" style="padding:6px 8px; border:1px solid #ddd; border-radius:4px; font-size:13px;">
-                            <option value="all" ${appFilters.type === 'all' ? 'selected' : ''}>すべて</option>
-                            ${(() => { const fixed = ['利用規約','NDA','業務委託契約','プライバシーポリシー']; const dynamic = dbService.getContracts().map(c => c.type).filter(Boolean); const types = [...new Set([...fixed, ...dynamic.filter(t => t !== 'その他')])]; types.push('その他'); return types.map(t => `<option value="${t}" ${appFilters.type === t ? 'selected' : ''}>${t}</option>`).join(''); })()}
-                        </select>
-                    </div>
-                </div>
-            </div>
-
-            <div class="table-container">
-                <table class="data-table contracts-table">
-                    <thead>
-                        <tr>
-                            <th>契約・規約名</th>
-                            <th>種別</th>
-                            <th>最終更新</th>
-                            <th>リスク</th>
-                            <th>状態</th>
-                            <th>担当者</th>
-                        </tr>
-                    </thead>
-                    <tbody>${rows || '<tr><td colspan="6" class="text-center text-muted" style="padding:40px;">該当する契約が見つかりませんでした</td></tr>'}</tbody>
-                </table>
-            </div>
-
-            <div class="flex justify-between items-center mt-md">
-                <div class="text-muted" style="font-size:13px;">全 ${totalItems} 件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, totalItems)} 件を表示</div>
-                <div class="flex gap-sm">
-                    <button class="btn-dashboard" ${page <= 1 ? 'disabled' : ''} onclick="window.app.changePage(${page - 1})">前へ</button>
-                    <div style="display:flex; align-items:center; padding:0 12px; font-size:13px; font-weight:600;">${page} / ${totalPages || 1}</div>
-                    <button class="btn-dashboard" ${page >= totalPages ? 'disabled' : ''} onclick="window.app.changePage(${page + 1})">次へ</button>
-                </div>
-            </div>
-`;
-    },
+    // 2. Contract List is lazy-loaded from js/modules/contracts.js.
+    contracts: null,
 
     // 3. Diff Details
     diff: (id) => {
@@ -2230,84 +2089,11 @@ const Views = {
 `;
     },
 
-    // 4. History
-    history: () => {
-        const liveLogs = dbService.getActivityLogs();
-        const cachedLogs = window.app?.getCachedItem(DASHBOARD_CACHE_KEYS.RECENT_HISTORY, 10 * 60 * 1000) || [];
-        const logs = Array.isArray(liveLogs) && liveLogs.length > 0 ? liveLogs : cachedLogs;
-        const rows = logs.map(h => {
-            let statusBadge = 'badge-neutral';
-            if (h.status === '成功') statusBadge = 'badge-success';
-            else if (h.status === '失敗') statusBadge = 'badge-danger';
-            else if (h.status === 'スキップ') statusBadge = 'badge-info';
+    // 4. History is lazy-loaded from js/modules/history.js.
+    history: null,
 
-            return `
-                <tr>
-                    <td>${h.created_at}</td>
-                    <td class="col-name" title="${escapeHtmlText(h.target_name)}">${escapeHtmlText(h.target_name)}</td>
-                    <td><span class="badge ${statusBadge}">${h.status || '成功'}</span></td>
-                    <td>${h.action}</td>
-                    <td>${h.actor}</td>
-                    <td><button class="btn-dashboard" style="padding:2px 8px; font-size:11px;" onclick="window.app.showLogDetails(${h.id})">詳細</button></td>
-                </tr>
-            `;
-        }).join('');
-
-        return `
-            <h2 class="page-title">解析ログ・監査履歴</h2>
-            <div class="table-container">
-            <table class="data-table history-table">
-                <thead>
-                    <tr>
-                        <th>日時</th>
-                        <th>対象</th>
-                        <th>ステータス</th>
-                        <th>操作/種別</th>
-                        <th>実行者</th>
-                        <th>詳細</th>
-                    </tr>
-                </thead>
-                <tbody>${rows || '<tr><td colspan="6" class="text-center text-muted">履歴はありません</td></tr>'}</tbody>
-            </table>
-        </div>
-`;
-    },
-
-    // 5. Team
-    team: () => {
-        const users = dbService.getUsers();
-        const limit = dbService.PLAN_LIMITS[window.app.subscription?.plan] || 1;
-        const rows = users.map(m => `
-    <tr>
-                <td class="col-name" title="${m.name}">${m.name}</td>
-            <td>${m.email}</td>
-            <td><span class="badge ${m.role === '管理者' ? 'badge-warning' : (m.role === '作業者' ? 'badge-success' : 'badge-neutral')}">${m.role}</span></td>
-            <td>${m.last_active_at}</td>
-            <td>${window.app.can('manage_team') ? `<button class="btn-dashboard" onclick="window.app.showEditMemberModal('${m.email}')">編集</button>` : '-'}</td>
-        </tr>
-    `).join('');
-
-        return `
-    <div class="flex justify-between items-center mb-md">
-        <h2 class="page-title" style="margin-bottom:0;">チーム管理 <small style="font-size:14px; font-weight:normal; color:#666; margin-left:12px;">(${users.length} / ${limit} 名)</small></h2>
-                ${window.app.can('manage_team') ? `<button class="btn-dashboard btn-primary-action" onclick="window.app.showInviteModal()"><i class="fa-solid fa-user-plus"></i> メンバー招待</button>` : ''}
-            </div>
-    <div class="table-container">
-        <table class="data-table team-table">
-            <thead>
-                <tr>
-                    <th>名前</th>
-                    <th>メールアドレス</th>
-                    <th>権限</th>
-                    <th>最終アクティブ</th>
-                    <th>操作</th>
-                </tr>
-            </thead>
-            <tbody>${rows}</tbody>
-        </table>
-    </div>
-`;
-    },
+    // 5. Team is lazy-loaded from js/modules/team.js.
+    team: null,
     mcp: () => {
         const mcpKey = window.app.mcpKey || '';
         const maskedKey = window.app.mcpKeyMasked || (mcpKey ? `mcp_••••••••••••${mcpKey.slice(-4)}` : '未発行');
@@ -5454,6 +5240,28 @@ class DashboardApp {
         }
     }
 
+    async renderViewContent(viewId, renderParams = null) {
+        if (routes[viewId]) {
+            const html = await navigateLazy(viewId, {
+                app: this,
+                dbService,
+                DASHBOARD_CACHE_KEYS,
+                escapeHtmlText,
+                formatDisplayTimestamp,
+                params: renderParams
+            });
+            if (typeof html !== 'string') {
+                throw new Error('Dashboard module did not return HTML');
+            }
+            this.mainContent.innerHTML = html;
+            return true;
+        }
+
+        if (!Views[viewId]) return false;
+        this.mainContent.innerHTML = Views[viewId](renderParams);
+        return true;
+    }
+
     async navigate(viewId, params = null) {
         console.log(`Navigating to ${viewId}`, params);
 
@@ -5642,9 +5450,10 @@ class DashboardApp {
             }
         });
 
-        if (Views[viewId]) {
+        if (Views[viewId] || routes[viewId]) {
             try {
-                this.mainContent.innerHTML = Views[viewId](renderParams);
+                const rendered = await this.renderViewContent(viewId, renderParams);
+                if (!rendered) return;
 
                 const titles = {
                     'dashboard': 'ダッシュボード',
@@ -5679,12 +5488,17 @@ class DashboardApp {
                 if (viewId === 'dashboard' || viewId === 'contracts') {
                     const syncedViewId = viewId;
                     const syncedRenderParams = renderParams;
-                    this.syncContractsInBackground(() => {
-                        if (this.currentView !== syncedViewId || !Views[syncedViewId]) return;
-                        this.mainContent.innerHTML = Views[syncedViewId](syncedRenderParams);
-                        this.enforceDetailScrollLayout();
-                        if (syncedViewId === 'dashboard') {
-                            this.cacheRecentHistorySnapshot();
+                    this.syncContractsInBackground(async () => {
+                        try {
+                            if (this.currentView !== syncedViewId) return;
+                            const rerendered = await this.renderViewContent(syncedViewId, syncedRenderParams);
+                            if (!rerendered) return;
+                            this.enforceDetailScrollLayout();
+                            if (syncedViewId === 'dashboard') {
+                                this.cacheRecentHistorySnapshot();
+                            }
+                        } catch (error) {
+                            console.warn('Background view rerender failed:', error);
                         }
                     });
                 }

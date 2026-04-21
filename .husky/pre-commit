@@ -1,0 +1,7 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Phase 1: lint new/non-legacy files only (legacy files are in .eslintignore).
+# Fails commit on ESLint errors and forbidden module patterns.
+npm run lint
+npm run security-patterns

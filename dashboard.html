@@ -3,6 +3,45 @@
 
 <head>
     <meta charset="UTF-8">
+    <!--
+      Content-Security-Policy (Phase 1: Report-Only)
+      ------------------------------------------------
+      Enforces no blocking yet; browser only REPORTS violations (DevTools console).
+      After a sprint of monitoring with no legitimate violations, flip the header
+      name from `Content-Security-Policy-Report-Only` to `Content-Security-Policy`
+      to enforce. 'unsafe-inline' is kept because dashboard.js renders UI via
+      template strings with onclick= and inline <style> blocks; removing those
+      is a separate refactor task.
+    -->
+    <meta http-equiv="Content-Security-Policy-Report-Only" content="
+        default-src 'self' https:;
+        script-src 'self' 'unsafe-inline' 'unsafe-eval'
+            https://www.googletagmanager.com
+            https://www.google-analytics.com
+            https://www.gstatic.com
+            https://apis.google.com
+            https://js.stripe.com
+            https://cdnjs.cloudflare.com;
+        style-src 'self' 'unsafe-inline'
+            https://fonts.googleapis.com
+            https://cdnjs.cloudflare.com;
+        font-src 'self' data:
+            https://fonts.gstatic.com
+            https://cdnjs.cloudflare.com;
+        img-src 'self' data: blob: https:;
+        connect-src 'self'
+            http://localhost:3001
+            https://api-qf37m5ba2q-an.a.run.app
+            https://diffsense.spacegleam.co.jp
+            https://*.googleapis.com
+            https://*.firebaseio.com
+            https://*.google-analytics.com
+            https://identitytoolkit.googleapis.com
+            https://securetoken.googleapis.com;
+        frame-src 'self' https://js.stripe.com https://*.firebaseapp.com;
+        object-src 'none';
+        base-uri 'self';
+    ">
     <script>
         // Cloud Runウォームアップ
         (function() {
@@ -315,7 +354,7 @@
     </div>
 
     <!-- App Logic -->
-    <script type="module" src="js/dashboard.js?v=20260407_pdfidb"></script>
+    <script type="module" src="js/dashboard.js?v=20260422_lazy_security"></script>
     <script type="module">
         import { requireAuth, handleLogout } from './js/auth.js?v=20260311d';
 

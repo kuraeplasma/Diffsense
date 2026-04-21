@@ -1,0 +1,16 @@
+# Ignore generated / third-party / legacy files during Phase 1.
+# New modules under js/modules/ WILL be linted.
+node_modules/
+dist/
+build/
+.netlify/
+.firebase/
+backend/node_modules/
+coverage/
+
+# Legacy pre-refactor files (will be migrated incrementally).
+# Only js/modules/** is linted in Phase 1; all other top-level js/*.js is legacy.
+js/*.js
+
+# Backend has its own workflow.
+backend/
