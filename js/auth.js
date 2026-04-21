@@ -1,4 +1,4 @@
-import { auth } from './firebase-config.js?v=20260311c';
+import { auth } from './firebase-config.js?v=20260422_auth_timeout';
 import { Notify } from './notify.js';
 
 import {

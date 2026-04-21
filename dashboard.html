@@ -354,9 +354,9 @@
     </div>
 
     <!-- App Logic -->
-    <script type="module" src="js/dashboard.js?v=20260422_lazy_security"></script>
+    <script type="module" src="js/dashboard.js?v=20260422_auth_timeout"></script>
     <script type="module">
-        import { requireAuth, handleLogout } from './js/auth.js?v=20260311d';
+        import { requireAuth, handleLogout } from './js/auth.js?v=20260422_auth_timeout';
 
         // Protect Route
         requireAuth();

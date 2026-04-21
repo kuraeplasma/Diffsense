@@ -2,7 +2,7 @@ import { Notify } from './notify.js';
 import { dbService } from './db-service.js?v=20260321f';
 import { aiService } from './ai-service.js?v=20260309h2';
 import { getApiBaseUrl, shouldUseLocalDevAuthBypass } from './api-base.js';
-import { auth } from './firebase-config.js';
+import { auth } from './firebase-config.js?v=20260422_auth_timeout';
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 // =========================================================================
@@ -42,6 +42,37 @@ const DASHBOARD_CACHE_KEYS = {
     SUBSCRIPTION: `diffsense_cache_subscription_${LOCAL_UI_CACHE_VERSION}`,
     RECENT_HISTORY: `diffsense_cache_recent_history_${LOCAL_UI_CACHE_VERSION}`
 };
+
+const waitForAuthStateReady = (authInstance, timeoutMs = 4000) => new Promise((resolve) => {
+    if (!authInstance || shouldUseLocalDevAuthBypass()) {
+        resolve(null);
+        return;
+    }
+
+    const currentUser = authInstance.currentUser;
+    if (currentUser) {
+        resolve(currentUser);
+        return;
+    }
+
+    let settled = false;
+    let unsubscribe = null;
+    const finish = (user = null) => {
+        if (settled) return;
+        settled = true;
+        if (unsubscribe) unsubscribe();
+        resolve(user || authInstance.currentUser || null);
+    };
+
+    const timer = setTimeout(() => finish(null), timeoutMs);
+    unsubscribe = onAuthStateChanged(authInstance, (user) => {
+        clearTimeout(timer);
+        finish(user);
+    }, () => {
+        clearTimeout(timer);
+        finish(null);
+    });
+});
 
 // MCP: URL Resolution helper for Claude/Cursor
 // The OAuth discovery (.well-known/oauth-authorization-server) issuer is https://diffsense.spacegleam.co.jp/
@@ -3868,20 +3899,9 @@ class DashboardApp {
             // On localhost with local API, skip Firebase auth. With prodApi=1, require real auth.
             try {
                 if (!shouldUseLocalDevAuthBypass()) {
-                    const { auth } = await import('./firebase-config.js');
-                    const { onAuthStateChanged } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
-                    const user = auth.currentUser;
+                    const user = await waitForAuthStateReady(auth);
                     if (user) {
                         dbService.setCurrentUser(user.uid);
-                    } else {
-                        // Wait for auth state
-                        await new Promise((resolve) => {
-                            const unsubscribe = onAuthStateChanged(auth, (u) => {
-                                unsubscribe();
-                                if (u) dbService.setCurrentUser(u.uid);
-                                resolve();
-                            });
-                        });
                     }
                 }
             } catch (e) {
