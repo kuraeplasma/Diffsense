@@ -828,12 +828,7 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
 
         let extractedRawText = '';
         let conversionMethod = 'mammoth';
-
-        console.log({
-            step: "docx_to_pdf_start",
-            filename,
-            contentType
-        });
+        const filename = req.body.filename || 'unknown';
 
         try {
             // 1. まずはLibreOfficeでのPDF変換を試みる（原本性が高いため）
@@ -858,7 +853,8 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
             } catch (convError) {
                 logger.warn(`LibreOffice conversion failed for ${filename}, falling back to mammoth:`, convError.message);
                 // Fallback to mammoth
-                extractedRawText = await extractTextFromDocx(currentBuffer);
+                const mammothResult = await mammoth.extractRawText({ buffer: currentBuffer });
+                extractedRawText = mammothResult.value;
                 conversionMethod = 'mammoth';
             } finally {
                 if (fs.existsSync(docxTmpPath)) fs.unlinkSync(docxTmpPath);
