@@ -1,6 +1,6 @@
 import { Notify } from './notify.js';
 import { dbService } from './db-service.js?v=20260422_stability';
-import { aiService } from './ai-service.js?v=20260422_trigger_guard';
+import { aiService } from './ai-service.js?v=20260423_docx_async_fix';
 import { getApiBaseUrl, shouldUseLocalDevAuthBypass } from './api-base.js';
 import { auth } from './firebase-config.js?v=20260422_auth_timeout';
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";

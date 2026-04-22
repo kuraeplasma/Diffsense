@@ -1,6 +1,24 @@
 import { getIdToken } from './auth.js';
 import { getApiBaseUrl } from './api-base.js';
 
+const ACTIVE_CONTRACT_POLLS = new Map();
+
+function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function joinApiUrl(apiBase, endpointPath) {
+    try {
+        return new URL(endpointPath, `${String(apiBase || '').replace(/\/$/, '')}/`).toString();
+    } catch {
+        const normalizedBase = String(apiBase || '').replace(/\/$/, '');
+        const normalizedPath = String(endpointPath || '').startsWith('/')
+            ? endpointPath
+            : `/${endpointPath}`;
+        return `${normalizedBase}${normalizedPath}`;
+    }
+}
+
 /**
  * AI Service - Backend API Communication
  * バックエンドAPIとの通信を担当
@@ -65,8 +83,8 @@ export const aiService = {
             // Word解析は常に専用エンドポイントを使用
             // 一部環境の /contracts/analyze バリデーションでは docx が未許可のため
             const endpoint = (method === 'docx')
-                ? `${API_BASE}/api/docx/upload-async`
-                : `${API_BASE}/api/contracts/analyze`;
+                ? joinApiUrl(API_BASE, '/api/docx/upload-async')
+                : joinApiUrl(API_BASE, '/api/contracts/analyze');
 
             let fetchOptions = {
                 method: 'POST',
@@ -129,7 +147,7 @@ export const aiService = {
 
             if (result?.status === 'processing') {
                 console.log("AI Service: Asynchronous processing started, polling for result...");
-                return await this._pollContractStatus(contractId, token);
+                return await this._pollContractStatusOnce(contractId, token);
             }
 
             // Normalize DOCX full-analysis response shape.
@@ -177,27 +195,61 @@ export const aiService = {
     /**
      * Poll contract status until completion (Private)
      */
-    async _pollContractStatus(contractId, token, maxRetries = 60) {
+    async _pollContractStatusOnce(contractId, token) {
+        const key = String(contractId);
+        if (ACTIVE_CONTRACT_POLLS.has(key)) {
+            return ACTIVE_CONTRACT_POLLS.get(key);
+        }
+        const pollPromise = this._pollContractStatus(contractId, token)
+            .finally(() => ACTIVE_CONTRACT_POLLS.delete(key));
+        ACTIVE_CONTRACT_POLLS.set(key, pollPromise);
+        return pollPromise;
+    },
+
+    async _pollContractStatus(contractId, token, options = {}) {
         const apiBase = this.getApiBase();
-        let retries = 0;
-        
-        while (retries < maxRetries) {
-            retries++;
+        const pollOptions = {
+            maxChecks: Number.isFinite(options.maxChecks) ? options.maxChecks : 40,
+            initialDelayMs: Number.isFinite(options.initialDelayMs) ? options.initialDelayMs : 1500,
+            maxDelayMs: Number.isFinite(options.maxDelayMs) ? options.maxDelayMs : 8000,
+            maxConsecutiveErrors: Number.isFinite(options.maxConsecutiveErrors) ? options.maxConsecutiveErrors : 5,
+            perRequestTimeoutMs: Number.isFinite(options.perRequestTimeoutMs) ? options.perRequestTimeoutMs : 12000
+        };
+        let checkCount = 0;
+        let waitMs = pollOptions.initialDelayMs;
+        let consecutiveErrors = 0;
+
+        while (checkCount < pollOptions.maxChecks) {
+            checkCount++;
             // Update loading UI if present in DOM
             const loadingMsg = document.getElementById('reg-loading');
             if (loadingMsg) {
                 const subText = loadingMsg.querySelector('span');
-                if (subText) subText.textContent = `AI解析を実行中... (${Math.min(retries * 2, 99)}%)`;
+                if (subText) {
+                    const progress = Math.min(Math.floor((checkCount / pollOptions.maxChecks) * 95), 95);
+                    subText.textContent = `AI解析を実行中... (${progress}%)`;
+                }
             }
-            
-            await new Promise(r => setTimeout(r, 2500));
-            
+
+            await sleep(waitMs);
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), pollOptions.perRequestTimeoutMs);
             try {
-                const response = await fetch(`${apiBase}/api/contracts/${contractId}`, {
-                    headers: { 'Authorization': token ? `Bearer ${token}` : '' }
+                const response = await fetch(joinApiUrl(apiBase, `/api/contracts/${contractId}`), {
+                    headers: { 'Authorization': token ? `Bearer ${token}` : '' },
+                    signal: controller.signal
                 });
-                
+                clearTimeout(timeoutId);
+
+                if (response.status === 401 || response.status === 403) {
+                    const authError = new Error('認証の有効期限が切れました。再ログインしてください。');
+                    authError.isTerminal = true;
+                    throw authError;
+                }
+
                 if (response.ok) {
+                    consecutiveErrors = 0;
                     const polled = await response.json();
                     const contract = polled.data;
                     if (contract) {
@@ -221,15 +273,32 @@ export const aiService = {
                             };
                         }
                         if (contract.status === 'error') {
-                            throw new Error(contract.errorMessage || 'AI解析中にエラーが発生しました');
+                            const processingError = new Error(contract.errorMessage || 'AI解析中にエラーが発生しました');
+                            processingError.isTerminal = true;
+                            throw processingError;
                         }
                     }
+                } else {
+                    consecutiveErrors++;
+                    console.warn(`Polling HTTP error ${response.status} (attempt ${checkCount})`);
                 }
             } catch (e) {
-                console.warn(`Polling error (retry ${retries}):`, e);
+                clearTimeout(timeoutId);
+                if (e?.isTerminal) throw e;
+                consecutiveErrors++;
+                console.warn(`Polling error (attempt ${checkCount}):`, e);
             }
+
+            if (consecutiveErrors >= pollOptions.maxConsecutiveErrors) {
+                throw new Error('ステータス確認に連続で失敗しました。通信環境を確認して再試行してください。');
+            }
+
+            waitMs = Math.min(
+                pollOptions.maxDelayMs,
+                Math.round(waitMs * 1.45)
+            );
         }
-        throw new Error('解析の待ち時間がタイムアウトしました。バックグラウンドでの処理は継続されています。');
+        throw new Error('解析の待ち時間がタイムアウトしました。しばらく待って再読み込みしてください。');
     },
 
     normalizePreviousVersion(previousVersion) {

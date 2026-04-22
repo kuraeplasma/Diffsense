@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <script src="js/env.js"></script>
+    <script src="/js/env.js?v=20260423_docx_async_fix"></script>
     <!--
       Content-Security-Policy (Phase 1: Report-Only)
       ------------------------------------------------
@@ -375,9 +375,9 @@
     </div>
 
     <!-- App Logic -->
-    <script type="module" src="js/dashboard.js?v=20260422_initial_original"></script>
+    <script type="module" src="/js/dashboard.js?v=20260423_docx_async_fix"></script>
     <script type="module">
-        import { requireAuth, handleLogout } from './js/auth.js?v=20260422_auth_timeout';
+        import { requireAuth, handleLogout } from '/js/auth.js?v=20260423_docx_async_fix';
 
         // Protect Route
         requireAuth();

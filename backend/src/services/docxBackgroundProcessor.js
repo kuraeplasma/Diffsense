@@ -12,10 +12,14 @@ const mammoth = require('mammoth');
 /**
  * Extracts text from DOCX buffer using mammoth fallback
  */
-async function extractTextFromDocx(buffer) {
+async function extractTextFromDocx(buffer, timeoutMs = 45000) {
     try {
-        const result = await mammoth.extractRawText({ buffer });
-        return result.value;
+        const result = await withTimeout(
+            mammoth.extractRawText({ buffer }),
+            timeoutMs,
+            'Mammoth DOCX extraction'
+        );
+        return String(result?.value || '');
     } catch (error) {
         logger.error('Mammoth extraction failed:', error);
         return '';
@@ -33,7 +37,7 @@ async function resolvePreviousDocxArticles(previousVersion) {
             // Base64 file
             const base64 = previousVersion.split(',')[1] || previousVersion;
             const buffer = Buffer.from(base64, 'base64');
-            const text = await extractTextFromDocx(buffer);
+            const text = await extractTextFromDocx(buffer, 30000);
             return docxService.parseTextToArticles(text);
         }
         return docxService.parseTextToArticles(previousVersion);
@@ -116,6 +120,7 @@ async function processDocxBackground(contractId, currentBuffer, filename, conten
     let conversionMethod = 'mammoth';
     const shouldSkipAI = skipAI === 'true' || skipAI === true;
     const mammothMinCharsForFallback = readPositiveIntFromEnv('DOCX_MAMMOTH_MIN_CHARS', 80);
+    const mammothTimeoutMs = readPositiveIntFromEnv('DOCX_MAMMOTH_TIMEOUT_MS', 45000);
     const geminiTimeoutMs = readPositiveIntFromEnv('DOCX_AI_TIMEOUT_MS', 90000);
 
     try {
@@ -123,7 +128,7 @@ async function processDocxBackground(contractId, currentBuffer, filename, conten
         const extractionStartedAt = Date.now();
 
         // 1. Fast path: mammoth extraction first
-        extractedRawText = await extractTextFromDocx(currentBuffer);
+        extractedRawText = await extractTextFromDocx(currentBuffer, mammothTimeoutMs);
         conversionMethod = 'mammoth';
 
         // 2. Slow fallback: LibreOffice -> PDF extraction only when mammoth text is too short

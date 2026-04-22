@@ -64,9 +64,7 @@ router.post('/upload-async', upload.single('file'), async (req, res, next) => {
             source: sourcePayload
         });
 
-        res.once('finish', () => {
-            scheduleDocxJob(queued.jobId);
-        });
+        scheduleDocxJob(queued.jobId);
 
         // Immediate response
         return res.json({
