@@ -3,6 +3,7 @@ const path = require('path');
 const logger = require('../utils/logger');
 const dbService = require('./db');
 const docxService = require('./docxService');
+const pdfService = require('./pdf');
 const diffService = require('./diffService');
 const geminiService = require('./gemini');
 const { fromLegacyArticleArray } = require('./contractStructure');
@@ -56,6 +57,25 @@ function isAiFailureSummary(summary) {
     return /AI解析に失敗|解析の準備|テキスト抽出のみ完了|エラーが発生/.test(summary);
 }
 
+function readPositiveIntFromEnv(name, fallback) {
+    const raw = Number.parseInt(String(process.env[name] || ''), 10);
+    return Number.isFinite(raw) && raw > 0 ? raw : fallback;
+}
+
+async function withTimeout(task, timeoutMs, label) {
+    let timerId = null;
+    try {
+        return await Promise.race([
+            task,
+            new Promise((_, reject) => {
+                timerId = setTimeout(() => reject(new Error(`${label} timeout (${timeoutMs}ms)`)), timeoutMs);
+            })
+        ]);
+    } finally {
+        if (timerId) clearTimeout(timerId);
+    }
+}
+
 /**
  * Merge structured and general analysis
  */
@@ -95,37 +115,49 @@ async function processDocxBackground(contractId, currentBuffer, filename, conten
     let extractedRawText = '';
     let conversionMethod = 'mammoth';
     const shouldSkipAI = skipAI === 'true' || skipAI === true;
+    const mammothMinCharsForFallback = readPositiveIntFromEnv('DOCX_MAMMOTH_MIN_CHARS', 80);
+    const geminiTimeoutMs = readPositiveIntFromEnv('DOCX_AI_TIMEOUT_MS', 90000);
 
     try {
         logger.info(`Starting background DOCX processing for ${contractId} (${filename})`);
+        const extractionStartedAt = Date.now();
 
-        // 1. PDF Conversion (LibreOffice) fallback to mammoth
+        // 1. Fast path: mammoth extraction first
+        extractedRawText = await extractTextFromDocx(currentBuffer);
+        conversionMethod = 'mammoth';
+
+        // 2. Slow fallback: LibreOffice -> PDF extraction only when mammoth text is too short
         const tmpDir = path.join(__dirname, '../../tmp/docx-convert');
         if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
-        
-        const docxTmpPath = path.join(tmpDir, `upload-${Date.now()}-${contractId}.docx`);
-        fs.writeFileSync(docxTmpPath, currentBuffer);
-        
-        try {
-            const pdfPath = await docxService.convertToPdf(docxTmpPath);
-            if (fs.existsSync(pdfPath)) {
-                const pdfBuffer = fs.readFileSync(pdfPath);
-                const pdfData = await pdfService.extractTextFromPdf(pdfBuffer);
-                extractedRawText = pdfData.text;
-                conversionMethod = 'libreoffice_pdf';
-                fs.unlinkSync(pdfPath);
+
+        if (String(extractedRawText || '').trim().length < mammothMinCharsForFallback) {
+            const docxTmpPath = path.join(tmpDir, `upload-${Date.now()}-${contractId}.docx`);
+            fs.writeFileSync(docxTmpPath, currentBuffer);
+
+            try {
+                const pdfPath = await docxService.convertToPdf(docxTmpPath);
+                if (fs.existsSync(pdfPath)) {
+                    const pdfBuffer = fs.readFileSync(pdfPath);
+                    const pdfBase64 = `data:application/pdf;base64,${pdfBuffer.toString('base64')}`;
+                    const pdfData = await pdfService.extractText(pdfBase64);
+                    const pdfText = String(pdfData?.rawText || '').trim();
+                    if (pdfText.length > String(extractedRawText || '').trim().length) {
+                        extractedRawText = pdfText;
+                        conversionMethod = 'libreoffice_pdf';
+                    }
+                    fs.unlinkSync(pdfPath);
+                }
+            } catch (convError) {
+                logger.warn(`LibreOffice conversion skipped for ${filename}: ${convError.message}`);
+            } finally {
+                if (fs.existsSync(docxTmpPath)) fs.unlinkSync(docxTmpPath);
             }
-        } catch (convError) {
-            logger.warn(`LibreOffice conversion failed for ${filename}, falling back to mammoth: ${convError.message}`);
-            extractedRawText = await extractTextFromDocx(currentBuffer);
-            conversionMethod = 'mammoth';
-        } finally {
-            if (fs.existsSync(docxTmpPath)) fs.unlinkSync(docxTmpPath);
         }
 
         if (!extractedRawText) {
             throw new Error('テキストの抽出に失敗しました。');
         }
+        logger.info(`DOCX extraction finished for ${contractId}: method=${conversionMethod}, durationMs=${Date.now() - extractionStartedAt}`);
 
         const currentArticles = docxService.parseTextToArticles(extractedRawText);
         const structuredContract = fromLegacyArticleArray(currentArticles);
@@ -158,21 +190,31 @@ async function processDocxBackground(contractId, currentBuffer, filename, conten
             const previousText = normalizeContentToText(previousArticles);
 
             if (currentText.trim().length > 0) {
-                const geminiResult = await geminiService.analyzeContract(currentText, previousText);
-                aiResult = structuredPairAnalysis
-                    ? mergeStructuredAndGeneralAnalysis(structuredPairAnalysis, geminiResult)
-                    : {
-                        changes: diffChanges.length ? aiResult.changes : (geminiResult.changes || []),
-                        riskLevel: geminiResult.riskLevel,
-                        riskReason: geminiResult.riskReason,
-                        summary: geminiResult.summary,
-                        isFallback: geminiResult.isFallback === true,
-                        contract_meta: geminiResult.contract_meta
-                    };
+                try {
+                    const aiStartedAt = Date.now();
+                    const geminiResult = await withTimeout(
+                        geminiService.analyzeContract(currentText, previousText),
+                        geminiTimeoutMs,
+                        'Gemini DOCX analysis'
+                    );
+                    logger.info(`Gemini DOCX analysis finished for ${contractId}: durationMs=${Date.now() - aiStartedAt}`);
+                    aiResult = structuredPairAnalysis
+                        ? mergeStructuredAndGeneralAnalysis(structuredPairAnalysis, geminiResult)
+                        : {
+                            changes: diffChanges.length ? aiResult.changes : (geminiResult.changes || []),
+                            riskLevel: geminiResult.riskLevel,
+                            riskReason: geminiResult.riskReason,
+                            summary: geminiResult.summary,
+                            isFallback: geminiResult.isFallback === true,
+                            contract_meta: geminiResult.contract_meta
+                        };
 
-                const aiSucceeded = aiResult && aiResult.summary && !isAiFailureSummary(aiResult.summary) && aiResult.isFallback !== true;
-                if (aiSucceeded) {
-                    await dbService.incrementUsage(uid);
+                    const aiSucceeded = aiResult && aiResult.summary && !isAiFailureSummary(aiResult.summary) && aiResult.isFallback !== true;
+                    if (aiSucceeded) {
+                        await dbService.incrementUsage(uid);
+                    }
+                } catch (aiError) {
+                    logger.warn(`Gemini analysis timed out/failed for contract ${contractId}; returning diff-only result: ${aiError.message}`);
                 }
             }
         }

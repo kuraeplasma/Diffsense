@@ -373,8 +373,7 @@ async function bootstrap() {
         }, slackRoutes);
         app.use('/api/user/check-exists', userRoutes);
         app.use('/api/user', authMiddleware, userRoutes);
-        // Keep DOCX analysis routes ahead of the generic /api mount.
-        app.use('/docx', authMiddleware, docxAnalysisRoutes);
+        // Keep DOCX analysis route ahead of the generic /api mount.
         app.use('/api/docx', authMiddleware, docxAnalysisRoutes);
         app.use('/api', authMiddleware, paymentRoutes);
         app.use('/api/sign', authMiddleware, signRoutes);

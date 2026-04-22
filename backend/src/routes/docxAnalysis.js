@@ -3,7 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const logger = require('../utils/logger');
 const dbService = require('../services/db');
-const { processDocxBackground } = require('../services/docxBackgroundProcessor');
+const { enqueueDocxJob, scheduleDocxJob } = require('../services/docxAsyncQueue');
 
 const upload = multer({
     storage: multer.memoryStorage(),
@@ -18,11 +18,13 @@ const upload = multer({
  */
 router.post('/upload-async', upload.single('file'), async (req, res, next) => {
     try {
+        console.log("DOCX ROUTE HIT:", req.originalUrl);
         const uid = req.user.uid;
         const { contractId, source, previousVersion, skipAI } = req.body;
         const file = req.file;
 
         let currentBuffer = null;
+        let sourcePayload = '';
         let filename = 'document.docx';
         let contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
@@ -31,13 +33,12 @@ router.post('/upload-async', upload.single('file'), async (req, res, next) => {
             filename = file.originalname;
             contentType = file.mimetype;
         } else if (source) {
-            const base64Clean = String(source || '').split(',').pop();
-            currentBuffer = Buffer.from(base64Clean, 'base64');
+            sourcePayload = String(source || '');
             filename = req.body.filename || 'document.docx';
             contentType = req.body.contentType || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
         }
 
-        if (!currentBuffer) {
+        if (!currentBuffer && !sourcePayload) {
             return res.status(400).json({ success: false, error: 'ファイルがアップロードされていません' });
         }
 
@@ -46,29 +47,32 @@ router.post('/upload-async', upload.single('file'), async (req, res, next) => {
             return res.status(400).json({ success: false, error: '契約IDが不正です' });
         }
 
-        // DOCX Magic Bytes check
-        if (currentBuffer.length < 4 ||
-            currentBuffer[0] !== 0x50 || currentBuffer[1] !== 0x4B ||
-            currentBuffer[2] !== 0x03 || currentBuffer[3] !== 0x04) {
-            return res.status(400).json({ success: false, error: '無効なファイル形式です。Word文書（.docx）をアップロードしてください。' });
-        }
-
         // Set initial status
         await dbService.updateContract(parsedContractId, {
             status: 'processing',
             last_updated_at: new Date().toISOString()
         }, uid);
 
+        const queued = await enqueueDocxJob({
+            contractId: parsedContractId,
+            uid,
+            filename,
+            contentType,
+            previousVersion,
+            skipAI: skipAI === 'true' || skipAI === true,
+            fileBuffer: currentBuffer,
+            source: sourcePayload
+        });
+
+        res.once('finish', () => {
+            scheduleDocxJob(queued.jobId);
+        });
+
         // Immediate response
-        res.json({
-            success: true,
+        return res.json({
             status: 'processing',
             contractId: parsedContractId
         });
-
-        // Background task
-        processDocxBackground(parsedContractId, currentBuffer, filename, contentType, previousVersion, skipAI === 'true' || skipAI === true, uid)
-            .catch(err => logger.error(`Async route background error for ${parsedContractId}:`, err));
 
     } catch (error) {
         logger.error('Async DOCX upload route error:', error);

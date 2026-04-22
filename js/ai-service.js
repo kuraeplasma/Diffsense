@@ -46,7 +46,8 @@ export const aiService = {
                 skipAI: options.skipAI === true,
                 timestamp: Date.now()
             });
-            const apiBase = this.getApiBase();
+            const API_BASE = this.getApiBase();
+            console.log("API_BASE:", API_BASE);
             const token = await getIdToken();
             console.log("AI Service: Token retrieval status:", token ? "Success" : "Failed");
             const normalizedPreviousVersion = method === 'docx'
@@ -64,17 +65,50 @@ export const aiService = {
             // Word解析は常に専用エンドポイントを使用
             // 一部環境の /contracts/analyze バリデーションでは docx が未許可のため
             const endpoint = (method === 'docx')
-                ? `${apiBase}/api/docx/upload-async`
-                : `${apiBase}/api/contracts/analyze`;
+                ? `${API_BASE}/api/docx/upload-async`
+                : `${API_BASE}/api/contracts/analyze`;
 
-            const response = await fetch(endpoint, {
+            let fetchOptions = {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
                     'Authorization': token ? `Bearer ${token}` : ''
-                },
-                body: JSON.stringify(body)
-            });
+                }
+            };
+
+            if (method === 'docx') {
+                const formData = new FormData();
+                formData.append('contractId', contractId);
+                formData.append('method', method);
+                formData.append('previousVersion', normalizedPreviousVersion || '');
+                if (options.skipAI) formData.append('skipAI', 'true');
+
+                // sourceがBase64文字列ならBlobに変換してファイルとして追加
+                if (typeof source === 'string' && source.length > 0) {
+                    try {
+                        const byteCharacters = atob(source);
+                        const byteNumbers = new Array(byteCharacters.length);
+                        for (let i = 0; i < byteCharacters.length; i++) {
+                            byteNumbers[i] = byteCharacters.charCodeAt(i);
+                        }
+                        const byteArray = new Uint8Array(byteNumbers);
+                        const blob = new Blob([byteArray], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+                        formData.append('file', blob, 'document.docx');
+                    } catch (e) {
+                        console.error("AI Service: Failed to convert Base64 to Blob", e);
+                        // 変換に失敗した場合はJSONフォールバックを試みるために既存のbodyに戻るか、エラーを投げる
+                        throw new Error("ファイルの準備に失敗しました。");
+                    }
+                } else if (source instanceof File || source instanceof Blob) {
+                    formData.append('file', source);
+                }
+
+                fetchOptions.body = formData;
+            } else {
+                fetchOptions.headers['Content-Type'] = 'application/json';
+                fetchOptions.body = JSON.stringify(body);
+            }
+
+            const response = await fetch(endpoint, fetchOptions);
 
             let result = null;
             try {
