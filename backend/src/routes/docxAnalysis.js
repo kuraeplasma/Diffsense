@@ -1,43 +1,16 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const mammoth = require('mammoth');
 const logger = require('../utils/logger');
 const dbService = require('../services/db');
 const { enqueueDocxJob, scheduleDocxJob } = require('../services/docxAsyncQueue');
 
 const upload = multer({
-    storage: multer.memoryStorage()
-});
-
-function decodeBase64Payload(raw) {
-    const base64Clean = String(raw || '').split(',').pop();
-    return Buffer.from(base64Clean, 'base64');
-}
-
-async function validateDocxExtraction(buffer, timeoutMs = 30000) {
-    let timerId = null;
-    try {
-        const result = await Promise.race([
-            mammoth.extractRawText({ buffer }),
-            new Promise((_, reject) => {
-                timerId = setTimeout(() => {
-                    reject(new Error(`Mammoth extraction timeout (${timeoutMs}ms)`));
-                }, timeoutMs);
-            })
-        ]);
-        const extracted = String(result?.value || '').trim();
-        if (!extracted) {
-            throw new Error('Mammoth extracted empty text');
-        }
-        return { ok: true };
-    } catch (error) {
-        logger.error('DOCX preflight mammoth extraction failed:', error);
-        return { ok: false, error };
-    } finally {
-        if (timerId) clearTimeout(timerId);
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: 50 * 1024 * 1024 // 50MB
     }
-}
+});
 
 /**
  * POST /api/docx/upload-async
@@ -47,7 +20,7 @@ router.post('/upload-async', upload.single('file'), async (req, res, next) => {
     try {
         console.log("DOCX ROUTE HIT:", req.originalUrl);
         const uid = req.user.uid;
-        const { contractId, source, previousVersion, skipAI } = req.body || {};
+        const { contractId, source, previousVersion, skipAI } = req.body;
         const file = req.file;
 
         let currentBuffer = null;
@@ -63,23 +36,10 @@ router.post('/upload-async', upload.single('file'), async (req, res, next) => {
             sourcePayload = String(source || '');
             filename = req.body.filename || 'document.docx';
             contentType = req.body.contentType || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-            currentBuffer = decodeBase64Payload(sourcePayload);
         }
 
         if (!currentBuffer && !sourcePayload) {
             return res.status(400).json({ success: false, error: 'ファイルがアップロードされていません' });
-        }
-        if (!Buffer.isBuffer(currentBuffer) || currentBuffer.length === 0) {
-            return res.status(400).json({ success: false, error: 'アップロードファイルの読み取りに失敗しました。' });
-        }
-
-        const extractionCheck = await validateDocxExtraction(currentBuffer);
-        if (!extractionCheck.ok) {
-            return res.status(500).json({
-                success: false,
-                error: 'Wordからのテキスト抽出に失敗しました。',
-                detail: extractionCheck.error.message
-            });
         }
 
         const parsedContractId = parseInt(contractId, 10);

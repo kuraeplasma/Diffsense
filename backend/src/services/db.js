@@ -802,7 +802,7 @@ class DBService {
      */
     async updateContract(id, updates, ownerUid = null) {
         const contracts = await this.readData('contracts');
-        const index = contracts.findIndex(c => String(c.id) === String(id));
+        const index = contracts.findIndex(c => c.id === id);
 
         if (index > -1) {
             // 所有権の検証 (IDOR対策)

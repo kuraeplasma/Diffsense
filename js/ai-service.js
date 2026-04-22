@@ -19,26 +19,6 @@ function joinApiUrl(apiBase, endpointPath) {
     }
 }
 
-function normalizeDocxPreviousVersionForUpload(previousVersion) {
-    const raw = previousVersion == null ? '' : String(previousVersion);
-    if (!raw) return '';
-
-    // data:*;base64 は巨大化しやすくアップロード失敗の原因になるため送らない
-    if (/^data:.*;base64,/i.test(raw)) {
-        console.warn('AI Service: Omit base64 previousVersion for DOCX upload');
-        return '';
-    }
-
-    // 大きすぎるテキストはアップロード失敗の原因になりやすいため抑制
-    const MAX_PREVIOUS_TEXT_LENGTH = 200000;
-    if (raw.length > MAX_PREVIOUS_TEXT_LENGTH) {
-        console.warn(`AI Service: Truncate previousVersion for DOCX upload (${raw.length} -> ${MAX_PREVIOUS_TEXT_LENGTH})`);
-        return raw.slice(0, MAX_PREVIOUS_TEXT_LENGTH);
-    }
-
-    return raw;
-}
-
 /**
  * AI Service - Backend API Communication
  * バックエンドAPIとの通信を担当
@@ -113,30 +93,34 @@ export const aiService = {
                 }
             };
 
-            if (method === 'docx' || source instanceof File) {
+            if (method === 'docx') {
                 const formData = new FormData();
                 formData.append('contractId', contractId);
                 formData.append('method', method);
-                
-                if (source instanceof File) {
+                formData.append('previousVersion', normalizedPreviousVersion || '');
+                if (options.skipAI) formData.append('skipAI', 'true');
+
+                // sourceがBase64文字列ならBlobに変換してファイルとして追加
+                if (typeof source === 'string' && source.length > 0) {
+                    try {
+                        const byteCharacters = atob(source);
+                        const byteNumbers = new Array(byteCharacters.length);
+                        for (let i = 0; i < byteCharacters.length; i++) {
+                            byteNumbers[i] = byteCharacters.charCodeAt(i);
+                        }
+                        const byteArray = new Uint8Array(byteNumbers);
+                        const blob = new Blob([byteArray], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+                        formData.append('file', blob, 'document.docx');
+                    } catch (e) {
+                        console.error("AI Service: Failed to convert Base64 to Blob", e);
+                        // 変換に失敗した場合はJSONフォールバックを試みるために既存のbodyに戻るか、エラーを投げる
+                        throw new Error("ファイルの準備に失敗しました。");
+                    }
+                } else if (source instanceof File || source instanceof Blob) {
                     formData.append('file', source);
-                } else {
-                    formData.append('source', String(source || ''));
                 }
 
-                if (normalizedPreviousVersion) {
-                    const safePrev = method === 'docx' 
-                        ? normalizeDocxPreviousVersionForUpload(normalizedPreviousVersion)
-                        : normalizedPreviousVersion;
-                    formData.append('previousVersion', safePrev);
-                }
-                
-                if (options.skipAI) {
-                    formData.append('skipAI', 'true');
-                }
-                
                 fetchOptions.body = formData;
-                // Note: Don't set Content-Type header; fetch sets it with boundary for FormData
             } else {
                 fetchOptions.headers['Content-Type'] = 'application/json';
                 fetchOptions.body = JSON.stringify(body);
@@ -163,8 +147,7 @@ export const aiService = {
 
             if (result?.status === 'processing') {
                 console.log("AI Service: Asynchronous processing started, polling for result...");
-                const resolvedContractId = Number(result.contractId || result?.data?.contractId || contractId);
-                return await this._pollContractStatusOnce(resolvedContractId, token);
+                return await this._pollContractStatusOnce(contractId, token);
             }
 
             // Normalize DOCX full-analysis response shape.
