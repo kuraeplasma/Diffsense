@@ -19,6 +19,19 @@ function joinApiUrl(apiBase, endpointPath) {
     }
 }
 
+async function base64ToDocxBlob(base64Source) {
+    const normalized = String(base64Source || '').split(',').pop() || '';
+    const byteCharacters = atob(normalized);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    return new Blob([byteArray], {
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    });
+}
+
 /**
  * AI Service - Backend API Communication
  * バックエンドAPIとの通信を担当
@@ -94,8 +107,6 @@ export const aiService = {
             };
 
             if (method === 'docx') {
-                // FormDataのContent-Typeはブラウザに任せる（boundary付き）
-                delete fetchOptions.headers['Content-Type'];
                 const formData = new FormData();
                 formData.append('contractId', contractId);
                 formData.append('method', method);
@@ -105,13 +116,7 @@ export const aiService = {
                 // sourceがBase64文字列ならBlobに変換してファイルとして追加
                 if (typeof source === 'string' && source.length > 0) {
                     try {
-                        const byteCharacters = atob(source);
-                        const byteNumbers = new Array(byteCharacters.length);
-                        for (let i = 0; i < byteCharacters.length; i++) {
-                            byteNumbers[i] = byteCharacters.charCodeAt(i);
-                        }
-                        const byteArray = new Uint8Array(byteNumbers);
-                        const blob = new Blob([byteArray], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+                        const blob = await base64ToDocxBlob(source);
                         formData.append('file', blob, 'document.docx');
                     } catch (e) {
                         console.error("AI Service: Failed to convert Base64 to Blob", e);
@@ -126,6 +131,11 @@ export const aiService = {
             } else {
                 fetchOptions.headers['Content-Type'] = 'application/json';
                 fetchOptions.body = JSON.stringify(body);
+            }
+
+            // FormData送信時はブラウザにContent-Type（multipart boundary付き）を設定させる
+            if (method === 'docx') {
+                delete fetchOptions.headers['Content-Type'];
             }
 
             const response = await fetch(endpoint, fetchOptions);
