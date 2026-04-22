@@ -448,43 +448,7 @@ function buildFirebaseDownloadUrl(bucketName, objectPath, token) {
     return `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodedPath}?alt=media&token=${token}`;
 }
 
-async function extractTextFromDocx(buffer) {
-    const result = await mammoth.extractRawText({ buffer });
-    return String(result?.value || '').replace(/\r/g, '');
-}
 
-async function resolvePreviousDocxArticles(previousVersion) {
-    if (!previousVersion) return [];
-    if (Array.isArray(previousVersion)) return previousVersion;
-    if (typeof previousVersion === 'object' && Array.isArray(previousVersion.articles)) {
-        return toLegacyArticleArray(previousVersion);
-    }
-    if (typeof previousVersion !== 'string') return [];
-
-    const trimmed = previousVersion.trim();
-    if (!trimmed) return [];
-
-    const looksLikeRawText = /\n|第\s*[0-9０-９一二三四五六七八九十百千〇零]+\s*条/.test(trimmed);
-    if (looksLikeRawText) {
-        return docxService.parseTextToArticles(trimmed);
-    }
-
-    try {
-        const buffer = decodeBase64Payload(trimmed);
-        const isZip = buffer.length > 4 && buffer[0] === 0x50 && buffer[1] === 0x4B;
-        if (!isZip) return docxService.parseTextToArticles(trimmed);
-        try {
-            const extractedText = await extractTextFromDocx(buffer);
-            return docxService.parseTextToArticles(extractedText);
-        } catch (mammothError) {
-            logger.warn('Mammoth parse failed for previous DOCX; fallback parser used:', mammothError.message);
-            return await docxService.parseDocx(buffer);
-        }
-    } catch (error) {
-        logger.warn('Failed to parse previousVersion as DOCX, fallback to text parser:', error.message);
-        return docxService.parseTextToArticles(trimmed);
-    }
-}
 
 /**
  * POST /api/contracts/analyze
