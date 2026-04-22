@@ -64,8 +64,8 @@ export const aiService = {
             // Word解析は常に専用エンドポイントを使用
             // 一部環境の /contracts/analyze バリデーションでは docx が未許可のため
             const endpoint = (method === 'docx')
-                ? `${apiBase}/contracts/upload-docx`
-                : `${apiBase}/contracts/analyze`;
+                ? `${apiBase}/api/docx/upload-async`
+                : `${apiBase}/api/contracts/analyze`;
 
             const response = await fetch(endpoint, {
                 method: 'POST',
@@ -91,6 +91,11 @@ export const aiService = {
                 if (result.plan !== undefined) apiError.plan = result.plan;
                 if (result.nextPlan !== undefined) apiError.nextPlan = result.nextPlan;
                 throw apiError;
+            }
+
+            if (result?.status === 'processing') {
+                console.log("AI Service: Asynchronous processing started, polling for result...");
+                return await this._pollContractStatus(contractId, token);
             }
 
             // Normalize DOCX full-analysis response shape.
@@ -133,6 +138,64 @@ export const aiService = {
 
             throw error;
         }
+    },
+
+    /**
+     * Poll contract status until completion (Private)
+     */
+    async _pollContractStatus(contractId, token, maxRetries = 60) {
+        const apiBase = this.getApiBase();
+        let retries = 0;
+        
+        while (retries < maxRetries) {
+            retries++;
+            // Update loading UI if present in DOM
+            const loadingMsg = document.getElementById('reg-loading');
+            if (loadingMsg) {
+                const subText = loadingMsg.querySelector('span');
+                if (subText) subText.textContent = `AI解析を実行中... (${Math.min(retries * 2, 99)}%)`;
+            }
+            
+            await new Promise(r => setTimeout(r, 2500));
+            
+            try {
+                const response = await fetch(`${apiBase}/api/contracts/${contractId}`, {
+                    headers: { 'Authorization': token ? `Bearer ${token}` : '' }
+                });
+                
+                if (response.ok) {
+                    const polled = await response.json();
+                    const contract = polled.data;
+                    if (contract) {
+                        if (contract.status === 'completed') {
+                            console.log("AI Service: Async analysis completed!");
+                            // Return expected result shape
+                            return {
+                                success: true,
+                                data: {
+                                    summary: contract.ai_summary,
+                                    riskLevel: contract.risk_level === 'High' ? 3 : (contract.risk_level === 'Medium' ? 2 : 1),
+                                    riskReason: contract.ai_risk_reason,
+                                    changes: contract.ai_changes,
+                                    isFallback: contract.ai_is_fallback === true,
+                                    extractedText: contract.sections,
+                                    rawExtractedText: contract.original_content,
+                                    doc: contract.doc || null,
+                                    sourceType: 'DOCX',
+                                    isLimited: contract.ai_limited === true
+                                }
+                            };
+                        }
+                        if (contract.status === 'error') {
+                            throw new Error(contract.errorMessage || 'AI解析中にエラーが発生しました');
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn(`Polling error (retry ${retries}):`, e);
+            }
+        }
+        throw new Error('解析の待ち時間がタイムアウトしました。バックグラウンドでの処理は継続されています。');
     },
 
     normalizePreviousVersion(previousVersion) {

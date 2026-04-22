@@ -12,9 +12,19 @@ const diffService = require('../services/diffService');
 const dbService = require('../services/db');
 const { toLegacyArticleArray, fromLegacyArticleArray } = require('../services/contractStructure');
 const logger = require('../utils/logger');
+const { processDocxBackground, extractTextFromDocx } = require('../services/docxBackgroundProcessor');
 const crypto = require('crypto');
 const stringSimilarity = require('string-similarity');
 const mammoth = require('mammoth');
+const multer = require('multer');
+
+// Configure multer for memory storage
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: 50 * 1024 * 1024 // 50MB limit
+    }
+});
 
 router.get('/', async (req, res, next) => {
     try {
@@ -797,16 +807,35 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
  * POST /api/contracts/upload-docx
  * Parse DOCX and compare by article blocks
  */
-router.post('/upload-docx', rateLimit, async (req, res, next) => {
+router.post('/upload-docx', rateLimit, upload.single('file'), async (req, res, next) => {
     try {
-        const { contractId, source, previousVersion, skipAI } = req.body || {};
+        const body = req.body || {};
+        const { contractId, source, previousVersion, skipAI } = body;
         const uid = req.user.uid;
 
-        if (!Number.isInteger(contractId) || contractId <= 0) {
-            return res.status(400).json({ success: false, error: '"contractId" must be a positive integer' });
+        // Check if file is provided via multer (FormData) or fallback to body.source (Base64)
+        const file = req.file;
+        let currentBuffer = null;
+        let filename = 'document.docx';
+        let contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+        if (file) {
+            currentBuffer = file.buffer;
+            filename = file.originalname;
+            contentType = file.mimetype;
+        } else if (source) {
+            currentBuffer = decodeBase64Payload(source);
+            filename = body.filename || 'document.docx';
+            contentType = body.contentType || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
         }
-        if (!source || typeof source !== 'string') {
-            return res.status(400).json({ success: false, error: '"source" is required' });
+
+        if (!currentBuffer) {
+            return res.status(400).json({ success: false, error: 'ファイルデータが見つかりません。' });
+        }
+
+        const parsedContractId = Number(contractId);
+        if (!Number.isInteger(parsedContractId) || parsedContractId <= 0) {
+            return res.status(400).json({ success: false, error: '"contractId" must be a positive integer' });
         }
 
         const userProfile = await dbService.getUserProfile(uid);
@@ -817,164 +846,29 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
             return res.status(403).json({ success: false, error: `プランの月間解析上限（${limit}回）に達しました。アップグレードをご検討ください。` });
         }
 
-        const currentBuffer = decodeBase64Payload(source);
-
         // MIMEタイプ検証: DOCXはZIP形式（magic bytes: PK\x03\x04）
-        if (!currentBuffer || currentBuffer.length < 4 ||
+        if (currentBuffer.length < 4 ||
             currentBuffer[0] !== 0x50 || currentBuffer[1] !== 0x4B ||
             currentBuffer[2] !== 0x03 || currentBuffer[3] !== 0x04) {
             return res.status(400).json({ success: false, error: '無効なファイル形式です。Word文書（.docx）をアップロードしてください。' });
         }
 
-        let extractedRawText = '';
-        let conversionMethod = 'mammoth';
-
-        console.log({
-            step: "docx_to_pdf_start",
-            filename,
-            contentType
-        });
-
-        try {
-            // 1. まずはLibreOfficeでのPDF変換を試みる（原本性が高いため）
-            const tmpDir = path.join(__dirname, '../../tmp/docx-convert');
-            if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
-            
-            const docxTmpPath = path.join(tmpDir, `upload-${Date.now()}.docx`);
-            fs.writeFileSync(docxTmpPath, currentBuffer);
-            
-            try {
-                const pdfPath = await docxService.convertToPdf(docxTmpPath);
-                if (fs.existsSync(pdfPath)) {
-                    const pdfBuffer = fs.readFileSync(pdfPath);
-                    const pdfData = await pdfService.extractTextFromPdf(pdfBuffer);
-                    extractedRawText = pdfData.text;
-                    conversionMethod = 'libreoffice_pdf';
-                    logger.info(`DOCX conversion success via LibreOffice: ${filename}`);
-                    
-                    // Cleanup
-                    fs.unlinkSync(pdfPath);
-                }
-            } catch (convError) {
-                logger.warn(`LibreOffice conversion failed for ${filename}, falling back to mammoth:`, convError.message);
-                // Fallback to mammoth
-                extractedRawText = await extractTextFromDocx(currentBuffer);
-                conversionMethod = 'mammoth';
-            } finally {
-                if (fs.existsSync(docxTmpPath)) fs.unlinkSync(docxTmpPath);
-            }
-        } catch (extractError) {
-            logger.error('DOCX_CONVERT_ERROR', extractError);
-            return res.status(500).json({ 
-                success: false, 
-                error: 'DOCX_CONVERT_FAILED',
-                detail: extractError.message
-            });
-        }
-
-        const currentArticles = docxService.parseTextToArticles(extractedRawText);
-        const structuredContract = fromLegacyArticleArray(currentArticles);
-        const previousArticles = await resolvePreviousDocxArticles(previousVersion);
-
-        const extractedTextHash = crypto.createHash('sha256').update(extractedRawText).digest('hex');
-
-        const diffChanges = previousArticles.length
-            ? diffService.compare(previousArticles, currentArticles)
-            : [];
-
-        let aiResult = {
-            changes: diffChanges.map((c) => ({
-                section: c.section,
-                type: c.type,
-                old: c.old,
-                new: c.new,
-                impact: '',
-                concern: ''
-            })),
-            riskLevel: diffChanges.some((c) => c.type === 'DELETE') ? 2 : 1,
-            riskReason: diffChanges.length ? '条文単位の差分を検出しました' : '差分は検出されませんでした',
-            summary: diffChanges.length ? `${diffChanges.length}件の差分を検出しました` : '差分は検出されませんでした',
-            isFallback: false
-        };
-
-        if (!skipAI) {
-            const structuredPairAnalysis = previousArticles.length
-                ? await buildStructuredPairAnalysis(previousArticles, currentArticles)
-                : null;
-            const currentText = normalizeContentToText(currentArticles);
-            const previousText = normalizeContentToText(previousArticles);
-
-            if (currentText.trim().length > 0) {
-                const geminiResult = await geminiService.analyzeContract(currentText, previousText);
-                aiResult = structuredPairAnalysis
-                    ? mergeStructuredAndGeneralAnalysis(structuredPairAnalysis, geminiResult)
-                    : {
-                        changes: diffChanges.length ? aiResult.changes : (geminiResult.changes || []),
-                        riskLevel: geminiResult.riskLevel,
-                        riskReason: geminiResult.riskReason,
-                        summary: geminiResult.summary,
-                        isFallback: geminiResult.isFallback === true
-                    };
-
-                const aiSucceeded = aiResult && aiResult.summary && !isAiFailureSummary(aiResult.summary) && aiResult.isFallback !== true;
-                if (aiSucceeded) {
-                    await dbService.incrementUsage(uid);
-                    // Save contract_meta (deadline info) if extracted
-                    const meta = aiResult.contract_meta;
-                    if (meta && contractId) {
-                        const metaUpdate = {
-                            expiry_date: meta.expiry_date || null,
-                            renewal_deadline: meta.renewal_deadline || null,
-                            contract_start: meta.contract_start || null,
-                            auto_renewal: meta.auto_renewal === true,
-                            notice_period_days: Number(meta.notice_period_days) || null,
-                            contract_category: meta.contract_category || null,
-                            date_confidence: meta.date_confidence || 'unknown',
-                            alert_sent_30d: false,
-                            alert_sent_7d: false,
-                            alert_sent_0d: false
-                        };
-                        await dbService.updateContract(contractId, metaUpdate, uid);
-                        logger.info(`contract_meta saved for DOCX contract ${contractId}: expiry=${meta.expiry_date}`);
-                    }
-                }
-            }
-        }
-
-        // 4. Feature Gating
-        let gatedChanges = aiResult.changes || [];
-        const plan = userProfile.plan || 'free';
-        const isFree = plan === 'free';
-        const isStarter = plan === 'starter';
-
-        const isLimited = isFree || isStarter || aiResult.isLimited === true;
-
+        // Perform analysis synchronously (original behavior)
+        const isSkipAI = skipAI === 'true' || skipAI === true;
+        const result = await processDocxBackground(parsedContractId, currentBuffer, filename, contentType, previousVersion, isSkipAI, uid);
+        
+        // Return full result as before
         res.json({
             success: true,
-            data: {
-                ...aiResult,
-                sourceType: 'DOCX',
-                type: 'docx',
-                content: extractedRawText,
-                extractedText: currentArticles,
-                rawExtractedText: extractedRawText,
-                structuredContract,
-                previousArticles,
-                isLimited,
-                extractedTextHash,
-                extractedTextLength: extractedRawText.length,
-                doc: {
-                    content: extractedRawText,
-                    type: 'docx',
-                    size: extractedRawText.length
-                }
-            }
+            data: result.data
         });
+
     } catch (error) {
-        logger.error('DOCX upload error:', error);
+        logger.error('DOCX upload start error:', error);
         next(error);
     }
 });
+
 
 /**
  * GET /api/contracts/:id/original-file

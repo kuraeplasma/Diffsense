@@ -88,6 +88,7 @@ async function bootstrap() {
         const notificationRoutes = require('./routes/notifications');
         const cronRoutes = require('./routes/cron');
         const slackRoutes = require('./routes/slack');
+        const docxAnalysisRoutes = require('./routes/docxAnalysis');
         const { createMcpAuthRouter, createMcpRouter } = require('./mcp-server/mcpServer');
         const cronService = require('./services/cronService');
 
@@ -374,6 +375,7 @@ async function bootstrap() {
         app.use('/api/user', authMiddleware, userRoutes);
         app.use('/api', authMiddleware, paymentRoutes);
         app.use('/api/sign', authMiddleware, signRoutes);
+        app.use('/api/docx', authMiddleware, docxAnalysisRoutes);
 
         app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
