@@ -344,11 +344,11 @@ async function bootstrap() {
         });
 
         app.use('/api/sign', (req, res, next) => {
-            if (['/verify', '/submit', '/decline', '/original-file'].includes(req.path)) return signRoutes(req, res, next);
+            if (['/verify', '/submit', '/decline', '/original-file', '/generate-pdf'].includes(req.path)) return signRoutes(req, res, next);
             return next();
         });
         app.use('/sign', (req, res, next) => {
-            if (['/verify', '/submit', '/decline', '/original-file'].includes(req.path)) return signRoutes(req, res, next);
+            if (['/verify', '/submit', '/decline', '/original-file', '/generate-pdf'].includes(req.path)) return signRoutes(req, res, next);
             return next();
         });
 

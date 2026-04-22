@@ -3,11 +3,14 @@ const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 const crypto = require('crypto');
+const { execFile } = require('child_process');
+const { promisify } = require('util');
 const jwt = require('jsonwebtoken');
 const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
 const rateLimit = require('express-rate-limit');
 const router = express.Router();
 const logger = require('../utils/logger');
+const execFileAsync = promisify(execFile);
 
 // リマインドメール専用レート制限: 10分間に3回まで
 const remindRateLimit = rateLimit({
@@ -226,6 +229,119 @@ function extractUploadsRelativePath(value) {
 
 function buildFirebaseDownloadUrl(bucketName, objectPath, token) {
     return `https://firebasestorage.googleapis.com/v0/b/${encodeURIComponent(bucketName)}/o/${encodeURIComponent(objectPath)}?alt=media&token=${encodeURIComponent(token)}`;
+}
+
+async function convertDocxToPdf(docxPath) {
+    const fs = require('fs');
+    const pathMod = require('path');
+    const absoluteDocxPath = pathMod.resolve(String(docxPath || ''));
+    if (!absoluteDocxPath || !fs.existsSync(absoluteDocxPath)) {
+        throw new Error('DOCX file not found for conversion');
+    }
+
+    const outputDir = pathMod.dirname(absoluteDocxPath);
+    const outputPdfPath = pathMod.join(
+        outputDir,
+        `${pathMod.basename(absoluteDocxPath, pathMod.extname(absoluteDocxPath))}.pdf`
+    );
+    if (fs.existsSync(outputPdfPath)) {
+        await fs.promises.unlink(outputPdfPath).catch(() => {});
+    }
+
+    const commandCandidates = [
+        String(process.env.SOFFICE_PATH || '').trim(),
+        process.platform === 'win32' ? 'soffice.exe' : 'soffice',
+        process.platform === 'win32' ? 'C:\\Program Files\\LibreOffice\\program\\soffice.exe' : 'libreoffice'
+    ].filter(Boolean);
+
+    let lastError = null;
+    for (const command of commandCandidates) {
+        try {
+            await execFileAsync(
+                command,
+                ['--headless', '--convert-to', 'pdf:writer_pdf_Export', '--outdir', outputDir, absoluteDocxPath],
+                { windowsHide: true, timeout: 180000 }
+            );
+            if (fs.existsSync(outputPdfPath)) {
+                return outputPdfPath;
+            }
+        } catch (error) {
+            lastError = error;
+        }
+    }
+
+    throw new Error(`DOCX to PDF conversion failed${lastError?.message ? `: ${lastError.message}` : ''}`);
+}
+
+async function createPdfBufferFromDocxSource(sourceBuffer, signRequestId) {
+    const tmpDir = path.join(__dirname, '../../tmp/sign-docx');
+    await fs.promises.mkdir(tmpDir, { recursive: true });
+    const safeBase = sanitizeStorageFileName(`sign-${signRequestId}-${Date.now()}`, `sign-${Date.now()}`);
+    const docxPath = path.join(tmpDir, `${safeBase}.docx`);
+    const generatedPdfPath = path.join(tmpDir, `${safeBase}.pdf`);
+
+    try {
+        await fs.promises.writeFile(docxPath, sourceBuffer);
+        const convertedPdfPath = await convertDocxToPdf(docxPath);
+        return await fs.promises.readFile(convertedPdfPath);
+    } finally {
+        await fs.promises.unlink(docxPath).catch(() => {});
+        await fs.promises.unlink(generatedPdfPath).catch(() => {});
+    }
+}
+
+async function persistSignSourcePdf(signRequestId, pdfBuffer, req, suffix = 'source') {
+    if (!pdfBuffer?.length) {
+        throw new Error('PDFバッファが空です');
+    }
+    const safeRequestId = sanitizeStorageFileName(String(signRequestId || Date.now()), 'sign-request');
+
+    if (firebaseInitialized && bucket) {
+        const objectPath = `sign_docs_source/${safeRequestId}-${Date.now()}-${suffix}.pdf`;
+        const file = bucket.file(objectPath);
+        const downloadToken = crypto.randomUUID();
+        await file.save(pdfBuffer, {
+            metadata: {
+                contentType: 'application/pdf',
+                metadata: {
+                    firebaseStorageDownloadTokens: downloadToken
+                }
+            }
+        });
+
+        let pdfUrl = '';
+        try {
+            const [signedUrl] = await file.getSignedUrl({
+                action: 'read',
+                expires: Date.now() + 7 * 24 * 60 * 60 * 1000
+            });
+            pdfUrl = signedUrl;
+        } catch (signedUrlError) {
+            const bucketName = bucket.name || process.env.FB_STORAGE_BUCKET || process.env.FIREBASE_STORAGE_BUCKET;
+            if (!bucketName) throw signedUrlError;
+            pdfUrl = buildFirebaseDownloadUrl(bucketName, objectPath, downloadToken);
+            logger.warn('[sign generate-pdf] Signed URL generation failed; using token URL', {
+                signRequestId: safeRequestId,
+                error: signedUrlError.message
+            });
+        }
+
+        return {
+            pdfUrl,
+            pdfStoragePath: objectPath
+        };
+    }
+
+    const uploadsDir = path.join(__dirname, '../../uploads/sign-source');
+    await fs.promises.mkdir(uploadsDir, { recursive: true });
+    const filename = `${safeRequestId}-${Date.now()}-${suffix}.pdf`;
+    const absolutePath = path.join(uploadsDir, filename);
+    await fs.promises.writeFile(absolutePath, pdfBuffer);
+
+    return {
+        pdfUrl: `${getBackendBaseUrl(req)}/uploads/sign-source/${filename}`,
+        pdfStoragePath: absolutePath
+    };
 }
 async function resolveSignRequestPdfUrl(signRequest, req, contract = null) {
     const backendBaseUrl = getBackendBaseUrl(req);
@@ -1268,6 +1384,126 @@ router.get('/verify', async (req, res) => {
             return res.status(401).json({ success: false, error: '有効期限が切れましたので、再度発行依頼をしていただくようお願いいたします。' });
         }
         return res.status(401).json({ success: false, error: '無効な署名リンクです' });
+    }
+});
+
+router.post('/generate-pdf', async (req, res) => {
+    try {
+        const token = String(req.body?.token || req.query?.token || '').trim();
+        if (!token) {
+            return res.status(400).json({ success: false, error: 'トークンがありません' });
+        }
+
+        const payload = jwt.verify(token, String(process.env.JWT_SECRET || '').trim());
+        const signRequest = await markSignRequestExpired(
+            await dbService.getSignRequestById(payload.signRequestId)
+        );
+
+        if (!signRequest) {
+            return res.status(404).json({ success: false, error: '署名依頼が見つかりません' });
+        }
+        if (signRequest.status === 'expired') {
+            return res.status(410).json({ success: false, error: '有効期限が切れましたので、再度発行依頼をしていただくようお願いいたします。' });
+        }
+        if (signRequest.status === 'completed') {
+            return res.status(410).json({ success: false, error: 'この署名依頼はすでに完了しています' });
+        }
+
+        const recipient = (signRequest.recipients || []).find((item) => String(item.email || '').trim() === String(payload.email || '').trim());
+        if (!recipient) {
+            return res.status(403).json({ success: false, error: '署名リンクが無効です' });
+        }
+
+        const ownerUid = String(signRequest.ownerUid || signRequest.requestedBy || '').trim();
+        let contract = null;
+        if (signRequest.contract_id && ownerUid) {
+            try {
+                const contracts = await dbService.getContracts(ownerUid);
+                contract = (Array.isArray(contracts) ? contracts : []).find((item) => String(item.id) === String(signRequest.contract_id)) || null;
+            } catch (contractError) {
+                logger.warn('[sign generate-pdf] contract lookup failed', {
+                    requestId: signRequest.id,
+                    contractId: signRequest.contract_id,
+                    error: contractError.message
+                });
+            }
+        }
+
+        const existingPdfUrl = await resolveSignRequestPdfUrl(signRequest, req, contract);
+        if (existingPdfUrl) {
+            return res.json({ success: true, pdfUrl: existingPdfUrl });
+        }
+
+        const sourceMeta = contract || signRequest.document_snapshot || {};
+        const sourceCandidates = [
+            contract?.original_file_path,
+            contract?.original_file_url,
+            signRequest?.document_snapshot?.original_file_path,
+            signRequest?.document_snapshot?.original_file_url,
+            signRequest?.original_file_path,
+            signRequest?.original_file_url
+        ].filter(Boolean);
+
+        let sourceBuffer = null;
+        let resolvedSource = '';
+        for (const candidate of sourceCandidates) {
+            const current = await loadOriginalSourceBuffer(candidate, `sign-generate-pdf:${signRequest.id}`);
+            if (current?.length) {
+                sourceBuffer = current;
+                resolvedSource = String(candidate || '');
+                break;
+            }
+        }
+
+        if (!sourceBuffer?.length) {
+            return res.status(404).json({ success: false, error: '署名対象の原本ファイルが見つかりません' });
+        }
+
+        const sourceName = String(
+            sourceMeta?.original_filename
+            || signRequest?.document_name
+            || resolvedSource
+            || ''
+        ).trim();
+        const isDocxSourceFile = isDocxLikeSource(resolvedSource, sourceName);
+        const pdfBuffer = isDocxSourceFile
+            ? await createPdfBufferFromDocxSource(sourceBuffer, signRequest.id)
+            : sourceBuffer;
+
+        const persisted = await persistSignSourcePdf(
+            signRequest.id,
+            pdfBuffer,
+            req,
+            isDocxSourceFile ? 'docx-generated' : 'source'
+        );
+
+        const updatedSnapshot = {
+            ...(signRequest.document_snapshot || {}),
+            pdf_url: persisted.pdfUrl,
+            pdf_storage_path: persisted.pdfStoragePath
+        };
+
+        await dbService.updateSignRequest(
+            signRequest.id,
+            { document_snapshot: updatedSnapshot },
+            ownerUid || null
+        );
+
+        if (contract) {
+            await dbService.updateContract(
+                contract.id,
+                {
+                    pdf_url: persisted.pdfUrl,
+                    pdf_storage_path: persisted.pdfStoragePath
+                },
+                ownerUid || null
+            );
+        }
+
+        return res.json({ success: true, pdfUrl: persisted.pdfUrl });
+    } catch (error) {
+        logger.error('[sign generate-pdf] Error:', error.message);
+        return res.status(500).json({ success: false, error: 'PDF_GENERATE_FAILED' });
     }
 });
 
