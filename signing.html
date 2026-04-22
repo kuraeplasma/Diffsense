@@ -1030,6 +1030,8 @@
       return forceProd ? PROD_API_BASE : 'http://localhost:3001';
     })();
 
+    console.log('API_BASE:', API_BASE);
+
     const state = {
       token: new URLSearchParams(location.search).get('token'),
       pdfDoc: null,
@@ -1161,6 +1163,37 @@
 
         const data = result.data || {};
         state.signRequestId = data.signRequestId;
+        const doc = result.doc || data.doc || data;
+
+        console.log('doc確認:', doc);
+
+        // PDF無い場合は強制生成
+        if (!doc.pdfUrl) {
+          console.warn('PDF未存在 → 強制生成開始');
+
+          const res = await fetch(`${API_BASE}/api/sign/generate-pdf`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              docId: doc.id,
+              token: state.token
+            })
+          });
+
+          const generateData = await res.json();
+
+          console.log('PDF生成結果:', generateData);
+
+          if (!generateData.pdfUrl) {
+            throw new Error('PDF生成失敗');
+          }
+
+          doc.pdfUrl = generateData.pdfUrl;
+          data.pdfUrl = generateData.pdfUrl;
+        }
+
         state.recipientEmail = data.email || '';
         state.recipientName = data.recipientName || data.email || '署名者';
         state.fields = Array.isArray(data.fields) ? data.fields : [];
@@ -1179,25 +1212,6 @@
           hasContent: !!state.originalContent,
           pdfUrl: !!data.pdfUrl
         });
-        if (!data.pdfUrl) {
-          console.warn('PDF未生成のためオンデマンド生成を実行');
-          const generateRes = await fetch(`${API_BASE}/api/sign/generate-pdf`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              token: state.token,
-              signRequestId: state.signRequestId
-            })
-          });
-          const generateData = await generateRes.json().catch(() => ({}));
-          if (!generateRes.ok || !generateData.success || !generateData.pdfUrl) {
-            showError('PDF生成に失敗しました');
-            return;
-          }
-          data.pdfUrl = generateData.pdfUrl;
-        }
 
         try {
           const res = await fetch(data.pdfUrl, { method: 'HEAD' });
