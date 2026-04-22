@@ -19,30 +19,17 @@ function joinApiUrl(apiBase, endpointPath) {
     }
 }
 
-async function base64ToDocxBlob(base64Source) {
-    const normalized = String(base64Source || '').split(',').pop() || '';
-    const byteCharacters = atob(normalized);
-    const byteNumbers = new Array(byteCharacters.length);
-    for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-    }
-    const byteArray = new Uint8Array(byteNumbers);
-    return new Blob([byteArray], {
-        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-    });
-}
-
-function normalizeDocxPreviousVersionForForm(previousVersion) {
+function normalizeDocxPreviousVersionForUpload(previousVersion) {
     const raw = previousVersion == null ? '' : String(previousVersion);
     if (!raw) return '';
 
-    // data:*;base64 は巨大化しやすく multipart field 上限を超えるため送らない
+    // data:*;base64 は巨大化しやすくアップロード失敗の原因になるため送らない
     if (/^data:.*;base64,/i.test(raw)) {
-        console.warn('AI Service: Omit base64 previousVersion for DOCX multipart upload');
+        console.warn('AI Service: Omit base64 previousVersion for DOCX upload');
         return '';
     }
 
-    // 大きすぎるテキストを送ると multipart 解析エラーの原因になるため抑制
+    // 大きすぎるテキストはアップロード失敗の原因になりやすいため抑制
     const MAX_PREVIOUS_TEXT_LENGTH = 200000;
     if (raw.length > MAX_PREVIOUS_TEXT_LENGTH) {
         console.warn(`AI Service: Truncate previousVersion for DOCX upload (${raw.length} -> ${MAX_PREVIOUS_TEXT_LENGTH})`);
@@ -127,36 +114,19 @@ export const aiService = {
             };
 
             if (method === 'docx') {
-                const formData = new FormData();
-                const safePreviousVersion = normalizeDocxPreviousVersionForForm(normalizedPreviousVersion);
-                formData.append('contractId', contractId);
-                formData.append('method', method);
-                formData.append('previousVersion', safePreviousVersion);
-                if (options.skipAI) formData.append('skipAI', 'true');
-
-                // sourceがBase64文字列ならBlobに変換してファイルとして追加
-                if (typeof source === 'string' && source.length > 0) {
-                    try {
-                        const blob = await base64ToDocxBlob(source);
-                        formData.append('file', blob, 'document.docx');
-                    } catch (e) {
-                        console.error("AI Service: Failed to convert Base64 to Blob", e);
-                        // 変換に失敗した場合はJSONフォールバックを試みるために既存のbodyに戻るか、エラーを投げる
-                        throw new Error("ファイルの準備に失敗しました。");
-                    }
-                } else if (source instanceof File || source instanceof Blob) {
-                    formData.append('file', source);
-                }
-
-                fetchOptions.body = formData;
+                const safePreviousVersion = normalizeDocxPreviousVersionForUpload(normalizedPreviousVersion);
+                const docxBody = {
+                    contractId,
+                    method: 'docx',
+                    source: typeof source === 'string' ? source : '',
+                    previousVersion: safePreviousVersion
+                };
+                if (options.skipAI) docxBody.skipAI = true;
+                fetchOptions.headers['Content-Type'] = 'application/json';
+                fetchOptions.body = JSON.stringify(docxBody);
             } else {
                 fetchOptions.headers['Content-Type'] = 'application/json';
                 fetchOptions.body = JSON.stringify(body);
-            }
-
-            // FormData送信時はブラウザにContent-Type（multipart boundary付き）を設定させる
-            if (method === 'docx') {
-                delete fetchOptions.headers['Content-Type'];
             }
 
             const response = await fetch(endpoint, fetchOptions);

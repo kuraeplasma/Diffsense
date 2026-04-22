@@ -10,6 +10,11 @@ const upload = multer({
     storage: multer.memoryStorage()
 });
 
+function decodeBase64Payload(raw) {
+    const base64Clean = String(raw || '').split(',').pop();
+    return Buffer.from(base64Clean, 'base64');
+}
+
 async function validateDocxExtraction(buffer, timeoutMs = 30000) {
     let timerId = null;
     try {
@@ -42,7 +47,7 @@ router.post('/upload-async', upload.single('file'), async (req, res, next) => {
     try {
         console.log("DOCX ROUTE HIT:", req.originalUrl);
         const uid = req.user.uid;
-        const { contractId, source, previousVersion, skipAI } = req.body;
+        const { contractId, source, previousVersion, skipAI } = req.body || {};
         const file = req.file;
 
         let currentBuffer = null;
@@ -58,13 +63,11 @@ router.post('/upload-async', upload.single('file'), async (req, res, next) => {
             sourcePayload = String(source || '');
             filename = req.body.filename || 'document.docx';
             contentType = req.body.contentType || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+            currentBuffer = decodeBase64Payload(sourcePayload);
         }
 
         if (!currentBuffer && !sourcePayload) {
             return res.status(400).json({ success: false, error: 'ファイルがアップロードされていません' });
-        }
-        if (!file) {
-            return res.status(400).json({ success: false, error: 'file が未指定です。FormData の file フィールドを確認してください。' });
         }
         if (!Buffer.isBuffer(currentBuffer) || currentBuffer.length === 0) {
             return res.status(400).json({ success: false, error: 'アップロードファイルの読み取りに失敗しました。' });
