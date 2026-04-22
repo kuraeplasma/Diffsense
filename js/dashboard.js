@@ -2572,11 +2572,12 @@ class RegistrationFlow {
                 type: this.tempData.type, // デフォルト
                 sourceUrl: this.tempData.method === 'url' ? this.tempData.source : '',
                 originalFilename: (this.tempData.method === 'pdf' || isWord) ? this.tempData.fileData.name : ''
-            });
+            }, { persist: false });
             const savedContract = await dbService.persistContractToApi(newContract, 'POST', { throwOnError: true });
             if (!savedContract) {
                 throw new Error('契約データの保存に失敗しました');
             }
+            const persistedContractId = savedContract.id || newContract.id;
             await dbService.syncContractsFromApi();
             // 2. テキスト抽出を実行（失敗しても登録は維持する）
             let extractionSucceeded = false;
@@ -2589,7 +2590,7 @@ class RegistrationFlow {
                     previousFileBase64 = await aiService.convertFileToBase64(this.compareFile);
                 }
 
-                extractionSucceeded = await this.extractTextOnly(newContract.id, previousText, previousFileBase64) === true;
+                extractionSucceeded = await this.extractTextOnly(persistedContractId, previousText, previousFileBase64) === true;
                 await dbService.syncContractsFromApi();
             } catch (extractError) {
                 console.error('Text Extraction Failed (Non-fatal):', extractError);
@@ -2606,7 +2607,7 @@ class RegistrationFlow {
             if (extractionSucceeded) {
                 // 4. 詳細ページへ遷移（まずは原本を表示して安心させる）
                 this.app.setDetailActiveTab('original');
-                this.app.navigate('diff', newContract.id);
+                this.app.navigate('diff', persistedContractId);
                 Notify.toast('読み込みが完了しました。', {
                     type: 'success',
                     duration: 2000,

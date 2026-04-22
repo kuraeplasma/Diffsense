@@ -150,7 +150,8 @@ export const aiService = {
 
             if (result?.status === 'processing') {
                 console.log("AI Service: Asynchronous processing started, polling for result...");
-                return await this._pollContractStatusOnce(contractId, token);
+                const resolvedContractId = Number(result.contractId || result?.data?.contractId || contractId);
+                return await this._pollContractStatusOnce(resolvedContractId, token);
             }
 
             // Normalize DOCX full-analysis response shape.
