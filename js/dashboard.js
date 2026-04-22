@@ -5390,7 +5390,7 @@ class DashboardApp {
         if (viewId === 'diff') {
             const normalizedDiffId = normalizeDiffContractId(params);
             const docs = normalizedDiffId ? dbService.getDocumentsByContractId(normalizedDiffId) : [];
-            if (!normalizedDiffId || docs.length < 2) {
+            if (!normalizedDiffId || docs.length === 0) {
                 console.warn('Diff navigation blocked', {
                     type: 'diff_navigation_blocked',
                     contractId: normalizedDiffId || null,
@@ -5406,8 +5406,13 @@ class DashboardApp {
                 this.updateActiveMenu('contracts');
                 this.updateRegistrationButtonVisibility('contracts');
                 await this.renderViewContent('contracts', { page: this.currentPage, ...this.filters });
-                Notify.warning('比較できる文書が2件未満のため、契約一覧に戻しました。');
+                Notify.warning('表示できる文書がないため、契約一覧に戻しました。');
                 return;
+            }
+            if (docs.length < 2) {
+                this.clearHistoryComparisonContext(normalizedDiffId);
+                this.clearDocumentCompareState(normalizedDiffId);
+                this.setDetailActiveTab('original');
             }
             this.currentContractId = normalizedDiffId;
         }
