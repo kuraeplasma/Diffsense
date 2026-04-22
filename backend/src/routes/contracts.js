@@ -37,6 +37,26 @@ router.get('/', async (req, res, next) => {
     }
 });
 
+router.get('/:id', async (req, res, next) => {
+    try {
+        const ownerUid = req.user.uid;
+        const contractId = String(req.params.id || '').trim();
+        if (!contractId) {
+            return res.status(400).json({ success: false, error: '契約IDが不正です' });
+        }
+
+        const contract = await dbService.getContractById(contractId, ownerUid);
+        if (!contract) {
+            return res.status(404).json({ success: false, error: '契約が見つかりません' });
+        }
+
+        return res.json({ success: true, data: contract });
+    } catch (error) {
+        logger.error('Contract fetch error:', error);
+        return next(error);
+    }
+});
+
 router.post('/', async (req, res, next) => {
     try {
         const ownerUid = req.user.uid;
