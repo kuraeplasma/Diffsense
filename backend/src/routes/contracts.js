@@ -1094,8 +1094,10 @@ router.post('/:id/reanalyze', rateLimit, async (req, res, next) => {
         const meta = aiResult.contract_meta;
         const metaUpdate = {
             summary: aiResult.summary || null,
-            risk_level: aiResult.riskLevel || null,
-            risk_reason: aiResult.riskReason || null,
+            ai_summary: aiResult.summary || null,
+            risk_level: aiResult.riskLevel === "3" || aiResult.riskLevel === 3 ? 'High' : (aiResult.riskLevel === "2" || aiResult.riskLevel === 2 ? 'Medium' : 'Low'),
+            ai_risk_reason: aiResult.riskReason || null,
+            ai_changes: aiResult.changes || [],
             last_analyzed_at: new Date().toISOString(),
             ai_succeeded: aiResult.aiSucceeded === true,
             ai_limited: aiResult.isLimited === true,

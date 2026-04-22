@@ -242,7 +242,20 @@ const renderClauseParagraphs = (text) => {
 
 const hasAnalysisRecord = (payload) => {
     if (!payload || typeof payload !== 'object') return false;
-    return payload.aiSucceeded === true || payload.ai_succeeded === true || payload.isLimited === true || payload.ai_limited === true;
+    const summary = String(payload.summary || payload.ai_summary || '').trim();
+    const riskReason = String(payload.riskReason || payload.ai_risk_reason || payload.risk_reason || '').trim();
+    const changes = Array.isArray(payload.changes || payload.ai_changes)
+        ? (payload.changes || payload.ai_changes).filter(Boolean)
+        : [];
+    const hasPayload = Boolean(summary || riskReason || changes.length > 0);
+    const isFailureSummary = /AI解析に失敗|AI分析に失敗|エラーが発生|取得できませんでした|テキスト抽出のみ完了|解析の準備/.test(summary);
+    if (payload.isFallback === true || payload.ai_is_fallback === true) return false;
+    if (payload.aiFailed === true || payload.ai_failed === true) return false;
+    return payload.aiSucceeded === true
+        || payload.ai_succeeded === true
+        || payload.isLimited === true
+        || payload.ai_limited === true
+        || (hasPayload && !isFailureSummary);
 };
 
 const sanitizeAnalysisPayload = (payload) => {
@@ -1389,8 +1402,8 @@ const Views = {
             contract.ai_succeeded === true
             && contract.ai_is_fallback !== true
             && (
-                String(contract.ai_summary || '').trim()
-                || String(contract.ai_risk_reason || '').trim()
+                String(contract.ai_summary || contract.summary || '').trim()
+                || String(contract.ai_risk_reason || contract.risk_reason || '').trim()
                 || (Array.isArray(contract.ai_changes) && contract.ai_changes.length > 0)
             )
         );
@@ -1486,7 +1499,7 @@ const Views = {
             } else if (hasAIResults) {
                 const normalizedStored = sanitizeAnalysisPayload({
                     summary: contract.ai_summary || contract.summary || '',
-                    riskLevel: contract.risk_level === 'High' ? 3 : (contract.risk_level === 'Medium' ? 2 : 1),
+                    riskLevel: (contract.risk_level === 'High' || contract.risk_level === '3' || contract.risk_level === 3) ? 3 : ((contract.risk_level === 'Medium' || contract.risk_level === '2' || contract.risk_level === 2) ? 2 : 1),
                     riskReason: contract.ai_risk_reason || contract.risk_reason || '',
                     changes: contract.ai_changes || [],
                     isFallback: contract.ai_is_fallback === true

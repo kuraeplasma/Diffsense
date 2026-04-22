@@ -231,7 +231,7 @@ function normalizeAnalyzeResult(parsed) {
     
     // aiSucceeded: 
     // - フォールバックでなく、かつサマリーがエラー文言でない場合に true
-    const aiSucceeded = !isFallback && !isLimited && summary.length > 0 && 
+    const aiSucceeded = !isFallback && summary.length > 0 && 
                         !/AI解析に失敗しました|エラーが発生しました|取得できませんでした/.test(summary);
 
     return {
