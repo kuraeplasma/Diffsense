@@ -899,13 +899,14 @@ async function loadOriginalSourceBuffer(candidate, logLabel = 'sign-original') {
 
     if (bucket && !/^https?:\/\//i.test(value) && !value.includes('\\') && !value.startsWith('/')) {
         try {
-            logger.info(`[${logLabel}] attempting GCS download: ${value.substring(0, 100)}`)
-            const [downloaded] = await bucket.file(value).download();
+            const gcsPath = value.replace(/^gs:\/\/[^\/]+\//, '');
+            logger.info(`[${logLabel}] attempting GCS download: original=${value.substring(0, 80)} gcsPath=${gcsPath.substring(0, 80)}`)
+            const [downloaded] = await bucket.file(gcsPath).download();
             logger.info(`[${logLabel}] GCS download success, bytes=${downloaded?.length || 0}`);
             return Buffer.from(downloaded);
         } catch (error) {
-            logger.warn(`[${logLabel}] bucket original download failed`, {
-                source: value.substring(0, 100),
+            logger.warn(`[${logLabel}] GCS download failed`, {
+                original: value.substring(0, 100),
                 bucket: bucket?.name || null,
                 error: error.message
             });
@@ -1302,9 +1303,12 @@ router.get('/original-file', async (req, res) => {
             try {
                 const contracts = await dbService.getContracts(ownerUid);
                 contract = (Array.isArray(contracts) ? contracts : []).find((item) => String(item.id) === String(signRequest.contract_id)) || null;
+                logger.info(`Sign /original-file: contract lookup contractId=${signRequest.contract_id} found=${!!contract}${contract ? ` file_path=${!!contract.original_file_path} file_url=${!!contract.original_file_url}` : ''}`);
             } catch (contractError) {
-                logger.warn(`Sign original-file contract lookup failed requestId=${signRequest.id} contractId=${signRequest.contract_id} error=${contractError.message}`);
+                logger.warn(`Sign /original-file: contract lookup failed contractId=${signRequest.contract_id} error=${contractError.message}`);
             }
+        } else {
+            logger.info(`Sign /original-file: contract_id=${signRequest.contract_id} ownerUid=${ownerUid ? 'SET' : 'EMPTY'}`);
         }
 
         const sourceMeta = contract || signRequest.document_snapshot || {};
@@ -1312,11 +1316,22 @@ router.get('/original-file', async (req, res) => {
             contract?.original_file_path,
             contract?.original_file_url,
             signRequest?.document_snapshot?.original_file_path,
-            signRequest?.document_snapshot?.original_file_url
+            signRequest?.document_snapshot?.original_file_url,
+            signRequest?.original_file_path,
+            signRequest?.original_file_url
         ].filter(Boolean);
 
-        logger.info(`Sign /original-file: candidates count=${candidates.length} contract=${!!contract} docsnap=${!!signRequest.document_snapshot} token=${token.substring(0, 30)}`);
-        logger.debug(`Sign /original-file: candidates=${JSON.stringify(candidates.map(c => String(c).substring(0, 100)))}`);
+        logger.info(`Sign /original-file: candidates count=${candidates.length} contract=${!!contract} docsnap=${!!signRequest.document_snapshot}`);
+        if (candidates.length === 0) {
+            logger.error(`Sign /original-file: NO candidates!`, {
+                has_contract: !!contract,
+                contract_paths: contract ? { file_path: !!contract.original_file_path, file_url: !!contract.original_file_url } : null,
+                has_docsnap: !!signRequest?.document_snapshot,
+                request_paths: signRequest ? { file_path: !!signRequest.original_file_path, file_url: !!signRequest.original_file_url } : null,
+                contract_id: signRequest.contract_id,
+                ownerUid: ownerUid ? 'SET' : 'EMPTY'
+            });
+        }
 
         let buffer = null;
         for (const candidate of candidates) {
