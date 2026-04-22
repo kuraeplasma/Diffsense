@@ -1,5 +1,10 @@
 const AdmZip = require('adm-zip');
 const { XMLParser } = require('fast-xml-parser');
+const { execFile } = require('child_process');
+const { promisify } = require('util');
+const fs = require('fs');
+const path = require('path');
+const execFileAsync = promisify(execFile);
 const logger = require('../utils/logger');
 
 class DocxService {
@@ -393,6 +398,49 @@ class DocxService {
             .map(line => this._categorizeParagraph(line));
 
         return this._regroupByArticle(blocks);
+    }
+
+    /**
+     * Convert DOCX file to PDF using LibreOffice/soffice
+     */
+    async convertToPdf(docxPath) {
+        const absoluteDocxPath = path.resolve(String(docxPath || ''));
+        if (!absoluteDocxPath || !fs.existsSync(absoluteDocxPath)) {
+            throw new Error('DOCX file not found for conversion');
+        }
+
+        const outputDir = path.dirname(absoluteDocxPath);
+        const outputPdfPath = path.join(
+            outputDir,
+            `${path.basename(absoluteDocxPath, path.extname(absoluteDocxPath))}.pdf`
+        );
+        if (fs.existsSync(outputPdfPath)) {
+            await fs.promises.unlink(outputPdfPath).catch(() => {});
+        }
+
+        const commandCandidates = [
+            String(process.env.SOFFICE_PATH || '').trim(),
+            process.platform === 'win32' ? 'soffice.exe' : 'soffice',
+            process.platform === 'win32' ? 'C:\\Program Files\\LibreOffice\\program\\soffice.exe' : 'libreoffice'
+        ].filter(Boolean);
+
+        let lastError = null;
+        for (const command of commandCandidates) {
+            try {
+                await execFileAsync(
+                    command,
+                    ['--headless', '--convert-to', 'pdf:writer_pdf_Export', '--outdir', outputDir, absoluteDocxPath],
+                    { windowsHide: true, timeout: 180000 }
+                );
+                if (fs.existsSync(outputPdfPath)) {
+                    return outputPdfPath;
+                }
+            } catch (error) {
+                lastError = error;
+            }
+        }
+
+        throw new Error(`LibreOffice conversion failed${lastError?.message ? `: ${lastError.message}` : ''}`);
     }
 }
 

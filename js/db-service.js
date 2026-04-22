@@ -690,16 +690,28 @@ export const dbService = {
         const contracts = this.getContracts();
         const contract = contracts.find(c => String(c.id) === String(id));
         if (contract) {
+            const sourceType = String(data.sourceType || '').toUpperCase();
+
             // 抽出されたテキストを保存
             if (data.extractedText !== undefined) {
                 contract.original_content = this.cloneContent(data.extractedText) || "（テキストデータを抽出できませんでした）";
                 contract.extracted_text_hash = data.extractedTextHash;
                 contract.extracted_text_length = data.extractedTextLength;
-                contract.source_type = data.sourceType;
-                contract.pdf_storage_path = data.pdfStoragePath;
-                contract.pdf_url = data.pdfUrl;
+                contract.source_type = sourceType || data.sourceType;
+                contract.pdf_storage_path = sourceType === 'DOCX' ? null : data.pdfStoragePath;
+                contract.pdf_url = sourceType === 'DOCX' ? null : data.pdfUrl;
                 if (data.rawExtractedText !== undefined) {
                     contract.pdf_raw_text = data.rawExtractedText || '';
+                }
+                if (data.doc && typeof data.doc === 'object') {
+                    contract.doc_type = data.doc.type || sourceType || null;
+                    contract.doc_size = Number(data.doc.size || 0) || 0;
+                } else if (sourceType === 'DOCX') {
+                    contract.doc_type = 'docx';
+                    contract.doc_size = Number(data.extractedTextLength || 0) || 0;
+                }
+                if (sourceType === 'DOCX') {
+                    contract.original_file_path = null;
                 }
             }
 
@@ -723,6 +735,7 @@ export const dbService = {
         const contracts = this.getContracts();
         const contract = contracts.find(c => String(c.id) === String(id));
         if (contract) {
+            const sourceType = String(analysisData.sourceType || '').toUpperCase();
             const incomingContent = this.cloneContent(analysisData.extractedText);
             const hasIncomingContent = incomingContent !== undefined && incomingContent !== null && this.contentSignature(incomingContent).length > 0;
             const currentSignature = this.contentSignature(contract.original_content);
@@ -751,15 +764,30 @@ export const dbService = {
             }
 
             // PDF情報も更新（新バージョン取り込み時）
-            if (analysisData.pdfUrl) {
-                contract.pdf_url = analysisData.pdfUrl;
-                contract.pdf_storage_path = analysisData.pdfStoragePath;
-                contract.source_type = analysisData.sourceType || contract.source_type;
+            if (Object.prototype.hasOwnProperty.call(analysisData, 'pdfUrl')) {
+                contract.pdf_url = analysisData.pdfUrl || null;
+                contract.pdf_storage_path = analysisData.pdfStoragePath || null;
+            }
+            if (sourceType) {
+                contract.source_type = sourceType;
+            }
+            if (sourceType === 'DOCX') {
+                contract.pdf_url = null;
+                contract.pdf_storage_path = null;
             }
 
             // 元のDOCX/PDFファイルパスを保存（docx-preview/PDFビューア用）
-            if (analysisData.originalFilePath) {
-                contract.original_file_path = analysisData.originalFilePath;
+            if (Object.prototype.hasOwnProperty.call(analysisData, 'originalFilePath')) {
+                contract.original_file_path = analysisData.originalFilePath || null;
+            } else if (sourceType === 'DOCX') {
+                contract.original_file_path = null;
+            }
+            if (analysisData.doc && typeof analysisData.doc === 'object') {
+                contract.doc_type = analysisData.doc.type || sourceType || contract.doc_type || null;
+                contract.doc_size = Number(analysisData.doc.size || 0) || 0;
+            } else if (sourceType === 'DOCX') {
+                contract.doc_type = 'docx';
+                contract.doc_size = Number(analysisData.extractedTextLength || 0) || 0;
             }
 
             // ファイル名も更新（ある場合）

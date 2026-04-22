@@ -1,5 +1,7 @@
 const express = require('express');
 const router = express.Router();
+const fs = require('fs');
+const path = require('path');
 const rateLimit = require('../middleware/rateLimit');
 const { validateAnalyzeRequest } = require('../utils/validator');
 const geminiService = require('../services/gemini');
@@ -12,9 +14,7 @@ const { toLegacyArticleArray, fromLegacyArticleArray } = require('../services/co
 const logger = require('../utils/logger');
 const crypto = require('crypto');
 const stringSimilarity = require('string-similarity');
-const { execFile } = require('child_process');
-const { promisify } = require('util');
-const execFileAsync = promisify(execFile);
+const mammoth = require('mammoth');
 
 router.get('/', async (req, res, next) => {
     try {
@@ -438,90 +438,9 @@ function buildFirebaseDownloadUrl(bucketName, objectPath, token) {
     return `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodedPath}?alt=media&token=${token}`;
 }
 
-async function convertDocxToPdf(docxPath) {
-    const fs = require('fs');
-    const pathMod = require('path');
-    const absoluteDocxPath = pathMod.resolve(String(docxPath || ''));
-    if (!absoluteDocxPath || !fs.existsSync(absoluteDocxPath)) {
-        throw new Error('DOCX file not found for conversion');
-    }
-
-    const outputDir = pathMod.dirname(absoluteDocxPath);
-    const outputPdfPath = pathMod.join(
-        outputDir,
-        `${pathMod.basename(absoluteDocxPath, pathMod.extname(absoluteDocxPath))}.pdf`
-    );
-    if (fs.existsSync(outputPdfPath)) {
-        await fs.promises.unlink(outputPdfPath).catch(() => {});
-    }
-
-    const commandCandidates = [
-        String(process.env.SOFFICE_PATH || '').trim(),
-        process.platform === 'win32' ? 'soffice.exe' : 'soffice',
-        process.platform === 'win32' ? 'C:\\Program Files\\LibreOffice\\program\\soffice.exe' : 'libreoffice'
-    ].filter(Boolean);
-
-    let lastError = null;
-    for (const command of commandCandidates) {
-        try {
-            await execFileAsync(
-                command,
-                ['--headless', '--convert-to', 'pdf:writer_pdf_Export', '--outdir', outputDir, absoluteDocxPath],
-                { windowsHide: true, timeout: 180000 }
-            );
-            if (fs.existsSync(outputPdfPath)) {
-                return outputPdfPath;
-            }
-        } catch (error) {
-            lastError = error;
-        }
-    }
-
-    throw new Error(`DOCX to PDF conversion failed${lastError?.message ? `: ${lastError.message}` : ''}`);
-}
-
-async function persistDocxDerivedPdf(contractId, pdfPath, req) {
-    const fs = require('fs');
-    const pathMod = require('path');
-    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
-    const baseUrl = `${protocol}://${req.get('host')}`;
-    const pdfBuffer = await fs.promises.readFile(pdfPath);
-    const { bucket } = require('../firebase');
-
-    let pdfUrl = '';
-    let pdfStoragePath = null;
-    if (bucket) {
-        const objectPath = `contracts/${contractId}/${Date.now()}-from-docx.pdf`;
-        const file = bucket.file(objectPath);
-        const downloadToken = crypto.randomUUID();
-        await file.save(pdfBuffer, {
-            metadata: {
-                contentType: 'application/pdf',
-                metadata: {
-                    firebaseStorageDownloadTokens: downloadToken
-                }
-            }
-        });
-        try {
-            const [signedUrl] = await file.getSignedUrl({
-                action: 'read',
-                expires: Date.now() + 31536000000
-            });
-            pdfUrl = signedUrl;
-        } catch (signedUrlError) {
-            const bucketName = bucket.name || process.env.FB_STORAGE_BUCKET || process.env.FIREBASE_STORAGE_BUCKET;
-            if (!bucketName) throw signedUrlError;
-            pdfUrl = buildFirebaseDownloadUrl(bucketName, objectPath, downloadToken);
-            logger.warn('Signed URL generation failed for DOCX PDF; using token URL:', signedUrlError.message);
-        }
-        pdfStoragePath = objectPath;
-    } else {
-        const filename = pathMod.basename(pdfPath);
-        pdfStoragePath = pdfPath;
-        pdfUrl = `${baseUrl}/uploads/${filename}`;
-    }
-
-    return { pdfUrl, pdfStoragePath };
+async function extractTextFromDocx(buffer) {
+    const result = await mammoth.extractRawText({ buffer });
+    return String(result?.value || '').replace(/\r/g, '');
 }
 
 async function resolvePreviousDocxArticles(previousVersion) {
@@ -544,7 +463,13 @@ async function resolvePreviousDocxArticles(previousVersion) {
         const buffer = decodeBase64Payload(trimmed);
         const isZip = buffer.length > 4 && buffer[0] === 0x50 && buffer[1] === 0x4B;
         if (!isZip) return docxService.parseTextToArticles(trimmed);
-        return await docxService.parseDocx(buffer);
+        try {
+            const extractedText = await extractTextFromDocx(buffer);
+            return docxService.parseTextToArticles(extractedText);
+        } catch (mammothError) {
+            logger.warn('Mammoth parse failed for previous DOCX; fallback parser used:', mammothError.message);
+            return await docxService.parseDocx(buffer);
+        }
     } catch (error) {
         logger.warn('Failed to parse previousVersion as DOCX, fallback to text parser:', error.message);
         return docxService.parseTextToArticles(trimmed);
@@ -745,7 +670,8 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                 }
             } else if (method === 'docx') {
                 const docxBuffer = decodeBase64Payload(source);
-                extractedText = await docxService.parseDocx(docxBuffer);
+                rawExtractedText = await extractTextFromDocx(docxBuffer);
+                extractedText = docxService.parseTextToArticles(rawExtractedText);
                 structuredContract = fromLegacyArticleArray(extractedText);
             } else if (method === 'url') {
                 extractedText = await urlService.extractText(source);
@@ -900,47 +826,57 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
             return res.status(400).json({ success: false, error: '無効なファイル形式です。Word文書（.docx）をアップロードしてください。' });
         }
 
-        // ── 設計変更: 元のDOCXファイルをサーバーに保存 ──
-        // テキスト抽出とは別に、原本ファイルを /uploads/ に保存する。
-        // これによりdocx-previewで元のレイアウトを正確に再現できる。
-        let originalFilePath = null;
+        let extractedRawText = '';
+        let conversionMethod = 'mammoth';
+
+        console.log({
+            step: "docx_to_pdf_start",
+            filename,
+            contentType
+        });
+
         try {
-            const fs = require('fs');
-            const pathMod = require('path');
-            const uploadsDir = pathMod.join(__dirname, '../../uploads');
-            if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-            const filename = `docx-${contractId}-${crypto.randomUUID()}.docx`;
-            const savePath = pathMod.join(uploadsDir, filename);
-            await fs.promises.writeFile(savePath, currentBuffer);
-            originalFilePath = savePath;
-            logger.info(`Original DOCX saved: ${savePath}`);
-        } catch (saveErr) {
-            logger.warn('DOCX file save failed (display will use fallback):', saveErr.message);
+            // 1. まずはLibreOfficeでのPDF変換を試みる（原本性が高いため）
+            const tmpDir = path.join(__dirname, '../../tmp/docx-convert');
+            if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
+            
+            const docxTmpPath = path.join(tmpDir, `upload-${Date.now()}.docx`);
+            fs.writeFileSync(docxTmpPath, currentBuffer);
+            
+            try {
+                const pdfPath = await docxService.convertToPdf(docxTmpPath);
+                if (fs.existsSync(pdfPath)) {
+                    const pdfBuffer = fs.readFileSync(pdfPath);
+                    const pdfData = await pdfService.extractTextFromPdf(pdfBuffer);
+                    extractedRawText = pdfData.text;
+                    conversionMethod = 'libreoffice_pdf';
+                    logger.info(`DOCX conversion success via LibreOffice: ${filename}`);
+                    
+                    // Cleanup
+                    fs.unlinkSync(pdfPath);
+                }
+            } catch (convError) {
+                logger.warn(`LibreOffice conversion failed for ${filename}, falling back to mammoth:`, convError.message);
+                // Fallback to mammoth
+                extractedRawText = await extractTextFromDocx(currentBuffer);
+                conversionMethod = 'mammoth';
+            } finally {
+                if (fs.existsSync(docxTmpPath)) fs.unlinkSync(docxTmpPath);
+            }
+        } catch (extractError) {
+            logger.error('DOCX_CONVERT_ERROR', extractError);
+            return res.status(500).json({ 
+                success: false, 
+                error: 'DOCX_CONVERT_FAILED',
+                detail: extractError.message
+            });
         }
 
-        if (!originalFilePath) {
-            return res.status(500).json({ success: false, error: 'Word原本の保存に失敗しました。' });
-        }
-
-        let pdfUrl = '';
-        let pdfStoragePath = null;
-        try {
-            const convertedPdfPath = await convertDocxToPdf(originalFilePath);
-            const persistedPdf = await persistDocxDerivedPdf(contractId, convertedPdfPath, req);
-            pdfUrl = persistedPdf.pdfUrl;
-            pdfStoragePath = persistedPdf.pdfStoragePath;
-            logger.info(`DOCX converted to PDF: contractId=${contractId} pdfUrl=${pdfUrl ? 'SET' : 'EMPTY'}`);
-        } catch (convertError) {
-            logger.error('DOCX to PDF conversion error:', convertError);
-            return res.status(500).json({ success: false, error: 'WordファイルのPDF変換に失敗しました。' });
-        }
-
-        const currentArticles = await docxService.parseDocx(currentBuffer);
+        const currentArticles = docxService.parseTextToArticles(extractedRawText);
         const structuredContract = fromLegacyArticleArray(currentArticles);
         const previousArticles = await resolvePreviousDocxArticles(previousVersion);
 
-        const serialized = JSON.stringify(currentArticles);
-        const extractedTextHash = crypto.createHash('sha256').update(serialized).digest('hex');
+        const extractedTextHash = crypto.createHash('sha256').update(extractedRawText).digest('hex');
 
         const diffChanges = previousArticles.length
             ? diffService.compare(previousArticles, currentArticles)
@@ -1018,15 +954,20 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
             data: {
                 ...aiResult,
                 sourceType: 'DOCX',
+                type: 'docx',
+                content: extractedRawText,
                 extractedText: currentArticles,
+                rawExtractedText: extractedRawText,
                 structuredContract,
                 previousArticles,
                 isLimited,
                 extractedTextHash,
-                extractedTextLength: serialized.length,
-                originalFilePath,
-                pdfUrl,
-                pdfStoragePath
+                extractedTextLength: extractedRawText.length,
+                doc: {
+                    content: extractedRawText,
+                    type: 'docx',
+                    size: extractedRawText.length
+                }
             }
         });
     } catch (error) {

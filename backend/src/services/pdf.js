@@ -73,6 +73,88 @@ function normalizeLineText(text) {
     return line.trim();
 }
 
+const ARTICLE_HEADER_TOKEN_REGEX = /第\s*[0-9０-９一二三四五六七八九十百千〇零]+\s*条(?=(?:\s|$|[（(【]))/g;
+
+function normalizeArticleHeaderLead(text) {
+    let line = String(text || '').trim();
+    line = line.replace(/^第\s*第?\s*([0-9０-９一二三四五六七八九十百千〇零]+)\s*条\s*条?/, '第$1条');
+    line = line.replace(/^第\s+([0-9０-９一二三四五六七八九十百千〇零]+)\s+条/, '第$1条');
+    return line;
+}
+
+function isArticleHeaderLine(text) {
+    return /^第\s*[0-9０-９一二三四五六七八九十百千〇零]+\s*条(?:\s|$|[（(【])/.test(
+        normalizeArticleHeaderLead(text)
+    );
+}
+
+function splitParagraphByInlineArticleHeaders(text) {
+    const line = String(text || '').trim();
+    if (!line) return [];
+
+    const rawMatches = [...line.matchAll(ARTICLE_HEADER_TOKEN_REGEX)];
+    if (rawMatches.length === 0) return [line];
+
+    const matches = rawMatches.filter((match) => {
+        const idx = Number(match.index || 0);
+        if (idx === 0) return true;
+        const prev = line[idx - 1] || '';
+        return /[\s　。．!！?？\n\r]/.test(prev);
+    });
+
+    const shouldSplit = matches.length > 1 || matches.some((match) => Number(match.index || 0) > 0);
+    if (!shouldSplit) return [line];
+
+    const parts = [];
+    for (let i = 0; i < matches.length; i++) {
+        const start = Number(matches[i].index || 0);
+        const end = i + 1 < matches.length ? Number(matches[i + 1].index || line.length) : line.length;
+
+        if (start > 0 && i === 0) {
+            const head = line.slice(0, start).trim();
+            if (head) parts.push(head);
+        }
+
+        const body = line.slice(start, end).trim();
+        if (body) parts.push(body);
+    }
+
+    return parts.length > 0 ? parts : [line];
+}
+
+function buildSyntheticClauseArticles(paragraphs) {
+    const cleanParagraphs = (paragraphs || [])
+        .map((line) => String(line || '').trim())
+        .filter(Boolean);
+    if (cleanParagraphs.length === 0) return [];
+
+    const groups = [];
+    let bucket = [];
+    let bucketWeight = 0;
+
+    for (const paragraph of cleanParagraphs) {
+        const weight = Math.max(1, Math.ceil(paragraph.length / 180));
+        const shouldSplit = bucket.length >= 4 || (bucketWeight + weight > 6 && bucket.length > 0);
+        if (shouldSplit) {
+            groups.push(bucket);
+            bucket = [];
+            bucketWeight = 0;
+        }
+        bucket.push(paragraph);
+        bucketWeight += weight;
+    }
+
+    if (bucket.length > 0) {
+        groups.push(bucket);
+    }
+
+    return groups.map((lines, index) => ({
+        articleNumber: `第${index + 1}条`,
+        title: '',
+        content: lines.join('\n').trim()
+    }));
+}
+
 function shouldKeepSoftLineBreak(prevLine, nextLine) {
     const prev = String(prevLine || '').trim();
     const next = String(nextLine || '').trim();
@@ -337,7 +419,7 @@ class PDFService {
             for (const line of allLines) {
                 // Skip lines that are likely page numbers or artifacts
                 // but only if they are not part of an article header or a list
-                if (isPageArtifact(line) && !/^第\s*[0-9０-９一二三四五六七八九十百千〇零]+\s*条/.test(line.text)) {
+                if (isPageArtifact(line) && !isArticleHeaderLine(line.text)) {
                     // Check if it's likely a page number (at extreme top/bottom)
                     // (Simplified: for now just skip standalone short numeric lines)
                     continue;
@@ -350,7 +432,7 @@ class PDFService {
                 }
                 const isNewPage = line.pageNum !== prev.pageNum;
                 const lineGap = isNewPage ? 999 : Math.abs(prev.y - line.y);
-                const isArticleHeader = /^第\s*[0-9０-９一二三四五六七八九十百千〇零]+\s*条/.test(line.text);
+                const isArticleHeader = isArticleHeaderLine(line.text);
                 if (isNewPage || lineGap > lineGapThreshold || isArticleHeader) {
                     if (current.trim()) paragraphs.push(current.trim());
                     current = line.text;
@@ -367,7 +449,11 @@ class PDFService {
                 prev = line;
             }
             if (current.trim()) paragraphs.push(current.trim());
-            const normalizedParagraphs = normalizeParagraphBreaks(paragraphs);
+            const normalizedParagraphs = normalizeParagraphBreaks(paragraphs)
+                .flatMap((paragraph) => splitParagraphByInlineArticleHeaders(paragraph))
+                .map((paragraph) => normalizeArticleHeaderLead(paragraph))
+                .map((paragraph) => normalizeLineText(collapseLineDuplicates(paragraph)))
+                .filter(Boolean);
 
             // Reuse the same article parser as DOCX flow so PDF and Word behave consistently.
             const normalizedText = normalizedParagraphs.join('\n');
@@ -383,6 +469,20 @@ class PDFService {
                     title: titleLine ? titleLine.text : '',
                     version: versionLine ? versionLine.text : ''
                 });
+            }
+
+            if ((!structuredContract || !Array.isArray(structuredContract.articles) || structuredContract.articles.length === 0)
+                && normalizedParagraphs.length > 0) {
+                const syntheticArticles = buildSyntheticClauseArticles(normalizedParagraphs);
+                if (syntheticArticles.length > 0) {
+                    structuredContract = {
+                        title: structuredContract?.title || (titleLine ? titleLine.text : ''),
+                        version: structuredContract?.version || (versionLine ? versionLine.text : ''),
+                        preamble: '',
+                        articles: syntheticArticles
+                    };
+                    logger.warn('PDF clause headers not detected; synthetic clause blocks were generated.');
+                }
             }
 
             const articles = toLegacyArticleArray(structuredContract);

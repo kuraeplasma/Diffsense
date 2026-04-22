@@ -2670,7 +2670,7 @@ class RegistrationFlow {
                     aiFailed: result.data.aiFailed === true,
                     status: '未確認',
                     originalFilename: this.tempData.fileData?.name || '',
-                    originalFilePath: result.data.originalFilePath || null
+                    doc: result.data.doc || null
                 });
                 await this.app.refreshSubscriptionStatusSafe();
 
@@ -2698,8 +2698,9 @@ class RegistrationFlow {
                     extractedTextHash: result.data.extractedTextHash,
                     extractedTextLength: result.data.extractedTextLength,
                     sourceType: result.data.sourceType,
-                    pdfStoragePath: result.data.pdfStoragePath,
-                    pdfUrl: result.data.pdfUrl,
+                    pdfStoragePath: String(result.data.sourceType || '').toUpperCase() === 'DOCX' ? null : result.data.pdfStoragePath,
+                    pdfUrl: String(result.data.sourceType || '').toUpperCase() === 'DOCX' ? null : result.data.pdfUrl,
+                    doc: result.data.doc || null,
                     status: '未処理'  // 差分がまだないので未処理
                 });
 
@@ -6449,9 +6450,9 @@ class DashboardApp {
                             extractedTextHash: result.data.extractedTextHash,
                             extractedTextLength: result.data.extractedTextLength,
                             sourceType: result.data.sourceType,
-                            pdfStoragePath: result.data.pdfStoragePath,
-                            pdfUrl: result.data.pdfUrl,
-                            originalFilePath: result.data.originalFilePath || null,
+                            pdfStoragePath: String(result.data.sourceType || '').toUpperCase() === 'DOCX' ? null : result.data.pdfStoragePath,
+                            pdfUrl: String(result.data.sourceType || '').toUpperCase() === 'DOCX' ? null : result.data.pdfUrl,
+                            doc: result.data.doc || null,
                             status: '未確認',
                             originalFilename: file.name
                         };
