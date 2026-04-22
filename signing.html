@@ -1166,6 +1166,8 @@
         const doc = result.doc || data.doc || data;
 
         console.log('doc確認:', doc);
+        console.log('pdfUrl:', doc.pdfUrl || data.pdfUrl || '');
+        console.log('originalFileUrl:', doc.originalFileUrl || doc.original_file_url || data.originalFileUrl || '');
 
         // PDF無い場合は強制生成
         if (!doc.pdfUrl) {
