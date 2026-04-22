@@ -1006,7 +1006,7 @@
   <script>
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-    const PROD_API_BASE = 'https://diffsense-api-707048573054.asia-northeast1.run.app';
+    const PROD_API_BASE = 'https://api-qf37m5ba2q-an.a.run.app';
     const IS_LOCAL_SIGNING_HOST = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
 
     const API_BASE = (() => {
@@ -1166,8 +1166,6 @@
         const doc = result.doc || data.doc || data;
 
         console.log('doc確認:', doc);
-        console.log('pdfUrl:', doc.pdfUrl || data.pdfUrl || '');
-        console.log('originalFileUrl:', doc.originalFileUrl || doc.original_file_url || data.originalFileUrl || '');
 
         // PDF無い場合は強制生成
         if (!doc.pdfUrl) {
