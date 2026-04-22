@@ -204,6 +204,12 @@
       font-weight: 700;
     }
 
+    canvas {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
     .canvas-wrap {
       position: relative;
       width: fit-content;
@@ -1173,33 +1179,29 @@
           hasContent: !!state.originalContent,
           pdfUrl: !!data.pdfUrl
         });
-        state.documentMode = data.previewMode === 'docx' && state.originalFileUrl
-          ? 'docx'
-          : (data.previewMode === 'fallback' || !data.pdfUrl ? 'fallback' : 'pdf');
-
-        const requiresVisibleLayout = state.documentMode === 'docx';
-        if (requiresVisibleLayout) {
-          showMain();
+        if (!data.pdfUrl) {
+          showError('署名対象のPDFが見つかりません。');
+          return;
         }
 
-        if (state.documentMode === 'docx') {
-          console.log('[signing.html] loading DOCX:', state.originalFileUrl);
-          await loadDocx(state.originalFileUrl);
-        } else if (state.documentMode === 'fallback') {
-          renderFallbackDocument();
-        } else {
+        try {
+          const res = await fetch(data.pdfUrl, { method: 'HEAD' });
+          if (!res.ok) {
+            showError('PDFの読み込みに失敗しました');
+            return;
+          }
+
+          state.documentMode = 'pdf';
           await loadPdf(data.pdfUrl);
-        }
-        if (!requiresVisibleLayout) {
+
           showMain();
+          renderFieldStatus();
+          updateFinishState();
+
+        } catch (e) {
+          console.error(e);
+          showError('PDF表示に失敗しました');
         }
-        if (state.documentMode === 'docx') {
-          await nextPaint();
-          fitDocxPages();
-          renderFieldMarkers();
-        }
-        renderFieldStatus();
-        updateFinishState();
       } catch (error) {
         console.error(error);
         showError(error.message || '署名画面の読み込みに失敗しました。');
@@ -1296,16 +1298,59 @@
       state.documentMode = 'pdf';
       updateDocumentChrome();
       document.getElementById('document-fallback').style.display = 'none';
-      document.getElementById('pdf-canvas').style.display = 'block';
-      document.getElementById('fields-overlay').style.display = 'block';
-      state.pdfDoc = await pdfjsLib.getDocument({
-        url,
-        cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
-        cMapPacked: true,
-        standardFontDataUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/standard_fonts/'
-      }).promise;
-      state.totalPages = state.pdfDoc.numPages;
-      await renderPage(state.currentPage);
+      document.getElementById('pdf-canvas').style.display = 'none';
+      document.getElementById('fields-overlay').style.display = 'none';
+
+      let container = document.getElementById('pdf-container');
+      if (!container) {
+        container = document.createElement('div');
+        container.id = 'pdf-container';
+        const canvasWrap = document.querySelector('.canvas-wrap');
+        if (canvasWrap) {
+          canvasWrap.insertBefore(container, document.getElementById('document-fallback'));
+        }
+      }
+
+      const pdf = await pdfjsLib.getDocument(url).promise;
+      state.pdfDoc = pdf;
+
+      container.innerHTML = '';
+      for (let i = 1; i <= pdf.numPages; i += 1) {
+        const page = await pdf.getPage(i);
+        const containerWidth = container.clientWidth || 800;
+        const viewport = page.getViewport({ scale: 1 });
+        const scale = containerWidth / viewport.width;
+        const scaledViewport = page.getViewport({ scale });
+
+        const devicePixelRatio = window.devicePixelRatio || 1;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = scaledViewport.width * devicePixelRatio;
+        canvas.height = scaledViewport.height * devicePixelRatio;
+
+        canvas.style.width = `${scaledViewport.width}px`;
+        canvas.style.height = `${scaledViewport.height}px`;
+
+        const context = canvas.getContext('2d');
+        if (!context) {
+          throw new Error('Canvas context取得失敗');
+        }
+        context.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+        context.clearRect(0, 0, canvas.width, canvas.height);
+
+        await page.render({
+          canvasContext: context,
+          viewport: scaledViewport
+        }).promise;
+
+        container.appendChild(canvas);
+      }
+
+      state.currentPage = 1;
+      state.totalPages = pdf.numPages;
+      document.getElementById('page-summary').textContent = `全 ${state.totalPages} ページ`;
+      document.getElementById('prev-btn').disabled = true;
+      document.getElementById('next-btn').disabled = true;
     }
 
     async function ensureDocxPreviewModule() {
