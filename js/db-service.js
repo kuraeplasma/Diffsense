@@ -411,15 +411,24 @@ export const dbService = {
         return JSON.parse(localStorage.getItem(this.KEYS.DIFF_RESULTS) || '[]');
     },
 
-    getDiffResult(docAId, docBId) {
+    getDiffResult(docAId, docBId, contractId = null) {
         const results = this.getDiffResults();
-        return results.find((item) => item.docA_id === docAId && item.docB_id === docBId) || null;
+        return results.find((item) => {
+            if (item.docA_id !== docAId || item.docB_id !== docBId) return false;
+            if (contractId === null || contractId === undefined || contractId === '') return true;
+            if (item.contract_id !== undefined && item.contract_id !== null) {
+                return String(item.contract_id) === String(contractId);
+            }
+            return String(docAId).startsWith(`contract-${contractId}-`)
+                && String(docBId).startsWith(`contract-${contractId}-`);
+        }) || null;
     },
 
     saveDiffResult(payload) {
         const results = this.getDiffResults();
         const existingIndex = results.findIndex((item) => item.docA_id === payload.docA_id && item.docB_id === payload.docB_id);
         const nextValue = {
+            contract_id: payload.contract_id || null,
             docA_id: payload.docA_id,
             docB_id: payload.docB_id,
             diff_data: payload.diff_data || {},
@@ -439,9 +448,10 @@ export const dbService = {
         return JSON.parse(localStorage.getItem(this.KEYS.RECENT_DIFF) || '[]');
     },
 
-    touchRecentDiff(docAId, docBId) {
+    touchRecentDiff(docAId, docBId, contractId = null) {
         const items = this.getRecentDiffs().filter((item) => !(item.docA === docAId && item.docB === docBId));
         items.unshift({
+            contract_id: contractId || null,
             docA: docAId,
             docB: docBId,
             last_viewed: new Date().toISOString()
@@ -795,6 +805,7 @@ export const dbService = {
                 const historyVersion = latestHistory?.version ?? contract.history?.length;
                 if (latestHistory && historyVersion) {
                     this.saveDiffResult({
+                        contract_id: contract.id,
                         docA_id: `contract-${contract.id}-hist-${historyVersion}`,
                         docB_id: `contract-${contract.id}-current`,
                         diff_data: {

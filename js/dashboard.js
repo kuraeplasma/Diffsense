@@ -1,6 +1,6 @@
 import { Notify } from './notify.js';
-import { dbService } from './db-service.js?v=20260321f';
-import { aiService } from './ai-service.js?v=20260309h2';
+import { dbService } from './db-service.js?v=20260422_stability';
+import { aiService } from './ai-service.js?v=20260422_trigger_guard';
 import { getApiBaseUrl, shouldUseLocalDevAuthBypass } from './api-base.js';
 import { auth } from './firebase-config.js?v=20260422_auth_timeout';
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -27,6 +27,13 @@ async function navigateLazy(page, renderOptions = {}) {
         }
     } catch (e) {
         console.error("lazy load error:", e);
+        const message = escapeHtmlText(e?.message || '画面モジュールの読み込みに失敗しました');
+        return `
+            <div class="dashboard-error-state" style="padding:24px; background:#fff5f5; border:1px solid #fecaca; border-radius:8px; color:#991b1b;">
+                <div style="font-weight:700; margin-bottom:8px;"><i class="fa-solid fa-triangle-exclamation"></i> 画面を読み込めませんでした</div>
+                <div style="font-size:13px; line-height:1.7;">${message}</div>
+            </div>
+        `;
     }
     return null;
 }
@@ -36,7 +43,7 @@ if (typeof window !== 'undefined') {
     window.__diffsenseNavigateLazy = navigateLazy;
     window.__diffsenseRoutes = routes;
 }
-const LOCAL_UI_CACHE_VERSION = '20260310v3';
+const LOCAL_UI_CACHE_VERSION = String(Date.now());
 const DASHBOARD_CACHE_KEYS = {
     USER_META: `diffsense_cache_user_meta_${LOCAL_UI_CACHE_VERSION}`,
     SUBSCRIPTION: `diffsense_cache_subscription_${LOCAL_UI_CACHE_VERSION}`,
@@ -277,8 +284,7 @@ const mergeStructuredChangesWithAnalysis = (structuredChanges, analysisChanges) 
 };
 
 const isReusableAnalysisPayload = (payload) => {
-    const normalized = sanitizeAnalysisPayload(payload);
-    return hasAnalysisRecord(normalized) && normalized.isFallback !== true;
+    return false;
 };
 
 const buildStoredContractAnalysis = (contract) => {
@@ -502,98 +508,6 @@ const buildClauseLevelChange = (section, previousClause, currentClause) => {
     };
 };
 
-const buildStructuredFallbackAnalysis = (previousContent, currentContent) => {
-    if (!isStructuredDocumentContent(previousContent) && !isStructuredDocumentContent(currentContent)) {
-        return null;
-    }
-
-    const previousClauses = parseContractIntoClauses(previousContent);
-    const currentClauses = parseContractIntoClauses(currentContent);
-    if (previousClauses.length === 0 && currentClauses.length === 0) {
-        return null;
-    }
-
-    const previousMap = new Map(previousClauses.map((clause) => [clauseIdentityKey(clause), clause]));
-    const currentMap = new Map(currentClauses.map((clause) => [clauseIdentityKey(clause), clause]));
-    const orderedKeys = [];
-
-    currentClauses.forEach((clause) => {
-        const key = clauseIdentityKey(clause);
-        if (!orderedKeys.includes(key)) orderedKeys.push(key);
-    });
-    previousClauses.forEach((clause) => {
-        const key = clauseIdentityKey(clause);
-        if (!orderedKeys.includes(key)) orderedKeys.push(key);
-    });
-
-    const changes = orderedKeys.map((key) => {
-        const previousClause = previousMap.get(key) || null;
-        const currentClause = currentMap.get(key) || null;
-        const section = composeClauseHeading(
-            currentClause?.title || previousClause?.title || '条文',
-            currentClause?.header || previousClause?.header || ''
-        );
-        return buildClauseLevelChange(section, previousClause, currentClause);
-    }).filter(Boolean);
-
-    if (changes.length === 0) {
-        return {
-            summary: '差分は検出されませんでした',
-            riskLevel: 1,
-            riskReason: '差分は検出されませんでした',
-            changes: [],
-            isFallback: true
-        };
-    }
-
-    const previewChanges = changes.slice(0, 3);
-    const previewSections = previewChanges.map((item) => item.section).filter(Boolean);
-    const hasDelete = changes.some((item) => item.type === 'DELETE');
-    const hasAdd = changes.some((item) => item.type === 'ADD');
-    const hasModify = changes.some((item) => item.type === 'MODIFY');
-    const modifyCount = changes.filter((item) => item.type === 'MODIFY').length;
-    const addCount = changes.filter((item) => item.type === 'ADD').length;
-    const deleteCount = changes.filter((item) => item.type === 'DELETE').length;
-    let riskReason = '条文差分を検出しました';
-    if (hasDelete && (hasAdd || hasModify)) {
-        riskReason = '追加・削除・変更を検出しました';
-    } else if (hasDelete) {
-        riskReason = '削除を検出しました';
-    } else if (hasAdd && hasModify) {
-        riskReason = '追加・変更を検出しました';
-    } else if (hasAdd) {
-        riskReason = '追加を検出しました';
-    } else if (hasModify) {
-        riskReason = '変更を検出しました';
-    }
-
-    const previewText = previewChanges.map((item) => {
-        const typeLabel = item.type === 'ADD' ? '追加' : (item.type === 'DELETE' ? '削除' : '変更');
-        return `${item.section}で${typeLabel}`;
-    }).join('、');
-    const suffix = changes.length > previewChanges.length
-        ? `。ほか${changes.length - previewChanges.length}条文でも変更があります。`
-        : '。';
-    let summary = `${previewText}${suffix}`;
-    if (!previewText) {
-        const summaryParts = [];
-        if (modifyCount > 0) summaryParts.push(`変更 ${modifyCount}件`);
-        if (addCount > 0) summaryParts.push(`追加 ${addCount}件`);
-        if (deleteCount > 0) summaryParts.push(`削除 ${deleteCount}件`);
-        summary = summaryParts.length > 0
-            ? `${summaryParts.join('、')}を確認しました。`
-            : '変更点を確認してください。';
-    }
-
-    return {
-        summary: summary.trim(),
-        riskLevel: hasDelete ? 2 : 1,
-        riskReason,
-        changes,
-        isFallback: true
-    };
-};
-
 const isCurrentVsLatestHistoryPair = (documentOptions, sourceDoc, targetDoc) => {
     if (!Array.isArray(documentOptions) || !sourceDoc || !targetDoc?.is_current) return false;
     const historicalDocs = documentOptions.filter((doc) => !doc.is_current);
@@ -604,6 +518,32 @@ const isCurrentVsLatestHistoryPair = (documentOptions, sourceDoc, targetDoc) => 
     }, null);
     return Boolean(latestHistoricalDoc && latestHistoricalDoc.id === sourceDoc.id);
 };
+
+const isDocumentInContractScope = (contractId, doc) => {
+    if (!contractId || !doc) return false;
+    const expectedContractId = String(contractId);
+    if (doc.contract_id !== undefined && doc.contract_id !== null) {
+        return String(doc.contract_id) === expectedContractId;
+    }
+    return String(doc.id || '').startsWith(`contract-${expectedContractId}-`);
+};
+
+const isDocumentPairInContractScope = (contractId, sourceDoc, targetDoc) => {
+    return isDocumentInContractScope(contractId, sourceDoc)
+        && isDocumentInContractScope(contractId, targetDoc)
+        && String(sourceDoc.id) !== String(targetDoc.id);
+};
+
+const logDiffExecution = (event, payload = {}) => {
+    console.info('Diff execution', {
+        type: 'diff_execution',
+        event,
+        ...payload,
+        timestamp: Date.now()
+    });
+};
+
+const hasUserTriggeredExecution = (options = {}) => options?.userTriggered === true;
 
 const contentToComparableText = (content) => {
     if (content === null || content === undefined) return '';
@@ -1166,9 +1106,10 @@ const Views = {
         `;
     },
     // 5. Plan Management (New)
-    plan: () => {
-        const sub = window.app ? window.app.subscription : null;
-        const payment = window.app ? window.app.paymentStatus : null;
+    plan: (_, appState = null) => {
+        const app = appState || window.app || null;
+        const sub = app ? app.subscription : null;
+        const payment = app ? app.paymentStatus : null;
         if (!sub || !sub.plan) {
             return `
                 <div class="page-title">プラン管理</div>
@@ -1180,8 +1121,8 @@ const Views = {
         }
 
         const currentBillingCycle = sub.billingCycle === 'annual' ? 'annual' : 'monthly';
-        const requestedBillingCycle = window.app?.planViewBillingCycle === 'annual' ? 'annual' : currentBillingCycle;
-        const annualKnownUnavailable = window.app?.hasAnnualBillingPlans === false;
+        const requestedBillingCycle = app?.planViewBillingCycle === 'annual' ? 'annual' : currentBillingCycle;
+        const annualKnownUnavailable = app?.hasAnnualBillingPlans === false;
         const selectedBillingCycle =
             (annualKnownUnavailable && requestedBillingCycle === 'annual' && currentBillingCycle !== 'annual')
                 ? 'monthly'
@@ -1189,7 +1130,7 @@ const Views = {
 
         const currentCycleLabel = currentBillingCycle === 'annual' ? '年額' : '月額';
         const selectedCycleLabel = selectedBillingCycle === 'annual' ? '年額' : '月額';
-        const planAvailability = window.app?.paymentPlanAvailability || null;
+        const planAvailability = app?.paymentPlanAvailability || null;
         const formatYen = (value) => `¥${Number(value).toLocaleString('ja-JP')}`;
 
         const plans = [
@@ -1383,80 +1324,39 @@ const Views = {
     contracts: null,
 
     // 3. Diff Details
-    diff: (id) => {
+    diff: (id, appState = null) => {
+        const app = appState || window.app || null;
         const contract = dbService.getContractById(id);
-        const comparisonContext = window.app?.getHistoryComparisonContext(id) || null;
+        const comparisonContext = app?.getHistoryComparisonContext(id) || null;
         const documentOptions = dbService.getDocumentsByContractId(id);
-        const storedCompareState = window.app?.getDocumentCompareState(id) || null;
-        const fallbackSourceDoc = documentOptions.length >= 2 ? documentOptions[documentOptions.length - 2] : null;
-        const fallbackTargetDoc = documentOptions.length >= 1 ? documentOptions[documentOptions.length - 1] : null;
-        const selectedSourceDoc = documentOptions.find((doc) => doc.id === storedCompareState?.docAId) || fallbackSourceDoc;
-        const selectedTargetDoc = documentOptions.find((doc) => doc.id === storedCompareState?.docBId) || fallbackTargetDoc;
+        const hasComparableVersion = documentOptions.length >= 2;
+        const storedCompareState = app?.getDocumentCompareState(id) || null;
+        const fallbackSourceDoc = hasComparableVersion ? documentOptions[documentOptions.length - 2] : null;
+        const fallbackTargetDoc = hasComparableVersion ? documentOptions[documentOptions.length - 1] : null;
+        const selectedSourceCandidate = hasComparableVersion
+            ? (documentOptions.find((doc) => doc.id === storedCompareState?.docAId) || fallbackSourceDoc)
+            : null;
+        const selectedTargetCandidate = hasComparableVersion
+            ? (documentOptions.find((doc) => doc.id === storedCompareState?.docBId) || fallbackTargetDoc)
+            : null;
+        const selectedSourceDoc = isDocumentPairInContractScope(id, selectedSourceCandidate, selectedTargetCandidate)
+            ? selectedSourceCandidate
+            : null;
+        const selectedTargetDoc = selectedSourceDoc ? selectedTargetCandidate : null;
         const displaySourceDoc = selectedSourceDoc;
         const displayTargetDoc = selectedTargetDoc;
-        const selectedDiffResult = selectedSourceDoc && selectedTargetDoc
-            ? dbService.getDiffResult(selectedSourceDoc.id, selectedTargetDoc.id)
-            : null;
-        const selectedDiffPayload = hasAnalysisRecord(selectedDiffResult?.diff_data)
-            ? selectedDiffResult.diff_data
-            : null;
-        const structuredFallbackAnalysis = selectedSourceDoc && selectedTargetDoc
-            ? buildStructuredFallbackAnalysis(selectedSourceDoc.content, selectedTargetDoc.content)
-            : null;
-        const hasStructuredDifferences = Boolean(structuredFallbackAnalysis?.changes?.length);
-        const latestCurrentPair = isCurrentVsLatestHistoryPair(documentOptions, selectedSourceDoc, selectedTargetDoc);
-        const storedContractAnalysis = (latestCurrentPair || (documentOptions.length === 1 && selectedTargetDoc?.is_current)) ? buildStoredContractAnalysis(contract) : null;
-        const hasExplicitNoDiffResult = hasStructuredDifferences
-            && Boolean(selectedDiffPayload)
-            && isExplicitNoDiffAnalysis(selectedDiffPayload);
-        const hasFallbackNoDiffResult = hasExplicitNoDiffResult
-            && selectedDiffPayload?.isFallback === true;
-        const shouldPreferStructuredFallback = Boolean(
-            hasStructuredDifferences
-            && selectedDiffPayload
-            && (
-                selectedDiffPayload.isFallback === true
-                || selectedDiffPayload.aiFailed === true
-                || (Array.isArray(selectedDiffPayload.changes) ? selectedDiffPayload.changes.filter(Boolean).length === 0 : true)
-            )
-        );
-        const canUseStoredContractAnalysis = Boolean(
-            latestCurrentPair
-            && hasAnalysisRecord(storedContractAnalysis)
-            && storedContractAnalysis?.isFallback !== true
-        );
-        const shouldPreferStoredContractAnalysis = Boolean(
-            canUseStoredContractAnalysis
-            && (
-                !selectedDiffPayload
-                || shouldPreferStructuredFallback
-                || hasExplicitNoDiffResult
-                || selectedDiffPayload?.isFallback === true
-            )
-        );
-        const effectiveSelectedDiffData = shouldPreferStoredContractAnalysis
-            ? storedContractAnalysis
-            : ((!hasExplicitNoDiffResult && !shouldPreferStructuredFallback && selectedDiffPayload)
-                ? selectedDiffPayload
-                : null);
-        const shouldShowStructuredFallbackPanel = Boolean(
-            !comparisonContext
-            && hasStructuredDifferences
-            && (!effectiveSelectedDiffData || hasExplicitNoDiffResult || shouldPreferStructuredFallback)
-        );
-        const shouldForceAutoPairAnalysis = Boolean(
-            selectedDiffPayload
-            && (
-                selectedDiffPayload.isFallback === true
-                || selectedDiffPayload.aiFailed === true
-                || hasExplicitNoDiffResult
-            )
-        );
+        const selectedDiffPayload = null;
+        const effectiveSelectedDiffData = selectedDiffPayload?.isFallback === true
+            ? null
+            : selectedDiffPayload;
+        const shouldShowStructuredFallbackPanel = false;
+        const shouldForceAutoPairAnalysis = false;
         const shouldAutoPairAnalysis = Boolean(
-            !comparisonContext
+            false
+            && !comparisonContext
             && selectedSourceDoc
             && selectedTargetDoc
-            && window.app?.can('operate_contract')
+            && app?.can('operate_contract')
             && (
                 !selectedDiffPayload
                 || shouldForceAutoPairAnalysis
@@ -1464,7 +1364,7 @@ const Views = {
             )
         );
         if (shouldAutoPairAnalysis) {
-            window.app.scheduleAutoPairAnalysis(
+            app.scheduleAutoPairAnalysis(
                 id,
                 selectedSourceDoc.id,
                 selectedTargetDoc.id,
@@ -1474,27 +1374,64 @@ const Views = {
         const isAutoPairAnalysisPending = Boolean(
             selectedSourceDoc
             && selectedTargetDoc
-            && window.app?.isPairAnalysisPending(id, selectedSourceDoc.id, selectedTargetDoc.id)
+            && app?.isPairAnalysisPending(id, selectedSourceDoc.id, selectedTargetDoc.id)
         );
-        const shouldUseStructuredDisplayChanges = Boolean(
-            !comparisonContext
-            && selectedSourceDoc
-            && selectedTargetDoc
-            && hasStructuredDifferences
-        );
-        const requestedActiveTab = window.app ? window.app.activeDetailTab : 'diff';
-        const runtimePdfUrl = window.app?.getRuntimePdfPreviewUrl(id) || null;
+        const shouldUseStructuredDisplayChanges = false;
+        const requestedActiveTab = app ? app.activeDetailTab : 'diff';
+        const runtimePdfUrl = app?.getRuntimePdfPreviewUrl(id) || null;
         const resolvedPdfPreviewUrl = resolvePdfPreviewUrl(contract, runtimePdfUrl);
         const sourceType = String(contract?.source_type || '').toUpperCase();
         const isPdfSource = sourceType === 'PDF' || (contract?.original_filename || '').toLowerCase().endsWith('.pdf');
         const hasPdfPreview = Boolean(resolvedPdfPreviewUrl);
         const showPdfViewerInRightPane = false;
 
-        const hasComparableVersion = documentOptions.length >= 2;
-        const hasAIResults = !!contract.last_analyzed_at;
-        const shouldHideDiffTab = !comparisonContext && !hasComparableVersion && !hasAIResults;
+        const hasAIResults = Boolean(
+            contract.ai_succeeded === true
+            && contract.ai_is_fallback !== true
+            && (
+                String(contract.ai_summary || '').trim()
+                || String(contract.ai_risk_reason || '').trim()
+                || (Array.isArray(contract.ai_changes) && contract.ai_changes.length > 0)
+            )
+        );
+        const shouldHideDiffTab = !hasComparableVersion;
         const activeTab = shouldHideDiffTab ? 'original' : requestedActiveTab;
-        const canTriggerPairAnalysis = Boolean(selectedSourceDoc && selectedTargetDoc && window.app?.can('operate_contract'));
+        const canTriggerPairAnalysis = Boolean(selectedSourceDoc && selectedTargetDoc && app?.can('operate_contract'));
+        const state = {
+            contractId: id,
+            contract,
+            comparison: {
+                context: comparisonContext,
+                documentState: storedCompareState,
+                documentOptions,
+                hasComparableVersion,
+                selectedSourceDoc,
+                selectedTargetDoc,
+                displaySourceDoc,
+                displayTargetDoc
+            },
+            diff: {
+                selectedPayload: selectedDiffPayload,
+                shouldHideTab: shouldHideDiffTab,
+                activeTab,
+                canTriggerPairAnalysis
+            },
+            analysis: {
+                hasResults: hasAIResults,
+                isAnalyzing: Boolean(app?.analyzingContractIds?.has(Number(contract.id))),
+                data: null
+            }
+        };
+        if (app) {
+            app.detailState = state;
+        }
+        if (state.diff.activeTab === 'diff' && state.comparison.hasComparableVersion) {
+            logDiffExecution('render', {
+                contractId: id,
+                docAId: state.comparison.selectedSourceDoc?.id || null,
+                docBId: state.comparison.selectedTargetDoc?.id || null
+            });
+        }
 
         let diffData = {
             summary: '',
@@ -1508,15 +1445,7 @@ const Views = {
         try {
             console.log(`[DEBUG] Preparing diffData for contract ${id}, activeTab=${activeTab}`);
             if (effectiveSelectedDiffData) {
-                const cached = effectiveSelectedDiffData?.isFallback === true
-                    ? {
-                        summary: String(effectiveSelectedDiffData.summary || 'AI差分要約を取得できませんでした。再解析を実行してください。').trim() || 'AI差分要約を取得できませんでした。再解析を実行してください。',
-                        riskLevel: effectiveSelectedDiffData.riskLevel ?? 1,
-                        riskReason: String(effectiveSelectedDiffData.riskReason || 'AI差分要約未取得').trim() || 'AI差分要約未取得',
-                        changes: Array.isArray(effectiveSelectedDiffData.changes) ? effectiveSelectedDiffData.changes.filter(Boolean) : [],
-                        isFallback: true
-                    }
-                    : sanitizeAnalysisPayload(effectiveSelectedDiffData);
+                const cached = sanitizeAnalysisPayload(effectiveSelectedDiffData);
                 diffData = {
                     title: `${contract.name} - 文書比較`,
                     summary: cached.summary || '選択した2文書の差分結果を表示しています。',
@@ -1526,24 +1455,6 @@ const Views = {
                     isFallback: cached.isFallback === true,
                     aiSucceeded: cached.aiSucceeded ?? contract.ai_succeeded,
                     isLimited: cached.isLimited ?? contract.ai_limited
-                };
-            } else if (shouldShowStructuredFallbackPanel && structuredFallbackAnalysis) {
-                diffData = {
-                    title: `${contract.name} - 文書比較`,
-                    summary: structuredFallbackAnalysis.summary || '変更点を表示しています。',
-                    riskLevel: structuredFallbackAnalysis.riskLevel ?? 1,
-                    riskReason: structuredFallbackAnalysis.riskReason || '変更点を表示しています',
-                    changes: Array.isArray(structuredFallbackAnalysis.changes) ? structuredFallbackAnalysis.changes : [],
-                    isFallback: false
-                };
-            } else if (hasFallbackNoDiffResult) {
-                diffData = {
-                    title: `${contract.name} - 文書比較`,
-                    summary: 'AI差分要約を取得できませんでした。再解析を実行してください。',
-                    riskLevel: 1,
-                    riskReason: 'AI差分要約未取得',
-                    changes: [],
-                    isFallback: true
                 };
             } else if (selectedSourceDoc && selectedTargetDoc) {
                 diffData = {
@@ -1640,7 +1551,7 @@ const Views = {
 
         const displayChanges = normalizeChangesForDisplay(
             shouldUseStructuredDisplayChanges
-                ? mergeStructuredChangesWithAnalysis(structuredFallbackAnalysis?.changes, diffData.changes)
+                ? mergeStructuredChangesWithAnalysis([], diffData.changes)
                 : diffData.changes
         );
         const changesHtml = (displayChanges.length > 0 ? displayChanges : []).map((c) => {
@@ -1680,11 +1591,12 @@ const Views = {
 
         const mobileRiskTone = diffData.riskLevel >= 3 ? 'high' : (diffData.riskLevel >= 2 ? 'medium' : 'low');
         const mobileRiskLabel = diffData.riskLevel >= 3 ? 'High' : (diffData.riskLevel >= 2 ? 'Medium' : 'Low');
-        const isAnalyzingContract = Boolean(window.app?.analyzingContractIds?.has(Number(contract.id)));
+        state.analysis.data = diffData;
+        const isAnalyzingContract = state.analysis.isAnalyzing;
         const hasAnalysisPayload = Boolean(diffData.summary || diffData.riskReason || (Array.isArray(diffData.changes) && diffData.changes.length > 0));
-        const shouldShowAnalysis = Boolean(contract.ai_succeeded || diffData.isFallback || (hasAIResults && hasAnalysisPayload));
+        const shouldShowAnalysis = Boolean(hasAIResults && hasAnalysisPayload && diffData.isFallback !== true);
         const mobilePrimaryAction = (() => {
-            if (!window.app.can('operate_contract')) return null;
+            if (!app?.can('operate_contract')) return null;
             if (!hasAIResults) {
                 return {
                     label: 'リスク解析する',
@@ -1723,10 +1635,10 @@ const Views = {
                         </div>
                     </div>
                     <div class="flex gap-sm">
-                        ${window.app.can('operate_contract') ? `<button class="btn-dashboard" onclick="window.app.shareReport(${contract.id})"><i class="fa-solid fa-share-nodes"></i> 共有</button>` : ''}
-                        ${(['pro', 'business'].includes(window.app.subscription?.plan)) ? `<button class="btn-dashboard" onclick="window.app.exportPDF(${contract.id})"><i class="fa-solid fa-file-pdf"></i> PDF出力</button>` : ''}
-                        ${window.app.can('operate_contract') ? `<button class="btn-dashboard" onclick="window.app.showHistoryModal(${id})"><i class="fa-solid fa-note-sticky"></i> メモ</button>` : ''}
-                        ${window.app.can('operate_contract')
+                        ${app?.can('operate_contract') ? `<button class="btn-dashboard" onclick="window.app.shareReport(${contract.id})"><i class="fa-solid fa-share-nodes"></i> 共有</button>` : ''}
+                        ${(['pro', 'business'].includes(app?.subscription?.plan)) ? `<button class="btn-dashboard" onclick="window.app.exportPDF(${contract.id})"><i class="fa-solid fa-file-pdf"></i> PDF出力</button>` : ''}
+                        ${app?.can('operate_contract') ? `<button class="btn-dashboard" onclick="window.app.showHistoryModal(${id})"><i class="fa-solid fa-note-sticky"></i> メモ</button>` : ''}
+                        ${app?.can('operate_contract')
                 ? (contract.status === '未処理'
                     ? ''
                     : contract.status === '未確認'
@@ -1879,7 +1791,7 @@ const Views = {
                         
                         ${contract.source_type === 'URL' ? `
                         <div style="margin-top: 24px; padding: 20px; border-top: 1px solid #eee;">
-                            ${window.app.subscription?.plan === 'pro' ? `
+                            ${app?.subscription?.plan === 'pro' ? `
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                                 <div style="display:flex; align-items:center; gap:10px;">
                                     <i class="fa-solid fa-satellite-dish" style="color:var(--accent-gold, #c19b4a); font-size:16px;"></i>
@@ -1932,7 +1844,7 @@ const Views = {
                                 ${contract.original_filename ? `<span class="doc-source-name" title="${contract.original_filename}"><i class="fa-solid fa-file-lines"></i> ${contract.original_filename}</span>` : ''}
                             </div>
                             
-                            ${window.app.can('operate_contract') ? `
+                            ${app?.can('operate_contract') ? `
                             <button class="btn-upload-version" onclick="window.app.uploadNewVersion(${id})">
                                 <i class="fa-solid fa-cloud-arrow-up"></i> 新しいバージョンをアップロード
                             </button>` : ''}
@@ -2413,7 +2325,7 @@ class RegistrationFlow {
     }
 
     open() {
-        if (!window.app.can('operate_contract')) {
+        if (!this.app?.can('operate_contract')) {
             Notify.warning('閲覧のみの権限では新規登録できません');
             return;
         }
@@ -2547,7 +2459,7 @@ class RegistrationFlow {
         }
 
         if (cardUrl) {
-            const isPro = window.app.subscription?.plan === 'pro';
+            const isPro = this.app?.subscription?.plan === 'pro';
             if (!isPro) {
                 cardUrl.style.opacity = '0.55';
                 cardUrl.style.position = 'relative';
@@ -2681,7 +2593,7 @@ class RegistrationFlow {
 
             if (extractionSucceeded) {
                 // 4. 詳細ページへ遷移（まずは原本を表示して安心させる）
-                this.app.activeDetailTab = 'original';
+                this.app.setDetailActiveTab('original');
                 this.app.navigate('diff', newContract.id);
                 Notify.toast('読み込みが完了しました。', {
                     type: 'success',
@@ -2722,7 +2634,8 @@ class RegistrationFlow {
                     contractId,
                     'docx',
                     sourceData,
-                    previousFileBase64
+                    previousFileBase64,
+                    { userTriggered: true }
                 );
 
                 if (!result.success) {
@@ -2758,7 +2671,7 @@ class RegistrationFlow {
                 this.tempData.method,
                 sourceData,
                 previousFileBase64 || previousVersion, // Word比較ならBase64を優先
-                { skipAI: true }
+                { skipAI: true, userTriggered: true }
             );
 
             if (result.success) {
@@ -2808,6 +2721,9 @@ class DashboardApp {
         this.mainContent = document.getElementById('app-content');
         this.pageTitle = document.getElementById('page-header-title');
         this.currentViewParams = null;
+        this.currentContractId = null;
+        this.analysisResult = null;
+        this.diffResult = null;
         this.userRole = '管理者'; // Default: オーナー（API失敗時はチームメンバーではないのでオーナー扱い）
 
 
@@ -2818,6 +2734,28 @@ class DashboardApp {
         this.runtimeOriginalDocxFiles = new Map();
         this.historyComparisonContext = null;
         this.documentCompareState = null;
+        this.detailState = {
+            contractId: null,
+            contract: null,
+            comparison: {
+                context: null,
+                documentState: null,
+                documentOptions: [],
+                hasComparableVersion: false,
+                selectedSourceDoc: null,
+                selectedTargetDoc: null
+            },
+            diff: {
+                activeTab: 'original',
+                selectedPayload: null,
+                shouldHideTab: true
+            },
+            analysis: {
+                hasResults: false,
+                isAnalyzing: false,
+                data: null
+            }
+        };
         this.dashboardFilter = "pending";
         this.activeDetailTab = 'original';
         this.filters = {
@@ -3119,9 +3057,13 @@ class DashboardApp {
     }
 
     setHistoryComparisonContext(context = null) {
-        this.historyComparisonContext = context && typeof context === 'object'
+        const nextContext = context && typeof context === 'object'
             ? { ...context }
             : null;
+        this.historyComparisonContext = nextContext;
+        if (this.detailState?.comparison) {
+            this.detailState.comparison.context = nextContext;
+        }
     }
 
     getHistoryComparisonContext(contractId) {
@@ -3138,6 +3080,9 @@ class DashboardApp {
             return;
         }
         this.historyComparisonContext = null;
+        if (this.detailState?.comparison) {
+            this.detailState.comparison.context = null;
+        }
     }
 
     getDocumentCompareState(contractId = null) {
@@ -3149,7 +3094,11 @@ class DashboardApp {
     }
 
     setDocumentCompareState(state = null) {
-        this.documentCompareState = state && typeof state === 'object' ? { ...state } : null;
+        const nextState = state && typeof state === 'object' ? { ...state } : null;
+        this.documentCompareState = nextState;
+        if (this.detailState?.comparison) {
+            this.detailState.comparison.documentState = nextState;
+        }
     }
 
     syncLatestDocumentCompareState(contractId) {
@@ -3171,6 +3120,9 @@ class DashboardApp {
             return;
         }
         this.documentCompareState = null;
+        if (this.detailState?.comparison) {
+            this.detailState.comparison.documentState = null;
+        }
     }
 
     buildPairAnalysisKey(contractId, docAId, docBId) {
@@ -3185,6 +3137,9 @@ class DashboardApp {
 
     scheduleAutoPairAnalysis(contractId, docAId, docBId, options = {}) {
         if (!this.can('operate_contract')) return false;
+        if (!hasUserTriggeredExecution(options)) return false;
+        const docs = dbService.getDocumentsByContractId(contractId);
+        if (docs.length < 2) return false;
 
         const key = this.buildPairAnalysisKey(contractId, docAId, docBId);
         if (!key) return false;
@@ -3202,12 +3157,9 @@ class DashboardApp {
                 const docs = dbService.getDocumentsByContractId(contractId);
                 const sourceDoc = docs.find((doc) => doc.id === docAId);
                 const targetDoc = docs.find((doc) => doc.id === docBId);
-                if (!sourceDoc || !targetDoc || sourceDoc.id === targetDoc.id) return;
+                if (!sourceDoc || !targetDoc || !isDocumentPairInContractScope(contractId, sourceDoc, targetDoc)) return;
 
-                const cached = dbService.getDiffResult(docAId, docBId);
-                if (!force && hasAnalysisRecord(cached?.diff_data)) return;
-
-                await this.analyzeDocumentPair(contractId, sourceDoc, targetDoc, { force, silent: true, auto: true });
+                await this.analyzeDocumentPair(contractId, sourceDoc, targetDoc, { force, silent: true, auto: true, userTriggered: true });
             } catch (error) {
                 console.error('Auto pair analysis error:', error);
             } finally {
@@ -3276,6 +3228,37 @@ class DashboardApp {
     renderInitialSkeleton(viewId = 'dashboard') {
         if (!this.mainContent) return;
         this.mainContent.innerHTML = Views.loading(viewId);
+    }
+
+    resetExecutionState(nextViewId = null) {
+        this.currentContractId = null;
+        this.analysisResult = null;
+        this.diffResult = null;
+        if (nextViewId !== 'diff') {
+            this.currentViewParams = null;
+            this.detailState = {
+                contractId: null,
+                contract: null,
+                comparison: {
+                    context: null,
+                    documentState: null,
+                    documentOptions: [],
+                    hasComparableVersion: false,
+                    selectedSourceDoc: null,
+                    selectedTargetDoc: null
+                },
+                diff: {
+                    activeTab: 'original',
+                    selectedPayload: null,
+                    shouldHideTab: true
+                },
+                analysis: {
+                    hasResults: false,
+                    isAnalyzing: false,
+                    data: null
+                }
+            };
+        }
     }
 
     recoverStuckDashboardSkeleton() {
@@ -3450,7 +3433,7 @@ class DashboardApp {
                 <div style="display:flex;gap:10px;justify-content:flex-end;">
                     <button onclick="document.getElementById('reanalyze-confirm-overlay').remove()"
                         style="padding:9px 20px;border:1px solid #ddd;border-radius:6px;background:#fff;color:#5e544d;font-size:14px;cursor:pointer;">キャンセル</button>
-                    <button onclick="document.getElementById('reanalyze-confirm-overlay').remove();window.app.runReanalyze('${contractId}')"
+                    <button onclick="document.getElementById('reanalyze-confirm-overlay').remove();window.app.runReanalyze('${contractId}', { userTriggered: true })"
                         style="padding:9px 22px;border:none;border-radius:6px;background:#c5a059;color:#fff;font-size:14px;font-weight:600;cursor:pointer;">
                         <i class="fa-solid fa-play" style="margin-right:6px;"></i>解析する
                     </button>
@@ -3463,7 +3446,18 @@ class DashboardApp {
     /**
      * Execute single-doc reanalysis (risk + deadline) via API.
      */
-    runReanalyze(contractId) {
+    runReanalyze(contractId, options = {}) {
+        if (!hasUserTriggeredExecution(options)) {
+            console.warn('AI execution blocked', {
+                type: 'ai_execution_blocked',
+                contractId,
+                method: 'reanalyze',
+                reason: 'missing_userTriggered',
+                timestamp: Date.now()
+            });
+            Notify.warning('解析はボタン操作からのみ実行できます。');
+            return;
+        }
         const c = dbService.getContractById(contractId);
         if (!c) { Notify.error('契約が見つかりません'); return; }
 
@@ -3487,6 +3481,12 @@ class DashboardApp {
             }
 
             try {
+                console.info('AI execution started', {
+                    type: 'ai_execution_started',
+                    contractId,
+                    method: 'reanalyze',
+                    timestamp: Date.now()
+                });
                 const authModule = await import('./auth.js');
                 const token = await authModule.getIdToken();
                 const apiBase = (await import('./api-base.js')).getApiBaseUrl();
@@ -3596,7 +3596,18 @@ class DashboardApp {
     /**
      * Re-analyze a contract from the deadline alerts view to extract deadline info.
      */
-    async runDeadlineReanalyze(contractId) {
+    async runDeadlineReanalyze(contractId, options = {}) {
+        if (!hasUserTriggeredExecution(options)) {
+            console.warn('AI execution blocked', {
+                type: 'ai_execution_blocked',
+                contractId,
+                method: 'deadline_reanalyze',
+                reason: 'missing_userTriggered',
+                timestamp: Date.now()
+            });
+            Notify.warning('解析はボタン操作からのみ実行できます。');
+            return;
+        }
         const contracts = dbService.getContracts();
         const c = contracts.find(x => String(x.id) === String(contractId));
         if (!c) { Notify.error('契約が見つかりません'); return; }
@@ -3629,6 +3640,12 @@ class DashboardApp {
         }
 
         try {
+            console.info('AI execution started', {
+                type: 'ai_execution_started',
+                contractId,
+                method: 'deadline_reanalyze',
+                timestamp: Date.now()
+            });
             const authModule = await import('./auth.js');
             const token = await authModule.getIdToken();
             const apiBase = (await import('./api-base.js')).getApiBaseUrl();
@@ -3801,7 +3818,7 @@ class DashboardApp {
                         style="background:#fff;border:1.5px dashed #c5a059;color:#c5a059;border-radius:20px;padding:3px 0;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;width:90px;text-align:center;">
                         <i class="fa-solid fa-plus" style="margin-right:4px;font-size:10px;"></i>期限を入力
                     </button>
-                    <button id="btn-deadline-reanalyze-${c.id}" onclick="event.stopPropagation();window.app.runDeadlineReanalyze('${c.id}')"
+                    <button id="btn-deadline-reanalyze-${c.id}" onclick="event.stopPropagation();window.app.runDeadlineReanalyze('${c.id}', { userTriggered: true })"
                         style="background:#fff;border:1.5px dashed #aaa;color:#666;border-radius:20px;padding:3px 0;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;width:90px;text-align:center;">
                         <i class="fa-solid fa-rotate" style="margin-right:4px;font-size:10px;"></i>再解析
                     </button>
@@ -5356,16 +5373,43 @@ class DashboardApp {
         }
 
         if (!Views[viewId]) return false;
-        this.mainContent.innerHTML = Views[viewId](renderParams);
+        this.mainContent.innerHTML = Views[viewId](renderParams, this);
         return true;
     }
 
     async navigate(viewId, params = null) {
         console.log(`Navigating to ${viewId}`, params);
 
+        this.resetExecutionState(viewId);
+
         if (viewId !== 'diff') {
             this.clearHistoryComparisonContext();
             this.clearDocumentCompareState();
+        }
+
+        if (viewId === 'diff') {
+            const normalizedDiffId = normalizeDiffContractId(params);
+            const docs = normalizedDiffId ? dbService.getDocumentsByContractId(normalizedDiffId) : [];
+            if (!normalizedDiffId || docs.length < 2) {
+                console.warn('Diff navigation blocked', {
+                    type: 'diff_navigation_blocked',
+                    contractId: normalizedDiffId || null,
+                    documentCount: docs.length,
+                    timestamp: Date.now()
+                });
+                this.clearHistoryComparisonContext(normalizedDiffId);
+                this.clearDocumentCompareState(normalizedDiffId);
+                this.resetExecutionState('contracts');
+                this.setDetailActiveTab('original');
+                this.currentView = 'contracts';
+                this.mainContent.classList.remove('is-detail-view');
+                this.updateActiveMenu('contracts');
+                this.updateRegistrationButtonVisibility('contracts');
+                await this.renderViewContent('contracts', { page: this.currentPage, ...this.filters });
+                Notify.warning('比較できる文書が2件未満のため、契約一覧に戻しました。');
+                return;
+            }
+            this.currentContractId = normalizedDiffId;
         }
 
         // Auto-close sidebar on mobile
@@ -5485,10 +5529,10 @@ class DashboardApp {
                 
                 // If no history exists, always show 'original' tab first
                 if (historyCount === 0) {
-                    this.activeDetailTab = 'original';
+                    this.setDetailActiveTab('original');
                 } else if (!this.currentViewParams) {
-                    // Initial load with history -> show 'diff'
-                    this.activeDetailTab = 'diff';
+                    // Initial load never executes diff rendering.
+                    this.setDetailActiveTab('original');
                 }
             }
             this.currentViewParams = normalizedDiffId;
@@ -5500,17 +5544,28 @@ class DashboardApp {
                     if (this.currentView === 'diff' && this.activeDetailTab === 'diff') {
                         try {
                             window.scrollTo(0, 0);
-                            this.mainContent.innerHTML = Views.diff(this.currentViewParams);
+                            this.mainContent.innerHTML = Views.diff(this.currentViewParams, this);
                             this.resetDetailPaneScroll();
                             this.enforceDetailScrollLayout();
                             this.setupClauseNavAutoSync();
                         } catch (error) {
                             console.warn('Deferred diff rerender failed:', error);
+                            this.mainContent.innerHTML = `
+                                <div class="p-md text-danger">
+                                    差分画面の表示に失敗しました。契約一覧に戻って再度お試しください。
+                                </div>
+                            `;
                         }
                     }
                 })
                 .catch((error) => {
                     console.warn('Diff library lazy load failed:', error);
+                    this.mainContent.innerHTML = `
+                        <div class="p-md text-danger">
+                            差分ライブラリの読み込みに失敗しました。ネットワーク状態を確認して再読み込みしてください。
+                        </div>
+                    `;
+                    Notify.error('差分ライブラリの読み込みに失敗しました。');
                 });
         }
         if (viewId === 'plan') {
@@ -5666,7 +5721,7 @@ class DashboardApp {
                 else if (c.status === '未確認') statusBadge = '<span class="badge badge-warning">要確認 (変更)</span>';
                 else if (c.status === '確認済') statusBadge = '<span class="badge badge-neutral"><i class="fa-solid fa-check"></i> 確認済</span>';
 
-                const actionBtn = window.app.can('operate_contract')
+                const actionBtn = this.can('operate_contract')
                     ? `<button class="btn-dashboard">${c.status === '確認済' ? '履歴を見る' : '確認する'}</button>`
                     : `<button class="btn-dashboard">詳細を見る</button>`;
 
@@ -5707,12 +5762,25 @@ class DashboardApp {
     }
 
     async setDetailTab(tab) {
-        this.activeDetailTab = tab;
+        this.setDetailActiveTab(tab);
+        if (tab === 'diff') {
+            logDiffExecution('tab_selected', {
+                contractId: this.currentViewParams,
+                userTriggered: true
+            });
+        }
         await this.navigate('diff', this.currentViewParams);
 
         // Reset scroll positions when switching tabs in detail view.
         this.resetDetailPaneScroll();
         this.setupClauseNavAutoSync();
+    }
+
+    setDetailActiveTab(tab) {
+        this.activeDetailTab = tab;
+        if (this.detailState?.diff) {
+            this.detailState.diff.activeTab = tab;
+        }
     }
 
     getDetailHeaderOffset(scrollArea = null) {
@@ -6187,7 +6255,8 @@ class DashboardApp {
                     id,
                     'text',  // テキストとして送信
                     contract.original_content,
-                    previousVersion
+                    previousVersion,
+                    { userTriggered: true }
                 );
 
                 if (result.success) {
@@ -6342,7 +6411,7 @@ class DashboardApp {
                         analysisMethod,
                         base64Data,
                         previousVersion,
-                        isFirstUpload ? { skipAI: true } : {}
+                        isFirstUpload ? { skipAI: true, userTriggered: true } : { userTriggered: true }
                     );
 
                     // ローディング削除
@@ -6384,7 +6453,7 @@ class DashboardApp {
                         // 初回取り込みは原本全文タブ、2回目以降（差分・履歴あり）は差分タブ
                         const updatedContract = dbService.getContractById(id);
                         const hasHistory = updatedContract && updatedContract.history && updatedContract.history.length > 0;
-                        this.activeDetailTab = hasHistory ? 'diff' : 'original';
+                        this.setDetailActiveTab(hasHistory ? 'diff' : 'original');
                         this.syncLatestDocumentCompareState(id);
                         this.navigate('diff', id);
 
@@ -6486,7 +6555,8 @@ class DashboardApp {
                     id,
                     'url',
                     url,
-                    contract.original_content // 旧バージョンのテキスト
+                    contract.original_content, // 旧バージョンのテキスト
+                    { userTriggered: true }
                 );
 
                 // ローディング削除
@@ -6518,7 +6588,7 @@ class DashboardApp {
                     // 画面を再読み込み (履歴があれば差分、初回なら原本)
                     const updatedContract = dbService.getContractById(id);
                     const hasHistory = updatedContract && updatedContract.history && updatedContract.history.length > 0;
-                    this.activeDetailTab = hasHistory ? 'diff' : 'original';
+                    this.setDetailActiveTab(hasHistory ? 'diff' : 'original');
                     this.syncLatestDocumentCompareState(id);
                     this.navigate('diff', id);
 
@@ -7113,7 +7183,7 @@ class DashboardApp {
 
             if (contract.source_url) {
                 requestedRemoteAnalysis = true;
-                const result = await aiService.analyzeContract(contractId, 'url', contract.source_url, historyItem.content);
+                const result = await aiService.analyzeContract(contractId, 'url', contract.source_url, historyItem.content, { userTriggered: true });
                 if (!result.success) throw new Error(result.error || '比較解析に失敗しました');
                 comparisonContext.analysis = result.data;
             } else if (isPdfSource) {
@@ -7127,7 +7197,7 @@ class DashboardApp {
                     const file = new File([blob], contract.original_filename || 'contract.pdf', { type: blob.type || 'application/pdf' });
                     const base64 = await aiService.convertFileToBase64(file);
                     requestedRemoteAnalysis = true;
-                    const result = await aiService.analyzeContract(contractId, 'pdf', base64, historyItem.content);
+                    const result = await aiService.analyzeContract(contractId, 'pdf', base64, historyItem.content, { userTriggered: true });
                     if (!result.success) throw new Error(result.error || '比較解析に失敗しました');
                     comparisonContext.analysis = result.data;
                 }
@@ -7141,7 +7211,7 @@ class DashboardApp {
                 await this.refreshSubscriptionStatusSafe();
             }
             this.setHistoryComparisonContext(comparisonContext);
-            this.activeDetailTab = 'diff';
+            this.setDetailActiveTab('diff');
             await this.navigate('diff', contractId);
         } catch (error) {
             console.error('History comparison error:', error);
@@ -7151,6 +7221,14 @@ class DashboardApp {
 
     async handleDocumentCompareChange(contractId, field, value) {
         const docs = dbService.getDocumentsByContractId(contractId);
+        if (docs.length < 2) {
+            this.clearHistoryComparisonContext(contractId);
+            this.clearDocumentCompareState(contractId);
+            this.setDetailActiveTab('original');
+            Notify.warning('比較できる文書が2件未満のため、原文のみ表示します。');
+            this.navigate('diff', contractId);
+            return;
+        }
         const currentState = this.getDocumentCompareState(contractId) || {};
         const nextState = {
             contractId,
@@ -7173,68 +7251,18 @@ class DashboardApp {
 
         const sourceDoc = docs.find((doc) => doc.id === nextState.docAId);
         const targetDoc = docs.find((doc) => doc.id === nextState.docBId);
-        if (!sourceDoc || !targetDoc) {
+        if (!sourceDoc || !targetDoc || !isDocumentPairInContractScope(contractId, sourceDoc, targetDoc)) {
             Notify.error('選択した文書が見つかりません。');
             return;
         }
 
-        const cached = dbService.getDiffResult(sourceDoc.id, targetDoc.id);
-        const structuredFallbackAnalysis = buildStructuredFallbackAnalysis(sourceDoc.content, targetDoc.content);
-        const hasStructuredDifferences = Boolean(structuredFallbackAnalysis?.changes?.length);
-        const hasFallbackNoDiffCache = hasStructuredDifferences
-            && cached?.diff_data?.isFallback === true
-            && isExplicitNoDiffAnalysis(cached?.diff_data);
-        const storedAnalysis = buildStoredContractAnalysis(dbService.getContractById(contractId));
-        const canHydrateFromStoredAnalysis = isCurrentVsLatestHistoryPair(docs, sourceDoc, targetDoc)
-            && hasAnalysisRecord(storedAnalysis)
-            && storedAnalysis?.isFallback !== true;
-        if (isLocalDashboardMode()) {
-            await this.analyzeDocumentPair(contractId, sourceDoc, targetDoc, { force: true, silent: true, auto: true });
-            return;
-        }
-        if (cached && isReusableAnalysisPayload(cached.diff_data) && !hasFallbackNoDiffCache) {
-            dbService.touchRecentDiff(sourceDoc.id, targetDoc.id);
-            this.navigate('diff', contractId);
-            return;
-        }
-        if (canHydrateFromStoredAnalysis) {
-            const contract = dbService.getContractById(contractId);
-            dbService.saveDiffResult({
-                docA_id: sourceDoc.id,
-                docB_id: targetDoc.id,
-                diff_data: buildStoredContractAnalysis(contract),
-                created_at: new Date().toISOString()
-            });
-            dbService.touchRecentDiff(sourceDoc.id, targetDoc.id);
-            this.navigate('diff', contractId);
-            return;
-        }
-        if (structuredFallbackAnalysis && Array.isArray(structuredFallbackAnalysis.changes) && structuredFallbackAnalysis.changes.length > 0) {
-            if (isCurrentVsLatestHistoryPair(docs, sourceDoc, targetDoc)) {
-                dbService.updateContractAnalysis(contractId, {
-                    summary: structuredFallbackAnalysis.summary,
-                    riskLevel: structuredFallbackAnalysis.riskLevel,
-                    riskReason: structuredFallbackAnalysis.riskReason,
-                    changes: structuredFallbackAnalysis.changes,
-                    isFallback: true,
-                    status: '未確認'
-                });
-            }
-            dbService.saveDiffResult({
-                docA_id: sourceDoc.id,
-                docB_id: targetDoc.id,
-                diff_data: {
-                    ...structuredFallbackAnalysis,
-                    riskReason: structuredFallbackAnalysis.riskReason || '変更点を表示しています',
-                    isFallback: true
-                },
-                created_at: new Date().toISOString()
-            });
-            dbService.touchRecentDiff(sourceDoc.id, targetDoc.id);
-            this.navigate('diff', contractId);
-            return;
-        }
-
+        logDiffExecution('document_pair_selected', {
+            contractId,
+            docAId: sourceDoc.id,
+            docBId: targetDoc.id,
+            userTriggered: true
+        });
+        dbService.touchRecentDiff(sourceDoc.id, targetDoc.id, contractId);
         this.navigate('diff', contractId);
     }
 
@@ -7244,13 +7272,19 @@ class DashboardApp {
             return;
         }
         const docs = dbService.getDocumentsByContractId(contractId);
+        if (docs.length < 2) {
+            this.setDetailActiveTab('original');
+            Notify.warning('比較できる文書が2件未満のため、原文のみ表示します。');
+            await this.navigate('diff', contractId);
+            return;
+        }
         const compareState = this.getDocumentCompareState(contractId) || {};
         const fallbackSourceDoc = docs.length >= 2 ? docs[docs.length - 2] : null;
         const fallbackTargetDoc = docs.length >= 1 ? docs[docs.length - 1] : null;
         const sourceDoc = docs.find((doc) => doc.id === compareState.docAId) || fallbackSourceDoc;
         const targetDoc = docs.find((doc) => doc.id === compareState.docBId) || fallbackTargetDoc;
 
-        if (!sourceDoc || !targetDoc || sourceDoc.id === targetDoc.id) {
+        if (!sourceDoc || !targetDoc || !isDocumentPairInContractScope(contractId, sourceDoc, targetDoc)) {
             Notify.warning('比較元と比較先を選択してください。');
             return;
         }
@@ -7261,22 +7295,50 @@ class DashboardApp {
         );
         if (!confirmed) return;
 
-        await this.analyzeDocumentPair(contractId, sourceDoc, targetDoc, { force: true });
+        await this.analyzeDocumentPair(contractId, sourceDoc, targetDoc, { force: true, userTriggered: true });
     }
 
     async analyzeDocumentPair(contractId, sourceDoc, targetDoc, options = {}) {
+        if (!hasUserTriggeredExecution(options)) {
+            console.warn('AI execution blocked', {
+                type: 'ai_execution_blocked',
+                contractId,
+                method: 'document_pair',
+                reason: 'missing_userTriggered',
+                timestamp: Date.now()
+            });
+            return;
+        }
         const contract = dbService.getContractById(contractId);
-        if (!contract || !sourceDoc || !targetDoc) return;
+        if (!contract) return;
+        if (!sourceDoc || !targetDoc) {
+            console.warn('AI execution blocked', {
+                type: 'ai_execution_blocked',
+                contractId,
+                method: 'document_pair',
+                reason: 'missing_source_or_target',
+                timestamp: Date.now()
+            });
+            return;
+        }
+        const docs = dbService.getDocumentsByContractId(contractId);
+        if (docs.length < 2 || !isDocumentPairInContractScope(contractId, sourceDoc, targetDoc)) {
+            this.setDetailActiveTab('original');
+            if (options.silent !== true) {
+                Notify.warning('比較できる文書が2件未満のため、原文のみ表示します。');
+            }
+            this.navigate('diff', contractId);
+            return;
+        }
         const force = options.force === true;
         const silent = options.silent === true;
-        const docs = dbService.getDocumentsByContractId(contractId);
-        const storedContractAnalysis = buildStoredContractAnalysis(contract);
-        const structuredFallbackAnalysis = buildStructuredFallbackAnalysis(sourceDoc.content, targetDoc.content);
-        const hasStructuredDifferences = Boolean(structuredFallbackAnalysis?.changes?.length);
-        const canReuseStoredAnalysis = !force
-            && isCurrentVsLatestHistoryPair(docs, sourceDoc, targetDoc)
-            && hasAnalysisRecord(storedContractAnalysis)
-            && storedContractAnalysis?.isFallback !== true;
+        const canReuseStoredAnalysis = false;
+        logDiffExecution('analyze_pair', {
+            contractId,
+            docAId: sourceDoc.id,
+            docBId: targetDoc.id,
+            userTriggered: true
+        });
 
         const diffPayload = {
             summary: '選択した2文書の差分結果です。',
@@ -7303,62 +7365,40 @@ class DashboardApp {
             const sourceType = String(contract?.source_type || '').toUpperCase();
             const isPdfSource = sourceType === 'PDF' || (contract?.original_filename || '').toLowerCase().endsWith('.pdf');
 
-            if (canReuseStoredAnalysis) {
-                Object.assign(diffPayload, storedContractAnalysis);
-            } else if (targetDoc.is_current && contract.source_url) {
+            if (targetDoc.is_current && contract.source_url) {
                 requestedRemoteAnalysis = true;
-                const result = await aiService.analyzeContract(contractId, 'url', contract.source_url, sourceDoc.content);
+                const result = await aiService.analyzeContract(contractId, 'url', contract.source_url, sourceDoc.content, { userTriggered: true });
                 if (!result.success) throw new Error(result.error || '差分解析に失敗しました');
                 Object.assign(diffPayload, result.data || {});
             } else if (targetDoc.is_current && isPdfSource) {
                 const pdfUrl = this.getRuntimePdfPreviewUrl(contractId) || contract.pdf_url;
                 if (!pdfUrl) {
-                    diffPayload.summary = 'PDF原本が保持されていないため、AI差分解析は実行せず構造化比較のみ表示します。';
-                    diffPayload.riskReason = '原本未保持';
-                } else {
-                    const response = await fetch(pdfUrl);
-                    if (!response.ok) throw new Error('PDF原本の取得に失敗しました');
-                    const blob = await response.blob();
-                    const file = new File([blob], targetDoc.document_name || contract.original_filename || 'contract.pdf', { type: blob.type || 'application/pdf' });
-                    const base64 = await aiService.convertFileToBase64(file);
-                    requestedRemoteAnalysis = true;
-                    const result = await aiService.analyzeContract(contractId, 'pdf', base64, sourceDoc.content);
-                    if (!result.success) throw new Error(result.error || '差分解析に失敗しました');
-                    Object.assign(diffPayload, result.data || {});
+                    throw new Error('PDF原本が保持されていないため、AI差分解析を実行できません');
                 }
+                const response = await fetch(pdfUrl);
+                if (!response.ok) throw new Error('PDF原本の取得に失敗しました');
+                const blob = await response.blob();
+                const file = new File([blob], targetDoc.document_name || contract.original_filename || 'contract.pdf', { type: blob.type || 'application/pdf' });
+                const base64 = await aiService.convertFileToBase64(file);
+                requestedRemoteAnalysis = true;
+                const result = await aiService.analyzeContract(contractId, 'pdf', base64, sourceDoc.content, { userTriggered: true });
+                if (!result.success) throw new Error(result.error || '差分解析に失敗しました');
+                Object.assign(diffPayload, result.data || {});
             } else {
                 const currentPayload = isStructuredDocumentContent(targetDoc.content)
                     ? targetDoc.content
                     : contentToComparableText(targetDoc.content);
                 requestedRemoteAnalysis = true;
-                const result = await aiService.analyzeContract(contractId, 'text', currentPayload, sourceDoc.content);
+                const result = await aiService.analyzeContract(contractId, 'text', currentPayload, sourceDoc.content, { userTriggered: true });
                 if (!result.success) throw new Error(result.error || '差分解析に失敗しました');
                 Object.assign(diffPayload, result.data || {});
             }
 
             const diffChanges = Array.isArray(diffPayload.changes) ? diffPayload.changes.filter(Boolean) : [];
-            if (hasStructuredDifferences) {
-                diffPayload.changes = mergeStructuredChangesWithAnalysis(structuredFallbackAnalysis.changes, diffChanges);
-                if (
-                    isExplicitNoDiffAnalysis(diffPayload)
-                    || diffPayload.isFallback === true
-                    || diffPayload.aiFailed === true
-                    || !hasMeaningfulAiSummary(diffPayload)
-                ) {
-                    diffPayload.summary = structuredFallbackAnalysis.summary;
-                    diffPayload.riskLevel = structuredFallbackAnalysis.riskLevel;
-                    diffPayload.riskReason = structuredFallbackAnalysis.riskReason || '変更点を表示しています';
-                    diffPayload.isFallback = true;
-                } else {
-                    diffPayload.isFallback = false;
-                }
-            }
-
-            if (!hasAnalysisRecord(diffPayload) && canReuseStoredAnalysis) {
-                Object.assign(diffPayload, storedContractAnalysis);
-            }
+            diffPayload.changes = diffChanges;
 
             dbService.saveDiffResult({
+                contract_id: contractId,
                 docA_id: sourceDoc.id,
                 docB_id: targetDoc.id,
                 diff_data: diffPayload,
@@ -7378,7 +7418,7 @@ class DashboardApp {
             if (requestedRemoteAnalysis) {
                 await this.refreshSubscriptionStatusSafe();
             }
-            dbService.touchRecentDiff(sourceDoc.id, targetDoc.id);
+            dbService.touchRecentDiff(sourceDoc.id, targetDoc.id, contractId);
             this.setDocumentCompareState({
                 contractId,
                 docAId: sourceDoc.id,

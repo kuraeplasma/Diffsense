@@ -26,6 +26,25 @@ export const aiService = {
      */
     async analyzeContract(contractId, method, source, previousVersion = null, options = {}) {
         try {
+            if (options.userTriggered !== true) {
+                const blockedError = new Error('AI execution blocked: userTriggered flag is required');
+                blockedError.code = 'USER_TRIGGER_REQUIRED';
+                console.warn('AI execution blocked', {
+                    type: 'ai_execution_blocked',
+                    contractId,
+                    method,
+                    reason: 'missing_userTriggered',
+                    timestamp: Date.now()
+                });
+                throw blockedError;
+            }
+            console.info('AI execution started', {
+                type: 'ai_execution_started',
+                contractId,
+                method,
+                skipAI: options.skipAI === true,
+                timestamp: Date.now()
+            });
             const apiBase = this.getApiBase();
             const token = await getIdToken();
             console.log("AI Service: Token retrieval status:", token ? "Success" : "Failed");
