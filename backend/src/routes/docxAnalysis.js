@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
+const mammoth = require('mammoth');
 const logger = require('../utils/logger');
 const dbService = require('../services/db');
 const { enqueueDocxJob, scheduleDocxJob } = require('../services/docxAsyncQueue');
@@ -11,6 +12,30 @@ const upload = multer({
         fileSize: 50 * 1024 * 1024 // 50MB
     }
 });
+
+async function validateDocxExtraction(buffer, timeoutMs = 30000) {
+    let timerId = null;
+    try {
+        const result = await Promise.race([
+            mammoth.extractRawText({ buffer }),
+            new Promise((_, reject) => {
+                timerId = setTimeout(() => {
+                    reject(new Error(`Mammoth extraction timeout (${timeoutMs}ms)`));
+                }, timeoutMs);
+            })
+        ]);
+        const extracted = String(result?.value || '').trim();
+        if (!extracted) {
+            throw new Error('Mammoth extracted empty text');
+        }
+        return { ok: true };
+    } catch (error) {
+        logger.error('DOCX preflight mammoth extraction failed:', error);
+        return { ok: false, error };
+    } finally {
+        if (timerId) clearTimeout(timerId);
+    }
+}
 
 /**
  * POST /api/docx/upload-async
@@ -40,6 +65,21 @@ router.post('/upload-async', upload.single('file'), async (req, res, next) => {
 
         if (!currentBuffer && !sourcePayload) {
             return res.status(400).json({ success: false, error: 'ファイルがアップロードされていません' });
+        }
+        if (!file) {
+            return res.status(400).json({ success: false, error: 'file が未指定です。FormData の file フィールドを確認してください。' });
+        }
+        if (!Buffer.isBuffer(currentBuffer) || currentBuffer.length === 0) {
+            return res.status(400).json({ success: false, error: 'アップロードファイルの読み取りに失敗しました。' });
+        }
+
+        const extractionCheck = await validateDocxExtraction(currentBuffer);
+        if (!extractionCheck.ok) {
+            return res.status(500).json({
+                success: false,
+                error: 'Wordからのテキスト抽出に失敗しました。',
+                detail: extractionCheck.error.message
+            });
         }
 
         const parsedContractId = parseInt(contractId, 10);
