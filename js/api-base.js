@@ -68,6 +68,10 @@ function shouldIgnoreExplicitBase(explicitBase) {
 export function getApiBaseUrl() {
     syncApiBaseOverrideFromUrl();
 
+    // 1. Check window.API_BASE (from env.js)
+    if (window.API_BASE) return normalizeBaseUrl(window.API_BASE);
+
+    // 2. Check explicit overrides
     const explicit = readExplicitApiBase();
     if (explicit && !shouldIgnoreExplicitBase(explicit)) return explicit;
 

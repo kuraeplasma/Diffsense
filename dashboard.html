@@ -3,6 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
+    <script src="js/env.js"></script>
     <!--
       Content-Security-Policy (Phase 1: Report-Only)
       ------------------------------------------------
@@ -32,6 +33,7 @@
         connect-src 'self'
             http://localhost:3001
             https://api-qf37m5ba2q-an.a.run.app
+            https://diffsense-api-707048573054.asia-northeast1.run.app
             https://diffsense.spacegleam.co.jp
             https://*.googleapis.com
             https://*.firebaseio.com
@@ -45,7 +47,7 @@
     <script>
         // Cloud Runウォームアップ
         (function() {
-            fetch('https://api-qf37m5ba2q-an.a.run.app/health', {
+            fetch('https://diffsense-api-707048573054.asia-northeast1.run.app/health', {
                 method: 'GET',
                 cache: 'no-store'
             }).catch(function() {});
