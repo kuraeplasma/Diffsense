@@ -26,6 +26,15 @@ const upload = multer({
     }
 });
 
+function generateServerContractId(existingContracts = []) {
+    const existing = new Set((Array.isArray(existingContracts) ? existingContracts : []).map((item) => String(item?.id)));
+    let candidate = Date.now();
+    while (existing.has(String(candidate))) {
+        candidate += 1;
+    }
+    return candidate;
+}
+
 router.get('/', async (req, res, next) => {
     try {
         const ownerUid = req.user.uid;
@@ -66,7 +75,8 @@ router.post('/', async (req, res, next) => {
         const payload = req.body || {};
         const nowIso = new Date().toISOString();
         const contract = {
-            id: Number(payload.id) || Date.now(),
+            // サーバー側で必ず採番し、クライアント側の仮IDは信用しない
+            id: generateServerContractId(contracts),
             name: String(payload.name || '').trim() || '書類',
             type: String(payload.type || '').trim() || '契約書',
             created_at: payload.created_at || nowIso,

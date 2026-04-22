@@ -113,17 +113,30 @@ export const aiService = {
                 }
             };
 
-            if (method === 'docx') {
-                const safePreviousVersion = normalizeDocxPreviousVersionForUpload(normalizedPreviousVersion);
-                const docxBody = {
-                    contractId,
-                    method: 'docx',
-                    source: typeof source === 'string' ? source : '',
-                    previousVersion: safePreviousVersion
-                };
-                if (options.skipAI) docxBody.skipAI = true;
-                fetchOptions.headers['Content-Type'] = 'application/json';
-                fetchOptions.body = JSON.stringify(docxBody);
+            if (method === 'docx' || source instanceof File) {
+                const formData = new FormData();
+                formData.append('contractId', contractId);
+                formData.append('method', method);
+                
+                if (source instanceof File) {
+                    formData.append('file', source);
+                } else {
+                    formData.append('source', String(source || ''));
+                }
+
+                if (normalizedPreviousVersion) {
+                    const safePrev = method === 'docx' 
+                        ? normalizeDocxPreviousVersionForUpload(normalizedPreviousVersion)
+                        : normalizedPreviousVersion;
+                    formData.append('previousVersion', safePrev);
+                }
+                
+                if (options.skipAI) {
+                    formData.append('skipAI', 'true');
+                }
+                
+                fetchOptions.body = formData;
+                // Note: Don't set Content-Type header; fetch sets it with boundary for FormData
             } else {
                 fetchOptions.headers['Content-Type'] = 'application/json';
                 fetchOptions.body = JSON.stringify(body);

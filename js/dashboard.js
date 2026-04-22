@@ -6430,7 +6430,7 @@ class DashboardApp {
                     const result = await aiService.analyzeContract(
                         id,
                         analysisMethod,
-                        base64Data,
+                        analysisMethod === 'docx' ? file : base64Data,
                         previousVersion,
                         isFirstUpload ? { skipAI: true, userTriggered: true } : { userTriggered: true }
                     );

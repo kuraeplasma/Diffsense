@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <script src="js/env.js"></script>
+    <!--
+      Content-Security-Policy (Phase 1: Report-Only)
+      ------------------------------------------------
+      Enforces no blocking yet; browser only REPORTS violations (DevTools console).
+      After a sprint of monitoring with no legitimate violations, flip the header
+      name from `Content-Security-Policy-Report-Only` to `Content-Security-Policy`
+      to enforce. 'unsafe-inline' is kept because dashboard.js renders UI via
+      template strings with onclick= and inline <style> blocks; removing those
+      is a separate refactor task.
+    -->
+    <meta http-equiv="Content-Security-Policy-Report-Only" content="
+        default-src 'self' https:;
+        script-src 'self' 'unsafe-inline' 'unsafe-eval'
+            https://www.googletagmanager.com
+            https://www.google-analytics.com
+            https://www.gstatic.com
+            https://apis.google.com
+            https://js.stripe.com
+            https://cdnjs.cloudflare.com;
+        style-src 'self' 'unsafe-inline'
+            https://fonts.googleapis.com
+            https://cdnjs.cloudflare.com;
+        font-src 'self' data:
+            https://fonts.gstatic.com
+            https://cdnjs.cloudflare.com;
+        img-src 'self' data: blob: https:;
+        connect-src 'self'
+            http://localhost:3001
+            https://api-qf37m5ba2q-an.a.run.app
+            https://diffsense-api-707048573054.asia-northeast1.run.app
+            https://diffsense.spacegleam.co.jp
+            https://*.googleapis.com
+            https://*.firebaseio.com
+            https://*.google-analytics.com
+            https://identitytoolkit.googleapis.com
+            https://securetoken.googleapis.com;
+        frame-src 'self' https://js.stripe.com https://*.firebaseapp.com;
+        object-src 'none';
+        base-uri 'self';
+    ">
+    <script>
+        // Cloud Runウォームアップ
+        (function() {
+            fetch('https://diffsense-api-707048573054.asia-northeast1.run.app/health', {
+                method: 'GET',
+                cache: 'no-store'
+            }).catch(function() {});
+        })();
+    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DIFFsense Dashboard</title>
+
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=AW-17941578077"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
+        gtag('config', 'AW-17941578077');
+    </script>
+
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;700&family=Noto+Serif+JP:wght@400;700&display=swap"
+        rel="stylesheet">
+    <style>body{margin:0;background:#fafafa;color:#222;font-family:Inter,"Noto Sans JP",sans-serif}#app-sidebar{width:250px;position:fixed;left:0;top:0;bottom:0;background:#111827;color:#fff;z-index:20}#app-main{margin-left:250px;min-height:100vh}#app-content{padding:24px;min-height:100vh}.shell-skeleton{display:grid;gap:14px}.skeleton-block{height:18px;background:linear-gradient(90deg,#eceff3,#f5f7fa,#eceff3);background-size:200% 100%;border-radius:6px;animation:skel 1.2s ease-in-out infinite}.skeleton-card{height:110px;border-radius:12px;background:#fff;border:1px solid #eceff3}.skeleton-row{height:46px;border-radius:8px;background:#fff;border:1px solid #eceff3}@keyframes skel{0%{background-position:200% 0}100%{background-position:-200% 0}}@media (max-width:900px){#app-main{margin-left:0}#app-content{padding:16px}}.toggle-switch{position:relative;display:inline-block;width:48px;height:26px}.toggle-switch input{opacity:0;width:0;height:0}.toggle-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#444;border-radius:26px;transition:.3s}.toggle-slider:before{position:absolute;content:"";height:20px;width:20px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s}input:checked+.toggle-slider{background:#4CAF50}input:checked+.toggle-slider:before{transform:translateX(22px)}</style>
+    <link rel="preload" as="style" href="css/dashboard.css?v=5" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="css/dashboard.css?v=5"></noscript>
+    <link rel="stylesheet" href="css/sign.css?v=premiumv53">
+    <link rel="stylesheet" href="css/dashboard-structured-fix.css?v=20260310local1">
+    <!-- FontAwesome for Icons (CDN) -->
+    <!-- FontAwesome for Icons (CDN) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="icon" type="image/png" href="favicon2.png?v=2">
+</head>

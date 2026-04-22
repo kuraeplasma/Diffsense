@@ -252,8 +252,12 @@ async function processDocxBackground(contractId, currentBuffer, filename, conten
             });
         }
 
-        await dbService.updateContract(contractId, updateData, uid);
-        logger.info(`Async DOCX processing completed for contract ${contractId}`);
+        const updated = await dbService.updateContract(contractId, updateData, uid);
+        if (updated) {
+            logger.info(`Async DOCX processing completed for contract ${contractId}`);
+        } else {
+            logger.error(`Failed to update database for contract ${contractId}. updateContract returned null (possibly ID mismatch or permission issue).`);
+        }
         return { success: true, data: updateData };
 
     } catch (error) {
