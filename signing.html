@@ -1166,6 +1166,13 @@
         state.originalContent = data.originalContent || null;
         state.pageDimensions = data.pageDimensions || {};
         state.sourceUrl = data.sourceUrl || '';
+        console.log('[signing.html] API /verify response:', {
+          originalFileUrl: state.originalFileUrl ? `SET (${state.originalFileUrl.substring(0, 100)})` : 'EMPTY',
+          originalFilename: state.originalFilename,
+          previewMode: data.previewMode,
+          hasContent: !!state.originalContent,
+          pdfUrl: !!data.pdfUrl
+        });
         state.documentMode = data.previewMode === 'docx' && state.originalFileUrl
           ? 'docx'
           : (data.previewMode === 'fallback' || !data.pdfUrl ? 'fallback' : 'pdf');
@@ -1176,6 +1183,7 @@
         }
 
         if (state.documentMode === 'docx') {
+          console.log('[signing.html] loading DOCX:', state.originalFileUrl);
           await loadDocx(state.originalFileUrl);
         } else if (state.documentMode === 'fallback') {
           renderFallbackDocument();
@@ -1376,12 +1384,20 @@
     }
 
     async function resolveDocxPreviewSource(source) {
-      if (source instanceof Blob) return source;
-      const response = await fetch(source);
-      if (!response.ok) {
-        throw new Error(`Word原本の取得に失敗しました: HTTP ${response.status}`);
+      if (source instanceof Blob) {
+        console.log('[signing.html] resolveDocxPreviewSource: already Blob');
+        return source;
       }
-      return await response.blob();
+      console.log('[signing.html] resolveDocxPreviewSource: fetching from', source.substring(0, 100));
+      const response = await fetch(source);
+      console.log('[signing.html] resolveDocxPreviewSource: fetch response status', response.status, response.statusText);
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => '');
+        console.error('[signing.html] resolveDocxPreviewSource error response:', errorText.substring(0, 200));
+        throw new Error(`Word原本の取得に失敗しました: HTTP ${response.status}`);\n      }
+      const blob = await response.blob();
+      console.log('[signing.html] resolveDocxPreviewSource: blob received, size=', blob.size);
+      return blob;
     }
 
     async function loadDocx(source) {
@@ -1394,16 +1410,23 @@
       fallback.style.display = 'block';
       fallback.innerHTML = '';
 
-      const { renderDocxPreviewPages } = await ensureDocxPreviewModule();
-      const previewSource = await resolveDocxPreviewSource(source);
-      const pages = await renderDocxPreviewPages(fallback, previewSource, {
-        expectedPageCount: getExpectedDocxPageCount()
-      });
-      state.totalPages = Math.max(1, pages.length);
-      state.currentPage = Math.min(state.currentPage || 1, state.totalPages);
-      syncDocxPageVisibility();
-      fitDocxPages();
-      renderFieldMarkers();
+      try {
+        console.log('[signing.html] loadDocx: loading from', source.substring(0, 100));
+        const { renderDocxPreviewPages } = await ensureDocxPreviewModule();
+        const previewSource = await resolveDocxPreviewSource(source);
+        console.log('[signing.html] loadDocx: resolveDocxPreviewSource returned', previewSource ? 'OK' : 'FAILED');
+        const pages = await renderDocxPreviewPages(fallback, previewSource, {
+          expectedPageCount: getExpectedDocxPageCount()
+        });
+        state.totalPages = Math.max(1, pages.length);
+        state.currentPage = Math.min(state.currentPage || 1, state.totalPages);
+        syncDocxPageVisibility();
+        fitDocxPages();
+        renderFieldMarkers();
+      } catch (error) {
+        console.error('[signing.html] loadDocx failed:', error);
+        showError(`Word原本の取得に失敗しました: ${error.message}`);
+      }
     }
 
     function escapeHtml(value) {

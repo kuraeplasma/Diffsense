@@ -269,15 +269,19 @@ async function resolveSignRequestOriginalFileUrl(signRequest, req, contract = nu
         signRequest?.document_snapshot?.original_file_url,
         signRequest?.document_snapshot?.original_file_path
     ];
+    logger.info(`resolveSignRequestOriginalFileUrl: candidates=${JSON.stringify(candidates.map(c => String(c || '').substring(0, 100)))}`);
     for (const candidate of candidates) {
         const value = String(candidate || '').trim();
         if (!value) continue;
         if (/^https?:\/\//i.test(value)) {
+            logger.info(`resolveSignRequestOriginalFileUrl: resolved to HTTPS URL: ${value.substring(0, 100)}`);
             return value;
         }
         const uploadsPath = extractUploadsRelativePath(value);
         if (uploadsPath) {
-            return `${backendBaseUrl}${uploadsPath}`;
+            const resolved = `${backendBaseUrl}${uploadsPath}`;
+            logger.info(`resolveSignRequestOriginalFileUrl: resolved to uploads path: ${resolved.substring(0, 100)}`);
+            return resolved;
         }
         if (bucket && !value.includes('\\') && !value.startsWith('/')) {
             try {
@@ -285,12 +289,14 @@ async function resolveSignRequestOriginalFileUrl(signRequest, req, contract = nu
                     action: 'read',
                     expires: Date.now() + 3600000
                 });
+                logger.info(`resolveSignRequestOriginalFileUrl: resolved to GCS signed URL: ${signedUrl.substring(0, 100)}`);
                 return signedUrl;
             } catch (err) {
                 logger.warn('resolveSignRequestOriginalFileUrl: signed URL failed for', value, err.message);
             }
         }
     }
+    logger.warn(`resolveSignRequestOriginalFileUrl: all candidates exhausted, returning empty string. contract=${!!contract} document_snapshot=${!!signRequest?.document_snapshot}`);
     return '';
 }
 
@@ -860,49 +866,70 @@ async function getRequestSigningUrl(signRequest, recipient) {
 
 async function loadOriginalSourceBuffer(candidate, logLabel = 'sign-original') {
     const value = String(candidate || '').trim();
-    if (!value) return null;
+    if (!value) {
+        logger.warn(`[${logLabel}] candidate is empty`);
+        return null;
+    }
 
     try {
         if (fs.existsSync(value)) {
+            logger.info(`[${logLabel}] found local file: ${value.substring(0, 100)}`);
             return fs.readFileSync(value);
         }
-    } catch {}
+    } catch (err) {
+        logger.warn(`[${logLabel}] local file check failed: ${err.message}`);
+    }
 
     const uploadsRelative = extractUploadsRelativePath(value);
     if (uploadsRelative) {
         const localPath = path.join(__dirname, '..', '..', uploadsRelative.replace(/^\//, ''));
         try {
             if (fs.existsSync(localPath)) {
+                logger.info(`[${logLabel}] found uploads file: ${localPath.substring(0, 100)}`);
                 return fs.readFileSync(localPath);
+            } else {
+                logger.warn(`[${logLabel}] uploads path not found: ${localPath.substring(0, 100)}`);
             }
-        } catch {}
+        } catch (err) {
+            logger.warn(`[${logLabel}] uploads file read failed: ${err.message}`);
+        }
+    } else {
+        logger.info(`[${logLabel}] not an uploads path: ${value.substring(0, 100)}`)
     }
 
     if (bucket && !/^https?:\/\//i.test(value) && !value.includes('\\') && !value.startsWith('/')) {
         try {
+            logger.info(`[${logLabel}] attempting GCS download: ${value.substring(0, 100)}`)
             const [downloaded] = await bucket.file(value).download();
+            logger.info(`[${logLabel}] GCS download success, bytes=${downloaded?.length || 0}`);
             return Buffer.from(downloaded);
         } catch (error) {
             logger.warn(`[${logLabel}] bucket original download failed`, {
-                source: value,
+                source: value.substring(0, 100),
                 bucket: bucket?.name || null,
                 error: error.message
             });
         }
+    } else if (bucket) {
+        logger.info(`[${logLabel}] skipping GCS (HTTPS or absolute path): ${value.substring(0, 100)}`);
     }
 
     if (/^https?:\/\//i.test(value)) {
         try {
-            const response = await axios.get(value, { responseType: 'arraybuffer' });
+            logger.info(`[${logLabel}] attempting HTTPS fetch: ${value.substring(0, 100)}`);
+            const response = await axios.get(value, { responseType: 'arraybuffer', timeout: 30000 });
+            logger.info(`[${logLabel}] HTTPS fetch success, bytes=${response.data?.length || 0}`);
             return Buffer.from(response.data);
         } catch (error) {
             logger.warn(`[${logLabel}] remote original fetch failed`, {
-                source: value,
+                source: value.substring(0, 100),
+                status: error.response?.status || null,
                 error: error.message
             });
         }
     }
 
+    logger.warn(`[${logLabel}] all methods exhausted: ${value.substring(0, 100)}`);
     return null;
 }
 
@@ -1209,6 +1236,7 @@ router.get('/verify', async (req, res) => {
         const originalFileUrl = resolvedOriginalFileUrl
             ? `${requestOrigin}/api/sign/original-file?token=${encodeURIComponent(token)}`
             : '';
+        logger.info(`Sign /verify: resolvedOriginalFileUrl=${resolvedOriginalFileUrl ? 'SET' : 'EMPTY'} originalFileUrl=${originalFileUrl ? 'SET' : 'EMPTY'} isDocxSource=${isDocxSource} originalFilename=${originalFilename.substring(0, 100)}`);
         if (!pdfUrl && !originalContent && !isDocxSource) {
             return res.status(404).json({ success: false, error: '署名対象の原本ファイルが見つかりません。' });
         }
@@ -1287,13 +1315,35 @@ router.get('/original-file', async (req, res) => {
             signRequest?.document_snapshot?.original_file_url
         ].filter(Boolean);
 
+        logger.info(`Sign /original-file: candidates count=${candidates.length} contract=${!!contract} docsnap=${!!signRequest.document_snapshot} token=${token.substring(0, 30)}`);
+        logger.debug(`Sign /original-file: candidates=${JSON.stringify(candidates.map(c => String(c).substring(0, 100)))}`);
+
         let buffer = null;
         for (const candidate of candidates) {
+            logger.info(`Sign /original-file: trying candidate ${String(candidate).substring(0, 100)}`);
             buffer = await loadOriginalSourceBuffer(candidate, `sign-original:${signRequest.id}`);
-            if (buffer?.length) break;
+            if (buffer?.length) {
+                logger.info(`Sign /original-file: success! buffer size=${buffer.length}`);
+                break;
+            }
         }
         if (!buffer?.length) {
-            return res.status(404).json({ success: false, error: '署名対象の原本ファイルが見つかりません' });
+            if (candidates.length === 0) {
+                logger.error(`Sign /original-file: NO candidates! contract=${!!contract} has_docsnap=${!!signRequest.document_snapshot}`, {
+                    contract_id: signRequest.contract_id,
+                    has_contract_original_file_path: !!contract?.original_file_path,
+                    has_contract_original_file_url: !!contract?.original_file_url,
+                    has_docsnap_original_file_path: !!signRequest.document_snapshot?.original_file_path,
+                    has_docsnap_original_file_url: !!signRequest.document_snapshot?.original_file_url
+                });
+            } else {
+                logger.error(`Sign /original-file: all candidates failed, tried ${candidates.length} candidates`);
+            }
+            return res.status(404).json({ 
+                success: false, 
+                error: '署名対象の原本ファイルが見つかりません',
+                debug: { candidatesCount: candidates.length }
+            });
         }
 
         const encodedFileName = encodeURIComponent(String(sourceMeta.original_filename || 'document.docx'));
