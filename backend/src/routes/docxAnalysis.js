@@ -7,10 +7,7 @@ const dbService = require('../services/db');
 const { enqueueDocxJob, scheduleDocxJob } = require('../services/docxAsyncQueue');
 
 const upload = multer({
-    storage: multer.memoryStorage(),
-    limits: {
-        fileSize: 50 * 1024 * 1024 // 50MB
-    }
+    storage: multer.memoryStorage()
 });
 
 async function validateDocxExtraction(buffer, timeoutMs = 30000) {

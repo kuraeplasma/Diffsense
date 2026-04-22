@@ -94,6 +94,8 @@ export const aiService = {
             };
 
             if (method === 'docx') {
+                // FormDataのContent-Typeはブラウザに任せる（boundary付き）
+                delete fetchOptions.headers['Content-Type'];
                 const formData = new FormData();
                 formData.append('contractId', contractId);
                 formData.append('method', method);
