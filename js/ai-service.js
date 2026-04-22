@@ -1,24 +1,6 @@
 import { getIdToken } from './auth.js';
 import { getApiBaseUrl } from './api-base.js';
 
-const ACTIVE_CONTRACT_POLLS = new Map();
-
-function sleep(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function joinApiUrl(apiBase, endpointPath) {
-    try {
-        return new URL(endpointPath, `${String(apiBase || '').replace(/\/$/, '')}/`).toString();
-    } catch {
-        const normalizedBase = String(apiBase || '').replace(/\/$/, '');
-        const normalizedPath = String(endpointPath || '').startsWith('/')
-            ? endpointPath
-            : `/${endpointPath}`;
-        return `${normalizedBase}${normalizedPath}`;
-    }
-}
-
 /**
  * AI Service - Backend API Communication
  * バックエンドAPIとの通信を担当
@@ -64,8 +46,7 @@ export const aiService = {
                 skipAI: options.skipAI === true,
                 timestamp: Date.now()
             });
-            const API_BASE = this.getApiBase();
-            console.log("API_BASE:", API_BASE);
+            const apiBase = this.getApiBase();
             const token = await getIdToken();
             console.log("AI Service: Token retrieval status:", token ? "Success" : "Failed");
             const normalizedPreviousVersion = method === 'docx'
@@ -83,50 +64,17 @@ export const aiService = {
             // Word解析は常に専用エンドポイントを使用
             // 一部環境の /contracts/analyze バリデーションでは docx が未許可のため
             const endpoint = (method === 'docx')
-                ? joinApiUrl(API_BASE, '/api/docx/upload-async')
-                : joinApiUrl(API_BASE, '/api/contracts/analyze');
+                ? `${apiBase}/contracts/upload-docx`
+                : `${apiBase}/contracts/analyze`;
 
-            let fetchOptions = {
+            const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: {
+                    'Content-Type': 'application/json',
                     'Authorization': token ? `Bearer ${token}` : ''
-                }
-            };
-
-            if (method === 'docx') {
-                const formData = new FormData();
-                formData.append('contractId', contractId);
-                formData.append('method', method);
-                formData.append('previousVersion', normalizedPreviousVersion || '');
-                if (options.skipAI) formData.append('skipAI', 'true');
-
-                // sourceがBase64文字列ならBlobに変換してファイルとして追加
-                if (typeof source === 'string' && source.length > 0) {
-                    try {
-                        const byteCharacters = atob(source);
-                        const byteNumbers = new Array(byteCharacters.length);
-                        for (let i = 0; i < byteCharacters.length; i++) {
-                            byteNumbers[i] = byteCharacters.charCodeAt(i);
-                        }
-                        const byteArray = new Uint8Array(byteNumbers);
-                        const blob = new Blob([byteArray], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
-                        formData.append('file', blob, 'document.docx');
-                    } catch (e) {
-                        console.error("AI Service: Failed to convert Base64 to Blob", e);
-                        // 変換に失敗した場合はJSONフォールバックを試みるために既存のbodyに戻るか、エラーを投げる
-                        throw new Error("ファイルの準備に失敗しました。");
-                    }
-                } else if (source instanceof File || source instanceof Blob) {
-                    formData.append('file', source);
-                }
-
-                fetchOptions.body = formData;
-            } else {
-                fetchOptions.headers['Content-Type'] = 'application/json';
-                fetchOptions.body = JSON.stringify(body);
-            }
-
-            const response = await fetch(endpoint, fetchOptions);
+                },
+                body: JSON.stringify(body)
+            });
 
             let result = null;
             try {
@@ -143,11 +91,6 @@ export const aiService = {
                 if (result.plan !== undefined) apiError.plan = result.plan;
                 if (result.nextPlan !== undefined) apiError.nextPlan = result.nextPlan;
                 throw apiError;
-            }
-
-            if (result?.status === 'processing') {
-                console.log("AI Service: Asynchronous processing started, polling for result...");
-                return await this._pollContractStatusOnce(contractId, token);
             }
 
             // Normalize DOCX full-analysis response shape.
@@ -190,115 +133,6 @@ export const aiService = {
 
             throw error;
         }
-    },
-
-    /**
-     * Poll contract status until completion (Private)
-     */
-    async _pollContractStatusOnce(contractId, token) {
-        const key = String(contractId);
-        if (ACTIVE_CONTRACT_POLLS.has(key)) {
-            return ACTIVE_CONTRACT_POLLS.get(key);
-        }
-        const pollPromise = this._pollContractStatus(contractId, token)
-            .finally(() => ACTIVE_CONTRACT_POLLS.delete(key));
-        ACTIVE_CONTRACT_POLLS.set(key, pollPromise);
-        return pollPromise;
-    },
-
-    async _pollContractStatus(contractId, token, options = {}) {
-        const apiBase = this.getApiBase();
-        const pollOptions = {
-            maxChecks: Number.isFinite(options.maxChecks) ? options.maxChecks : 40,
-            initialDelayMs: Number.isFinite(options.initialDelayMs) ? options.initialDelayMs : 1500,
-            maxDelayMs: Number.isFinite(options.maxDelayMs) ? options.maxDelayMs : 8000,
-            maxConsecutiveErrors: Number.isFinite(options.maxConsecutiveErrors) ? options.maxConsecutiveErrors : 5,
-            perRequestTimeoutMs: Number.isFinite(options.perRequestTimeoutMs) ? options.perRequestTimeoutMs : 12000
-        };
-        let checkCount = 0;
-        let waitMs = pollOptions.initialDelayMs;
-        let consecutiveErrors = 0;
-
-        while (checkCount < pollOptions.maxChecks) {
-            checkCount++;
-            // Update loading UI if present in DOM
-            const loadingMsg = document.getElementById('reg-loading');
-            if (loadingMsg) {
-                const subText = loadingMsg.querySelector('span');
-                if (subText) {
-                    const progress = Math.min(Math.floor((checkCount / pollOptions.maxChecks) * 95), 95);
-                    subText.textContent = `AI解析を実行中... (${progress}%)`;
-                }
-            }
-
-            await sleep(waitMs);
-
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), pollOptions.perRequestTimeoutMs);
-            try {
-                const response = await fetch(joinApiUrl(apiBase, `/api/contracts/${contractId}`), {
-                    headers: { 'Authorization': token ? `Bearer ${token}` : '' },
-                    signal: controller.signal
-                });
-                clearTimeout(timeoutId);
-
-                if (response.status === 401 || response.status === 403) {
-                    const authError = new Error('認証の有効期限が切れました。再ログインしてください。');
-                    authError.isTerminal = true;
-                    throw authError;
-                }
-
-                if (response.ok) {
-                    consecutiveErrors = 0;
-                    const polled = await response.json();
-                    const contract = polled.data;
-                    if (contract) {
-                        if (contract.status === 'completed') {
-                            console.log("AI Service: Async analysis completed!");
-                            // Return expected result shape
-                            return {
-                                success: true,
-                                data: {
-                                    summary: contract.ai_summary,
-                                    riskLevel: contract.risk_level === 'High' ? 3 : (contract.risk_level === 'Medium' ? 2 : 1),
-                                    riskReason: contract.ai_risk_reason,
-                                    changes: contract.ai_changes,
-                                    isFallback: contract.ai_is_fallback === true,
-                                    extractedText: contract.sections,
-                                    rawExtractedText: contract.original_content,
-                                    doc: contract.doc || null,
-                                    sourceType: 'DOCX',
-                                    isLimited: contract.ai_limited === true
-                                }
-                            };
-                        }
-                        if (contract.status === 'error') {
-                            const processingError = new Error(contract.errorMessage || 'AI解析中にエラーが発生しました');
-                            processingError.isTerminal = true;
-                            throw processingError;
-                        }
-                    }
-                } else {
-                    consecutiveErrors++;
-                    console.warn(`Polling HTTP error ${response.status} (attempt ${checkCount})`);
-                }
-            } catch (e) {
-                clearTimeout(timeoutId);
-                if (e?.isTerminal) throw e;
-                consecutiveErrors++;
-                console.warn(`Polling error (attempt ${checkCount}):`, e);
-            }
-
-            if (consecutiveErrors >= pollOptions.maxConsecutiveErrors) {
-                throw new Error('ステータス確認に連続で失敗しました。通信環境を確認して再試行してください。');
-            }
-
-            waitMs = Math.min(
-                pollOptions.maxDelayMs,
-                Math.round(waitMs * 1.45)
-            );
-        }
-        throw new Error('解析の待ち時間がタイムアウトしました。しばらく待って再読み込みしてください。');
     },
 
     normalizePreviousVersion(previousVersion) {

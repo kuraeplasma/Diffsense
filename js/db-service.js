@@ -478,10 +478,9 @@ export const dbService = {
     /**
      * Add a new contract (Monitoring Target)
      */
-    addContract(data, options = {}) {
+    addContract(data) {
         const contracts = this.getContracts();
         const newId = contracts.length > 0 ? Math.max(...contracts.map(c => c.id)) + 1 : 1;
-        const shouldPersist = options.persist !== false;
         const newContract = {
             id: newId,
             name: data.name,
@@ -503,9 +502,7 @@ export const dbService = {
         contracts.unshift(newContract); // Add to top
         localStorage.setItem(this.KEYS.CONTRACTS, JSON.stringify(contracts));
         this.addActivityLog("新規登録", data.name, "ユーザー", "成功");
-        if (shouldPersist) {
-            this._persistContractToApi(newContract, 'POST');
-        }
+        this._persistContractToApi(newContract, 'POST');
         return newContract;
     },
 

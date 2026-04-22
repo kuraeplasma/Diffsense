@@ -408,11 +408,6 @@ class DocxService {
         if (!absoluteDocxPath || !fs.existsSync(absoluteDocxPath)) {
             throw new Error('DOCX file not found for conversion');
         }
-        const conversionTimeoutMs = (() => {
-            const fromEnv = Number.parseInt(String(process.env.DOCX_CONVERT_TIMEOUT_MS || ''), 10);
-            if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv;
-            return 25000;
-        })();
 
         const outputDir = path.dirname(absoluteDocxPath);
         const outputPdfPath = path.join(
@@ -435,7 +430,7 @@ class DocxService {
                 await execFileAsync(
                     command,
                     ['--headless', '--convert-to', 'pdf:writer_pdf_Export', '--outdir', outputDir, absoluteDocxPath],
-                    { windowsHide: true, timeout: conversionTimeoutMs }
+                    { windowsHide: true, timeout: 180000 }
                 );
                 if (fs.existsSync(outputPdfPath)) {
                     return outputPdfPath;
