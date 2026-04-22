@@ -1125,6 +1125,10 @@ router.post('/:id/reanalyze', rateLimit, async (req, res, next) => {
             success: true,
             data: {
                 ...aiResult,
+                summary: aiResult.summary,
+                riskLevel: aiResult.riskLevel,
+                riskReason: aiResult.riskReason,
+                changes: aiResult.changes,
                 contract_meta: responseMeta,
             }
         });

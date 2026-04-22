@@ -1399,8 +1399,7 @@ const Views = {
         const showPdfViewerInRightPane = false;
 
         const hasAIResults = Boolean(
-            contract.ai_succeeded === true
-            && contract.ai_is_fallback !== true
+            (contract.ai_succeeded === true || contract.ai_is_fallback === true || contract.ai_summary)
             && (
                 String(contract.ai_summary || contract.summary || '').trim()
                 || String(contract.ai_risk_reason || contract.risk_reason || '').trim()
@@ -3460,6 +3459,7 @@ class DashboardApp {
      * Execute single-doc reanalysis (risk + deadline) via API.
      */
     runReanalyze(contractId, options = {}) {
+        console.info('AI_CLICK', { contractId, options });
         if (!hasUserTriggeredExecution(options)) {
             console.warn('AI execution blocked', {
                 type: 'ai_execution_blocked',
@@ -3513,6 +3513,7 @@ class DashboardApp {
                     body: JSON.stringify({ contractText })
                 });
                 const data = await res.json();
+                console.info('AI_RESPONSE', { contractId, data });
 
                 if (!data.success) {
                     Notify.error(data.error || '解析に失敗しました');
@@ -7317,6 +7318,7 @@ class DashboardApp {
     }
 
     async analyzeDocumentPair(contractId, sourceDoc, targetDoc, options = {}) {
+        console.info('AI_CLICK', { contractId, options });
         if (!hasUserTriggeredExecution(options)) {
             console.warn('AI execution blocked', {
                 type: 'ai_execution_blocked',

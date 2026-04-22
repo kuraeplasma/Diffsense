@@ -25,6 +25,7 @@ export const aiService = {
      * @returns {Promise<Object>} 解析結果
      */
     async analyzeContract(contractId, method, source, previousVersion = null, options = {}) {
+        console.info('AI_CLICK', { contractId, options });
         try {
             if (options.userTriggered !== true) {
                 const blockedError = new Error('AI execution blocked: userTriggered flag is required');

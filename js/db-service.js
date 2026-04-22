@@ -771,22 +771,23 @@ export const dbService = {
             }
 
             // リスクレベルを変換して保存
-            if (analysisData.riskLevel !== undefined) {
-                contract.risk_level = this.convertRiskLevel(analysisData.riskLevel);
+            if (analysisData.riskLevel !== undefined || analysisData.risk_level !== undefined) {
+                const rl = analysisData.riskLevel !== undefined ? analysisData.riskLevel : analysisData.risk_level;
+                contract.risk_level = this.convertRiskLevel(rl);
             }
 
             // ステータスを更新
             contract.status = analysisData.status || '未確認';
 
             // AI解析結果を保存
-            contract.ai_summary = analysisData.summary || '';
-            contract.ai_risk_reason = analysisData.riskReason || '';
-            contract.ai_changes = analysisData.changes || [];
-            contract.ai_is_fallback = analysisData.isFallback === true;
+            contract.ai_summary = analysisData.summary || analysisData.ai_summary || '';
+            contract.ai_risk_reason = analysisData.riskReason || analysisData.ai_risk_reason || '';
+            contract.ai_changes = analysisData.changes || analysisData.ai_changes || [];
+            contract.ai_is_fallback = analysisData.isFallback === true || analysisData.is_fallback === true;
             
             // フラグの強制Boolean化
-            contract.ai_succeeded = Boolean(analysisData.aiSucceeded);
-            contract.ai_limited = Boolean(analysisData.isLimited);
+            contract.ai_succeeded = Boolean(analysisData.aiSucceeded !== undefined ? analysisData.aiSucceeded : analysisData.ai_succeeded);
+            contract.ai_limited = Boolean(analysisData.isLimited !== undefined ? analysisData.isLimited : (analysisData.is_limited || analysisData.ai_limited));
             
             // 解析タイムスタンプの更新
             // isAnalysisUpdate が false でない限り（解析APIが呼ばれたとみなされる場合）は必ず更新する
@@ -830,10 +831,23 @@ export const dbService = {
     /**
      * 数値リスクレベルを文字列に変換
      */
-    convertRiskLevel(numericLevel) {
-        if (numericLevel >= 3) return 'High';
-        if (numericLevel === 2) return 'Medium';
-        if (numericLevel === 1) return 'Low';
+    convertRiskLevel(value) {
+        if (value === null || value === undefined) return 'None';
+        
+        // すでに正規化された文字列ラベルの場合
+        if (typeof value === 'string') {
+            const normalized = value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+            if (['High', 'Medium', 'Low', 'None'].includes(normalized)) return normalized;
+            
+            // 数値文字列 "3", "2", "1" の場合
+            const num = parseInt(value, 10);
+            if (!isNaN(num)) return this.convertRiskLevel(num);
+            return 'None';
+        }
+        
+        if (value >= 3) return 'High';
+        if (value === 2) return 'Medium';
+        if (value === 1) return 'Low';
         return 'None';
     },
 
