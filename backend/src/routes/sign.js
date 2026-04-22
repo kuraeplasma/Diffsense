@@ -1304,6 +1304,17 @@ router.get('/original-file', async (req, res) => {
                 const contracts = await dbService.getContracts(ownerUid);
                 contract = (Array.isArray(contracts) ? contracts : []).find((item) => String(item.id) === String(signRequest.contract_id)) || null;
                 logger.info(`Sign /original-file: contract lookup contractId=${signRequest.contract_id} found=${!!contract}${contract ? ` file_path=${!!contract.original_file_path} file_url=${!!contract.original_file_url}` : ''}`);
+                if (contract) {
+                    logger.info(`Sign /original-file: contract data:`, JSON.stringify({
+                        id: contract.id,
+                        original_file_path: contract.original_file_path,
+                        original_file_url: contract.original_file_url,
+                        original_filename: contract.original_filename,
+                        document_name: contract.document_name
+                    }, null, 2));
+                } else {
+                    logger.warn(`Sign /original-file: contract NOT found. Available contracts:`, contracts?.slice(0, 3).map(c => ({ id: c.id, has_file_path: !!c.original_file_path, has_file_url: !!c.original_file_url })));
+                }
             } catch (contractError) {
                 logger.warn(`Sign /original-file: contract lookup failed contractId=${signRequest.contract_id} error=${contractError.message}`);
             }
@@ -1321,7 +1332,14 @@ router.get('/original-file', async (req, res) => {
             signRequest?.original_file_url
         ].filter(Boolean);
 
-        logger.info(`Sign /original-file: candidates count=${candidates.length} contract=${!!contract} docsnap=${!!signRequest.document_snapshot}`);
+        logger.info(`Sign /original-file: candidates count=${candidates.length} contract=${!!contract} docsnap=${!!signRequest?.document_snapshot}`);
+        if (signRequest?.document_snapshot && !contract) {
+            logger.info(`Sign /original-file: using document_snapshot (no contract):`, JSON.stringify({
+                original_file_path: signRequest.document_snapshot.original_file_path,
+                original_file_url: signRequest.document_snapshot.original_file_url,
+                original_filename: signRequest.document_snapshot.original_filename
+            }, null, 2));
+        }
         if (candidates.length === 0) {
             logger.error(`Sign /original-file: NO candidates!`, {
                 has_contract: !!contract,
