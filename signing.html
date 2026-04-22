@@ -1394,7 +1394,8 @@
       if (!response.ok) {
         const errorText = await response.text().catch(() => '');
         console.error('[signing.html] resolveDocxPreviewSource error response:', errorText.substring(0, 200));
-        throw new Error(`Word原本の取得に失敗しました: HTTP ${response.status}`);\n      }
+        throw new Error(`Word原本の取得に失敗しました: HTTP ${response.status}`);
+      }
       const blob = await response.blob();
       console.log('[signing.html] resolveDocxPreviewSource: blob received, size=', blob.size);
       return blob;
