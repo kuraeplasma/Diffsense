@@ -19,10 +19,25 @@ const upload = multer({
 router.post('/upload-async', upload.single('file'), async (req, res, next) => {
     try {
         const uid = req.user.uid;
-        const { contractId, previousVersion, skipAI } = req.body;
+        const { contractId, source, previousVersion, skipAI } = req.body;
         const file = req.file;
 
-        if (!file) {
+        let currentBuffer = null;
+        let filename = 'document.docx';
+        let contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+        if (file) {
+            currentBuffer = file.buffer;
+            filename = file.originalname;
+            contentType = file.mimetype;
+        } else if (source) {
+            const base64Clean = String(source || '').split(',').pop();
+            currentBuffer = Buffer.from(base64Clean, 'base64');
+            filename = req.body.filename || 'document.docx';
+            contentType = req.body.contentType || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+        }
+
+        if (!currentBuffer) {
             return res.status(400).json({ success: false, error: 'ファイルがアップロードされていません' });
         }
 
@@ -30,10 +45,6 @@ router.post('/upload-async', upload.single('file'), async (req, res, next) => {
         if (isNaN(parsedContractId)) {
             return res.status(400).json({ success: false, error: '契約IDが不正です' });
         }
-
-        const currentBuffer = file.buffer;
-        const filename = file.originalname;
-        const contentType = file.mimetype;
 
         // DOCX Magic Bytes check
         if (currentBuffer.length < 4 ||
