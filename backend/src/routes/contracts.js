@@ -1193,7 +1193,29 @@ router.post('/:id/reanalyze', rateLimit, async (req, res, next) => {
         }
 
         // フロントから本文を受け取る（キャッシュ済みテキスト）
-        const { contractText } = req.body;
+        const requestText = typeof req.body?.contractText === 'string' ? req.body.contractText.trim() : '';
+        let contractText = requestText;
+        if (!contractText || contractText.length < 10) {
+            const savedContract = await dbService.getContractById(contractId, uid);
+            if (savedContract) {
+                const textCandidates = [
+                    savedContract.original_content,
+                    savedContract.current_content,
+                    savedContract.extracted_text,
+                    savedContract.originalContent,
+                    savedContract.currentContent,
+                    savedContract.text
+                ];
+                for (const candidate of textCandidates) {
+                    const normalized = normalizeContentToText(candidate).trim();
+                    if (normalized.length >= 10) {
+                        contractText = normalized;
+                        break;
+                    }
+                }
+            }
+        }
+
         if (!contractText || contractText.trim().length < 10) {
             return res.status(400).json({ success: false, error: '解析対象のテキストがありません' });
         }
@@ -1243,7 +1265,9 @@ router.post('/:id/reanalyze', rateLimit, async (req, res, next) => {
                     ...fallbackAnalysis,
                     aiSucceeded: false,
                     aiFailed: true,
-                    contract_meta: fallbackResponseMeta
+                    contract_meta: fallbackResponseMeta,
+                    errorCode: aiResult?.errorCode || null,
+                    errorMessage: aiResult?.errorMessage || null
                 }
             });
         }

@@ -3591,8 +3591,10 @@ class DashboardApp {
                     || updatedContract.contract_start
                     || updatedContract.contract_category
                 );
-                if (aiFailed) {
-                    Notify.warning('AI応答が不完全だったため、補完解析結果を表示しています。消費はしていませんので、再解析を推奨します。');
+                if (aiFailed && normalizedData.errorCode === 'AI_RATE_LIMITED') {
+                    Notify.warning('現在アクセスが集中しています。数分後にもう一度お試しください。');
+                } else if (aiFailed) {
+                    Notify.error('AI解析に失敗しました。消費はしていませんので、再度解析してください。');
                 } else if (hasDeadline) {
                     Notify.success('解析完了。期限情報を期限・アラート管理に格納しました');
                 } else {
@@ -3723,6 +3725,16 @@ class DashboardApp {
 
             if (!data.success) {
                 Notify.error(data.error || '再解析に失敗しました');
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-rotate" style="margin-right:4px;font-size:10px;"></i>再解析'; }
+                return;
+            }
+
+            if (data?.data?.aiFailed === true) {
+                if (data?.data?.errorCode === 'AI_RATE_LIMITED') {
+                    Notify.warning('現在アクセスが集中しています。数分後にもう一度お試しください。');
+                } else {
+                    Notify.error('AI解析に失敗しました。消費はしていませんので、再度解析してください。');
+                }
                 if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-rotate" style="margin-right:4px;font-size:10px;"></i>再解析'; }
                 return;
             }

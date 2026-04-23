@@ -984,6 +984,13 @@ class GeminiService {
 
         } catch (error) {
             logger.warn('Parallel analysis failed, falling back to monolithic request:', error.message);
+            const firstStatus = Number(error?.response?.status || 0);
+            if (firstStatus === 429) {
+                const limited = buildHeuristicFallbackAnalysis(currentText, previousText);
+                limited.errorCode = 'AI_RATE_LIMITED';
+                limited.errorMessage = '現在アクセスが集中しています。数分後にもう一度お試しください。';
+                return limited;
+            }
             // 失敗時は従来の一括プロンプトでリトライ
             const monolithicPrompt = this.buildPrompt(currentText, previousText);
             try {
@@ -1000,6 +1007,13 @@ class GeminiService {
                     isFallback: false
                 };
             } catch (monolithicError) {
+                const monolithicStatus = Number(monolithicError?.response?.status || 0);
+                if (monolithicStatus === 429) {
+                    const limited = buildHeuristicFallbackAnalysis(currentText, previousText);
+                    limited.errorCode = 'AI_RATE_LIMITED';
+                    limited.errorMessage = '現在アクセスが集中しています。数分後にもう一度お試しください。';
+                    return limited;
+                }
                 logger.error('Gemini monolithic fallback failed:', monolithicError);
                 if (shouldUseLocalAiFallback()) {
                     return previousText
