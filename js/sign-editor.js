@@ -1494,12 +1494,12 @@ export const SignEditor = {
                     ? signatureEditorSize
                     : `${field.width || 130}px`;
                 div.style.height = field.type === 'signature' ? signatureEditorSize : '48px';
-                div.style.background = 'rgba(201, 168, 76, 0.1)';
-                div.style.border = '2px solid #C9A84C';
+                div.style.background = field.type === 'signature' ? 'rgba(197, 48, 48, 0.03)' : 'rgba(52, 168, 83, 0.1)';
+                div.style.border = `2px solid ${field.type === 'signature' ? '#c53030' : '#34a853'}`;
                 div.style.borderRadius = field.type === 'signature' ? '50%' : '8px';
                 div.style.fontSize = '12px';
                 div.style.fontWeight = '600';
-                div.style.color = '#B8963D';
+                div.style.color = field.type === 'signature' ? '#c53030' : '#34a853';
                 div.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
                 div.style.cursor = 'move';
                 div.style.opacity = isMovingField
