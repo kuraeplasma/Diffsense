@@ -1801,6 +1801,17 @@ const Views = {
                                     新しいバージョンをアップロードすれば、差分を自動解析します。
                                 </div>
                             </div>
+                            ${(!isAnalyzingContract && !shouldShowAnalysis && !(contract.expiry_date || contract.renewal_deadline || contract.contract_category)) ? `
+                            <div style="padding:40px 20px; text-align:center; color:#999;">
+                                <i class="fa-solid fa-file-invoice" style="font-size:32px; margin-bottom:16px; display:block; opacity:0.1;"></i>
+                                <div style="font-size:14px; color:#666;">ドキュメントを読み込みました</div>
+                                <div style="font-size:12px; margin-top:8px; line-height:1.6; color:#999;">
+                                    右上の「リスク解析」ボタンをクリックすると、AIがリスクを判定します。<br>
+                                    新しいバージョンをアップロードすれば、差分を自動解析します。
+                                </div>
+                            </div>
+                            ` : ''}
+
                             `}
                         </div>
                         
