@@ -85,6 +85,15 @@ router.patch('/:id', async (req, res, next) => {
         }
         const updates = { ...(req.body || {}) };
         delete updates.ownerUid;
+
+        // 空値フィールドで既存データを上書きしない
+        const protectedFields = ['original_file_path', 'pdf_storage_path', 'pdf_url', 'source_url'];
+        protectedFields.forEach(field => {
+            if (updates[field] === null || updates[field] === undefined || updates[field] === '') {
+                delete updates[field];
+            }
+        });
+
         const updated = await dbService.updateContract(contractId, updates, ownerUid);
         if (!updated) {
             return res.status(404).json({ success: false, error: '契約が見つかりません' });
