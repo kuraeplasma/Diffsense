@@ -15,7 +15,7 @@ export const SignUI = {
         query: '',
         sortBy: 'date_desc'
     },
-    localDummyContracts: [
+    localDummyContracts: [], /*
         {
             name: 'サンプル_業務委託基本契約書',
             type: '業務委託契約',
@@ -58,7 +58,7 @@ export const SignUI = {
                 ]
             }
         }
-    ],
+    */ ],
 
     isCompletedRequest(request) {
         return String(request?.status || '').toLowerCase() === 'completed';

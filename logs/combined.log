@@ -109,3 +109,10 @@
 {"level":"warn","message":"DBService: Firestore not available, falling back to file-based storage (data may be lost on restart)","service":"diffsense-api","timestamp":"2026-04-23 00:10:53"}
 {"level":"warn","message":"GEMINI_API_KEY is NOT configured in environment.","service":"diffsense-api","timestamp":"2026-04-23 00:10:53"}
 {"level":"warn","message":"GEMINI_API_KEY is not set. AI analysis will fail.","service":"diffsense-api","timestamp":"2026-04-23 00:10:53"}
+{"level":"warn","message":"GEMINI_API_KEY is NOT configured in environment.","service":"diffsense-api","timestamp":"2026-04-24 03:45:14"}
+{"level":"warn","message":"GEMINI_API_KEY is not set. AI analysis will fail.","service":"diffsense-api","timestamp":"2026-04-24 03:45:14"}
+{"level":"warn","message":"GEMINI_API_KEY is NOT configured in environment.","service":"diffsense-api","timestamp":"2026-04-24 03:45:14"}
+{"level":"warn","message":"GEMINI_API_KEY is not set. AI analysis will fail.","service":"diffsense-api","timestamp":"2026-04-24 03:45:14"}
+{"level":"warn","message":"Firebase credentials not configured. Set FB_PROJECT_ID, FB_CLIENT_EMAIL, and FB_PRIVATE_KEY in .env","service":"diffsense-api","timestamp":"2026-04-24 03:45:14"}
+{"level":"warn","message":"Server will start without Firebase. Set AUTH_BYPASS=true in .env for local development.","service":"diffsense-api","timestamp":"2026-04-24 03:45:14"}
+{"level":"warn","message":"DBService: Firestore not available, falling back to file-based storage (data may be lost on restart)","service":"diffsense-api","timestamp":"2026-04-24 03:45:14"}

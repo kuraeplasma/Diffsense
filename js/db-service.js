@@ -62,6 +62,16 @@ export const dbService = {
         const parsed = new Date(normalized);
         return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
     },
+
+    normalizeContractStatus(status) {
+        const value = String(status || '').trim();
+        if (value === '確認済') return '確認済み';
+        return value;
+    },
+
+    isConfirmedStatus(status) {
+        return this.normalizeContractStatus(status) === '確認済み';
+    },
     // Dynamic KEYS getter (with UID prefix)
     get KEYS() {
         const prefix = this._uid ? `diffsense_${this._uid}_` : 'diffsense_';
@@ -340,10 +350,13 @@ export const dbService = {
         }
         if (status !== "all") {
             if (status === '未確認') {
-                // UI表示（dashboard.js）のバッジと合わせ、「確認済」以外はすべて「未確認」としてフィルタリングする
-                contracts = contracts.filter(c => c.status !== '確認済');
+                // UI表示（dashboard.js）のバッジと合わせ、「確認済み」以外はすべて「未確認」としてフィルタリングする
+                contracts = contracts.filter(c => !this.isConfirmedStatus(c.status));
+            } else if (this.isConfirmedStatus(status)) {
+                contracts = contracts.filter(c => this.isConfirmedStatus(c.status));
             } else {
-                contracts = contracts.filter(c => c.status === status);
+                const normalizedStatus = this.normalizeContractStatus(status);
+                contracts = contracts.filter(c => this.normalizeContractStatus(c.status) === normalizedStatus);
             }
         }
         if (type !== "all") {
@@ -473,20 +486,69 @@ export const dbService = {
         localStorage.setItem(this.KEYS.RECENT_DIFF, JSON.stringify(items.slice(0, 20)));
     },
 
-    updateContractStatus(id, status) {
+    updateContractStatus(id, status, options = {}) {
+        const { skipRemotePersist = false, skipActivityLog = false } = options;
         const contracts = this.getContracts();
         const contract = contracts.find(c => String(c.id) === String(id));
         if (contract) {
-            contract.status = status;
+            const normalizedStatus = this.normalizeContractStatus(status);
+            contract.status = normalizedStatus;
             contract.last_updated_at = this.nowIso();
             localStorage.setItem(this.KEYS.CONTRACTS, JSON.stringify(contracts));
-            this._persistContractToApi(contract);
+            if (!skipRemotePersist) {
+                this._persistContractToApi(contract);
+            }
 
-            // Log this action
-            this.addActivityLog(`ステータス更新 (${status})`, contract.name, "ユーザー", "成功");
+            if (!skipActivityLog) {
+                this.addActivityLog(`ステータス更新 (${normalizedStatus})`, contract.name, "ユーザー", "成功");
+            }
             return true;
         }
         return false;
+    },
+
+    async updateContractStatusAndSync(id, status, options = {}) {
+        const { retryCount = 1, rollbackOnSyncError = true } = options;
+        const current = this.getContractById(id);
+        if (!current) {
+            return { ok: false, synced: false, error: new Error('Contract not found') };
+        }
+
+        const previousStatus = current.status;
+        const previousUpdatedAt = current.last_updated_at;
+        const normalizedStatus = this.normalizeContractStatus(status);
+
+        const updated = this.updateContractStatus(id, normalizedStatus, {
+            skipRemotePersist: true,
+            skipActivityLog: true
+        });
+        if (!updated) {
+            return { ok: false, synced: false, error: new Error('Contract not found') };
+        }
+
+        const currentContract = this.getContractById(id);
+        let lastError = null;
+        for (let attempt = 0; attempt <= retryCount; attempt += 1) {
+            try {
+                await this.persistContractToApi(currentContract, 'PATCH', { throwOnError: true });
+                this.addActivityLog(`ステータス更新 (${normalizedStatus})`, currentContract.name, "ユーザー", "成功");
+                return { ok: true, synced: true, contract: this.getContractById(id) || currentContract };
+            } catch (error) {
+                lastError = error;
+            }
+        }
+
+        if (rollbackOnSyncError) {
+            const contracts = this.getContracts();
+            const rollbackTarget = contracts.find(c => String(c.id) === String(id));
+            if (rollbackTarget) {
+                rollbackTarget.status = previousStatus;
+                rollbackTarget.last_updated_at = previousUpdatedAt || this.nowIso();
+                localStorage.setItem(this.KEYS.CONTRACTS, JSON.stringify(contracts));
+            }
+        }
+        this.addActivityLog(`ステータス更新 (${normalizedStatus})`, currentContract.name, "ユーザー", "失敗");
+        return { ok: true, synced: false, error: lastError };
     },
 
     /**
@@ -537,7 +599,7 @@ export const dbService = {
         const pending = contracts.filter(c => this.isPendingContract(c)).length;
 
         // 2. Risk Review (リスク要確認): High Risk AND NOT Confirmed
-        const highRisk = contracts.filter(c => c.risk_level === 'High' && c.status !== '確認済').length;
+        const highRisk = contracts.filter(c => c.risk_level === 'High' && !this.isConfirmedStatus(c.status)).length;
 
         // 3. Monitoring (監視中): 差分チェック未実施を除外
         const total = contracts.filter(c => this.isMonitoringContract(c)).length;
@@ -558,7 +620,7 @@ export const dbService = {
             case 'pending':
                 return contracts.filter(c => this.isPendingContract(c));
             case 'risk':
-                return contracts.filter(c => c.risk_level === 'High' && c.status !== '確認済');
+                return contracts.filter(c => c.risk_level === 'High' && !this.isConfirmedStatus(c.status));
             case 'total':
                 return contracts.filter(c => this.isMonitoringContract(c)); // Now sorted
             default:
@@ -826,7 +888,34 @@ export const dbService = {
             contract.ai_risk_reason = analysisData.riskReason || analysisData.ai_risk_reason || '';
             contract.ai_changes = analysisData.changes || analysisData.ai_changes || [];
             contract.ai_is_fallback = analysisData.isFallback === true || analysisData.is_fallback === true;
-            
+
+            // 期限情報（contract_meta）を保存
+            const metaSource = (analysisData.contract_meta && typeof analysisData.contract_meta === 'object')
+                ? analysisData.contract_meta
+                : analysisData;
+            const pickMeta = (key) => {
+                if (Object.prototype.hasOwnProperty.call(analysisData, key)) return analysisData[key];
+                if (metaSource && Object.prototype.hasOwnProperty.call(metaSource, key)) return metaSource[key];
+                return undefined;
+            };
+            const expiryDate = pickMeta('expiry_date');
+            const renewalDeadline = pickMeta('renewal_deadline');
+            const contractStart = pickMeta('contract_start');
+            const autoRenewal = pickMeta('auto_renewal');
+            const noticePeriodDays = pickMeta('notice_period_days');
+            const contractCategory = pickMeta('contract_category');
+            const dateConfidence = pickMeta('date_confidence');
+            if (expiryDate !== undefined) contract.expiry_date = expiryDate || null;
+            if (renewalDeadline !== undefined) contract.renewal_deadline = renewalDeadline || null;
+            if (contractStart !== undefined) contract.contract_start = contractStart || null;
+            if (autoRenewal !== undefined) contract.auto_renewal = (autoRenewal === null) ? null : (autoRenewal === true);
+            if (noticePeriodDays !== undefined) {
+                const numericNotice = Number(noticePeriodDays);
+                contract.notice_period_days = Number.isFinite(numericNotice) ? numericNotice : null;
+            }
+            if (contractCategory !== undefined) contract.contract_category = contractCategory || null;
+            if (dateConfidence !== undefined) contract.date_confidence = dateConfidence || 'unknown';
+             
             // フラグの強制Boolean化
             contract.ai_succeeded = Boolean(analysisData.aiSucceeded !== undefined ? analysisData.aiSucceeded : analysisData.ai_succeeded);
             contract.ai_limited = Boolean(analysisData.isLimited !== undefined ? analysisData.isLimited : (analysisData.is_limited || analysisData.ai_limited));
@@ -1032,6 +1121,9 @@ export const dbService = {
     },
 
     _seedSignatures() {
+        // 資料をすべて削除する要望に対応し、サンプルデータは投入しない
+        localStorage.setItem(this.KEYS.SIGN_REQUESTS, JSON.stringify([]));
+        return;
         const seedData = [
             {
                 id: 101,

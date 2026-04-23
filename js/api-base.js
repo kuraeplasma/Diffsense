@@ -67,15 +67,31 @@ function shouldIgnoreExplicitBase(explicitBase) {
 
 export function getApiBaseUrl() {
     syncApiBaseOverrideFromUrl();
+    const params = new URLSearchParams(window.location.search);
+    const hasRuntimeApiOverride = Boolean(window.__DIFFSENSE_API_BASE__ || params.get('apiBase'));
 
     // 1. Check window.API_BASE (from env.js)
     if (window.API_BASE) return normalizeBaseUrl(window.API_BASE);
 
     // 2. Check explicit overrides
     const explicit = readExplicitApiBase();
-    if (explicit && !shouldIgnoreExplicitBase(explicit)) return explicit;
+    if (explicit && !shouldIgnoreExplicitBase(explicit)) {
+        try {
+            const host = new URL(explicit).hostname;
+            const isExplicitLocal = host === 'localhost' || host === '127.0.0.1';
+            // Ignore stale localStorage override on localhost unless explicitly requested at runtime.
+            if (!(isLocalHostEnvironment() && isExplicitLocal && !hasRuntimeApiOverride)) {
+                return explicit;
+            }
+        } catch {
+            return explicit;
+        }
+    }
 
-    return isLocalHostEnvironment() ? LOCAL_API_BASE_URL : PROD_API_BASE_URL;
+    // Default to production API even on localhost.
+    // If local backend is needed, pass ?apiBase=http://localhost:3001
+    // or set localStorage['diffsense_api_base'] accordingly.
+    return PROD_API_BASE_URL;
 }
 
 export function shouldUseLocalDevAuthBypass() {

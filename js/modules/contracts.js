@@ -10,6 +10,7 @@ export function render({ app, dbService, escapeHtmlText, formatDisplayTimestamp,
     const appFilters = app ? app.filters : {};
 
     const { items, totalPages, totalItems } = dbService.getPaginatedContracts(page, pageSize, params);
+    const isConfirmedStatus = (status) => ['確認済み', '確認済'].includes(String(status || '').trim());
 
     const rows = items.map(c => {
         let riskBadge = '';
@@ -18,8 +19,8 @@ export function render({ app, dbService, escapeHtmlText, formatDisplayTimestamp,
         else if (c.risk_level === 'Low') riskBadge = '<span class="badge badge-success">Low</span>';
         else riskBadge = '<span class="badge badge-neutral">-</span>';
 
-        const statusBadge = c.status === '確認済'
-            ? '<span class="badge badge-neutral"><i class="fa-solid fa-check"></i> 確認済</span>'
+        const statusBadge = isConfirmedStatus(c.status)
+            ? '<span class="badge badge-neutral"><i class="fa-solid fa-check"></i> 確認済み</span>'
             : '<span class="badge badge-warning">未確認</span>';
 
         return `
@@ -74,7 +75,7 @@ export function render({ app, dbService, escapeHtmlText, formatDisplayTimestamp,
                         <select onchange="window.app.updateFilter('status', this.value)" style="padding:6px 8px; border:1px solid #ddd; border-radius:4px; font-size:13px;">
                             <option value="all" ${appFilters.status === 'all' ? 'selected' : ''}>すべて</option>
                             <option value="未確認" ${appFilters.status === '未確認' ? 'selected' : ''}>未確認</option>
-                            <option value="確認済" ${appFilters.status === '確認済' ? 'selected' : ''}>確認済</option>
+                            <option value="確認済み" ${isConfirmedStatus(appFilters.status) ? 'selected' : ''}>確認済み</option>
                         </select>
                     </div>
 

@@ -1,7 +1,7 @@
 import { Notify } from './notify.js';
 import { dbService } from './db-service.js?v=20260422_stability';
 import { aiService } from './ai-service.js?v=20260422_trigger_guard';
-import { getApiBaseUrl, shouldUseLocalDevAuthBypass } from './api-base.js';
+import { getApiBaseUrl, shouldUseLocalDevAuthBypass, isLocalHostEnvironment } from './api-base.js';
 import { auth } from './firebase-config.js?v=20260422_auth_timeout';
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
@@ -203,7 +203,7 @@ const isStructuredDocumentContent = (content) => {
 };
 
 const isWordDocumentFilename = (value) => /\.(docx?|dotx?)$/i.test(String(value || '').trim());
-const isLocalDashboardMode = () => window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const isLocalDashboardMode = () => window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '[::1]' || window.location.hostname.endsWith('.local');
 
 const isEmbeddablePdfUrl = (value) => {
     const src = String(value || '').trim();
@@ -1136,6 +1136,7 @@ const Views = {
         `;
     },
     // 5. Plan Management (New)
+    // 5. Plan Management (New)
     plan: (_, appState = null) => {
         const app = appState || window.app || null;
         const sub = app ? app.subscription : null;
@@ -1361,24 +1362,30 @@ const Views = {
         const documentOptions = dbService.getDocumentsByContractId(id);
         const hasComparableVersion = documentOptions.length >= 2;
         const storedCompareState = app?.getDocumentCompareState(id) || null;
+
         const fallbackSourceDoc = hasComparableVersion ? documentOptions[documentOptions.length - 2] : null;
         const fallbackTargetDoc = hasComparableVersion ? documentOptions[documentOptions.length - 1] : null;
+
         const selectedSourceCandidate = hasComparableVersion
             ? (documentOptions.find((doc) => doc.id === storedCompareState?.docAId) || fallbackSourceDoc)
             : null;
         const selectedTargetCandidate = hasComparableVersion
             ? (documentOptions.find((doc) => doc.id === storedCompareState?.docBId) || fallbackTargetDoc)
             : null;
+
         const selectedSourceDoc = isDocumentPairInContractScope(id, selectedSourceCandidate, selectedTargetCandidate)
             ? selectedSourceCandidate
             : null;
         const selectedTargetDoc = selectedSourceDoc ? selectedTargetCandidate : null;
+
         const displaySourceDoc = selectedSourceDoc;
         const displayTargetDoc = selectedTargetDoc;
+
         const selectedDiffPayload = null;
         const effectiveSelectedDiffData = selectedDiffPayload?.isFallback === true
             ? null
             : selectedDiffPayload;
+
         const shouldShowStructuredFallbackPanel = false;
         const shouldForceAutoPairAnalysis = false;
         const shouldAutoPairAnalysis = Boolean(
@@ -1393,6 +1400,7 @@ const Views = {
                 || selectedDiffPayload?.riskReason === 'AI差分未保存'
             )
         );
+
         if (shouldAutoPairAnalysis) {
             app.scheduleAutoPairAnalysis(
                 id,
@@ -1401,11 +1409,13 @@ const Views = {
                 { force: shouldForceAutoPairAnalysis }
             );
         }
+
         const isAutoPairAnalysisPending = Boolean(
             selectedSourceDoc
             && selectedTargetDoc
             && app?.isPairAnalysisPending(id, selectedSourceDoc.id, selectedTargetDoc.id)
         );
+
         const shouldUseStructuredDisplayChanges = false;
         const requestedActiveTab = app ? app.activeDetailTab : 'diff';
         const runtimePdfUrl = app?.getRuntimePdfPreviewUrl(id) || null;
@@ -1423,9 +1433,11 @@ const Views = {
                 || (Array.isArray(contract.ai_changes) && contract.ai_changes.length > 0)
             )
         );
+
         const shouldHideDiffTab = !hasComparableVersion;
         const activeTab = shouldHideDiffTab ? 'original' : requestedActiveTab;
         const canTriggerPairAnalysis = Boolean(selectedSourceDoc && selectedTargetDoc && app?.can('operate_contract'));
+
         const state = {
             contractId: id,
             contract,
@@ -1451,9 +1463,11 @@ const Views = {
                 data: null
             }
         };
+
         if (app) {
             app.detailState = state;
         }
+
         if (state.diff.activeTab === 'diff' && state.comparison.hasComparableVersion) {
             logDiffExecution('render', {
                 contractId: id,
@@ -1472,7 +1486,6 @@ const Views = {
         };
 
         try {
-            console.log(`[DEBUG] Preparing diffData for contract ${id}, activeTab=${activeTab}`);
             if (effectiveSelectedDiffData) {
                 const cached = sanitizeAnalysisPayload(effectiveSelectedDiffData);
                 diffData = {
@@ -1545,9 +1558,6 @@ const Views = {
             throw e;
         }
 
-        // デバッグ情報（開発時のみ表示）
-        const debugInfoHtml = '';
-
         const compareBannerHtml = activeTab === 'diff' ? `
             <div class="document-compare-toolbar">
                 <div class="document-compare-grid">
@@ -1583,6 +1593,7 @@ const Views = {
                 ? mergeStructuredChangesWithAnalysis([], diffData.changes)
                 : diffData.changes
         );
+
         const changesHtml = (displayChanges.length > 0 ? displayChanges : []).map((c) => {
             const changeType = (() => {
                 const t = String(c.type || '').toUpperCase();
@@ -1620,13 +1631,23 @@ const Views = {
 
         const mobileRiskTone = diffData.riskLevel >= 3 ? 'high' : (diffData.riskLevel >= 2 ? 'medium' : 'low');
         const mobileRiskLabel = diffData.riskLevel >= 3 ? 'High' : (diffData.riskLevel >= 2 ? 'Medium' : 'Low');
+
         state.analysis.data = diffData;
         const isAnalyzingContract = state.analysis.isAnalyzing;
+        const hasDeadlineInfo = Boolean(
+            contract.expiry_date
+            || contract.renewal_deadline
+            || contract.contract_start
+            || contract.contract_category
+            || contract.auto_renewal === true
+            || contract.auto_renewal === false
+        );
         const hasAnalysisPayload = Boolean(diffData.summary || diffData.riskReason || (Array.isArray(diffData.changes) && diffData.changes.length > 0));
         const shouldShowAnalysis = Boolean(hasAIResults && hasAnalysisPayload);
+
         const mobilePrimaryAction = (() => {
             if (!app?.can('operate_contract')) return null;
-            if (!hasAIResults) {
+            if (!hasAIResults && contract.ai_succeeded !== false) {
                 return {
                     label: 'リスク解析＋期限取得',
                     icon: 'fa-wand-magic-sparkles',
@@ -1649,7 +1670,6 @@ const Views = {
 
         return `
             <div class="detail-split-container">
-                <!-- Breadcrumb & Top Actions -->
                 <div class="detail-split-header flex justify-between items-center">
                     <div class="detail-header-main">
                         <a onclick="window.app.navigate('contracts')" style="display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:50%; background:#f8fafc; color:#5e544d; font-size:14px; cursor:pointer;" title="戻る">
@@ -1701,17 +1721,17 @@ const Views = {
                     <div class="mobile-risk-summary-label">AI要約</div>
                     <div class="mobile-risk-summary">${escapeHtmlText(diffData.summary || 'AI要約はまだありません。')}</div>
                 </section>
-                ` : (contract.last_analyzed_at ? `
-                <section class="mobile-risk-sticky mobile-only" style="background:#fff2f2; border-top:1px solid #fecaca; padding:12px;" aria-label="解析失敗">
-                    <div style="display:flex; align-items:center; gap:10px; color:#991b1b; font-size:12px;">
-                        <i class="fa-solid fa-triangle-exclamation"></i>
-                        <span>AI解析に失敗しました。再解析を試してください。</span>
+                ` : (contract.ai_succeeded === false ? `
+                <section class="mobile-risk-sticky mobile-only" style="background:#fff5f5; border-top:1px solid #feb2b2; padding:12px;" aria-label="解析失敗">
+                    <div style="display:flex; align-items:center; gap:10px; color:#c53030; font-size:12px;">
+                        <i class="fa-solid fa-circle-exclamation"></i>
+                        <span>AI解析に失敗しました。</span>
+                        <a onclick="window.app.confirmReanalyze('${contract.id}')" style="margin-left:auto; font-weight:700; cursor:pointer;">再試行</a>
                     </div>
                 </section>
                 ` : '')))}
 
                 <div class="detail-split-body">
-                    <!-- Left Pane: Analysis & Diffs -->
                     <div class="pane">
                         <div class="pane-header" style="min-height:56px; box-sizing:border-box;">
                             <span><i class="fa-solid fa-magnifying-glass-chart"></i> AI解析・差分判定</span>
@@ -1750,17 +1770,27 @@ const Views = {
                                             ${diffData.riskLevel >= 3 ? 'High' : diffData.riskLevel >= 2 ? 'Medium' : 'Low'}
                                         </span>
                                         <span style="font-size:12px; color:#666;">${diffData.riskReason || ''}</span>
-                                        ${diffData.isFallback === true ? '<span style="font-size:10px;background:#fff8e1;color:#f57c00;border-radius:4px;padding:2px 6px;">補完解析</span>' : ''}
                                     </div>
                                     <div style="font-size:13px; color:#333; line-height:1.7; white-space:pre-wrap;">${diffData.summary || 'AI解析結果がありません'}</div>
                                 </div>
-                                ` : '')}
-
+                                ` : (contract.ai_succeeded === false ? `
+                                <div style="margin-bottom:24px; background:#fff5f5; border:1px solid #feb2b2; border-radius:8px; padding:20px; text-align:center;">
+                                    <div style="color:#c53030; font-weight:700; margin-bottom:12px;">
+                                        <i class="fa-solid fa-circle-exclamation" style="margin-right:8px;"></i>AI解析に失敗しました
+                                    </div>
+                                    <div style="font-size:12px; color:#742a2a; margin-bottom:16px; line-height:1.6;">
+                                        書類の内容が複雑すぎるか、AIの一時的なエラーにより解析を完了できませんでした。<br>
+                                        <span style="font-weight:700;">解析回数は消費されていません。</span>
+                                    </div>
+                                    <button class="btn-dashboard btn-primary-action" onclick="window.app.confirmReanalyze('${contract.id}')" style="margin:0 auto;">
+                                        <i class="fa-solid fa-rotate-right"></i> もう一度解析を試す
+                                    </button>
+                                </div>
+                                ` : ''))}
                             </div>
 
-                            ${((hasComparableVersion || hasAIResults || isAnalyzingContract) && (isAnalyzingContract || shouldShowAnalysis || (contract.expiry_date || contract.renewal_deadline || contract.contract_category))) ? `
-
-                            ${(contract.expiry_date || contract.renewal_deadline || contract.contract_category) ? (() => {
+                            ${((hasComparableVersion || hasAIResults || isAnalyzingContract || hasDeadlineInfo) && (isAnalyzingContract || shouldShowAnalysis || hasDeadlineInfo || contract.ai_succeeded === false)) ? `
+                            ${(hasDeadlineInfo) ? (() => {
                                 const fmtDate = (d) => {
                                     if (!d) return null;
                                     const dt = new Date(d);
@@ -1794,14 +1824,13 @@ const Views = {
                                         ${contract.contract_start ? `<div style="background:#fff;border-radius:8px;padding:10px 14px;border:1px solid #e3f2fd;"><div style="font-size:11px;color:#8a7a6a;margin-bottom:2px;">契約開始日</div><div style="font-size:13px;font-weight:600;">${fmtDate(contract.contract_start)}</div></div>` : ''}
                                         ${contract.expiry_date ? `<div style="background:#fff;border-radius:8px;padding:10px 14px;border:1px solid #e3f2fd;"><div style="font-size:11px;color:#8a7a6a;margin-bottom:2px;">契約終了日</div><div style="font-size:13px;font-weight:600;">${fmtDate(contract.expiry_date)}</div>${expiryDays !== null ? `<div style="font-size:11px;color:${expiryDays <= 30 ? alertColor : '#666'};margin-top:2px;">${dayLabel(expiryDays)}</div>` : ''}</div>` : ''}
                                         ${contract.renewal_deadline ? `<div style="background:#fff;border-radius:8px;padding:10px 14px;border:1px solid #ffe0b2;"><div style="font-size:11px;color:#8a7a6a;margin-bottom:2px;">更新拒絶期限</div><div style="font-size:13px;font-weight:600;">${fmtDate(contract.renewal_deadline)}</div>${renewalDays !== null ? `<div style="font-size:11px;color:${renewalDays <= 30 ? alertColor : '#666'};margin-top:2px;">${dayLabel(renewalDays)}</div>` : ''}</div>` : ''}
-                                        ${contract.auto_renewal !== undefined ? `<div style="background:#fff;border-radius:8px;padding:10px 14px;border:1px solid #e3f2fd;"><div style="font-size:11px;color:#8a7a6a;margin-bottom:2px;">自動更新</div><div style="font-size:13px;font-weight:600;color:${contract.auto_renewal ? '#e53935' : '#2e7d32'}">${contract.auto_renewal ? 'あり（要注意）' : 'なし'}</div></div>` : ''}
+                                        ${((contract.auto_renewal === true || contract.auto_renewal === false) ? `<div style="background:#fff;border-radius:8px;padding:10px 14px;border:1px solid #e3f2fd;"><div style="font-size:11px;color:#8a7a6a;margin-bottom:2px;">自動更新</div><div style="font-size:13px;font-weight:600;color:${contract.auto_renewal ? '#e53935' : '#2e7d32'}">${contract.auto_renewal ? 'あり（要注意）' : 'なし'}</div></div>` : '')}
                                     </div>
                                     <div style="margin-top:10px;text-align:right;">
                                         <a onclick="window.app.navigate('deadlines')" style="font-size:12px;color:#1976d2;cursor:pointer;"><i class="fa-solid fa-arrow-right" style="margin-right:4px;"></i>期限一覧を見る</a>
                                     </div>
                                 </div>`;
                             })() : ''}
-
                             ` : `
                             <div style="padding:40px 20px; text-align:center; color:#999;">
                                 <i class="fa-solid fa-file-invoice" style="font-size:32px; margin-bottom:16px; display:block; opacity:0.1;"></i>
@@ -1861,14 +1890,12 @@ const Views = {
                         ` : ''}
                     </div>
 
-                    <!-- Right Pane: Original Document -->
                     <div class="pane">
                         <div class="pane-header" style="display:flex; justify-content:space-between; align-items:center; min-height:56px; box-sizing:border-box;">
                             <div style="display:flex; align-items:center; gap:8px; min-width:0;">
                                 <span><i class="fa-solid fa-file-contract"></i> ドキュメント表示</span>
                                 ${contract.original_filename ? `<span class="doc-source-name" title="${contract.original_filename}"><i class="fa-solid fa-file-lines"></i> ${contract.original_filename}</span>` : ''}
                             </div>
-                            
                             ${app?.can('operate_contract') ? `
                             <button class="btn-upload-version" onclick="window.app.uploadNewVersion(${id})">
                                 <i class="fa-solid fa-cloud-arrow-up"></i> 新しいバージョンをアップロード
@@ -1893,7 +1920,6 @@ const Views = {
                                         ${activeTab === 'diff'
                     ? (() => {
                         try {
-                            // 差分表示ロジック
                             const renderAiChangeCards = () => {
                                 const aiOnlyHtml = normalizeChangesForDisplay(contract.ai_changes || []).map((c, idx) => {
                                     const escapedOld = escapeHtmlText(c.old || '');
@@ -1914,7 +1940,6 @@ const Views = {
                                 return `<div class="document-content-diff-wrap">${aiOnlyHtml}</div>`;
                             };
 
-                            // Extract text for diff if structured
                             const normalizePdfDisplayText = (text) => {
                                 const src = String(text || '');
                                 if (!src) return '';
@@ -1930,16 +1955,11 @@ const Views = {
                                         if (out.length > 0 && out[out.length - 1] !== '') out.push('');
                                         continue;
                                     }
-
                                     const prev = out.length > 0 ? out[out.length - 1] : '';
                                     const prevTrim = String(prev || '').trim();
                                     const isList = listLinePattern.test(line);
                                     const isLikelyHeaderTail = shortTailPattern.test(line) && articleHeaderPattern.test(prevTrim);
-                                    const isLikelyWrappedContinuation =
-                                        !isList &&
-                                        prevTrim &&
-                                        prevTrim !== '' &&
-                                        /[\u3040-\u30ff\u3400-\u9fffA-Za-z0-9）)】]$/.test(prevTrim);
+                                    const isLikelyWrappedContinuation = !isList && prevTrim && prevTrim !== '' && /[\u3040-\u30ff\u3400-\u9fffA-Za-z0-9）)】]$/.test(prevTrim);
 
                                     if (out.length === 0 || prevTrim === '' || isList) {
                                         out.push(line);
@@ -1949,7 +1969,6 @@ const Views = {
                                         out.push(line);
                                     }
                                 }
-
                                 return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
                             };
 
@@ -2006,27 +2025,25 @@ const Views = {
                             const renderDualFullDiff = () => {
                                 const lhsText = isPdfSource ? normalizePdfDisplayText(previousVersionText) : previousVersionText;
                                 const rhsText = isPdfSource ? normalizePdfDisplayText(currentVersionText) : currentVersionText;
-                            if (!window.Diff || typeof window.Diff.diffWordsWithSpace !== 'function') {
-                                return `
-                                    <div class="document-content-diff-wrap">
-                                        <div class="dual-full-diff-grid">
-                                            <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px;">
-                                                <div style="font-size:12px; font-weight:700; color:#b42318; margin-bottom:8px;">変更前（旧版全文）</div>
-                                                <div style="white-space:pre-wrap; line-height:1.9;">${escapeHtmlText(lhsText)}</div>
-                                            </div>
-                                            <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px;">
-                                                <div style="font-size:12px; font-weight:700; color:#027a48; margin-bottom:8px;">変更後（新版本文）</div>
-                                                <div style="white-space:pre-wrap; line-height:1.9;">${escapeHtmlText(rhsText)}</div>
+                                if (!window.Diff || typeof window.Diff.diffWordsWithSpace !== 'function') {
+                                    return `
+                                        <div class="document-content-diff-wrap">
+                                            <div class="dual-full-diff-grid">
+                                                <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px;">
+                                                    <div style="font-size:12px; font-weight:700; color:#b42318; margin-bottom:8px;">変更前（旧版全文）</div>
+                                                    <div style="white-space:pre-wrap; line-height:1.9;">${escapeHtmlText(lhsText)}</div>
+                                                </div>
+                                                <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px;">
+                                                    <div style="font-size:12px; font-weight:700; color:#027a48; margin-bottom:8px;">変更後（新版本文）</div>
+                                                    <div style="white-space:pre-wrap; line-height:1.9;">${escapeHtmlText(rhsText)}</div>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                `;
+                                    `;
                                 }
-
                                 const chunks = window.Diff.diffWordsWithSpace(lhsText, rhsText);
                                 let oldHtml = '';
                                 let newHtml = '';
-
                                 for (const chunk of chunks) {
                                     const safe = escapeHtmlText(chunk.value);
                                     if (chunk.added) {
@@ -2038,7 +2055,6 @@ const Views = {
                                         newHtml += safe;
                                     }
                                 }
-
                                 return `
                                 <div class="document-content-diff-wrap">
                                     <div class="dual-full-diff-grid">
@@ -2807,7 +2823,7 @@ class DashboardApp {
         this.stripePublishableKey = '';
 
         // 初期表示をOwnerプランに設定 (ローカル開発・全機能解放)
-        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '[::1]' || window.location.hostname.endsWith('.local');
         this.subscription = { 
             plan: isLocal ? 'owner' : 'free', 
             billingCycle: 'monthly', 
@@ -2818,10 +2834,11 @@ class DashboardApp {
             signUsageLimit: 999999
         };
         this.userPlan = isLocal ? 'owner' : 'free';
+        if (isLocal) this.userRole = '管理者';
 
         // URLパラメータによるプラン強制 (検証用: ?forcePlan=free|starter|business|pro) ローカル環境のみ有効
         const urlParams = new URLSearchParams(window.location.search);
-        const _isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const _isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '[::1]' || window.location.hostname.endsWith('.local');
         const forcedPlan = _isLocalHost ? urlParams.get('forcePlan') : null;
         const forcedPlanData = {
             free:     { plan: 'free',     billingCycle: 'monthly', usageCount: 0, usageLimit: 999999, daysRemaining: null, planLimit: 999999, signUsageLimit: 999999 },
@@ -3227,19 +3244,33 @@ class DashboardApp {
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('forcePlan')) return;
 
+        // ローカル環境（Owner）の場合はキャッシュでの上書きを制限する
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '[::1]' || window.location.hostname.endsWith('.local');
+        
         const cachedSub = this.getCachedItem(DASHBOARD_CACHE_KEYS.SUBSCRIPTION, 10 * 60 * 1000);
         if (cachedSub && cachedSub.plan) {
-            this.subscription = {
-                ...this.subscription,
-                ...cachedSub,
-                billingCycle: cachedSub.billingCycle === 'annual' ? 'annual' : 'monthly'
-            };
-            this.userPlan = cachedSub.plan;
+            // ローカルかつ現在がownerなら、キャッシュがowner以外なら上書きしない
+            if (isLocal && this.userPlan === 'owner' && cachedSub.plan !== 'owner') {
+                // Keep owner
+            } else {
+                this.subscription = {
+                    ...this.subscription,
+                    ...cachedSub,
+                    billingCycle: cachedSub.billingCycle === 'annual' ? 'annual' : 'monthly'
+                };
+                this.userPlan = cachedSub.plan;
+            }
         }
 
         const cachedUser = this.getCachedItem(DASHBOARD_CACHE_KEYS.USER_META, 30 * 60 * 1000);
         if (cachedUser) {
-            if (cachedUser.role) this.userRole = cachedUser.role;
+            // ローカルかつ現在がownerなら、ロールを管理者に固定する
+            const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '[::1]' || window.location.hostname.endsWith('.local');
+            if (isLocal && this.userPlan === 'owner') {
+                this.userRole = '管理者';
+            } else if (cachedUser.role) {
+                this.userRole = cachedUser.role;
+            }
             if (cachedUser.email) {
                 const emailEl = document.getElementById('user-email-display');
                 if (emailEl) emailEl.textContent = cachedUser.email;
@@ -3508,12 +3539,6 @@ class DashboardApp {
             }
 
             try {
-                console.info('AI execution started', {
-                    type: 'ai_execution_started',
-                    contractId,
-                    method: 'reanalyze',
-                    timestamp: Date.now()
-                });
                 const authModule = await import('./auth.js');
                 const token = await authModule.getIdToken();
                 const apiBase = (await import('./api-base.js')).getApiBaseUrl();
@@ -3537,16 +3562,11 @@ class DashboardApp {
                 const normalizedData = { ...(data.data || {}) };
                 const aiReady = isAiAnalysisResultReady(normalizedData);
                 const aiFailed = normalizedData.aiFailed === true || !aiReady;
-                const hasDisplayablePayload = Boolean(
-                    String(normalizedData.summary || '').trim()
-                    || String(normalizedData.riskReason || normalizedData.risk_reason || '').trim()
-                    || (Array.isArray(normalizedData.changes) && normalizedData.changes.length > 0)
-                );
-                if (aiFailed && !hasDisplayablePayload) {
-                    normalizedData.summary = 'AI応答を取得できませんでした。消費はしていませんので、再解析してください。';
-                    normalizedData.riskReason = 'AI応答未取得';
+                if (aiFailed) {
+                    normalizedData.summary = '';
+                    normalizedData.riskReason = '';
                     normalizedData.changes = [];
-                    normalizedData.isFallback = true;
+                    normalizedData.isFallback = false;
                     normalizedData.aiFailed = true;
                     normalizedData.aiSucceeded = false;
                 }
@@ -3558,23 +3578,6 @@ class DashboardApp {
                     aiSucceeded: normalizedData.aiSucceeded === true && aiReady,
                     status: aiFailed ? (c.status || '未処理') : '未確認',
                 });
-                // contract_meta（期限情報）を追加保存
-                if (normalizedData.contract_meta) {
-                    const meta = normalizedData.contract_meta;
-                    const allContracts = dbService.getContracts();
-                    const idx = allContracts.findIndex(x => String(x.id) === String(contractId));
-                    if (idx !== -1) {
-                        Object.assign(allContracts[idx], {
-                            expiry_date: meta.expiry_date || null,
-                            renewal_deadline: meta.renewal_deadline || null,
-                            contract_start: meta.contract_start || null,
-                            auto_renewal: meta.auto_renewal,
-                            contract_category: meta.contract_category || null,
-                            date_confidence: meta.date_confidence || 'unknown',
-                        });
-                        localStorage.setItem(dbService.KEYS.CONTRACTS, JSON.stringify(allContracts));
-                    }
-                }
                 await this.refreshSubscriptionStatusSafe();
                 if (!normalizedData.contract_meta && !aiFailed) {
                     try {
@@ -3591,17 +3594,25 @@ class DashboardApp {
                     || updatedContract.contract_start
                     || updatedContract.contract_category
                 );
-                if (aiFailed && normalizedData.errorCode === 'AI_RATE_LIMITED') {
-                    Notify.warning('現在アクセスが集中しています。数分後にもう一度お試しください。');
-                } else if (aiFailed) {
-                    Notify.error('AI解析に失敗しました。消費はしていませんので、再度解析してください。');
+                if (aiFailed) {
+                    if (normalizedData.errorCode === 'AI_RATE_LIMITED') {
+                        Notify.warning('現在アクセスが集中しています。数分後にもう一度お試しください。');
+                    } else {
+                        Notify.error('AI解析に失敗しました。消費はしていませんので、再度解析してください。');
+                    }
                 } else if (hasDeadline) {
                     Notify.success('解析完了。期限情報を期限・アラート管理に格納しました');
                 } else {
                     Notify.warning('解析は完了しましたが期限情報を取得できませんでした。期限・アラート管理で手動入力してください。');
                 }
             } catch (err) {
-                Notify.error('解析エラー: ' + err.message);
+                const raw = String(err?.message || '');
+                const networkFail = /Failed to fetch|NetworkError|ERR_CONNECTION_REFUSED|ERR_NETWORK/i.test(raw);
+                if (networkFail) {
+                    Notify.error('AI解析に失敗しました。消費はしていませんので、再度解析してください。');
+                } else {
+                    Notify.error('解析エラー: ' + raw);
+                }
             } finally {
                 this.analyzingContractIds.delete(Number(contractId));
                 this.navigate('diff', contractId); // Final re-render
@@ -3758,7 +3769,16 @@ class DashboardApp {
             await this.refreshSubscriptionStatusSafe();
 
             const meta = data.data.contract_meta;
-            const hasDeadline = meta && (meta.expiry_date || meta.renewal_deadline);
+            const hasDeadline = Boolean(
+                meta && (
+                    meta.expiry_date
+                    || meta.renewal_deadline
+                    || meta.contract_start
+                    || meta.contract_category
+                    || meta.auto_renewal === true
+                    || meta.auto_renewal === false
+                )
+            );
             if (hasDeadline) {
                 Notify.success('再解析完了。期限情報を取得しました');
             } else {
@@ -3772,14 +3792,14 @@ class DashboardApp {
     }
 
     /**
-     * Update the sidebar badge for deadlines (urgent contracts count).
+     * 期限管理バッジの更新
      */
     updateDeadlinesBadge() {
         const badge = document.getElementById('nav-deadlines-badge');
         if (!badge) return;
         const contracts = dbService.getContracts ? dbService.getContracts() : (dbService._localContracts || []);
         const urgentCount = contracts.filter(c => {
-            const days = this._daysUntil(c.expiry_date);
+            const days = this._daysUntil(c.expiry_date || c.renewal_deadline);
             return days !== null && days >= 0 && days <= 30;
         }).length;
         if (urgentCount > 0) {
@@ -3791,23 +3811,21 @@ class DashboardApp {
     }
 
     /**
-     * Render the deadlines management view.
+     * 期限管理ビューのレンダリング
      */
     renderDeadlinesView(opts = {}) {
         const plan = this.userPlan || this.subscription?.plan || 'free';
         const deadlineLocked = plan === 'free';
-
         const query = (opts.query || '').trim().toLowerCase();
-        const filterRange = opts.filterRange || 'all'; // all | urgent | warning | upcoming | nodate
-        const sortKey = opts.sortKey || 'analyzed'; // analyzed | days | name | date
+        const filterRange = opts.filterRange || 'all';
+        const sortKey = opts.sortKey || 'analyzed';
         const sortDir = opts.sortDir || 'desc';
 
         const allContracts = (dbService.getContracts ? dbService.getContracts() : (dbService._localContracts || []))
-            .filter(c => c.last_analyzed_at); // リスク解析済みのみ表示
+            .filter(c => c.last_analyzed_at || c.expiry_date || c.renewal_deadline);
 
-        // Annotate with days remaining
         const annotated = allContracts.map(c => {
-            const targetDate = c.expiry_date;
+            const targetDate = c.expiry_date || c.renewal_deadline;
             const days = this._daysUntil(targetDate);
             let range = 'nodate';
             if (days !== null) {
@@ -3819,7 +3837,6 @@ class DashboardApp {
             return { ...c, _daysRemaining: days, _range: range };
         });
 
-        // Filter by search query
         const searched = query
             ? annotated.filter(c =>
                 (c.name || '').toLowerCase().includes(query) ||
@@ -4003,8 +4020,11 @@ class DashboardApp {
     updateRegistrationButtonVisibility(viewId = this.currentView) {
         const regBtn = document.getElementById('open-registration-btn');
         if (!regBtn) return;
-        const canShowOnView = viewId === 'dashboard' || viewId === 'contracts';
-        regBtn.style.display = (this.can('operate_contract') && canShowOnView) ? 'inline-flex' : 'none';
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '[::1]' || window.location.hostname.endsWith('.local');
+        const canOperate = this.can('operate_contract') || isLocal;
+        const canShowOnView = ['dashboard', 'contracts', 'deadlines'].includes(viewId);
+        console.log(`Registration button visibility: canOperate=${canOperate}, canShowOnView=${canShowOnView}, viewId=${viewId}`);
+        regBtn.style.display = (canOperate && canShowOnView) ? 'inline-flex' : 'none';
     }
 
     updateActiveMenu(viewId = this.currentView) {
@@ -4381,7 +4401,7 @@ class DashboardApp {
 
     async fetchSubscriptionStatus(token) {
         // ローカル環境ではデフォルトで 'owner' プランを適用（全機能解放・全機能無制限）
-        const _isLocalEnv = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const _isLocalEnv = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '[::1]' || window.location.hostname.endsWith('.local');
         let forcedPlan = _isLocalEnv ? (new URLSearchParams(window.location.search).get('forcePlan') || 'owner') : null;
         
         if (forcedPlan) {
