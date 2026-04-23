@@ -1226,6 +1226,7 @@
           await loadPdf(data.pdfUrl);
 
           showMain();
+          renderFieldMarkers();
           renderFieldStatus();
           updateFinishState();
 
@@ -1376,6 +1377,7 @@
 
         container.appendChild(canvas);
       }
+      renderFieldMarkers();
 
       state.currentPage = 1;
       state.totalPages = pdf.numPages;
@@ -1951,10 +1953,11 @@
         const badge = document.createElement('span');
         badge.className = 'field-number-badge';
         badge.style.cssText = `
-          position: absolute; top: -10px; left: -6px; z-index: 10;
-          background: #111827; color: #fff; font-size: 9px; font-weight: 700;
-          width: 18px; height: 18px; border-radius: 50%;
+          position: absolute; top: -14px; left: -14px; z-index: 100;
+          background: #111827; color: #fff !important; font-size: 14px; font-weight: 700;
+          width: 34px; height: 34px; border-radius: 50%;
           display: flex; align-items: center; justify-content: center;
+          box-shadow: 0 6px 14px rgba(0,0,0,0.25);
           pointer-events: none;
         `;
         badge.textContent = `${fieldIndex + 1}`;
