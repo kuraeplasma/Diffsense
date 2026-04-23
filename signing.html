@@ -1945,6 +1945,22 @@
         marker.disabled = true;
       }
 
+      // Add Small Numbering Badge
+      const fieldIndex = state.fields.findIndex(f => f.id === field.id);
+      if (fieldIndex !== -1) {
+        const badge = document.createElement('span');
+        badge.className = 'field-number-badge';
+        badge.style.cssText = `
+          position: absolute; top: -10px; left: -6px; z-index: 10;
+          background: #111827; color: #fff; font-size: 9px; font-weight: 700;
+          width: 18px; height: 18px; border-radius: 50%;
+          display: flex; align-items: center; justify-content: center;
+          pointer-events: none;
+        `;
+        badge.textContent = `${fieldIndex + 1}`;
+        marker.appendChild(badge);
+      }
+
       return marker;
     }
 
