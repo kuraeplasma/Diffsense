@@ -876,6 +876,62 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
 
         const extractedTextHash = crypto.createHash('sha256').update(extractedRawText).digest('hex');
 
+        // --- Persistence Logic: Upload DOCX and PDF to Storage ---
+        let original_file_path = null;
+        let pdfStoragePath = null;
+        let pdfUrl = null;
+
+        const { bucket } = require('../firebase');
+        if (bucket) {
+            try {
+                // 1. Upload Original DOCX
+                const docxStoragePath = `contracts/${contractId}/original-${Date.now()}.docx`;
+                const docxFile = bucket.file(docxStoragePath);
+                await docxFile.save(currentBuffer, {
+                    metadata: { contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }
+                });
+                original_file_path = docxStoragePath;
+                logger.info(`Original DOCX uploaded: ${docxStoragePath}`);
+
+                // 2. Upload Converted PDF (if available)
+                if (conversionMethod === 'libreoffice_pdf' && typeof pdfBuffer !== 'undefined') {
+                    pdfStoragePath = `contracts/${contractId}/${Date.now()}.pdf`;
+                    const pdfFile = bucket.file(pdfStoragePath);
+                    const downloadToken = crypto.randomUUID();
+                    await pdfFile.save(pdfBuffer, {
+                        metadata: {
+                            contentType: 'application/pdf',
+                            metadata: { firebaseStorageDownloadTokens: downloadToken }
+                        }
+                    });
+                    
+                    try {
+                        const [signedUrl] = await pdfFile.getSignedUrl({
+                            action: 'read',
+                            expires: Date.now() + 31536000000
+                        });
+                        pdfUrl = signedUrl;
+                    } catch (e) {
+                        const bucketName = bucket.name || process.env.FIREBASE_STORAGE_BUCKET;
+                        pdfUrl = buildFirebaseDownloadUrl(bucketName, pdfStoragePath, downloadToken);
+                    }
+                    logger.info(`Converted PDF uploaded: ${pdfStoragePath}`);
+                }
+            } catch (storageErr) {
+                logger.warn('DOCX Storage upload failed:', storageErr.message);
+            }
+        }
+
+        // Update Firestore with new paths
+        await dbService.updateContract(contractId, {
+            original_file_path,
+            pdf_storage_path: pdfStoragePath,
+            pdf_url: pdfUrl,
+            last_updated_at: new Date().toISOString(),
+            status: '解析済み',
+            original_filename: filename
+        }, uid).catch(dbErr => logger.error('Firestore update failed for DOCX upload:', dbErr.message));
+
         const diffChanges = previousArticles.length
             ? diffService.compare(previousArticles, currentArticles)
             : [];
@@ -961,6 +1017,9 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
                 isLimited,
                 extractedTextHash,
                 extractedTextLength: extractedRawText.length,
+                pdfStoragePath,
+                pdfUrl,
+                original_file_path,
                 doc: {
                     content: extractedRawText,
                     type: 'docx',
