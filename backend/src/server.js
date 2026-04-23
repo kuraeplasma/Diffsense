@@ -344,17 +344,17 @@ async function bootstrap() {
         });
 
         // --- Public Signature Routes (No Authentication) ---
-        // These are registered before authMiddleware to allow recipients access.
-        app.use('/api/sign/verify', signRoutes);
-        app.use('/api/sign/submit', signRoutes);
-        app.use('/api/sign/decline', signRoutes);
-        app.use('/api/sign/original-file', signRoutes);
-        app.use('/api/sign/generate-pdf', signRoutes);
-        app.use('/sign/verify', signRoutes);
-        app.use('/sign/submit', signRoutes);
-        app.use('/sign/decline', signRoutes);
-        app.use('/sign/original-file', signRoutes);
-        app.use('/sign/generate-pdf', signRoutes);
+        // Register specific methods to ensure path matching doesn't fall through.
+        app.get('/api/sign/verify', signRoutes);
+        app.post('/api/sign/submit', signRoutes);
+        app.post('/api/sign/decline', signRoutes);
+        app.get('/api/sign/original-file', signRoutes);
+        app.post('/api/sign/generate-pdf', signRoutes);
+        app.get('/sign/verify', signRoutes);
+        app.post('/sign/submit', signRoutes);
+        app.post('/sign/decline', signRoutes);
+        app.get('/sign/original-file', signRoutes);
+        app.post('/sign/generate-pdf', signRoutes);
 
         const mcpRouter = createMcpRouter();
         app.use(createMcpAuthRouter());
