@@ -1623,7 +1623,7 @@ const Views = {
         state.analysis.data = diffData;
         const isAnalyzingContract = state.analysis.isAnalyzing;
         const hasAnalysisPayload = Boolean(diffData.summary || diffData.riskReason || (Array.isArray(diffData.changes) && diffData.changes.length > 0));
-        const shouldShowAnalysis = Boolean(hasAIResults && hasAnalysisPayload && diffData.isFallback !== true);
+        const shouldShowAnalysis = Boolean(hasAIResults && hasAnalysisPayload);
         const mobilePrimaryAction = (() => {
             if (!app?.can('operate_contract')) return null;
             if (!hasAIResults) {
@@ -1750,6 +1750,7 @@ const Views = {
                                             ${diffData.riskLevel >= 3 ? 'High' : diffData.riskLevel >= 2 ? 'Medium' : 'Low'}
                                         </span>
                                         <span style="font-size:12px; color:#666;">${diffData.riskReason || ''}</span>
+                                        ${diffData.isFallback === true ? '<span style="font-size:10px;background:#fff8e1;color:#f57c00;border-radius:4px;padding:2px 6px;">補完解析</span>' : ''}
                                     </div>
                                     <div style="font-size:13px; color:#333; line-height:1.7; white-space:pre-wrap;">${diffData.summary || 'AI解析結果がありません'}</div>
                                 </div>
@@ -3574,10 +3575,22 @@ class DashboardApp {
                         localStorage.setItem(dbService.KEYS.CONTRACTS, JSON.stringify(allContracts));
                     }
                 }
-                this.refreshSubscriptionStatusSafe();
+                await this.refreshSubscriptionStatusSafe();
+                if (!normalizedData.contract_meta && !aiFailed) {
+                    try {
+                        await dbService.syncContractsFromApi();
+                    } catch (syncErr) {
+                        console.warn('contract sync after reanalyze failed:', syncErr);
+                    }
+                }
 
-                const meta = normalizedData.contract_meta;
-                const hasDeadline = meta && (meta.expiry_date || meta.renewal_deadline || meta.contract_start);
+                const updatedContract = dbService.getContractById(contractId) || {};
+                const hasDeadline = Boolean(
+                    updatedContract.expiry_date
+                    || updatedContract.renewal_deadline
+                    || updatedContract.contract_start
+                    || updatedContract.contract_category
+                );
                 if (aiFailed) {
                     Notify.warning('AI応答が不完全だったため、補完解析結果を表示しています。消費はしていませんので、再解析を推奨します。');
                 } else if (hasDeadline) {
