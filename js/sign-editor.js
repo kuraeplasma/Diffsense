@@ -1,4 +1,4 @@
-﻿/**
+/**
  * SignEditor - Mock Document Editor for Field Placement
  */
 import { Notify } from './notify.js';
