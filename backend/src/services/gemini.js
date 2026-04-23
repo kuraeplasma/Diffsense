@@ -246,6 +246,167 @@ function normalizeAnalyzeResult(parsed) {
     };
 }
 
+function normalizeIsoDate(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return null;
+    if (/^(null|undefined|なし|不明|-|N\/A)$/i.test(raw)) return null;
+
+    const ymd = raw.match(/^(\d{4})[\/\-.年]\s*(\d{1,2})[\/\-.月]\s*(\d{1,2})日?$/);
+    if (ymd) {
+        const y = Number(ymd[1]);
+        const m = Number(ymd[2]);
+        const d = Number(ymd[3]);
+        if (y >= 1900 && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+            return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        }
+    }
+
+    const dt = new Date(raw);
+    if (Number.isNaN(dt.getTime())) return null;
+    const y = dt.getFullYear();
+    const m = dt.getMonth() + 1;
+    const d = dt.getDate();
+    return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+function normalizeNoticePeriodDays(value) {
+    if (value === null || value === undefined || value === '') return null;
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return value >= 0 ? Math.round(value) : null;
+    }
+    const raw = String(value).trim();
+    if (!raw) return null;
+    const direct = Number(raw);
+    if (Number.isFinite(direct) && direct >= 0) {
+        return Math.round(direct);
+    }
+    const matched = raw.match(/(\d{1,4})\s*(日|営業日|週間|週|か月|ヶ月|ヵ月|月|年)/);
+    if (!matched) return null;
+    const n = Number(matched[1]);
+    if (!Number.isFinite(n) || n < 0) return null;
+    const unit = matched[2];
+    if (unit === '年') return n * 365;
+    if (unit === 'か月' || unit === 'ヶ月' || unit === 'ヵ月' || unit === '月') return n * 30;
+    if (unit === '週間' || unit === '週') return n * 7;
+    return n;
+}
+
+function normalizeAutoRenewal(value) {
+    if (typeof value === 'boolean') return value;
+    const raw = String(value || '').trim().toLowerCase();
+    if (!raw) return null;
+    if (['true', 'yes', 'y', '1', 'あり', '有', '自動更新あり'].includes(raw)) return true;
+    if (['false', 'no', 'n', '0', 'なし', '無', '自動更新なし'].includes(raw)) return false;
+    return null;
+}
+
+function normalizeDateConfidence(value) {
+    const raw = String(value || '').trim().toLowerCase();
+    if (!raw) return 'unknown';
+    if (raw === 'high') return 'high';
+    if (raw === 'medium' || raw === 'partial') return 'medium';
+    if (raw === 'low') return 'low';
+    return 'unknown';
+}
+
+function toUtcDate(isoDate) {
+    const matched = String(isoDate || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!matched) return null;
+    const y = Number(matched[1]);
+    const m = Number(matched[2]);
+    const d = Number(matched[3]);
+    if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return null;
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    return Number.isNaN(dt.getTime()) ? null : dt;
+}
+
+function formatUtcDate(dt) {
+    if (!(dt instanceof Date) || Number.isNaN(dt.getTime())) return null;
+    const y = dt.getUTCFullYear();
+    const m = dt.getUTCMonth() + 1;
+    const d = dt.getUTCDate();
+    return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+function shiftIsoDate(isoDate, deltaDays) {
+    const base = toUtcDate(isoDate);
+    if (!base || !Number.isFinite(deltaDays)) return null;
+    base.setUTCDate(base.getUTCDate() + Math.round(deltaDays));
+    return formatUtcDate(base);
+}
+
+function daysBetweenIsoDates(startIso, endIso) {
+    const start = toUtcDate(startIso);
+    const end = toUtcDate(endIso);
+    if (!start || !end) return null;
+    const diff = Math.round((end.getTime() - start.getTime()) / 86400000);
+    return Number.isFinite(diff) ? diff : null;
+}
+
+function normalizeContractMeta(rawMeta) {
+    if (!rawMeta || typeof rawMeta !== 'object') return null;
+
+    const normalized = {
+        expiry_date: normalizeIsoDate(rawMeta.expiry_date || rawMeta.expiryDate || rawMeta.end_date),
+        renewal_deadline: normalizeIsoDate(rawMeta.renewal_deadline || rawMeta.renewalDeadline || rawMeta.notice_deadline),
+        contract_start: normalizeIsoDate(rawMeta.contract_start || rawMeta.contractStart || rawMeta.start_date),
+        auto_renewal: normalizeAutoRenewal(rawMeta.auto_renewal),
+        notice_period_days: normalizeNoticePeriodDays(rawMeta.notice_period_days || rawMeta.noticePeriodDays),
+        contract_category: String(rawMeta.contract_category || rawMeta.contractCategory || '').trim() || null,
+        date_confidence: normalizeDateConfidence(rawMeta.date_confidence || rawMeta.dateConfidence)
+    };
+
+    if (!normalized.renewal_deadline && normalized.expiry_date && normalized.notice_period_days !== null) {
+        normalized.renewal_deadline = shiftIsoDate(normalized.expiry_date, -normalized.notice_period_days);
+    }
+
+    if (normalized.notice_period_days === null && normalized.renewal_deadline && normalized.expiry_date) {
+        const diffDays = daysBetweenIsoDates(normalized.renewal_deadline, normalized.expiry_date);
+        if (Number.isFinite(diffDays) && diffDays >= 0 && diffDays <= 3660) {
+            normalized.notice_period_days = diffDays;
+        }
+    }
+
+    if (
+        normalized.date_confidence === 'unknown'
+        && (normalized.expiry_date || normalized.renewal_deadline || normalized.contract_start)
+    ) {
+        normalized.date_confidence = 'medium';
+    }
+
+    return normalized;
+}
+
+function hasMeaningfulContractMeta(meta) {
+    if (!meta || typeof meta !== 'object') return false;
+    return Boolean(
+        meta.expiry_date
+        || meta.renewal_deadline
+        || meta.contract_start
+        || meta.contract_category
+        || meta.notice_period_days !== null
+        || typeof meta.auto_renewal === 'boolean'
+    );
+}
+
+function mergeContractMeta(baseMeta, incomingMeta) {
+    const base = normalizeContractMeta(baseMeta) || normalizeContractMeta({});
+    const incoming = normalizeContractMeta(incomingMeta);
+    if (!incoming) return base;
+
+    const merged = { ...base };
+    if (!merged.expiry_date && incoming.expiry_date) merged.expiry_date = incoming.expiry_date;
+    if (!merged.renewal_deadline && incoming.renewal_deadline) merged.renewal_deadline = incoming.renewal_deadline;
+    if (!merged.contract_start && incoming.contract_start) merged.contract_start = incoming.contract_start;
+    if (merged.auto_renewal === null && typeof incoming.auto_renewal === 'boolean') merged.auto_renewal = incoming.auto_renewal;
+    if (merged.notice_period_days === null && incoming.notice_period_days !== null) merged.notice_period_days = incoming.notice_period_days;
+    if (!merged.contract_category && incoming.contract_category) merged.contract_category = incoming.contract_category;
+    if ((merged.date_confidence || 'unknown') === 'unknown' && incoming.date_confidence && incoming.date_confidence !== 'unknown') {
+        merged.date_confidence = incoming.date_confidence;
+    }
+    return normalizeContractMeta(merged);
+}
+
 function shouldUseLocalAiFallback() {
     return process.env.LOCAL_FAKE_AI === 'true' || process.env.LOCAL_AI_ONLY === 'true';
 }
@@ -804,11 +965,16 @@ class GeminiService {
                 this.requestGeminiJson(detailsPrompt, true)
             ]);
 
+            const normalizedSummary = normalizeAnalyzeResult(summaryRes);
+            const normalizedMeta = await this.ensureContractMeta(
+                currentText,
+                previousText,
+                detailsRes?.contract_meta || detailsRes
+            );
             const result = {
-                ...normalizeAnalyzeResult(summaryRes),
+                ...normalizedSummary,
                 changes: normalizeChanges(detailsRes?.changes),
-                contract_meta: detailsRes?.contract_meta || null,
-                aiSucceeded: true,
+                contract_meta: normalizedMeta,
                 isLimited: false,
                 isFallback: false
             };
@@ -822,9 +988,14 @@ class GeminiService {
             const monolithicPrompt = this.buildPrompt(currentText, previousText);
             try {
                 const monolithicRes = await this.requestGeminiJson(monolithicPrompt, true);
+                const normalizedMeta = await this.ensureContractMeta(
+                    currentText,
+                    previousText,
+                    monolithicRes?.contract_meta || monolithicRes
+                );
                 return {
                     ...normalizeAnalyzeResult(monolithicRes),
-                    aiSucceeded: true,
+                    contract_meta: normalizedMeta,
                     isLimited: false,
                     isFallback: false
                 };
@@ -838,6 +1009,29 @@ class GeminiService {
                 return buildHeuristicFallbackAnalysis(currentText, previousText);
             }
         }
+    }
+
+    async ensureContractMeta(currentText, previousText, rawMeta) {
+        const primary = normalizeContractMeta(rawMeta);
+        if (hasMeaningfulContractMeta(primary)) {
+            return primary;
+        }
+
+        const prompt = this.buildDeadlineMetaPrompt(currentText, previousText);
+        for (const enforceJsonMime of [true, false]) {
+            try {
+                const recovered = await this.requestGeminiJson(prompt, enforceJsonMime);
+                const recoveredMeta = normalizeContractMeta(recovered?.contract_meta || recovered);
+                if (hasMeaningfulContractMeta(recoveredMeta)) {
+                    logger.info(`Recovered contract_meta via focused deadline extraction (jsonMime=${enforceJsonMime})`);
+                    return mergeContractMeta(primary, recoveredMeta);
+                }
+            } catch (error) {
+                logger.warn(`Focused deadline extraction failed (jsonMime=${enforceJsonMime}): ${error.message}`);
+            }
+        }
+
+        return primary;
     }
 
     async analyzeMcpContract(contractText) {
@@ -1234,9 +1428,45 @@ ${truncatedText}
             "renewal_deadline": "YYYY-MM-DD",
             "contract_start": "YYYY-MM-DD",
             "auto_renewal": true,
+            "notice_period_days": 30,
+            "date_confidence": "high|medium|low",
             "contract_category": "契約種別"
           }
-        }`;
+        }
+
+        注意:
+        - 日付は必ず YYYY-MM-DD で返してください。
+        - 「満了日の◯日前に通知」等の条文がある場合は notice_period_days を数値で返してください。
+        - renewal_deadline が未記載でも、expiry_date と notice_period_days から算出できる場合は算出して返してください。`;
+    }
+
+    buildDeadlineMetaPrompt(contractText, previousVersion) {
+        const truncatedText = contractText.substring(0, 30000);
+        const truncatedPrev = previousVersion ? previousVersion.substring(0, 30000) : null;
+        const context = previousVersion
+            ? `以下の契約書（新版優先）から期限情報のみを高精度で抽出してください。\n【旧版】\n${truncatedPrev}\n\n【新版】\n${truncatedText}`
+            : `以下の契約書から期限情報のみを高精度で抽出してください。\n【契約書】\n${truncatedText}`;
+
+        return `${context}
+        
+        以下のJSONのみで回答してください（説明文不要）:
+        {
+          "contract_meta": {
+            "expiry_date": "YYYY-MM-DD または null",
+            "renewal_deadline": "YYYY-MM-DD または null",
+            "contract_start": "YYYY-MM-DD または null",
+            "auto_renewal": true,
+            "notice_period_days": 30,
+            "contract_category": "契約種別またはnull",
+            "date_confidence": "high|medium|low"
+          }
+        }
+
+        ルール:
+        - 日付は必ず YYYY-MM-DD に正規化する。
+        - 明記がない項目は null。
+        - 「満了日の◯日前通知」等がある場合は notice_period_days を数値で返す。
+        - renewal_deadline が明記されていなくても、expiry_date と notice_period_days から算出可能なら算出する。`;
     }
 
     /**

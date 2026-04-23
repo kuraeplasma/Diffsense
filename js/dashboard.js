@@ -258,6 +258,15 @@ const hasAnalysisRecord = (payload) => {
         || (hasPayload && !isFailureSummary);
 };
 
+const AI_ANALYSIS_RETRY_GUIDANCE = 'AI解析に失敗しました。消費はしていませんので、再度解析してください。';
+
+const isAiAnalysisResultReady = (payload) => {
+    if (!payload || typeof payload !== 'object') return false;
+    if (payload.aiFailed === true || payload.ai_failed === true) return false;
+    if (payload.isFallback === true || payload.ai_is_fallback === true) return false;
+    return hasAnalysisRecord(payload);
+};
+
 const sanitizeAnalysisPayload = (payload) => {
     if (!payload || typeof payload !== 'object') return {};
     return {
@@ -1619,7 +1628,7 @@ const Views = {
             if (!app?.can('operate_contract')) return null;
             if (!hasAIResults) {
                 return {
-                    label: 'リスク解析する',
+                    label: 'リスク解析＋期限取得',
                     icon: 'fa-wand-magic-sparkles',
                     action: `window.app.confirmReanalyze('${contract.id}')`
                 };
@@ -1656,14 +1665,14 @@ const Views = {
                     </div>
                     <div class="flex gap-sm">
                         ${app?.can('operate_contract') ? `<button class="btn-dashboard" onclick="window.app.shareReport(${contract.id})"><i class="fa-solid fa-share-nodes"></i> 共有</button>` : ''}
-                        ${(['pro', 'business'].includes(app?.subscription?.plan)) ? `<button class="btn-dashboard" onclick="window.app.exportPDF(${contract.id})"><i class="fa-solid fa-file-pdf"></i> PDF出力</button>` : ''}
+                        ${(['owner', 'pro', 'business'].includes(app?.subscription?.plan)) ? `<button class="btn-dashboard" onclick="window.app.exportPDF(${contract.id})"><i class="fa-solid fa-file-pdf"></i> PDF出力</button>` : ''}
                         ${app?.can('operate_contract') ? `<button class="btn-dashboard" onclick="window.app.showHistoryModal(${id})"><i class="fa-solid fa-note-sticky"></i> メモ</button>` : ''}
                         ${app?.can('operate_contract')
-                ? (contract.status === '未処理'
-                    ? ''
-                    : contract.status === '未確認'
-                        ? `<button class="btn-dashboard btn-primary-action" onclick="window.app.confirmContract(${id})"><i class="fa-solid fa-check"></i> 確認済みにする</button>`
-                        : `<button class="btn-dashboard" disabled><i class="fa-solid fa-check"></i> 確認済み</button>`)
+                ? (['確認済み', '確認済'].includes(contract.status)
+                    ? `<button class="btn-dashboard" disabled><i class="fa-solid fa-check"></i> 確認済み</button>`
+                    : (contract.status === '未処理'
+                        ? ''
+                        : `<button class="btn-dashboard btn-primary-action" onclick="window.app.confirmContract(${id})"><i class="fa-solid fa-check"></i> 確認済みにする</button>`))
                 : ''}
                     </div>
                 </div>
@@ -1708,7 +1717,7 @@ const Views = {
                             <span><i class="fa-solid fa-magnifying-glass-chart"></i> AI解析・差分判定</span>
                             ${mobilePrimaryAction ? `<button class="btn-dashboard btn-primary-action mobile-only" onclick="${mobilePrimaryAction.action}" style="padding:6px 12px; font-size:12px; margin-left:auto;"><i class="fa-solid ${mobilePrimaryAction.icon}"></i> ${mobilePrimaryAction.label}</button>` : ''}
                             <button id="btn-reanalyze" class="btn-upload-version desktop-only" onclick="window.app.confirmReanalyze('${contract.id}')" style="margin-left: ${mobilePrimaryAction ? '8px' : 'auto'}">
-                                <i class="fa-solid fa-wand-magic-sparkles"></i>リスク解析
+                                <i class="fa-solid fa-wand-magic-sparkles"></i>リスク解析＋期限取得
                             </button>
                         </div>
                         <div class="pane-scroll-area">
@@ -1797,7 +1806,7 @@ const Views = {
                                 <i class="fa-solid fa-file-invoice" style="font-size:32px; margin-bottom:16px; display:block; opacity:0.1;"></i>
                                 <div style="font-size:14px; color:#666;">ドキュメントを読み込みました</div>
                                 <div style="font-size:12px; margin-top:8px; line-height:1.6; color:#999;">
-                                    右上の「リスク解析」ボタンをクリックすると、AIがリスクを判定します。<br>
+                                    右上の「リスク解析＋期限取得」ボタンをクリックすると、AIがリスクを判定します。<br>
                                     新しいバージョンをアップロードすれば、差分を自動解析します。
                                 </div>
                             </div>
@@ -1806,7 +1815,7 @@ const Views = {
                         
                         ${contract.source_type === 'URL' ? `
                         <div style="margin-top: 24px; padding: 20px; border-top: 1px solid #eee;">
-                            ${app?.subscription?.plan === 'pro' ? `
+                            ${['owner', 'pro'].includes(app?.subscription?.plan) ? `
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                                 <div style="display:flex; align-items:center; gap:10px;">
                                     <i class="fa-solid fa-satellite-dish" style="color:var(--accent-gold, #c19b4a); font-size:16px;"></i>
@@ -2474,7 +2483,7 @@ class RegistrationFlow {
         }
 
         if (cardUrl) {
-            const isPro = this.app?.subscription?.plan === 'pro';
+            const isPro = ['owner', 'pro'].includes(this.app?.subscription?.plan);
             if (!isPro) {
                 cardUrl.style.opacity = '0.55';
                 cardUrl.style.position = 'relative';
@@ -3435,7 +3444,7 @@ class DashboardApp {
                         <i class="fa-solid fa-wand-magic-sparkles" style="color:#c5a059;font-size:18px;"></i>
                     </div>
                     <div>
-                        <div style="font-size:15px;font-weight:700;color:#2b2623;margin-bottom:6px;">AIリスク解析を実行しますか？</div>
+                        <div style="font-size:15px;font-weight:700;color:#2b2623;margin-bottom:6px;">AIリスク解析＋期限取得を実行しますか？</div>
                         <div style="font-size:13px;color:#5e544d;line-height:1.6;">
                             リスク解析と期限解析を同時に行います。<br>
                             <strong style="color:#c5a059;">解析1回を消費します。</strong>
@@ -3524,14 +3533,33 @@ class DashboardApp {
                     return;
                 }
 
+                const normalizedData = { ...(data.data || {}) };
+                const aiReady = isAiAnalysisResultReady(normalizedData);
+                const aiFailed = normalizedData.aiFailed === true || !aiReady;
+                const hasDisplayablePayload = Boolean(
+                    String(normalizedData.summary || '').trim()
+                    || String(normalizedData.riskReason || normalizedData.risk_reason || '').trim()
+                    || (Array.isArray(normalizedData.changes) && normalizedData.changes.length > 0)
+                );
+                if (aiFailed && !hasDisplayablePayload) {
+                    normalizedData.summary = 'AI応答を取得できませんでした。消費はしていませんので、再解析してください。';
+                    normalizedData.riskReason = 'AI応答未取得';
+                    normalizedData.changes = [];
+                    normalizedData.isFallback = true;
+                    normalizedData.aiFailed = true;
+                    normalizedData.aiSucceeded = false;
+                }
+
                 // updateContractAnalysis で保存
                 dbService.updateContractAnalysis(contractId, {
-                    ...data.data,
-                    status: '未確認',
+                    ...normalizedData,
+                    aiFailed: aiFailed,
+                    aiSucceeded: normalizedData.aiSucceeded === true && aiReady,
+                    status: aiFailed ? (c.status || '未処理') : '未確認',
                 });
                 // contract_meta（期限情報）を追加保存
-                if (data.data.contract_meta) {
-                    const meta = data.data.contract_meta;
+                if (normalizedData.contract_meta) {
+                    const meta = normalizedData.contract_meta;
                     const allContracts = dbService.getContracts();
                     const idx = allContracts.findIndex(x => String(x.id) === String(contractId));
                     if (idx !== -1) {
@@ -3548,12 +3576,14 @@ class DashboardApp {
                 }
                 this.refreshSubscriptionStatusSafe();
 
-                const meta = data.data.contract_meta;
+                const meta = normalizedData.contract_meta;
                 const hasDeadline = meta && (meta.expiry_date || meta.renewal_deadline || meta.contract_start);
-                if (hasDeadline) {
+                if (aiFailed) {
+                    Notify.warning('AI応答が不完全だったため、補完解析結果を表示しています。消費はしていませんので、再解析を推奨します。');
+                } else if (hasDeadline) {
                     Notify.success('解析完了。期限情報を期限・アラート管理に格納しました');
                 } else {
-                    Notify.success('解析が完了しました');
+                    Notify.warning('解析は完了しましたが期限情報を取得できませんでした。期限・アラート管理で手動入力してください。');
                 }
             } catch (err) {
                 Notify.error('解析エラー: ' + err.message);
@@ -3562,7 +3592,7 @@ class DashboardApp {
                 this.navigate('diff', contractId); // Final re-render
                 if (btn) {
                     btn.disabled = false;
-                    btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i>AIリスク解析';
+                    btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i>AIリスク解析＋期限取得';
                 }
                 console.log({
                     type: 'reanalyze_performance',
@@ -3930,6 +3960,8 @@ class DashboardApp {
 
     can(action) {
         if (!this.userRole) return false;
+        // ownerプラン（ローカル環境）は全ての権限を保有
+        if (this.subscription?.plan === 'owner') return true;
 
         switch (action) {
             case 'manage_team':
@@ -4323,11 +4355,13 @@ class DashboardApp {
     }
 
     async fetchSubscriptionStatus(token) {
-        // forcePlan指定時はAPIフェッチをスキップし、強制プランを再適用（ローカル環境のみ有効）
+        // ローカル環境ではデフォルトで 'owner' プランを適用（全機能解放・全機能無制限）
         const _isLocalEnv = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-        const forcedPlan = _isLocalEnv ? new URLSearchParams(window.location.search).get('forcePlan') : null;
+        let forcedPlan = _isLocalEnv ? (new URLSearchParams(window.location.search).get('forcePlan') || 'owner') : null;
+        
         if (forcedPlan) {
             const forcedPlanMap = {
+                owner:    { plan: 'owner',    billingCycle: 'monthly', usageCount: 0, usageLimit: 999999, daysRemaining: null, planLimit: 999999, signUsageLimit: 999999 },
                 free:     { plan: 'free',     billingCycle: 'monthly', usageCount: 0, usageLimit: 999999, daysRemaining: null, planLimit: 999999, signUsageLimit: 999999 },
                 starter:  { plan: 'starter',  billingCycle: 'monthly', usageCount: 0, usageLimit: 999999, daysRemaining: null, planLimit: 999999, signUsageLimit: 999999 },
                 business: { plan: 'business', billingCycle: 'monthly', usageCount: 0, usageLimit: 999999, daysRemaining: null, planLimit: 999999, signUsageLimit: 999999 },
@@ -6215,16 +6249,26 @@ class DashboardApp {
         this.navigate('contracts', { page: newPage });
     }
 
-    confirmContract(id) {
+    async confirmContract(id) {
         if (!this.can('operate_contract')) {
             Notify.warning('閲覧のみの権限ではステータスを変更できません');
             return;
         }
-        if (dbService.updateContractStatus(id, '確認済')) {
-            // Switch to 'Monitoring' (Total) view and go back to dashboard
-            this.dashboardFilter = 'total';
-            this.navigate('dashboard');
+        const result = await dbService.updateContractStatusAndSync(id, '確認済み', {
+            retryCount: 1,
+            rollbackOnSyncError: true
+        });
+        if (!result.ok) {
+            Notify.error('契約情報が見つかりませんでした。');
+            return;
         }
+        if (!result.synced) {
+            Notify.error('確認済みの保存に失敗しました。通信状態を確認して再度お試しください。');
+            return;
+        }
+        // Switch to 'Monitoring' (Total) view and go back to dashboard
+        this.dashboardFilter = 'total';
+        await this.navigate('dashboard');
     }
 
     async analyzeContract(id) {
@@ -6279,6 +6323,8 @@ class DashboardApp {
                 );
 
                 if (result.success) {
+                    const aiReady = isAiAnalysisResultReady(result.data);
+                    const aiFailed = result.data.aiFailed === true || !aiReady;
                     // 解析結果をDBに保存
                     const analysisPayloadAi = {
                         extractedText: contract.original_content,  // 既存のテキストを保持
@@ -6286,11 +6332,11 @@ class DashboardApp {
                         riskLevel: result.data.riskLevel,
                         riskReason: result.data.riskReason,
                         summary: result.data.summary,
-                        aiSucceeded: result.data.aiSucceeded === true,
+                        aiSucceeded: result.data.aiSucceeded === true && !aiFailed,
                         isLimited: result.data.isLimited === true,
                         isFallback: result.data.isFallback === true,
-                        aiFailed: result.data.aiFailed === true,
-                        status: '未確認'  // 解析完了、確認待ち
+                        aiFailed: aiFailed,
+                        status: aiFailed ? (contract.status || '未処理') : '未確認'
                     };
                     // contract_meta（期限情報）が返ってきた場合はマージして保存
                     if (result.data.contract_meta) {
@@ -6309,8 +6355,8 @@ class DashboardApp {
                     await this.refreshSubscriptionStatusSafe();
 
                     // AI解析失敗チェック
-                    if (result.data.aiFailed) {
-                        Notify.error('AI解析に失敗しました。利用回数は消費されていません。再度お試しください。');
+                    if (aiFailed) {
+                        Notify.error(AI_ANALYSIS_RETRY_GUIDANCE);
                     } else {
                         Notify.success('AI解析が完了しました！');
                     }
@@ -6438,6 +6484,8 @@ class DashboardApp {
                     if (document.getElementById('analysis-overlay')) document.getElementById('analysis-overlay').remove();
 
                     if (result.success) {
+                        const aiReady = isAiAnalysisResultReady(result.data);
+                        const aiFailed = result.data.aiFailed === true || !aiReady;
                         const extractedContent = resolveExtractedContentPayload(result.data);
                         if (!extractedContent) {
                             throw new Error('解析結果に本文データが含まれていません');
@@ -6462,7 +6510,8 @@ class DashboardApp {
                             analysisPayload.riskReason = result.data.riskReason;
                             analysisPayload.summary = result.data.summary;
                             analysisPayload.isFallback = result.data.isFallback === true;
-                            analysisPayload.aiFailed = result.data.aiFailed === true;
+                            analysisPayload.aiFailed = aiFailed;
+                            analysisPayload.status = aiFailed ? '未処理' : '未確認';
                         }
                         dbService.updateContractAnalysis(id, analysisPayload, { isAnalysisUpdate: !isFirstUpload });
                         if (!isFirstUpload) {
@@ -6480,9 +6529,8 @@ class DashboardApp {
                             this.showToast('✅ 取り込みが完了しました', 'success', 5000);
                         } else {
                             // 部分的な失敗（AI解析のみ失敗）のチェック
-                            const aiFailed = result.data.aiFailed || (result.data.riskReason && result.data.riskReason.includes("AI解析サーバーからの応答がありませんでした"));
                             if (aiFailed) {
-                                if (await Notify.confirm('AI解析に失敗しました。\n\nテキストデータの取り込みは完了しましたが、AIによるリスク判定ができませんでした。\n\n※ 解析失敗時は利用回数を消費しません。\nもう一度解析を試みますか？', { title: '確認', type: 'warning' })) {
+                                if (await Notify.confirm(`${AI_ANALYSIS_RETRY_GUIDANCE}\n\nテキストデータの取り込みは完了しましたが、AIによるリスク判定を表示できませんでした。\n\nもう一度解析を試みますか？`, { title: '確認', type: 'warning' })) {
                                     await performAnalysis(retryCount + 1);
                                     return;
                                 } else {
@@ -6583,6 +6631,8 @@ class DashboardApp {
                 if (document.getElementById('analysis-overlay')) document.getElementById('analysis-overlay').remove();
 
                 if (result.success) {
+                    const aiReady = isAiAnalysisResultReady(result.data);
+                    const aiFailed = result.data.aiFailed === true || !aiReady;
                     const extractedContent = resolveExtractedContentPayload(result.data);
                     if (!extractedContent) {
                         throw new Error('解析結果に本文データが含まれていません');
@@ -6597,8 +6647,8 @@ class DashboardApp {
                         riskReason: result.data.riskReason,
                         summary: result.data.summary,
                         isFallback: result.data.isFallback === true,
-                        aiFailed: result.data.aiFailed === true,
-                        status: '未確認'
+                        aiFailed: aiFailed,
+                        status: aiFailed ? '未処理' : '未確認'
                     });
 
                     // サブスクリプション情報を再取得（使用回数を更新）
@@ -6611,8 +6661,8 @@ class DashboardApp {
                     this.syncLatestDocumentCompareState(id);
                     this.navigate('diff', id);
 
-                    if (result.data.aiFailed) {
-                        Notify.error('AI解析に失敗しました。利用回数は消費されていません。再度お試しください。');
+                    if (aiFailed) {
+                        Notify.error(AI_ANALYSIS_RETRY_GUIDANCE);
                     } else {
                         Notify.success('最新バージョンの取り込みとAI解析が完了しました！');
                     }

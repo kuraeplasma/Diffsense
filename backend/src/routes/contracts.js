@@ -115,6 +115,23 @@ function isAiFailureSummary(summary) {
     return /AI解析に失敗|AI分析に失敗|エラーが発生/.test(String(summary || ''));
 }
 
+function isAiResultReady(result) {
+    const summary = String(result?.summary || '').trim();
+    if (!summary) return false;
+    if (result?.isFallback === true) return false;
+    if (isAiFailureSummary(summary)) return false;
+    if (result?.aiSucceeded === false) return false;
+    return true;
+}
+
+function hasDisplayableAnalysisPayload(result) {
+    if (!result || typeof result !== 'object') return false;
+    const summary = String(result.summary || '').trim();
+    const riskReason = String(result.riskReason || result.risk_reason || '').trim();
+    const changes = Array.isArray(result.changes) ? result.changes.filter(Boolean) : [];
+    return Boolean(summary || riskReason || changes.length > 0);
+}
+
 function normalizeContentToText(content) {
     if (content === null || content === undefined) return '';
     if (typeof content === 'string') return content;
@@ -1186,7 +1203,7 @@ router.post('/:id/reanalyze', rateLimit, async (req, res, next) => {
         for (let attempt = 1; attempt <= 3; attempt++) {
             try {
                 aiResult = await geminiService.analyzeContract(contractText, null);
-                if (aiResult && aiResult.summary && aiResult.isFallback !== true) break;
+                if (isAiResultReady(aiResult)) break;
                 if (attempt < 3) {
                     logger.warn(`Reanalyze attempt ${attempt} returned fallback, retrying...`);
                     await new Promise(r => setTimeout(r, 1500 * attempt));
@@ -1197,14 +1214,42 @@ router.post('/:id/reanalyze', rateLimit, async (req, res, next) => {
             }
         }
 
-        if (!aiResult || !aiResult.summary) {
-            return res.status(500).json({ success: false, error: 'AI解析に失敗しました。しばらく後に再試行してください。' });
+        const aiReady = isAiResultReady(aiResult);
+        if (!aiReady) {
+            const hasDisplayable = hasDisplayableAnalysisPayload(aiResult);
+            const fallbackAnalysis = hasDisplayable
+                ? {
+                    ...aiResult,
+                    summary: String(aiResult?.summary || '').trim() || 'AI応答が不完全でした。消費はしていませんので、再解析してください。',
+                    riskLevel: aiResult?.riskLevel ?? 1,
+                    riskReason: String(aiResult?.riskReason || aiResult?.risk_reason || '').trim() || 'AI応答が不完全です',
+                    changes: Array.isArray(aiResult?.changes) ? aiResult.changes : [],
+                    isFallback: aiResult?.isFallback === true,
+                }
+                : {
+                    summary: 'AI応答を取得できませんでした。消費はしていませんので、再解析してください。',
+                    riskLevel: 1,
+                    riskReason: 'AI応答未取得',
+                    changes: [],
+                    isFallback: true,
+                    isLimited: false
+                };
+
+            const fallbackMeta = fallbackAnalysis?.contract_meta || null;
+            const fallbackResponseMeta = (userProfile?.plan || 'free') === 'free' ? null : fallbackMeta;
+            return res.json({
+                success: true,
+                data: {
+                    ...fallbackAnalysis,
+                    aiSucceeded: false,
+                    aiFailed: true,
+                    contract_meta: fallbackResponseMeta
+                }
+            });
         }
 
-        // フォールバック結果でも解析回数は消費しない（完全なAI解析時のみ消費）
-        if (aiResult.isFallback !== true) {
-            await dbService.incrementUsage(uid);
-        }
+        // 解析成功時のみ解析回数を消費
+        await dbService.incrementUsage(uid);
 
         // contract_meta を Firestore に保存
         const meta = aiResult.contract_meta;
@@ -1215,7 +1260,7 @@ router.post('/:id/reanalyze', rateLimit, async (req, res, next) => {
             ai_risk_reason: aiResult.riskReason || null,
             ai_changes: aiResult.changes || [],
             last_analyzed_at: new Date().toISOString(),
-            ai_succeeded: aiResult.aiSucceeded === true,
+            ai_succeeded: aiReady,
             ai_limited: aiResult.isLimited === true,
             ...(meta ? {
                 expiry_date: meta.expiry_date || null,
@@ -1241,6 +1286,8 @@ router.post('/:id/reanalyze', rateLimit, async (req, res, next) => {
             success: true,
             data: {
                 ...aiResult,
+                aiSucceeded: aiReady,
+                aiFailed: false,
                 summary: aiResult.summary,
                 riskLevel: aiResult.riskLevel,
                 riskReason: aiResult.riskReason,
