@@ -13,8 +13,8 @@
       --ink: #1f2937;
       --muted: #6b7280;
       --line: #e8dece;
-      --gold: #c5a059;
-      --gold-strong: #b79247;
+      --gold: #C9A84C;
+      --gold-strong: #B8963D;
       --dark: #1a1512;
       --success: #1d9e75;
       --danger: #c53030;
@@ -331,9 +331,9 @@
     .field-marker.mine {
       pointer-events: auto;
       cursor: pointer;
-      border: 2px dashed var(--gold);
-      color: var(--gold-strong);
-      background: rgba(197, 160, 89, 0.12);
+      border: 2px dashed var(--gold) !important;
+      color: var(--gold-strong) !important;
+      background: rgba(201, 168, 76, 0.12) !important;
     }
 
     .field-marker.mine.signed {
@@ -1892,7 +1892,7 @@
     }
 
     function createFieldMarkerElement(field, options = {}) {
-      const isMine = String(field.recipientEmail || '').trim() === state.recipientEmail;
+      const isMine = String(field.recipientEmail || '').trim().toLowerCase() === String(state.recipientEmail || '').trim().toLowerCase();
       const signatureValue = state.signatures[String(field.id)] || null;
       const isDateField = field.type === 'date' && isMine;
       const isSigned = Boolean(signatureValue) || isDateField;
@@ -1943,6 +1943,22 @@
       } else {
         marker.textContent = '他の署名者の欄';
         marker.disabled = true;
+      }
+
+      // Add Numbering Badge
+      const fieldIndex = state.fields.findIndex(f => f.id === field.id);
+      if (fieldIndex !== -1) {
+        const badge = document.createElement('span');
+        badge.className = 'field-number-badge';
+        badge.style.cssText = `
+          position: absolute; top: -10px; left: -6px; z-index: 10;
+          background: #111827; color: #fff; font-size: 9px; font-weight: 700;
+          width: 18px; height: 18px; border-radius: 50%;
+          display: flex; align-items: center; justify-content: center;
+          pointer-events: none;
+        `;
+        badge.textContent = `${fieldIndex + 1}`;
+        marker.appendChild(badge);
       }
 
       return marker;
