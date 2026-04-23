@@ -347,6 +347,7 @@ async function bootstrap() {
         // Public endpoints skip authentication, while others (like /create, /list) require it.
         const signMiddleware = (req, res, next) => {
             const publicPaths = ['/verify', '/submit', '/decline', '/original-file', '/generate-pdf'];
+            console.log(`[DEBUG SIGN PATH] method=${req.method} path=${req.path} originalUrl=${req.originalUrl}`);
             if (publicPaths.includes(req.path)) return next();
             return authMiddleware(req, res, next);
         };

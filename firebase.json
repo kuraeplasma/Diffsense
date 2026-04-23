@@ -32,6 +32,26 @@
                 "type": 301
             }
         ],
+        "rewrites": [
+            {
+                "source": "/sign",
+                "destination": "/signing.html"
+            },
+            {
+                "source": "/sign/**",
+                "destination": "/signing.html"
+            }
+        ],
+        "rewrites": [
+            {
+                "source": "/sign",
+                "destination": "/signing.html"
+            },
+            {
+                "source": "/sign/**",
+                "destination": "/signing.html"
+            }
+        ],
         "ignore": [
             "firebase.json",
             "**/.*",
