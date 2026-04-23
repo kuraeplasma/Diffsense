@@ -620,6 +620,18 @@ const normalizeDiffContractId = (value) => {
     return Number.isFinite(num) && num > 0 ? num : null;
 };
 
+const isConfirmedStatus = (status) => ['確認済み', '確認済'].includes(String(status || '').trim());
+const renderContractStatusBadge = (status) => {
+    const value = String(status || '').trim();
+    if (value === '未解析') return '<span class="badge badge-info">未解析 (新規)</span>';
+    if (value === '未処理') return '<span class="badge badge-info">未処理</span>';
+    if (value === '未確認') return '<span class="badge badge-warning">要確認 (変更)</span>';
+    if (value === '解析済み') return '<span class="badge badge-warning">要確認 (解析済み)</span>';
+    if (isConfirmedStatus(value)) return '<span class="badge badge-neutral"><i class="fa-solid fa-check"></i> 確認済み</span>';
+    if (!value) return '<span class="badge badge-neutral">未設定</span>';
+    return `<span class="badge badge-neutral">${escapeHtmlText(value)}</span>`;
+};
+
 const renderStructuredDiffParagraphColumn = (paragraphs, counterpartParagraphs, tone) => {
     const own = Array.isArray(paragraphs) ? paragraphs : [];
     const other = Array.isArray(counterpartParagraphs) ? counterpartParagraphs : [];
@@ -1034,14 +1046,10 @@ const renderDashboardOverview = (app) => {
         else if (c.risk_level === 'Medium') riskBadgeClass = 'badge-warning';
         else if (c.risk_level === 'Low') riskBadgeClass = 'badge-success';
 
-        let statusBadge = '';
-        if (c.status === '未解析') statusBadge = '<span class="badge badge-info">未解析 (新規)</span>';
-        else if (c.status === '未処理') statusBadge = '<span class="badge badge-info">未処理</span>';
-        else if (c.status === '未確認') statusBadge = '<span class="badge badge-warning">要確認 (変更)</span>';
-        else if (c.status === '確認済') statusBadge = '<span class="badge badge-neutral"><i class="fa-solid fa-check"></i> 確認済</span>';
+        const statusBadge = renderContractStatusBadge(c.status);
 
         const actionBtn = canOperateContract
-            ? `<button class="btn-dashboard">${c.status === '確認済' ? '履歴を見る' : '確認する'}</button>`
+            ? `<button class="btn-dashboard">${isConfirmedStatus(c.status) ? '履歴を見る' : '確認する'}</button>`
             : `<button class="btn-dashboard">詳細を見る</button>`;
 
         return `
@@ -5730,14 +5738,10 @@ class DashboardApp {
                 else if (c.risk_level === 'Medium') riskBadgeClass = 'badge-warning';
                 else if (c.risk_level === 'Low') riskBadgeClass = 'badge-success';
 
-                let statusBadge = '';
-                if (c.status === '未解析') statusBadge = '<span class="badge badge-info">未解析 (新規)</span>';
-                else if (c.status === '未処理') statusBadge = '<span class="badge badge-info">未処理</span>';
-                else if (c.status === '未確認') statusBadge = '<span class="badge badge-warning">要確認 (変更)</span>';
-                else if (c.status === '確認済') statusBadge = '<span class="badge badge-neutral"><i class="fa-solid fa-check"></i> 確認済</span>';
+                const statusBadge = renderContractStatusBadge(c.status);
 
                 const actionBtn = this.can('operate_contract')
-                    ? `<button class="btn-dashboard">${c.status === '確認済' ? '履歴を見る' : '確認する'}</button>`
+                    ? `<button class="btn-dashboard">${isConfirmedStatus(c.status) ? '履歴を見る' : '確認する'}</button>`
                     : `<button class="btn-dashboard">詳細を見る</button>`;
 
                 return `
