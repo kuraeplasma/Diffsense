@@ -3,8 +3,7 @@ const logger = require('../utils/logger');
 const Diff = require('diff');
 
 // Gemini API Configuration
-// NOTE: We use gemini-2.0-flash on the v1beta endpoint as gemini-1.5-flash is retired for this key.
-// Do not revert to v1 or 1.5-flash without verifying account model availability.
+// NOTE: We use gemini-2.0-flash on the v1beta endpoint as it is faster and more reliable.
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
@@ -908,6 +907,18 @@ function shouldRetryGeminiRequest(error) {
     const message = String(error?.message || '');
     return /timeout|ECONNRESET|ETIMEDOUT|socket hang up|network/i.test(message);
 }
+
+function getGeminiRequestBudget() {
+    // ローカル/本番で同一実装。必要時は環境変数で同じキーを調整する。
+    const timeoutMsRaw = Number(process.env.GEMINI_TIMEOUT_MS || 45000);
+    const maxAttemptsRaw = Number(process.env.GEMINI_MAX_ATTEMPTS || 2);
+    const retryBaseMsRaw = Number(process.env.GEMINI_RETRY_BASE_MS || 1000);
+    return {
+        timeoutMs: Number.isFinite(timeoutMsRaw) && timeoutMsRaw >= 5000 ? Math.floor(timeoutMsRaw) : 45000,
+        maxAttempts: Number.isFinite(maxAttemptsRaw) && maxAttemptsRaw >= 1 ? Math.min(Math.floor(maxAttemptsRaw), 5) : 2,
+        retryBaseMs: Number.isFinite(retryBaseMsRaw) && retryBaseMsRaw >= 0 ? Math.floor(retryBaseMsRaw) : 1000
+    };
+}
 class GeminiService {
     constructor() {
         if (!GEMINI_API_KEY) {
@@ -923,7 +934,6 @@ class GeminiService {
             ? null
             : (typeof previousVersion === 'string' ? previousVersion : JSON.stringify(previousVersion));
 
-        // 修正4：差分なしスキップ（AI APIを呼ばない）
         if (previousText && currentText && previousText.trim() === currentText.trim()) {
             logger.info('No changes detected, skipping AI analysis');
             return {
@@ -950,78 +960,57 @@ class GeminiService {
             throw new Error('Gemini API key is not configured');
         }
 
-        // 修正5：並列処理
-        logger.info('Starting parallel Gemini analysis tasks');
+        logger.info('Starting unified Gemini 2.0 analysis task');
         const start = Date.now();
         
-        // 1. 要約・リスク判定プロンプト
-        const summaryPrompt = this.buildSummaryPrompt(currentText, previousText);
-        // 2. 詳細・メタ情報プロンプト
-        const detailsPrompt = this.buildDetailsPrompt(currentText, previousText);
+        const prompt = this.buildUnifiedAnalysisPrompt(currentText, previousText);
+
+        const requestWithMimeFallback = async (p, label) => {
+            let lastError = null;
+            for (const enforceJsonMime of [true, false]) {
+                try {
+                    return await this.requestGeminiJson(p, enforceJsonMime);
+                } catch (error) {
+                    lastError = error;
+                    logger.warn(`${label} request failed (jsonMime=${enforceJsonMime}): ${error.message}`);
+                }
+            }
+            throw lastError || new Error(`${label} request failed`);
+        };
 
         try {
-            const [summaryRes, detailsRes] = await Promise.all([
-                this.requestGeminiJson(summaryPrompt, true),
-                this.requestGeminiJson(detailsPrompt, true)
-            ]);
+            const res = await requestWithMimeFallback(prompt, 'unified_analysis');
+            
+            if (!res) {
+                throw new Error('Unified request returned empty result');
+            }
 
-            const normalizedSummary = normalizeAnalyzeResult(summaryRes);
-            const normalizedMeta = await this.ensureContractMeta(
-                currentText,
-                previousText,
-                detailsRes?.contract_meta || detailsRes
-            );
             const result = {
-                ...normalizedSummary,
-                changes: normalizeChanges(detailsRes?.changes),
-                contract_meta: normalizedMeta,
+                ...normalizeAnalyzeResult(res),
+                changes: normalizeChanges(res?.changes),
+                contract_meta: normalizeContractMeta(res?.contract_meta || res),
                 isLimited: false,
                 isFallback: false
             };
 
-            logger.info(`Parallel analysis complete. duration=${Date.now() - start}ms`);
+            logger.info(`Analysis complete. duration=${Date.now() - start}ms`);
             return result;
 
         } catch (error) {
-            logger.warn('Parallel analysis failed, falling back to monolithic request:', error.message);
-            const firstStatus = Number(error?.response?.status || 0);
-            if (firstStatus === 429) {
+            logger.error('Gemini unified analysis failed:', error);
+            const status = Number(error?.response?.status || 0);
+            if (status === 429) {
                 const limited = buildHeuristicFallbackAnalysis(currentText, previousText);
                 limited.errorCode = 'AI_RATE_LIMITED';
                 limited.errorMessage = '現在アクセスが集中しています。数分後にもう一度お試しください。';
                 return limited;
             }
-            // 失敗時は従来の一括プロンプトでリトライ
-            const monolithicPrompt = this.buildPrompt(currentText, previousText);
-            try {
-                const monolithicRes = await this.requestGeminiJson(monolithicPrompt, true);
-                const normalizedMeta = await this.ensureContractMeta(
-                    currentText,
-                    previousText,
-                    monolithicRes?.contract_meta || monolithicRes
-                );
-                return {
-                    ...normalizeAnalyzeResult(monolithicRes),
-                    contract_meta: normalizedMeta,
-                    isLimited: false,
-                    isFallback: false
-                };
-            } catch (monolithicError) {
-                const monolithicStatus = Number(monolithicError?.response?.status || 0);
-                if (monolithicStatus === 429) {
-                    const limited = buildHeuristicFallbackAnalysis(currentText, previousText);
-                    limited.errorCode = 'AI_RATE_LIMITED';
-                    limited.errorMessage = '現在アクセスが集中しています。数分後にもう一度お試しください。';
-                    return limited;
-                }
-                logger.error('Gemini monolithic fallback failed:', monolithicError);
-                if (shouldUseLocalAiFallback()) {
-                    return previousText
-                        ? buildLocalDiffAnalysis(currentText, previousText)
-                        : buildLocalSingleAnalysis(currentText);
-                }
-                return buildHeuristicFallbackAnalysis(currentText, previousText);
+            if (shouldUseLocalAiFallback()) {
+                return previousText
+                    ? buildLocalDiffAnalysis(currentText, previousText)
+                    : buildLocalSingleAnalysis(currentText);
             }
+            return buildHeuristicFallbackAnalysis(currentText, previousText);
         }
     }
 
@@ -1095,7 +1084,7 @@ class GeminiService {
                 parts: [{ text: prompt }]
             }],
             generationConfig: {
-                temperature: 0.1,
+                temperature: 0.0,
                 maxOutputTokens: 4096
             }
         };
@@ -1104,14 +1093,15 @@ class GeminiService {
             body.generationConfig.responseMimeType = 'application/json';
         }
 
+        const budget = getGeminiRequestBudget();
         let lastError = null;
-        for (let attempt = 0; attempt < 3; attempt += 1) {
+        for (let attempt = 0; attempt < budget.maxAttempts; attempt += 1) {
             try {
                 const response = await axios.post(
                     `${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`,
                     body,
                     {
-                        timeout: 90000,
+                        timeout: budget.timeoutMs,
                         headers: {
                             'Content-Type': 'application/json',
                             'Referer': 'https://diffsense.spacegleam.co.jp'
@@ -1123,11 +1113,11 @@ class GeminiService {
                 return parseGeminiJsonResponse(aiText);
             } catch (error) {
                 lastError = error;
-                if (attempt >= 2 || !shouldRetryGeminiRequest(error)) {
+                if (attempt >= budget.maxAttempts - 1 || !shouldRetryGeminiRequest(error)) {
                     break;
                 }
-                const waitMs = 1200 * (attempt + 1);
-                logger.warn(`Gemini request retry ${attempt + 1}/2 after ${waitMs}ms: ${error.message}`);
+                const waitMs = budget.retryBaseMs * (attempt + 1);
+                logger.warn(`Gemini request retry ${attempt + 1}/${Math.max(0, budget.maxAttempts - 1)} after ${waitMs}ms: ${error.message}`);
                 await new Promise((resolve) => setTimeout(resolve, waitMs));
             }
         }
@@ -1317,6 +1307,60 @@ ${buildSemanticDiffCandidate(change?.old || '', change?.new || '')}
 - "change": false の場合は summary や risk を含めないでください。`;
     }
 
+    buildUnifiedAnalysisPrompt(contractText, previousVersion) {
+        const maxLength = 30000;
+        const truncatedText = contractText.length > maxLength
+            ? contractText.substring(0, maxLength) + '\n\n[...テキストが長すぎるため省略されました]'
+            : contractText;
+
+        const input = previousVersion
+            ? `【旧版】\n${previousVersion.substring(0, maxLength)}\n\n【新版】\n${truncatedText}`
+            : `【契約書】\n${truncatedText}`;
+
+        return `あなたは高度な法務専門AIエージェントです。提供された契約書（比較時は新旧の差分）を解析し、以下のJSON形式で結果を返してください。
+
+指示:
+1. 概要(summary): 契約の全体像、主要な変更の意義、および実務上の注意点を200〜300文字程度で丁寧に解説してください。単なる要約ではなく、文脈を汲み取ったアドバイスを含めてください。
+2. リスクレベル(riskLevel): 1(低), 2(中), 3(高)の3段階で判定してください。
+3. リスク理由(riskReason): 判定の根拠を100文字以内で簡潔に述べてください。
+4. 変更点(changes): 特に重要な変更やリスクのある条項を最大5件抽出してください。
+5. メタデータ(contract_meta): 契約開始日、終了日、更新期限、自動更新の有無、通知期間などを正確に抽出してください。
+
+出力形式(JSONのみ):
+{
+  "summary": "...",
+  "riskLevel": 2,
+  "riskReason": "...",
+  "changes": [
+    {
+      "section": "条項名",
+      "type": "modification | risk",
+      "old": "前の文言（または注意条文）",
+      "new": "後の文言（または修正案・解説）",
+      "impact": "法的影響",
+      "concern": "注意点"
+    }
+  ],
+  "contract_meta": {
+    "expiry_date": "YYYY-MM-DD",
+    "renewal_deadline": "YYYY-MM-DD",
+    "contract_start": "YYYY-MM-DD",
+    "auto_renewal": true,
+    "notice_period_days": 30,
+    "contract_category": "...",
+    "date_confidence": "high | medium | low"
+  }
+}
+
+重要:
+- 日本語で回答してください。
+- JSON以外のテキストは一切出力しないでください。
+- 日付が不明な場合はnullにしてください。
+- 差分解析の場合は、新旧の対比を明確にしてください。
+
+${input}`;
+    }
+
     buildPrompt(contractText, previousVersion) {
         const maxLength = 30000;
         const truncatedText = contractText.length > maxLength
@@ -1397,34 +1441,93 @@ ${truncatedText}
         }
     }
 
-    buildSummaryPrompt(contractText, previousVersion) {
+    buildFullAnalysisPrompt(contractText, previousVersion) {
         const truncatedText = contractText.substring(0, 30000);
         const truncatedPrev = previousVersion ? previousVersion.substring(0, 30000) : null;
-        
-        let context = previousVersion 
-            ? `以下の2つの契約書を比較し、変更の意義とリスク状況を要約してください。\n【旧版】\n${truncatedPrev}\n\n【新版】\n${truncatedText}`
-            : `以下の契約書を解析し、内容とリスク状況を要約してください。\n【契約書】\n${truncatedText}`;
 
-        return `${context}
-        
+        const input = previousVersion
+            ? `【比較解析】\n旧版:\n${truncatedPrev}\n\n新版:\n${truncatedText}`
+            : `【単体解析】\n内容:\n${truncatedText}`;
+
+        return `${input}
+
+[指示]
+契約書を解析し、以下のJSON形式で結果のみを返してください。説明は不要です。
+
+{
+  "summary": "内容とリスクの要約（日本語で簡潔に）",
+  "riskLevel": 1, 2, 3 のいずれか,
+  "riskReason": "理由（短く）",
+  "changes": [
+    {
+      "section": "条項名",
+      "type": "modification/risk",
+      "old": "前の文言",
+      "new": "後の文言/アドバイス",
+      "impact": "影響",
+      "concern": "注意点"
+    }
+  ],
+  "contract_meta": {
+    "expiry_date": "YYYY-MM-DD",
+    "renewal_deadline": "YYYY-MM-DD",
+    "contract_start": "YYYY-MM-DD",
+    "auto_renewal": true/false,
+    "notice_period_days": 数値,
+    "contract_category": "種別"
+  }
+}
+
+[ルール]
+- changesは最重要の5件以内
+- 日付不明はnull
+- JSON以外のテキストは出力禁止`;
+    }
+
+    buildSummaryPrompt(contractText, previousVersion) {
+        const maxLength = 30000;
+        const truncatedText = contractText.length > maxLength
+            ? contractText.substring(0, maxLength) + '\n\n[...テキストが長すぎるため省略されました]'
+            : contractText;
+
+        if (previousVersion) {
+            const truncatedPrev = previousVersion.length > maxLength
+                ? previousVersion.substring(0, maxLength) + '\n\n[...テキストが長すぎるため省略されました]'
+                : previousVersion;
+
+            return `以下の2つの契約書を比較し、変更の意義とリスク状況を要約してください。\n【旧版】\n${truncatedPrev}\n\n【新版】\n${truncatedText}
+
         以下のJSON形式で回答してください:
         {
           "summary": "日本語で200〜300文字程度で詳しく解説・要約してください。",
           "riskLevel": 3,
           "riskReason": "リスク判定の理由（100文字以内）"
         }`;
+        } else {
+            return `以下の契約書を解析し、内容とリスク状況を要約してください。\n【契約書】\n${truncatedText}
+
+        以下のJSON形式で回答してください:
+        {
+          "summary": "日本語で200〜300文字程度で詳しく解説・要約してください。",
+          "riskLevel": 3,
+          "riskReason": "リスク判定の理由（100文字以内）"
+        }`;
+        }
     }
 
     buildDetailsPrompt(contractText, previousVersion) {
-        const truncatedText = contractText.substring(0, 30000);
-        const truncatedPrev = previousVersion ? previousVersion.substring(0, 30000) : null;
+        const maxLength = 30000;
+        const truncatedText = contractText.length > maxLength
+            ? contractText.substring(0, maxLength) + '\n\n[...テキストが長すぎるため省略されました]'
+            : contractText;
 
-        let context = previousVersion
-            ? `以下の2つの契約書の具体的な変更条項と期限情報を抽出してください。\n【旧版】\n${truncatedPrev}\n\n【新版】\n${truncatedText}`
-            : `以下の契約書の重要な条項（リスク・注意点）と期限情報を抽出してください。\n【契約書】\n${truncatedText}`;
+        if (previousVersion) {
+            const truncatedPrev = previousVersion.length > maxLength
+                ? previousVersion.substring(0, maxLength) + '\n\n[...テキストが長すぎるため省略されました]'
+                : previousVersion;
 
-        return `${context}
-        
+            return `以下の2つの契約書の具体的な変更条項と期限情報を抽出してください。\n【旧版】\n${truncatedPrev}\n\n【新版】\n${truncatedText}
+
         以下のJSON形式で回答してください:
         {
           "changes": [
@@ -1452,17 +1555,52 @@ ${truncatedText}
         - 日付は必ず YYYY-MM-DD で返してください。
         - 「満了日の◯日前に通知」等の条文がある場合は notice_period_days を数値で返してください。
         - renewal_deadline が未記載でも、expiry_date と notice_period_days から算出できる場合は算出して返してください。`;
+        } else {
+            return `以下の契約書の重要な条項（リスク・注意点）と期限情報を抽出してください。\n【契約書】\n${truncatedText}
+
+        以下のJSON形式で回答してください:
+        {
+          "changes": [
+            {
+              "section": "条項名",
+              "type": "modification",
+              "old": "前の文言（単体解析時は原文引用）",
+              "new": "後の文言（単体解析時はリスク解説/修正案）",
+              "impact": "法的影響",
+              "concern": "注意点"
+            }
+          ],
+          "contract_meta": {
+            "expiry_date": "YYYY-MM-DD",
+            "renewal_deadline": "YYYY-MM-DD",
+            "contract_start": "YYYY-MM-DD",
+            "auto_renewal": true,
+            "notice_period_days": 30,
+            "date_confidence": "high|medium|low",
+            "contract_category": "契約種別"
+          }
+        }
+
+        注意:
+        - 日付は必ず YYYY-MM-DD で返してください。
+        - 「満了日の◯日前に通知」等の条文がある場合は notice_period_days を数値で返してください。
+        - renewal_deadline が未記載でも、expiry_date と notice_period_days から算出できる場合は算出して返してください。`;
+        }
     }
 
     buildDeadlineMetaPrompt(contractText, previousVersion) {
-        const truncatedText = contractText.substring(0, 30000);
-        const truncatedPrev = previousVersion ? previousVersion.substring(0, 30000) : null;
-        const context = previousVersion
-            ? `以下の契約書（新版優先）から期限情報のみを高精度で抽出してください。\n【旧版】\n${truncatedPrev}\n\n【新版】\n${truncatedText}`
-            : `以下の契約書から期限情報のみを高精度で抽出してください。\n【契約書】\n${truncatedText}`;
+        const maxLength = 30000;
+        const truncatedText = contractText.length > maxLength
+            ? contractText.substring(0, maxLength) + '\n\n[...テキストが長すぎるため省略されました]'
+            : contractText;
 
-        return `${context}
-        
+        if (previousVersion) {
+            const truncatedPrev = previousVersion.length > maxLength
+                ? previousVersion.substring(0, maxLength) + '\n\n[...テキストが長すぎるため省略されました]'
+                : previousVersion;
+
+            return `以下の契約書（新版優先）から期限情報のみを高精度で抽出してください。\n【旧版】\n${truncatedPrev}\n\n【新版】\n${truncatedText}
+
         以下のJSONのみで回答してください（説明文不要）:
         {
           "contract_meta": {
@@ -1481,6 +1619,28 @@ ${truncatedText}
         - 明記がない項目は null。
         - 「満了日の◯日前通知」等がある場合は notice_period_days を数値で返す。
         - renewal_deadline が明記されていなくても、expiry_date と notice_period_days から算出可能なら算出する。`;
+        } else {
+            return `以下の契約書から期限情報のみを高精度で抽出してください。\n【契約書】\n${truncatedText}
+
+        以下のJSONのみで回答してください（説明文不要）:
+        {
+          "contract_meta": {
+            "expiry_date": "YYYY-MM-DD または null",
+            "renewal_deadline": "YYYY-MM-DD または null",
+            "contract_start": "YYYY-MM-DD または null",
+            "auto_renewal": true,
+            "notice_period_days": 30,
+            "contract_category": "契約種別またはnull",
+            "date_confidence": "high|medium|low"
+          }
+        }
+
+        ルール:
+        - 日付は必ず YYYY-MM-DD に正規化する。
+        - 明記がない項目は null。
+        - 「満了日の◯日前通知」等がある場合は notice_period_days を数値で返す。
+        - renewal_deadline が明記されていなくても、expiry_date と notice_period_days から算出可能なら算出する。`;
+        }
     }
 
     /**

@@ -124,12 +124,18 @@ function isAiResultReady(result) {
     return true;
 }
 
-function hasDisplayableAnalysisPayload(result) {
-    if (!result || typeof result !== 'object') return false;
-    const summary = String(result.summary || '').trim();
-    const riskReason = String(result.riskReason || result.risk_reason || '').trim();
-    const changes = Array.isArray(result.changes) ? result.changes.filter(Boolean) : [];
-    return Boolean(summary || riskReason || changes.length > 0);
+function hasMeaningfulContractMeta(meta) {
+    if (!meta || typeof meta !== 'object') return false;
+    const noticePeriod = Number(meta.notice_period_days);
+    return Boolean(
+        meta.expiry_date
+        || meta.renewal_deadline
+        || meta.contract_start
+        || meta.contract_category
+        || meta.auto_renewal === true
+        || meta.auto_renewal === false
+        || Number.isFinite(noticePeriod)
+    );
 }
 
 function normalizeContentToText(content) {
@@ -1193,8 +1199,10 @@ router.post('/:id/reanalyze', rateLimit, async (req, res, next) => {
         }
 
         // フロントから本文を受け取る（キャッシュ済みテキスト）
+        // 受け取れなかった場合は保存済み本文から復元して解析する。
         const requestText = typeof req.body?.contractText === 'string' ? req.body.contractText.trim() : '';
         let contractText = requestText;
+
         if (!contractText || contractText.length < 10) {
             const savedContract = await dbService.getContractById(contractId, uid);
             if (savedContract) {
@@ -1220,52 +1228,67 @@ router.post('/:id/reanalyze', rateLimit, async (req, res, next) => {
             return res.status(400).json({ success: false, error: '解析対象のテキストがありません' });
         }
 
-        // 単体解析（previousVersion = null）- 最大3回リトライ
+        // 単体解析（previousVersion = null）
+        // ローカル/本番で同じ実装を使うため、環境共通の設定値で制御する。
         let aiResult = null;
-        for (let attempt = 1; attempt <= 3; attempt++) {
+        const configuredReanalyzeAttempts = Number(process.env.REANALYZE_MAX_ATTEMPTS || 2);
+        const maxReanalyzeAttempts = Number.isFinite(configuredReanalyzeAttempts) && configuredReanalyzeAttempts >= 1
+            ? Math.min(Math.floor(configuredReanalyzeAttempts), 5)
+            : 2;
+        for (let attempt = 1; attempt <= maxReanalyzeAttempts; attempt++) {
             try {
                 aiResult = await geminiService.analyzeContract(contractText, null);
                 if (isAiResultReady(aiResult)) break;
-                if (attempt < 3) {
+                if (attempt < maxReanalyzeAttempts) {
                     logger.warn(`Reanalyze attempt ${attempt} returned fallback, retrying...`);
                     await new Promise(r => setTimeout(r, 1500 * attempt));
                 }
             } catch (e) {
                 logger.warn(`Reanalyze attempt ${attempt} threw: ${e.message}`);
-                if (attempt < 3) await new Promise(r => setTimeout(r, 1500 * attempt));
+                if (attempt < maxReanalyzeAttempts) await new Promise(r => setTimeout(r, 1500 * attempt));
             }
         }
 
         const aiReady = isAiResultReady(aiResult);
         if (!aiReady) {
-            const hasDisplayable = hasDisplayableAnalysisPayload(aiResult);
-            const fallbackAnalysis = hasDisplayable
-                ? {
-                    ...aiResult,
-                    summary: String(aiResult?.summary || '').trim() || 'AI応答が不完全でした。消費はしていませんので、再解析してください。',
-                    riskLevel: aiResult?.riskLevel ?? 1,
-                    riskReason: String(aiResult?.riskReason || aiResult?.risk_reason || '').trim() || 'AI応答が不完全です',
-                    changes: Array.isArray(aiResult?.changes) ? aiResult.changes : [],
-                    isFallback: aiResult?.isFallback === true,
-                }
-                : {
-                    summary: 'AI応答を取得できませんでした。消費はしていませんので、再解析してください。',
-                    riskLevel: 1,
-                    riskReason: 'AI応答未取得',
-                    changes: [],
-                    isFallback: true,
-                    isLimited: false
-                };
+            // 解析失敗時でもステータスを確実に更新（フロントエンドでの再試行ボタン表示のため）
+            const failedMetaUpdate = {
+                ai_succeeded: false,
+                last_analyzed_at: new Date().toISOString(),
+                ai_failed_at: new Date().toISOString()
+            };
 
-            const fallbackMeta = fallbackAnalysis?.contract_meta || null;
-            const fallbackResponseMeta = (userProfile?.plan || 'free') === 'free' ? null : fallbackMeta;
+            const fallbackMeta = (aiResult && typeof aiResult.contract_meta === 'object')
+                ? aiResult.contract_meta
+                : null;
+
+            if (hasMeaningfulContractMeta(fallbackMeta)) {
+                Object.assign(failedMetaUpdate, {
+                    expiry_date: fallbackMeta.expiry_date || null,
+                    renewal_deadline: fallbackMeta.renewal_deadline || null,
+                    contract_start: fallbackMeta.contract_start || null,
+                    auto_renewal: fallbackMeta.auto_renewal === true,
+                    notice_period_days: Number(fallbackMeta.notice_period_days) || null,
+                    contract_category: fallbackMeta.contract_category || null,
+                    date_confidence: fallbackMeta.date_confidence || 'unknown'
+                });
+            }
+
+            await dbService.updateContract(contractId, failedMetaUpdate, uid);
+            logger.info(`Recorded AI failure for contract ${contractId}. meaningfulMeta=${!!fallbackMeta}`);
+
             return res.json({
                 success: true,
                 data: {
-                    ...fallbackAnalysis,
+                    summary: '',
+                    riskLevel: 1,
+                    riskReason: '',
+                    changes: [],
+                    isFallback: false,
+                    isLimited: false,
                     aiSucceeded: false,
                     aiFailed: true,
-                    contract_meta: fallbackResponseMeta,
+                    contract_meta: fallbackMeta,
                     errorCode: aiResult?.errorCode || null,
                     errorMessage: aiResult?.errorMessage || null
                 }
@@ -1303,8 +1326,7 @@ router.post('/:id/reanalyze', rateLimit, async (req, res, next) => {
 
         logger.info(`Reanalysis complete for contract ${contractId}, risk=${aiResult.riskLevel}, expiry=${meta?.expiry_date}`);
 
-        // Freeプランは期限機能非対応のためcontract_metaを返さない
-        const responseMeta = (userProfile?.plan || 'free') === 'free' ? null : (meta || null);
+        const responseMeta = meta || null;
 
         res.json({
             success: true,
