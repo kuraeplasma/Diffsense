@@ -55,6 +55,8 @@ router.post('/', async (req, res, next) => {
             source_type: payload.source_type || null,
             pdf_storage_path: payload.pdf_storage_path || null,
             pdf_url: payload.pdf_url || null,
+            original_file_path: payload.original_file_path || payload.filePath || null,
+            original_file_url: payload.original_file_url || payload.fileUrl || null,
             history: Array.isArray(payload.history) ? payload.history : []
         };
         const saved = await dbService.saveContract(ownerUid, contract);

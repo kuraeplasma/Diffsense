@@ -390,8 +390,10 @@ function normalizeSignSourceFields(source = {}) {
         ...source,
         pdf_url: firstNonEmptyString(source?.pdf_url, source?.pdfUrl),
         pdf_storage_path: firstNonEmptyString(source?.pdf_storage_path, source?.pdfStoragePath),
-        original_file_url: firstNonEmptyString(source?.original_file_url, source?.originalFileUrl),
-        original_file_path: firstNonEmptyString(source?.original_file_path, source?.filePath, source?.originalFilePath),
+        original_file_url: firstNonEmptyString(source?.original_file_url, source?.originalFileUrl, source?.pdf_url, source?.pdfUrl),
+        original_file_path: firstNonEmptyString(source?.original_file_path, source?.filePath, source?.originalFilePath, source?.pdf_storage_path, source?.pdfStoragePath),
+        pdf_url: firstNonEmptyString(source?.pdf_url, source?.pdfUrl),
+        pdf_storage_path: firstNonEmptyString(source?.pdf_storage_path, source?.pdfStoragePath),
         source_url: firstNonEmptyString(source?.source_url, source?.sourceUrl),
         original_filename: firstNonEmptyString(source?.original_filename, source?.originalFilename)
     };
@@ -1376,7 +1378,7 @@ router.post('/create', async (req, res) => {
         }
         contract = normalizeSignSourceFields(contract);
 
-        if (!contract.original_file_url && !contract.original_file_path) {
+        if (!contract.original_file_url && !contract.original_file_path && !contract.pdf_storage_path) {
             return res.status(400).json({
                 success: false,
                 error: '原本なしの署名依頼は禁止'

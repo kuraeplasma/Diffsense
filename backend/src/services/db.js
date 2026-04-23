@@ -801,7 +801,7 @@ class DBService {
      * Update a contract by ID
      */
     async updateContract(id, updates, ownerUid = null) {
-        const contracts = await this.readData('contracts');
+        const contracts = await this.getContracts(ownerUid);
         const index = contracts.findIndex(c => c.id === id);
 
         if (index > -1) {

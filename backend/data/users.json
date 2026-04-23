@@ -8,5 +8,13 @@
     "email": "kuraeplasma@gmail.com",
     "lastUsedAt": "2026-04-01T18:59:21.642Z",
     "usageCount": 3
+  },
+  {
+    "uid": "dev-uid",
+    "plan": "free",
+    "billingCycle": "monthly",
+    "hasPaymentMethod": false,
+    "usageCount": 0,
+    "lastResetDate": "2026-04-23T02:59:08.142Z"
   }
 ]
