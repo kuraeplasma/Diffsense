@@ -343,18 +343,15 @@ async function bootstrap() {
             });
         });
 
-        // --- Public Signature Routes (No Authentication) ---
-        // Register specific methods to ensure path matching doesn't fall through.
-        app.get('/api/sign/verify', signRoutes);
-        app.post('/api/sign/submit', signRoutes);
-        app.post('/api/sign/decline', signRoutes);
-        app.get('/api/sign/original-file', signRoutes);
-        app.post('/api/sign/generate-pdf', signRoutes);
-        app.get('/sign/verify', signRoutes);
-        app.post('/sign/submit', signRoutes);
-        app.post('/sign/decline', signRoutes);
-        app.get('/sign/original-file', signRoutes);
-        app.post('/sign/generate-pdf', signRoutes);
+        // --- Signature Routes ---
+        // Public endpoints skip authentication, while others (like /create, /list) require it.
+        const signMiddleware = (req, res, next) => {
+            const publicPaths = ['/verify', '/submit', '/decline', '/original-file', '/generate-pdf'];
+            if (publicPaths.includes(req.path)) return next();
+            return authMiddleware(req, res, next);
+        };
+        app.use('/api/sign', signMiddleware, signRoutes);
+        app.use('/sign', signMiddleware, signRoutes);
 
         const mcpRouter = createMcpRouter();
         app.use(createMcpAuthRouter());
@@ -377,10 +374,6 @@ async function bootstrap() {
         app.use('/api/user/check-exists', userRoutes);
         app.use('/api/user', authMiddleware, userRoutes);
         app.use('/api', authMiddleware, paymentRoutes);
-        
-        // --- Protected Signature Routes (Owner Only) ---
-        app.use('/api/sign', authMiddleware, signRoutes);
-        app.use('/sign', authMiddleware, signRoutes);
 
         app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
