@@ -1507,7 +1507,7 @@ export const SignEditor = {
                     : (this._pointerDrag?.mode === 'resize' && String(field.id) === String(this._pointerDrag?.fieldId) ? '0.96' : '1');
                 div.style.outline = String(field.id) === String(this._selectedFieldId) ? '3px solid rgba(17,24,39,0.18)' : 'none';
                 div.title = 'ドラッグして移動';
-                const badgeStyle = 'position:absolute; top:-10px; left:-6px; z-index:2; background:#111827; color:#fff; font-size:9px; font-weight:700; width:18px; height:18px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; box-shadow:0 4px 10px rgba(0,0,0,0.15); pointer-events:none;';
+                const badgeStyle = 'position:absolute; top:-14px; left:-14px; z-index:10; background:#111827; color:#fff; font-size:11px; font-weight:700; width:22px; height:22px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; pointer-events:none;';
                 div.innerHTML = field.type === 'signature'
                     ? `
                     ${this.getSignatureDisplayHtml(field, signatureEditorSize)}
