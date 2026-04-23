@@ -35,10 +35,10 @@ export const SignEditor = {
     _draftSavePromise: null,
     _styleFontsLoaded: false,
     _styleFonts: [
-        { id: 'font-a', name: '螂醍ｴ・嶌 譏取悃', family: '"Yu Mincho","Hiragino Mincho ProN","Noto Serif JP",serif' },
-        { id: 'font-b', name: '讓呎ｺ・譏取悃', family: '"BIZ UDPMincho","Yu Mincho","MS PMincho",serif' },
-        { id: 'font-c', name: '讓呎ｺ・繧ｴ繧ｷ繝・け', family: '"BIZ UDPGothic","Yu Gothic","Meiryo",sans-serif' },
-        { id: 'font-d', name: '螂醍ｴ・嶌 繧ｴ繧ｷ繝・け', family: '"Hiragino Sans","Noto Sans JP","Yu Gothic",sans-serif' }
+        { id: 'font-a', name: '契約書 明朝', family: '"Yu Mincho","Hiragino Mincho ProN","Noto Serif JP",serif' },
+        { id: 'font-b', name: '標準 明朝', family: '"BIZ UDPMincho","Yu Mincho","MS PMincho",serif' },
+        { id: 'font-c', name: '標準 ゴシック', family: '"BIZ UDPGothic","Yu Gothic","Meiryo",sans-serif' },
+        { id: 'font-d', name: '契約書 ゴシック', family: '"Hiragino Sans","Noto Sans JP","Yu Gothic",sans-serif' }
     ],
 
     async init(app, id) {
@@ -46,13 +46,13 @@ export const SignEditor = {
         if (window._lastSignDraft && String(window._lastSignDraft.id) === String(id)) {
             this._currentRequest = window._lastSignDraft;
         } else {
-            Notify.info('繧ｨ繝・ぅ繧ｿ繧定ｪｭ縺ｿ霎ｼ縺ｿ荳ｭ...');
+            Notify.info('エディタを読み込み中...');
             const requests = await dbService.getSignRequests();
             this._currentRequest = requests.find(r => String(r.id) === String(id));
         }
         
         if (!this._currentRequest) {
-            Notify.error('萓晞ｼ繝・・繧ｿ縺瑚ｦ九▽縺九ｊ縺ｾ縺帙ｓ');
+            Notify.error('依頼データが見つかりません');
             return;
         }
 
@@ -70,7 +70,7 @@ export const SignEditor = {
             );
         
         if (!contract) {
-            Notify.error('螂醍ｴ・ョ繝ｼ繧ｿ縺瑚ｦ九▽縺九ｊ縺ｾ縺帙ｓ');
+            Notify.error('契約データが見つかりません');
             return;
         }
         const previewContract = {
@@ -151,7 +151,7 @@ export const SignEditor = {
 
     removeRecipientRow(index) {
         if (this._recipients.length <= 1) {
-            Notify.warning('鄂ｲ蜷崎・・譛菴・蜷榊ｿ・ｦ√〒縺・);
+            Notify.warning('署名者は最低1名必要です');
             return;
         }
         this._recipients.splice(index, 1);
@@ -165,18 +165,18 @@ export const SignEditor = {
 
         container.innerHTML = this._recipients.map((rec, idx) => `
             <div class="recipient-edit-row" data-index="${idx}" style="margin-bottom:12px; background:#f9f9f9; padding:12px; border-radius:8px; border:1px solid #eee; position:relative;">
-                <label style="display:block; font-size:11px; font-weight:700; color:#6b7280; margin-bottom:6px;">繝｡繝ｼ繝ｫ繧｢繝峨Ξ繧ｹ</label>
+                <label style="display:block; font-size:11px; font-weight:700; color:#6b7280; margin-bottom:6px;">メールアドレス</label>
                 <input type="email" placeholder="name@example.com" class="rec-email-input" value="${this.escapeHtml(rec.email)}" 
                        style="width:100%; border:1px solid #d9dde3; border-radius:10px; background:#fff; font-size:13px; color:#111827; outline:none; padding:10px 12px;"
                        oninput="window.SignEditor.handleRecipientInput(${idx}, 'email', this.value)"
                        onchange="window.SignEditor.handleRecipientInput(${idx}, 'email', this.value)">
                 <div class="recipient-email-error" data-index="${idx}" style="display:none; font-size:11px; color:#d73a49; margin-top:6px;"></div>
-                <label style="display:block; font-size:11px; font-weight:700; color:#6b7280; margin:10px 0 6px;">螳帛錐</label>
-                <input type="text" placeholder="螻ｱ逕ｰ 螟ｪ驛・ class="rec-name-input" value="${this.escapeHtml(rec.name)}" 
+                <label style="display:block; font-size:11px; font-weight:700; color:#6b7280; margin:10px 0 6px;">宛名</label>
+                <input type="text" placeholder="山田 太郎" class="rec-name-input" value="${this.escapeHtml(rec.name)}" 
                        style="width:100%; border:1px solid #d9dde3; border-radius:10px; background:#fff; font-size:13px; font-weight:600; outline:none; padding:10px 12px;" 
                        oninput="window.SignEditor.handleRecipientInput(${idx}, 'name', this.value)"
                        onchange="window.SignEditor.handleRecipientInput(${idx}, 'name', this.value)">
-                <div style="font-size:11px; color:#6b7280; margin-top:6px;">${rec.name ? `譯亥・繝｡繝ｼ繝ｫ譛ｬ譁・↓縺ｯ縲・{this.escapeHtml(rec.name)}讒倥阪→險倩ｼ峨＆繧後∪縺吶Ａ : '縺薙％縺ｧ蜈･蜉帙＠縺溷錐蜑阪′縲∵｡亥・繝｡繝ｼ繝ｫ譛ｬ譁・↓縲後・・ｧ倥阪→縺励※險倩ｼ峨＆繧後∪縺吶・}</div>
+                <div style="font-size:11px; color:#6b7280; margin-top:6px;">${rec.name ? `案内メール本文には「${this.escapeHtml(rec.name)}様」と記載されます。` : 'ここで入力した名前が、案内メール本文に「〇〇様」として記載されます。'}</div>
                 ${this._recipients.length > 1 ? `
                     <button onclick="window.SignEditor.removeRecipientRow(${idx})" style="position:absolute; top:8px; right:8px; background:none; border:none; color:#ccc; cursor:pointer; font-size:12px;">
                         <i class="fa-solid fa-trash-can"></i>
@@ -232,16 +232,16 @@ export const SignEditor = {
             const name = String(recipient?.name || '').trim();
             const email = String(recipient?.email || '').trim();
             if (!name) {
-                return { valid: false, message: '螳帛錐繧貞・蜉帙＠縺ｦ縺上□縺輔＞', field: 'name' };
+                return { valid: false, message: '宛名を入力してください', field: 'name' };
             }
             if (!email) {
-                return { valid: false, message: '繝｡繝ｼ繝ｫ繧｢繝峨Ξ繧ｹ繧貞・蜉帙＠縺ｦ縺上□縺輔＞', field: 'email' };
+                return { valid: false, message: 'メールアドレスを入力してください', field: 'email' };
             }
             if (!this.validateEmail(email)) {
-                return { valid: false, message: '繝｡繝ｼ繝ｫ繧｢繝峨Ξ繧ｹ縺ｮ蠖｢蠑上′豁｣縺励￥縺ゅｊ縺ｾ縺帙ｓ', field: 'email' };
+                return { valid: false, message: 'メールアドレスの形式が正しくありません', field: 'email' };
             }
             if ((emailCounts[email.toLowerCase()] || 0) > 1) {
-                return { valid: false, message: '蜷後§繝｡繝ｼ繝ｫ繧｢繝峨Ξ繧ｹ繧帝㍾隍・＠縺ｦ逋ｻ骭ｲ縺ｧ縺阪∪縺帙ｓ', field: 'email' };
+                return { valid: false, message: '同じメールアドレスを重複して登録できません', field: 'email' };
             }
             return { valid: true, message: '', field: null };
         });
@@ -287,16 +287,16 @@ export const SignEditor = {
 
     deriveRecipientName(email, fallbackIndex = 0) {
         const localPart = String(email || '').trim().split('@')[0] || '';
-        return localPart || `鄂ｲ蜷崎・{fallbackIndex + 1}`;
+        return localPart || `署名者${fallbackIndex + 1}`;
     },
 
     formatRecipientHonorific(recipient, fallbackIndex = 0) {
         const baseName = String(recipient?.name || '').trim() || this.deriveRecipientName(recipient?.email, fallbackIndex);
-        return `${baseName}讒倭;
+        return `${baseName}様`;
     },
 
     getRecipientFieldOptionLabel(recipient, fallbackIndex = 0) {
-        return String(recipient?.name || '').trim() || `騾∽ｿ｡蜈・{fallbackIndex + 1}`;
+        return String(recipient?.name || '').trim() || `送信先${fallbackIndex + 1}`;
     },
 
     getPreviewDateValue(format) {
@@ -308,7 +308,7 @@ export const SignEditor = {
             return `${yyyy}-${mm}-${dd}`;
         }
         if (format === 'jp-long') {
-            return `${now.getFullYear()}蟷ｴ${now.getMonth() + 1}譛・{now.getDate()}譌･`;
+            return `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日`;
         }
         return now.toLocaleDateString('ja-JP');
     },
@@ -335,7 +335,7 @@ export const SignEditor = {
     },
 
     getPreviewSignatureValue(field) {
-        return '鄂ｲ蜷・;
+        return '署名';
     },
 
     getSignatureSealSize(text, options = {}) {
@@ -391,7 +391,7 @@ export const SignEditor = {
     },
 
     getSignatureDisplayHtml(field, size) {
-        const signatureText = String(field.signerName || '').trim() || '鄂ｲ蜷・;
+        const signatureText = String(field.signerName || '').trim() || '署名';
         const style = this.getFieldStyle(field.id);
         const fontSize = this.getSignatureSealFontSize(size);
         return `
@@ -413,7 +413,7 @@ export const SignEditor = {
     getStyleBadgeLabel(fieldId) {
         const style = this.getFieldStyle(fieldId);
         if (!style) return '';
-        return style.type === 'font' ? (style.fontName || '譁・ｭ怜・蜉・) : '譁・ｭ怜・蜉・;
+        return style.type === 'font' ? (style.fontName || '文字入力') : '文字入力';
     },
 
     syncDraftState(patch = {}) {
@@ -470,9 +470,9 @@ export const SignEditor = {
             <div id="sign-style-panel" class="sign-style-panel" role="dialog" aria-modal="true" aria-labelledby="sign-style-title">
                 <div class="sign-style-panel__header">
                     <div>
-                        <div id="sign-style-title" class="sign-style-panel__title">繝輔か繝ｳ繝医ｒ驕ｸ謚・/div>
+                        <div id="sign-style-title" class="sign-style-panel__title">フォントを選択</div>
                     </div>
-                    <button type="button" class="sign-style-panel__close" aria-label="髢峨§繧・ onclick="window.SignEditor.closeStylePanel()">&times;</button>
+                    <button type="button" class="sign-style-panel__close" aria-label="閉じる" onclick="window.SignEditor.closeStylePanel()">&times;</button>
                 </div>
                 <div class="sign-style-panel__body">
                     <section id="sign-style-panel-font" class="sign-style-panel__section">
@@ -480,8 +480,8 @@ export const SignEditor = {
                     </section>
                 </div>
                 <div class="sign-style-panel__footer">
-                    <button type="button" class="sign-style-panel__secondary-btn" onclick="window.SignEditor.closeStylePanel()">繧ｭ繝｣繝ｳ繧ｻ繝ｫ</button>
-                    <button type="button" class="sign-style-panel__primary-btn" onclick="window.SignEditor.applyStyle()">縺薙・繧ｹ繧ｿ繧､繝ｫ繧定ｨｭ螳・/button>
+                    <button type="button" class="sign-style-panel__secondary-btn" onclick="window.SignEditor.closeStylePanel()">キャンセル</button>
+                    <button type="button" class="sign-style-panel__primary-btn" onclick="window.SignEditor.applyStyle()">このスタイルを設定</button>
                 </div>
             </div>
         `;
@@ -554,12 +554,12 @@ export const SignEditor = {
             return;
         }
         if (!this._selectedStyleFontId) {
-            Notify.warning('繝輔か繝ｳ繝医ｒ驕ｸ謚槭＠縺ｦ縺上□縺輔＞');
+            Notify.warning('フォントを選択してください');
             return;
         }
         const font = this._styleFonts.find((item) => item.id === this._selectedStyleFontId);
         if (!font) {
-            Notify.warning('繝輔か繝ｳ繝医ｒ驕ｸ謚槭＠縺ｦ縺上□縺輔＞');
+            Notify.warning('フォントを選択してください');
             return;
         }
         this._fieldStyles[String(fieldId)] = {
@@ -699,7 +699,7 @@ export const SignEditor = {
     updatePreviewToggleButton() {
         const button = document.getElementById('sign-editor-preview-toggle');
         if (!button) return;
-        button.textContent = this._inlinePreviewMode ? '邱ｨ髮・｡ｨ遉ｺ縺ｫ謌ｻ繧・ : '蜿嶺ｿ｡閠・・繝ｬ繝薙Η繝ｼ';
+        button.textContent = this._inlinePreviewMode ? '編集表示に戻る' : '受信者プレビュー';
     },
 
     bindToolDragSources() {
@@ -741,10 +741,10 @@ export const SignEditor = {
         this.renderFields();
         this.createPointerGhost(
             mode === 'move'
-                ? '譫繧堤ｧｻ蜍・
+                ? '枠を移動'
                 : mode === 'resize'
-                    ? '繧ｵ繧､繧ｺ螟画峩'
-                    : (type === 'signature' ? '鄂ｲ蜷肴棧' : '譌･莉俶棧')
+                    ? 'サイズ変更'
+                    : (type === 'signature' ? '署名枠' : '日付枠')
         );
         this.updatePointerGhost(originEvent.clientX, originEvent.clientY);
         if (mode !== 'resize') {
@@ -866,12 +866,12 @@ export const SignEditor = {
             return this._fields.find((field) => String(field.id) === String(drag.fieldId)) || null;
         }
         if (drag.mode === 'new' && drag.type) {
-            const signatureSize = this.getSignatureSealSize('鄂ｲ蜷・, { base: 88, step: 20, unit: 2 });
+            const signatureSize = this.getSignatureSealSize('署名', { base: 88, step: 20, unit: 2 });
             return {
                 type: drag.type,
                 width: drag.type === 'signature' ? Number.parseInt(signatureSize, 10) : 130,
                 height: drag.type === 'signature' ? Number.parseInt(signatureSize, 10) : 48,
-                label: drag.type === 'signature' ? '鄂ｲ蜷・ : '譌･莉・,
+                label: drag.type === 'signature' ? '署名' : '日付',
                 signerName: '',
                 assigneeIndex: 0,
                 dateFormat: 'ja-JP'
@@ -925,14 +925,14 @@ export const SignEditor = {
         const rect = wrapper.getBoundingClientRect();
         const xPercent = Math.max(6, Math.min(94, ((clientX - rect.left) / rect.width) * 100));
         const yPercent = Math.max(4, Math.min(96, ((clientY - rect.top) / rect.height) * 100));
-        const assignee = this._recipients[template.assigneeIndex] || this._recipients[0] || { name: '鄂ｲ蜷崎・' };
+        const assignee = this._recipients[template.assigneeIndex] || this._recipients[0] || { name: '署名者1' };
 
         preview.style.left = `${xPercent}%`;
         preview.style.top = `${yPercent}%`;
         preview.style.width = `${template.width || (template.type === 'signature' ? 180 : 130)}px`;
         preview.style.height = `${template.height || 48}px`;
         if (template.type === 'signature') {
-            const signatureText = String(template.signerName || '').trim() || '鄂ｲ蜷・;
+            const signatureText = String(template.signerName || '').trim() || '署名';
             const signaturePreviewSize = this.getSignatureSealSize(signatureText, { fixedSize: template.width || 88 });
             preview.style.width = signaturePreviewSize;
             preview.style.height = signaturePreviewSize;
@@ -942,7 +942,7 @@ export const SignEditor = {
             preview.style.color = '#c53030';
             preview.innerHTML = `
                 <span style="font-family:'Noto Serif JP','Yu Mincho','Hiragino Mincho ProN',serif; font-size:${this.getSignatureSealFontSize(signaturePreviewSize)}; font-weight:700; letter-spacing:0.04em; text-align:center; word-break:break-all; padding:10px;">${this.escapeHtml(signatureText)}</span>
-                <span style="position:absolute; left:10px; bottom:-18px; background:#111827; color:#fff; font-size:10px; padding:2px 8px; border-radius:999px; white-space:nowrap;">${this.escapeHtml(assignee.name || '騾∽ｿ｡蜈・')}</span>
+                <span style="position:absolute; left:10px; bottom:-18px; background:#111827; color:#fff; font-size:10px; padding:2px 8px; border-radius:999px; white-space:nowrap;">${this.escapeHtml(assignee.name || '送信先1')}</span>
             `;
         } else {
             preview.style.background = 'rgba(52, 168, 83, 0.08)';
@@ -953,7 +953,7 @@ export const SignEditor = {
                 <i class="fa-solid fa-grip-lines" style="margin-right:8px; opacity:0.55;"></i>
                 <i class="fa-solid fa-calendar" style="margin-right:6px;"></i>
                 <span>${this.escapeHtml(this.getPreviewDateValue(template.dateFormat || 'ja-JP'))}</span>
-                <span style="position:absolute; left:10px; bottom:-18px; background:#111827; color:#fff; font-size:10px; padding:2px 8px; border-radius:999px; white-space:nowrap;">${this.escapeHtml(assignee.name || '騾∽ｿ｡蜈・')}</span>
+                <span style="position:absolute; left:10px; bottom:-18px; background:#111827; color:#fff; font-size:10px; padding:2px 8px; border-radius:999px; white-space:nowrap;">${this.escapeHtml(assignee.name || '送信先1')}</span>
             `;
         }
     },
@@ -993,7 +993,7 @@ export const SignEditor = {
 
     async loadPdf(url, container) {
         if (!url) {
-            container.innerHTML = '<div style="padding:100px; color:#999;">鄂ｲ蜷榊ｯｾ雎｡縺ｮ蜴滓悽繝輔ぃ繧､繝ｫ縺瑚ｦ九▽縺九ｊ縺ｾ縺帙ｓ</div>';
+            container.innerHTML = '<div style="padding:100px; color:#999;">署名対象の原本ファイルが見つかりません</div>';
             return;
         }
 
@@ -1025,7 +1025,7 @@ export const SignEditor = {
                 const pageWrapper = document.createElement('div');
                 pageWrapper.className = 'editor-page-wrapper';
                 pageWrapper.style.position = 'relative';
-                pageWrapper.style.overflow = 'visible'; // field-marker badge (top:-14px) 縺瑚ｦ句・繧後↑縺・ｈ縺・・遉ｺ
+                pageWrapper.style.overflow = 'visible'; // field-marker badge (top:-14px) が見切れないよう明示
                 pageWrapper.style.width = baseViewport.width + 'px';
                 pageWrapper.dataset.baseWidth = String(baseViewport.width);
                 pageWrapper.dataset.baseHeight = String(baseViewport.height);
@@ -1047,7 +1047,7 @@ export const SignEditor = {
                 this._previewMode = 'fallback';
                 return;
             }
-            this.renderUnavailableDocument(this._currentDoc, container, `PDF縺ｮ隱ｭ縺ｿ霎ｼ縺ｿ縺ｫ螟ｱ謨励＠縺ｾ縺励◆: ${error.message}`);
+            this.renderUnavailableDocument(this._currentDoc, container, `PDFの読み込みに失敗しました: ${error.message}`);
         }
     },
 
@@ -1074,10 +1074,10 @@ export const SignEditor = {
             }
             // If docxSource is still a plain string (not a real URL or Blob), no file is available
             if (typeof docxSource === 'string' && !/^https?:|^blob:/.test(docxSource)) {
-                throw new Error('蜴滓悽繝輔ぃ繧､繝ｫ縺瑚ｦ九▽縺九ｊ縺ｾ縺帙ｓ');
+                throw new Error('原本ファイルが見つかりません');
             }
             const pages = await renderDocxPreviewPages(container, docxSource);
-            if (!pages.length) throw new Error('Word縺ｮ繝壹・繧ｸ繧定｡ｨ遉ｺ縺ｧ縺阪∪縺帙ｓ縺ｧ縺励◆');
+            if (!pages.length) throw new Error('Wordのページを表示できませんでした');
             this._totalPages = pages.length;
             this._activePage = Math.min(this._activePage || 1, this._totalPages || 1);
             pages.forEach((pageWrapper, index) => {
@@ -1097,14 +1097,14 @@ export const SignEditor = {
                 this.renderUnavailableDocument(
                     this._currentDoc,
                     container,
-                    'Word蜴滓悽縺ｮ繝励Ξ繝薙Η繝ｼ縺ｫ螟ｱ謨励＠縺ｾ縺励◆縲りｦ九◆逶ｮ繧貞､峨∴縺ｪ縺・◆繧√∝挨繝ｬ繧､繧｢繧ｦ繝医∈縺ｮ閾ｪ蜍募､画鋤縺ｯ陦後▲縺ｦ縺・∪縺帙ｓ縲・
+                    'Word原本のプレビューに失敗しました。見た目を変えないため、別レイアウトへの自動変換は行っていません。'
                 );
                 this._previewMode = 'unavailable';
             }
         }
     },
 
-    renderUnavailableDocument(contract, container, message = '蜿悶ｊ霎ｼ繧薙□蜴滓悽繝輔ぃ繧､繝ｫ繧定｡ｨ遉ｺ縺ｧ縺阪∪縺帙ｓ縺ｧ縺励◆縲・) {
+    renderUnavailableDocument(contract, container, message = '取り込んだ原本ファイルを表示できませんでした。') {
         const originalFileHref = resolveBackendAssetUrl(contract?.original_file_url || contract?.original_file_path);
         const fallbackHref = originalFileHref || contract?.source_url || '';
         container.innerHTML = `
@@ -1112,9 +1112,9 @@ export const SignEditor = {
                 <div style="width:64px; height:64px; margin:0 auto 18px; border-radius:20px; background:#fef2f2; color:#c53030; display:flex; align-items:center; justify-content:center; font-size:28px;">
                     <i class="fa-regular fa-file-pdf"></i>
                 </div>
-                <div style="font-size:18px; font-weight:700; color:#111827; margin-bottom:8px;">蜿悶ｊ霎ｼ繧薙□雉・侭繧定｡ｨ遉ｺ縺ｧ縺阪∪縺帙ｓ</div>
+                <div style="font-size:18px; font-weight:700; color:#111827; margin-bottom:8px;">取り込んだ資料を表示できません</div>
                 <div style="font-size:13px; color:#6b7280; line-height:1.8;">${this.escapeHtml(message)}</div>
-                ${fallbackHref ? `<div style="margin-top:18px;"><a href="${this.escapeHtml(fallbackHref)}" target="_blank" rel="noopener noreferrer" style="color:#166534; font-weight:600; text-decoration:none;">蜈・・雉・侭繧帝幕縺・/a></div>` : ''}
+                ${fallbackHref ? `<div style="margin-top:18px;"><a href="${this.escapeHtml(fallbackHref)}" target="_blank" rel="noopener noreferrer" style="color:#166534; font-weight:600; text-decoration:none;">元の資料を開く</a></div>` : ''}
             </div>
         `;
         this._totalPages = 1;
@@ -1126,7 +1126,7 @@ export const SignEditor = {
     renderDocumentFallback(contract, container) {
         const contentPages = this.buildFallbackContentPages(contract?.original_content);
         if (!Array.isArray(contentPages) || contentPages.length === 0) {
-            container.innerHTML = '<div style="padding:100px; color:#999;">陦ｨ遉ｺ縺ｧ縺阪ｋ譛ｬ譁・ョ繝ｼ繧ｿ縺瑚ｦ九▽縺九ｊ縺ｾ縺帙ｓ</div>';
+            container.innerHTML = '<div style="padding:100px; color:#999;">表示できる本文データが見つかりません</div>';
             return;
         }
 
@@ -1405,7 +1405,7 @@ export const SignEditor = {
             height: type === 'signature' ? 88 : 48,
             assigneeIndex: Math.min(this._recipients.length - 1, 0),
             required: true,
-            label: type === 'signature' ? '鄂ｲ蜷・ : '',
+            label: type === 'signature' ? '署名' : '',
             signerName: '',
             dateFormat: 'ja-JP'
         };
@@ -1463,7 +1463,7 @@ export const SignEditor = {
             div.style.justifyContent = 'center';
             div.style.zIndex = '1000';
             const isMovingField = String(field.id) === String(this._pointerDrag?.fieldId) && this._pointerDrag?.mode === 'move';
-            const label = this.escapeHtml(field.label || (field.type === 'signature' ? '鄂ｲ蜷・ : '譌･莉・));
+            const label = this.escapeHtml(field.label || (field.type === 'signature' ? '署名' : '日付'));
             const sequenceLabel = `No.${index + 1}`;
             if (this._inlinePreviewMode) {
                 const previewSignatureSize = field.type === 'signature'
@@ -1488,7 +1488,7 @@ export const SignEditor = {
                     })
                     : `<span style="font-size:14px; color:#333; font-weight:600;">${this.escapeHtml(this.getPreviewDateValue(field.dateFormat))}</span>`;
             } else {
-                const signatureSealText = '鄂ｲ蜷・;
+                const signatureSealText = '署名';
                 const signatureEditorSize = this.getSignatureSealSize(signatureSealText, { fixedSize: field.width });
                 div.style.width = field.type === 'signature'
                     ? signatureEditorSize
@@ -1506,17 +1506,17 @@ export const SignEditor = {
                     ? '0.58'
                     : (this._pointerDrag?.mode === 'resize' && String(field.id) === String(this._pointerDrag?.fieldId) ? '0.96' : '1');
                 div.style.outline = String(field.id) === String(this._selectedFieldId) ? '3px solid rgba(17,24,39,0.18)' : 'none';
-                div.title = '繝峨Λ繝・げ縺励※遘ｻ蜍・;
+                div.title = 'ドラッグして移動';
                 div.innerHTML = field.type === 'signature'
                     ? `
                     ${this.getSignatureDisplayHtml(field, signatureEditorSize)}
                     <span style="position:absolute; top:-14px; left:-8px; z-index:2; background:#111827; color:#fff; font-size:11px; font-weight:700; min-width:42px; height:28px; padding:0 10px; border-radius:999px; white-space:nowrap; display:inline-flex; align-items:center; justify-content:center; box-shadow:0 6px 14px rgba(15,23,42,0.18);">${sequenceLabel}</span>
-                    <button onclick="event.stopPropagation(); window.SignEditor.removeField(${field.id})" title="蜑企勁" style="position:absolute; top:-14px; right:-14px; z-index:2; background:#fff; border:1px solid rgba(15,23,42,0.12); border-radius:50%; width:34px; height:34px; font-size:18px; cursor:pointer; color:#6b7280; display:flex; align-items:center; justify-content:center; box-shadow:0 6px 14px rgba(15,23,42,0.12); line-height:1;">&times;</button>
+                    <button onclick="event.stopPropagation(); window.SignEditor.removeField(${field.id})" title="削除" style="position:absolute; top:-14px; right:-14px; z-index:2; background:#fff; border:1px solid rgba(15,23,42,0.12); border-radius:50%; width:34px; height:34px; font-size:18px; cursor:pointer; color:#6b7280; display:flex; align-items:center; justify-content:center; box-shadow:0 6px 14px rgba(15,23,42,0.12); line-height:1;">&times;</button>
                 `
                     : `
                     <span>${this.escapeHtml(this.getPreviewDateValue(field.dateFormat))}</span>
                     <span style="position:absolute; top:-14px; left:-8px; background:#111827; color:#fff; font-size:11px; font-weight:700; min-width:42px; height:28px; padding:0 10px; border-radius:999px; white-space:nowrap; display:inline-flex; align-items:center; justify-content:center; box-shadow:0 6px 14px rgba(15,23,42,0.18);">${sequenceLabel}</span>
-                    <button onclick="event.stopPropagation(); window.SignEditor.removeField(${field.id})" title="蜑企勁" style="position:absolute; top:-14px; right:-14px; background:#fff; border:1px solid rgba(15,23,42,0.12); border-radius:50%; width:30px; height:30px; font-size:16px; cursor:pointer; color:#6b7280; display:flex; align-items:center; justify-content:center; box-shadow:0 6px 14px rgba(15,23,42,0.12); line-height:1;">&times;</button>
+                    <button onclick="event.stopPropagation(); window.SignEditor.removeField(${field.id})" title="削除" style="position:absolute; top:-14px; right:-14px; background:#fff; border:1px solid rgba(15,23,42,0.12); border-radius:50%; width:30px; height:30px; font-size:16px; cursor:pointer; color:#6b7280; display:flex; align-items:center; justify-content:center; box-shadow:0 6px 14px rgba(15,23,42,0.12); line-height:1;">&times;</button>
                 `;
                 div.addEventListener('click', (event) => {
                     event.stopPropagation();
@@ -1589,7 +1589,7 @@ export const SignEditor = {
         }
         if (!container) return;
         if (this._inlinePreviewMode) {
-            container.innerHTML = '蜿嶺ｿ｡閠・・繝ｬ繝薙Η繝ｼ荳ｭ縺ｯ邱ｨ髮・〒縺阪∪縺帙ｓ縲・;
+            container.innerHTML = '受信者プレビュー中は編集できません。';
             return;
         }
         const field = this.getSelectedField();
@@ -1610,31 +1610,31 @@ export const SignEditor = {
         const signatureSettings = field.type === 'signature'
             ? `
                 <div style="margin-top:12px;">
-                    <label style="display:block; font-weight:600; margin-bottom:6px; color:#444;">鄂ｲ蜷崎・・蜑ｲ繧雁ｽ薙※</label>
+                    <label style="display:block; font-weight:600; margin-bottom:6px; color:#444;">署名者の割り当て</label>
                     <select onchange="window.SignEditor.updateSelectedField({ assigneeIndex: Number(this.value) })" style="width:100%; padding:10px 12px; border-radius:10px; border:1px solid #d9dde3; background:#fff;">
                         ${recipientOptions}
                     </select>
                 </div>
-                <div style="font-size:11px; color:#6b7280; line-height:1.7; margin-top:8px;">驟咲ｽｮ縺励◆譫縺ｫ隱ｰ縺檎ｽｲ蜷阪☆繧九°繧帝∈謚槭＠縺ｦ縺上□縺輔＞縲・/div>
+                <div style="font-size:11px; color:#6b7280; line-height:1.7; margin-top:8px;">配置した枠に誰が署名するかを選択してください。</div>
             `
             : `
                 <div style="margin-top:12px;">
-                    <label style="display:block; font-weight:600; margin-bottom:6px; color:#444;">鄂ｲ蜷崎・・蜑ｲ繧雁ｽ薙※</label>
+                    <label style="display:block; font-weight:600; margin-bottom:6px; color:#444;">署名者の割り当て</label>
                     <select onchange="window.SignEditor.updateSelectedField({ assigneeIndex: Number(this.value) })" style="width:100%; padding:10px 12px; border-radius:10px; border:1px solid #d9dde3; background:#fff; margin-bottom:12px;">
                         ${recipientOptions}
                     </select>
-                    <label style="display:block; font-weight:600; margin-bottom:6px; color:#444;">譌･莉俶嶌蠑・/label>
+                    <label style="display:block; font-weight:600; margin-bottom:6px; color:#444;">日付書式</label>
                     <select onchange="window.SignEditor.updateSelectedField({ dateFormat: this.value })" style="width:100%; padding:10px 12px; border-radius:10px; border:1px solid #d9dde3; background:#fff;">
                         <option value="ja-JP" ${field.dateFormat === 'ja-JP' ? 'selected' : ''}>2026/03/19</option>
                         <option value="iso" ${field.dateFormat === 'iso' ? 'selected' : ''}>2026-03-19</option>
-                        <option value="jp-long" ${field.dateFormat === 'jp-long' ? 'selected' : ''}>2026蟷ｴ3譛・9譌･</option>
+                        <option value="jp-long" ${field.dateFormat === 'jp-long' ? 'selected' : ''}>2026年3月19日</option>
                     </select>
                 </div>
             `;
 
         container.innerHTML = `
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
-                <div style="font-weight:700; color:#1f2937;">${field.type === 'signature' ? '鄂ｲ蜷肴棧' : '譌･莉俶棧'}縺ｮ險ｭ螳・/div>
+                <div style="font-weight:700; color:#1f2937;">${field.type === 'signature' ? '署名枠' : '日付枠'}の設定</div>
                 <div style="font-size:11px; color:#6b7280;">No. ${this._fields.findIndex((item) => item.id === field.id) + 1}</div>
             </div>
             ${signatureSettings}
@@ -1648,7 +1648,7 @@ export const SignEditor = {
         const validations = this.updateRecipientValidationState({ force: true });
         const invalidRecipient = validations.find((state) => !state.valid);
         if (invalidRecipient) {
-            Notify.warning(invalidRecipient.message || '螳帛錐縺ｨ繝｡繝ｼ繝ｫ繧｢繝峨Ξ繧ｹ繧呈ｭ｣縺励￥蜈･蜉帙＠縺ｦ縺上□縺輔＞');
+            Notify.warning(invalidRecipient.message || '宛名とメールアドレスを正しく入力してください');
             return;
         }
         const validRecipients = this._recipients
@@ -1661,12 +1661,12 @@ export const SignEditor = {
             .filter((recipient) => recipient.name && recipient.email);
         
         if (validRecipients.length === 0) {
-            Notify.warning('螳帛錐縺ｨ繝｡繝ｼ繝ｫ繧｢繝峨Ξ繧ｹ繧呈ｭ｣縺励￥蜈･蜉帙＠縺ｦ縺上□縺輔＞');
+            Notify.warning('宛名とメールアドレスを正しく入力してください');
             return;
         }
 
         if (this._fields.length === 0) {
-            Notify.warning('鄂ｲ蜷阪ヵ繧｣繝ｼ繝ｫ繝峨ｒ1縺､莉･荳企・鄂ｮ縺励※縺上□縺輔＞');
+            Notify.warning('署名フィールドを1つ以上配置してください');
             return;
         }
 
@@ -1686,7 +1686,7 @@ export const SignEditor = {
                     recipients: validRecipients
                 });
                 if (!createdRequest) {
-                    throw new Error('鄂ｲ蜷堺ｾ晞ｼ縺ｮ菴懈・縺ｫ螟ｱ謨励＠縺ｾ縺励◆');
+                    throw new Error('署名依頼の作成に失敗しました');
                 }
                 if (createdRequest.id !== this._currentRequest.id) {
                     dbService.deleteSignRequest(this._currentRequest.id);
@@ -1722,7 +1722,7 @@ export const SignEditor = {
                     recipients: validRecipients
                 });
                 if (!recreatedRequest?.id) {
-                    throw new Error('鄂ｲ蜷堺ｾ晞ｼ縺ｮ蜀堺ｽ懈・縺ｫ螟ｱ謨励＠縺ｾ縺励◆');
+                    throw new Error('署名依頼の再作成に失敗しました');
                 }
 
                 if (this._currentRequest?.id && recreatedRequest.id !== this._currentRequest.id) {
@@ -1738,16 +1738,16 @@ export const SignEditor = {
 
             if (result) {
                 this.syncDraftState(result);
-                Notify.success('鄂ｲ蜷堺ｾ晞ｼ繧帝∽ｿ｡縺励∪縺励◆・・);
+                Notify.success('署名依頼を送信しました！');
                 if (window.signUI) {
                     window.signUI.currentTab = 'sent-requests';
                 }
                 setTimeout(() => window.app.navigate('sign'), 1500);
             } else {
-                throw new Error('騾∽ｿ｡縺ｫ螟ｱ謨励＠縺ｾ縺励◆');
+                throw new Error('送信に失敗しました');
             }
         } catch (error) {
-            Notify.error(`繧ｨ繝ｩ繝ｼ: ${error.message}`);
+            Notify.error(`エラー: ${error.message}`);
         } finally {
             this.setSendingState(false);
         }
@@ -1791,8 +1791,8 @@ export const SignEditor = {
         overlay.innerHTML = `
             <div style="width:min(92vw, 420px); background:#fff; border:1px solid rgba(15,23,42,0.08); border-radius:24px; box-shadow:0 24px 60px rgba(15,23,42,0.18); padding:32px 28px; text-align:center;">
                 <div style="width:54px; height:54px; margin:0 auto 18px; border-radius:50%; border:3px solid rgba(201, 164, 92, 0.22); border-top-color:#c9a45c; animation:sign-send-spin 0.9s linear infinite;"></div>
-                <div style="font-size:20px; font-weight:700; color:#111827; margin-bottom:10px;">鄂ｲ蜷堺ｾ晞ｼ繧帝∽ｿ｡縺励※縺・∪縺・/div>
-                <div style="font-size:13px; line-height:1.8; color:#6b7280;">騾∽ｿ｡縺悟ｮ御ｺ・☆繧九∪縺ｧ縲√％縺ｮ縺ｾ縺ｾ縺励・繧峨￥縺雁ｾ・■縺上□縺輔＞縲・/div>
+                <div style="font-size:20px; font-weight:700; color:#111827; margin-bottom:10px;">署名依頼を送信しています</div>
+                <div style="font-size:13px; line-height:1.8; color:#6b7280;">送信が完了するまで、このまましばらくお待ちください。</div>
             </div>
         `;
         if (!document.getElementById('sign-editor-sending-style')) {
@@ -1806,7 +1806,7 @@ export const SignEditor = {
 
     async openRecipientPreview() {
         if (!this._inlinePreviewMode && this._fields.length === 0) {
-            Notify.warning('繝励Ξ繝薙Η繝ｼ蜑阪↓鄂ｲ蜷阪ヵ繧｣繝ｼ繝ｫ繝峨ｒ1縺､莉･荳企・鄂ｮ縺励※縺上□縺輔＞');
+            Notify.warning('プレビュー前に署名フィールドを1つ以上配置してください');
             return;
         }
         this._inlinePreviewMode = !this._inlinePreviewMode;
