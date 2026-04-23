@@ -1510,7 +1510,7 @@ export const SignEditor = {
                 div.innerHTML = field.type === 'signature'
                     ? `
                     ${this.getSignatureDisplayHtml(field, signatureEditorSize)}
-                    <span style="position:absolute; top:-14px; left:-8px; z-index:2; background:#111827; color:#fff; font-size:11px; font-weight:700; min-width:42px; height:28px; padding:0 10px; border-radius:999px; white-space:nowrap; display:inline-flex; align-items:center; justify-content:center; box-shadow:0 6px 14px rgba(15,23,42,0.18);">${sequenceLabel}</span>
+                    <span style="position:absolute; top:-14px; left:-8px; z-index:2; background:#111827; color:#fff; font-size:11px; font-weight:700; width:22px; height:22px; border-radius:50%; white-space:nowrap; display:inline-flex; align-items:center; justify-content:center; box-shadow:0 6px 14px rgba(15,23,42,0.18);">${sequenceLabel}</span>
                     <button onclick="event.stopPropagation(); window.SignEditor.removeField(${field.id})" title="削除" style="position:absolute; top:-14px; right:-14px; z-index:2; background:#fff; border:1px solid rgba(15,23,42,0.12); border-radius:50%; width:34px; height:34px; font-size:18px; cursor:pointer; color:#6b7280; display:flex; align-items:center; justify-content:center; box-shadow:0 6px 14px rgba(15,23,42,0.12); line-height:1;">&times;</button>
                 `
                     : `
