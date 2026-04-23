@@ -3,11 +3,14 @@ const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 const crypto = require('crypto');
+const { execFile } = require('child_process');
+const { promisify } = require('util');
 const jwt = require('jsonwebtoken');
 const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
 const rateLimit = require('express-rate-limit');
 const router = express.Router();
 const logger = require('../utils/logger');
+const execFileAsync = promisify(execFile);
 
 // リマインドメール専用レート制限: 10分間に3回まで
 const remindRateLimit = rateLimit({
@@ -227,6 +230,119 @@ function extractUploadsRelativePath(value) {
 function buildFirebaseDownloadUrl(bucketName, objectPath, token) {
     return `https://firebasestorage.googleapis.com/v0/b/${encodeURIComponent(bucketName)}/o/${encodeURIComponent(objectPath)}?alt=media&token=${encodeURIComponent(token)}`;
 }
+
+async function convertDocxToPdf(docxPath) {
+    const fs = require('fs');
+    const pathMod = require('path');
+    const absoluteDocxPath = pathMod.resolve(String(docxPath || ''));
+    if (!absoluteDocxPath || !fs.existsSync(absoluteDocxPath)) {
+        throw new Error('DOCX file not found for conversion');
+    }
+
+    const outputDir = pathMod.dirname(absoluteDocxPath);
+    const outputPdfPath = pathMod.join(
+        outputDir,
+        `${pathMod.basename(absoluteDocxPath, pathMod.extname(absoluteDocxPath))}.pdf`
+    );
+    if (fs.existsSync(outputPdfPath)) {
+        await fs.promises.unlink(outputPdfPath).catch(() => {});
+    }
+
+    const commandCandidates = [
+        String(process.env.SOFFICE_PATH || '').trim(),
+        process.platform === 'win32' ? 'soffice.exe' : 'soffice',
+        process.platform === 'win32' ? 'C:\\Program Files\\LibreOffice\\program\\soffice.exe' : 'libreoffice'
+    ].filter(Boolean);
+
+    let lastError = null;
+    for (const command of commandCandidates) {
+        try {
+            await execFileAsync(
+                command,
+                ['--headless', '--convert-to', 'pdf:writer_pdf_Export', '--outdir', outputDir, absoluteDocxPath],
+                { windowsHide: true, timeout: 180000 }
+            );
+            if (fs.existsSync(outputPdfPath)) {
+                return outputPdfPath;
+            }
+        } catch (error) {
+            lastError = error;
+        }
+    }
+
+    throw new Error(`DOCX to PDF conversion failed${lastError?.message ? `: ${lastError.message}` : ''}`);
+}
+
+async function createPdfBufferFromDocxSource(sourceBuffer, signRequestId) {
+    const tmpDir = path.join(__dirname, '../../tmp/sign-docx');
+    await fs.promises.mkdir(tmpDir, { recursive: true });
+    const safeBase = sanitizeStorageFileName(`sign-${signRequestId}-${Date.now()}`, `sign-${Date.now()}`);
+    const docxPath = path.join(tmpDir, `${safeBase}.docx`);
+    const generatedPdfPath = path.join(tmpDir, `${safeBase}.pdf`);
+
+    try {
+        await fs.promises.writeFile(docxPath, sourceBuffer);
+        const convertedPdfPath = await convertDocxToPdf(docxPath);
+        return await fs.promises.readFile(convertedPdfPath);
+    } finally {
+        await fs.promises.unlink(docxPath).catch(() => {});
+        await fs.promises.unlink(generatedPdfPath).catch(() => {});
+    }
+}
+
+async function persistSignSourcePdf(signRequestId, pdfBuffer, req, suffix = 'source') {
+    if (!pdfBuffer?.length) {
+        throw new Error('PDFバッファが空です');
+    }
+    const safeRequestId = sanitizeStorageFileName(String(signRequestId || Date.now()), 'sign-request');
+
+    if (firebaseInitialized && bucket) {
+        const objectPath = `sign_docs_source/${safeRequestId}-${Date.now()}-${suffix}.pdf`;
+        const file = bucket.file(objectPath);
+        const downloadToken = crypto.randomUUID();
+        await file.save(pdfBuffer, {
+            metadata: {
+                contentType: 'application/pdf',
+                metadata: {
+                    firebaseStorageDownloadTokens: downloadToken
+                }
+            }
+        });
+
+        let pdfUrl = '';
+        try {
+            const [signedUrl] = await file.getSignedUrl({
+                action: 'read',
+                expires: Date.now() + 7 * 24 * 60 * 60 * 1000
+            });
+            pdfUrl = signedUrl;
+        } catch (signedUrlError) {
+            const bucketName = bucket.name || process.env.FB_STORAGE_BUCKET || process.env.FIREBASE_STORAGE_BUCKET;
+            if (!bucketName) throw signedUrlError;
+            pdfUrl = buildFirebaseDownloadUrl(bucketName, objectPath, downloadToken);
+            logger.warn('[sign generate-pdf] Signed URL generation failed; using token URL', {
+                signRequestId: safeRequestId,
+                error: signedUrlError.message
+            });
+        }
+
+        return {
+            pdfUrl,
+            pdfStoragePath: objectPath
+        };
+    }
+
+    const uploadsDir = path.join(__dirname, '../../uploads/sign-source');
+    await fs.promises.mkdir(uploadsDir, { recursive: true });
+    const filename = `${safeRequestId}-${Date.now()}-${suffix}.pdf`;
+    const absolutePath = path.join(uploadsDir, filename);
+    await fs.promises.writeFile(absolutePath, pdfBuffer);
+
+    return {
+        pdfUrl: `${getBackendBaseUrl(req)}/uploads/sign-source/${filename}`,
+        pdfStoragePath: absolutePath
+    };
+}
 async function resolveSignRequestPdfUrl(signRequest, req, contract = null) {
     const backendBaseUrl = getBackendBaseUrl(req);
     const candidates = [
@@ -269,15 +385,19 @@ async function resolveSignRequestOriginalFileUrl(signRequest, req, contract = nu
         signRequest?.document_snapshot?.original_file_url,
         signRequest?.document_snapshot?.original_file_path
     ];
+    logger.info(`resolveSignRequestOriginalFileUrl: candidates=${JSON.stringify(candidates.map(c => String(c || '').substring(0, 100)))}`);
     for (const candidate of candidates) {
         const value = String(candidate || '').trim();
         if (!value) continue;
         if (/^https?:\/\//i.test(value)) {
+            logger.info(`resolveSignRequestOriginalFileUrl: resolved to HTTPS URL: ${value.substring(0, 100)}`);
             return value;
         }
         const uploadsPath = extractUploadsRelativePath(value);
         if (uploadsPath) {
-            return `${backendBaseUrl}${uploadsPath}`;
+            const resolved = `${backendBaseUrl}${uploadsPath}`;
+            logger.info(`resolveSignRequestOriginalFileUrl: resolved to uploads path: ${resolved.substring(0, 100)}`);
+            return resolved;
         }
         if (bucket && !value.includes('\\') && !value.startsWith('/')) {
             try {
@@ -285,12 +405,14 @@ async function resolveSignRequestOriginalFileUrl(signRequest, req, contract = nu
                     action: 'read',
                     expires: Date.now() + 3600000
                 });
+                logger.info(`resolveSignRequestOriginalFileUrl: resolved to GCS signed URL: ${signedUrl.substring(0, 100)}`);
                 return signedUrl;
             } catch (err) {
                 logger.warn('resolveSignRequestOriginalFileUrl: signed URL failed for', value, err.message);
             }
         }
     }
+    logger.warn(`resolveSignRequestOriginalFileUrl: all candidates exhausted, returning empty string. contract=${!!contract} document_snapshot=${!!signRequest?.document_snapshot}`);
     return '';
 }
 
@@ -860,49 +982,71 @@ async function getRequestSigningUrl(signRequest, recipient) {
 
 async function loadOriginalSourceBuffer(candidate, logLabel = 'sign-original') {
     const value = String(candidate || '').trim();
-    if (!value) return null;
+    if (!value) {
+        logger.warn(`[${logLabel}] candidate is empty`);
+        return null;
+    }
 
     try {
         if (fs.existsSync(value)) {
+            logger.info(`[${logLabel}] found local file: ${value.substring(0, 100)}`);
             return fs.readFileSync(value);
         }
-    } catch {}
+    } catch (err) {
+        logger.warn(`[${logLabel}] local file check failed: ${err.message}`);
+    }
 
     const uploadsRelative = extractUploadsRelativePath(value);
     if (uploadsRelative) {
         const localPath = path.join(__dirname, '..', '..', uploadsRelative.replace(/^\//, ''));
         try {
             if (fs.existsSync(localPath)) {
+                logger.info(`[${logLabel}] found uploads file: ${localPath.substring(0, 100)}`);
                 return fs.readFileSync(localPath);
+            } else {
+                logger.warn(`[${logLabel}] uploads path not found: ${localPath.substring(0, 100)}`);
             }
-        } catch {}
+        } catch (err) {
+            logger.warn(`[${logLabel}] uploads file read failed: ${err.message}`);
+        }
+    } else {
+        logger.info(`[${logLabel}] not an uploads path: ${value.substring(0, 100)}`)
     }
 
     if (bucket && !/^https?:\/\//i.test(value) && !value.includes('\\') && !value.startsWith('/')) {
         try {
-            const [downloaded] = await bucket.file(value).download();
+            const gcsPath = value.replace(/^gs:\/\/[^\/]+\//, '');
+            logger.info(`[${logLabel}] attempting GCS download: original=${value.substring(0, 80)} gcsPath=${gcsPath.substring(0, 80)}`)
+            const [downloaded] = await bucket.file(gcsPath).download();
+            logger.info(`[${logLabel}] GCS download success, bytes=${downloaded?.length || 0}`);
             return Buffer.from(downloaded);
         } catch (error) {
-            logger.warn(`[${logLabel}] bucket original download failed`, {
-                source: value,
+            logger.warn(`[${logLabel}] GCS download failed`, {
+                original: value.substring(0, 100),
                 bucket: bucket?.name || null,
                 error: error.message
             });
         }
+    } else if (bucket) {
+        logger.info(`[${logLabel}] skipping GCS (HTTPS or absolute path): ${value.substring(0, 100)}`);
     }
 
     if (/^https?:\/\//i.test(value)) {
         try {
-            const response = await axios.get(value, { responseType: 'arraybuffer' });
+            logger.info(`[${logLabel}] attempting HTTPS fetch: ${value.substring(0, 100)}`);
+            const response = await axios.get(value, { responseType: 'arraybuffer', timeout: 30000 });
+            logger.info(`[${logLabel}] HTTPS fetch success, bytes=${response.data?.length || 0}`);
             return Buffer.from(response.data);
         } catch (error) {
             logger.warn(`[${logLabel}] remote original fetch failed`, {
-                source: value,
+                source: value.substring(0, 100),
+                status: error.response?.status || null,
                 error: error.message
             });
         }
     }
 
+    logger.warn(`[${logLabel}] all methods exhausted: ${value.substring(0, 100)}`);
     return null;
 }
 
@@ -1209,6 +1353,7 @@ router.get('/verify', async (req, res) => {
         const originalFileUrl = resolvedOriginalFileUrl
             ? `${requestOrigin}/api/sign/original-file?token=${encodeURIComponent(token)}`
             : '';
+        logger.info(`Sign /verify: resolvedOriginalFileUrl=${resolvedOriginalFileUrl ? 'SET' : 'EMPTY'} originalFileUrl=${originalFileUrl ? 'SET' : 'EMPTY'} isDocxSource=${isDocxSource} originalFilename=${originalFilename.substring(0, 100)}`);
         if (!pdfUrl && !originalContent && !isDocxSource) {
             return res.status(404).json({ success: false, error: '署名対象の原本ファイルが見つかりません。' });
         }
@@ -1239,6 +1384,126 @@ router.get('/verify', async (req, res) => {
             return res.status(401).json({ success: false, error: '有効期限が切れましたので、再度発行依頼をしていただくようお願いいたします。' });
         }
         return res.status(401).json({ success: false, error: '無効な署名リンクです' });
+    }
+});
+
+router.post('/generate-pdf', async (req, res) => {
+    try {
+        const token = String(req.body?.token || req.query?.token || '').trim();
+        if (!token) {
+            return res.status(400).json({ success: false, error: 'トークンがありません' });
+        }
+
+        const payload = jwt.verify(token, String(process.env.JWT_SECRET || '').trim());
+        const signRequest = await markSignRequestExpired(
+            await dbService.getSignRequestById(payload.signRequestId)
+        );
+
+        if (!signRequest) {
+            return res.status(404).json({ success: false, error: '署名依頼が見つかりません' });
+        }
+        if (signRequest.status === 'expired') {
+            return res.status(410).json({ success: false, error: '有効期限が切れましたので、再度発行依頼をしていただくようお願いいたします。' });
+        }
+        if (signRequest.status === 'completed') {
+            return res.status(410).json({ success: false, error: 'この署名依頼はすでに完了しています' });
+        }
+
+        const recipient = (signRequest.recipients || []).find((item) => String(item.email || '').trim() === String(payload.email || '').trim());
+        if (!recipient) {
+            return res.status(403).json({ success: false, error: '署名リンクが無効です' });
+        }
+
+        const ownerUid = String(signRequest.ownerUid || signRequest.requestedBy || '').trim();
+        let contract = null;
+        if (signRequest.contract_id && ownerUid) {
+            try {
+                const contracts = await dbService.getContracts(ownerUid);
+                contract = (Array.isArray(contracts) ? contracts : []).find((item) => String(item.id) === String(signRequest.contract_id)) || null;
+            } catch (contractError) {
+                logger.warn('[sign generate-pdf] contract lookup failed', {
+                    requestId: signRequest.id,
+                    contractId: signRequest.contract_id,
+                    error: contractError.message
+                });
+            }
+        }
+
+        const existingPdfUrl = await resolveSignRequestPdfUrl(signRequest, req, contract);
+        if (existingPdfUrl) {
+            return res.json({ success: true, pdfUrl: existingPdfUrl });
+        }
+
+        const sourceMeta = contract || signRequest.document_snapshot || {};
+        const sourceCandidates = [
+            contract?.original_file_path,
+            contract?.original_file_url,
+            signRequest?.document_snapshot?.original_file_path,
+            signRequest?.document_snapshot?.original_file_url,
+            signRequest?.original_file_path,
+            signRequest?.original_file_url
+        ].filter(Boolean);
+
+        let sourceBuffer = null;
+        let resolvedSource = '';
+        for (const candidate of sourceCandidates) {
+            const current = await loadOriginalSourceBuffer(candidate, `sign-generate-pdf:${signRequest.id}`);
+            if (current?.length) {
+                sourceBuffer = current;
+                resolvedSource = String(candidate || '');
+                break;
+            }
+        }
+
+        if (!sourceBuffer?.length) {
+            return res.status(404).json({ success: false, error: '署名対象の原本ファイルが見つかりません' });
+        }
+
+        const sourceName = String(
+            sourceMeta?.original_filename
+            || signRequest?.document_name
+            || resolvedSource
+            || ''
+        ).trim();
+        const isDocxSourceFile = isDocxLikeSource(resolvedSource, sourceName);
+        const pdfBuffer = isDocxSourceFile
+            ? await createPdfBufferFromDocxSource(sourceBuffer, signRequest.id)
+            : sourceBuffer;
+
+        const persisted = await persistSignSourcePdf(
+            signRequest.id,
+            pdfBuffer,
+            req,
+            isDocxSourceFile ? 'docx-generated' : 'source'
+        );
+
+        const updatedSnapshot = {
+            ...(signRequest.document_snapshot || {}),
+            pdf_url: persisted.pdfUrl,
+            pdf_storage_path: persisted.pdfStoragePath
+        };
+
+        await dbService.updateSignRequest(
+            signRequest.id,
+            { document_snapshot: updatedSnapshot },
+            ownerUid || null
+        );
+
+        if (contract) {
+            await dbService.updateContract(
+                contract.id,
+                {
+                    pdf_url: persisted.pdfUrl,
+                    pdf_storage_path: persisted.pdfStoragePath
+                },
+                ownerUid || null
+            );
+        }
+
+        return res.json({ success: true, pdfUrl: persisted.pdfUrl });
+    } catch (error) {
+        logger.error('[sign generate-pdf] Error:', error.message);
+        return res.status(500).json({ success: false, error: 'PDF_GENERATE_FAILED' });
     }
 });
 
@@ -1274,9 +1539,23 @@ router.get('/original-file', async (req, res) => {
             try {
                 const contracts = await dbService.getContracts(ownerUid);
                 contract = (Array.isArray(contracts) ? contracts : []).find((item) => String(item.id) === String(signRequest.contract_id)) || null;
+                logger.info(`Sign /original-file: contract lookup contractId=${signRequest.contract_id} found=${!!contract}${contract ? ` file_path=${!!contract.original_file_path} file_url=${!!contract.original_file_url}` : ''}`);
+                if (contract) {
+                    logger.info(`Sign /original-file: contract data:`, JSON.stringify({
+                        id: contract.id,
+                        original_file_path: contract.original_file_path,
+                        original_file_url: contract.original_file_url,
+                        original_filename: contract.original_filename,
+                        document_name: contract.document_name
+                    }, null, 2));
+                } else {
+                    logger.warn(`Sign /original-file: contract NOT found. Available contracts:`, contracts?.slice(0, 3).map(c => ({ id: c.id, has_file_path: !!c.original_file_path, has_file_url: !!c.original_file_url })));
+                }
             } catch (contractError) {
-                logger.warn(`Sign original-file contract lookup failed requestId=${signRequest.id} contractId=${signRequest.contract_id} error=${contractError.message}`);
+                logger.warn(`Sign /original-file: contract lookup failed contractId=${signRequest.contract_id} error=${contractError.message}`);
             }
+        } else {
+            logger.info(`Sign /original-file: contract_id=${signRequest.contract_id} ownerUid=${ownerUid ? 'SET' : 'EMPTY'}`);
         }
 
         const sourceMeta = contract || signRequest.document_snapshot || {};
@@ -1284,16 +1563,56 @@ router.get('/original-file', async (req, res) => {
             contract?.original_file_path,
             contract?.original_file_url,
             signRequest?.document_snapshot?.original_file_path,
-            signRequest?.document_snapshot?.original_file_url
+            signRequest?.document_snapshot?.original_file_url,
+            signRequest?.original_file_path,
+            signRequest?.original_file_url
         ].filter(Boolean);
+
+        logger.info(`Sign /original-file: candidates count=${candidates.length} contract=${!!contract} docsnap=${!!signRequest?.document_snapshot}`);
+        if (signRequest?.document_snapshot && !contract) {
+            logger.info(`Sign /original-file: using document_snapshot (no contract):`, JSON.stringify({
+                original_file_path: signRequest.document_snapshot.original_file_path,
+                original_file_url: signRequest.document_snapshot.original_file_url,
+                original_filename: signRequest.document_snapshot.original_filename
+            }, null, 2));
+        }
+        if (candidates.length === 0) {
+            logger.error(`Sign /original-file: NO candidates!`, {
+                has_contract: !!contract,
+                contract_paths: contract ? { file_path: !!contract.original_file_path, file_url: !!contract.original_file_url } : null,
+                has_docsnap: !!signRequest?.document_snapshot,
+                request_paths: signRequest ? { file_path: !!signRequest.original_file_path, file_url: !!signRequest.original_file_url } : null,
+                contract_id: signRequest.contract_id,
+                ownerUid: ownerUid ? 'SET' : 'EMPTY'
+            });
+        }
 
         let buffer = null;
         for (const candidate of candidates) {
+            logger.info(`Sign /original-file: trying candidate ${String(candidate).substring(0, 100)}`);
             buffer = await loadOriginalSourceBuffer(candidate, `sign-original:${signRequest.id}`);
-            if (buffer?.length) break;
+            if (buffer?.length) {
+                logger.info(`Sign /original-file: success! buffer size=${buffer.length}`);
+                break;
+            }
         }
         if (!buffer?.length) {
-            return res.status(404).json({ success: false, error: '署名対象の原本ファイルが見つかりません' });
+            if (candidates.length === 0) {
+                logger.error(`Sign /original-file: NO candidates! contract=${!!contract} has_docsnap=${!!signRequest.document_snapshot}`, {
+                    contract_id: signRequest.contract_id,
+                    has_contract_original_file_path: !!contract?.original_file_path,
+                    has_contract_original_file_url: !!contract?.original_file_url,
+                    has_docsnap_original_file_path: !!signRequest.document_snapshot?.original_file_path,
+                    has_docsnap_original_file_url: !!signRequest.document_snapshot?.original_file_url
+                });
+            } else {
+                logger.error(`Sign /original-file: all candidates failed, tried ${candidates.length} candidates`);
+            }
+            return res.status(404).json({ 
+                success: false, 
+                error: '署名対象の原本ファイルが見つかりません',
+                debug: { candidatesCount: candidates.length }
+            });
         }
 
         const encodedFileName = encodeURIComponent(String(sourceMeta.original_filename || 'document.docx'));
