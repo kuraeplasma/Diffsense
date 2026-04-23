@@ -1494,12 +1494,12 @@ export const SignEditor = {
                     ? signatureEditorSize
                     : `${field.width || 130}px`;
                 div.style.height = field.type === 'signature' ? signatureEditorSize : '48px';
-                div.style.background = field.type === 'signature' ? 'rgba(197, 48, 48, 0.03)' : 'rgba(52, 168, 83, 0.1)';
-                div.style.border = `2px solid ${field.type === 'signature' ? '#c53030' : '#34a853'}`;
+                div.style.background = 'rgba(201, 168, 76, 0.1)';
+                div.style.border = '2px solid #C9A84C';
                 div.style.borderRadius = field.type === 'signature' ? '50%' : '8px';
                 div.style.fontSize = '12px';
                 div.style.fontWeight = '600';
-                div.style.color = field.type === 'signature' ? '#c53030' : '#34a853';
+                div.style.color = '#B8963D';
                 div.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
                 div.style.cursor = 'move';
                 div.style.opacity = isMovingField
@@ -1507,15 +1507,16 @@ export const SignEditor = {
                     : (this._pointerDrag?.mode === 'resize' && String(field.id) === String(this._pointerDrag?.fieldId) ? '0.96' : '1');
                 div.style.outline = String(field.id) === String(this._selectedFieldId) ? '3px solid rgba(17,24,39,0.18)' : 'none';
                 div.title = 'ドラッグして移動';
+                const badgeStyle = 'position:absolute; top:-10px; left:-6px; z-index:2; background:#111827; color:#fff; font-size:9px; font-weight:700; width:18px; height:18px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; box-shadow:0 4px 10px rgba(0,0,0,0.15); pointer-events:none;';
                 div.innerHTML = field.type === 'signature'
                     ? `
                     ${this.getSignatureDisplayHtml(field, signatureEditorSize)}
-                    <span style="position:absolute; top:-14px; left:-8px; z-index:2; background:#111827; color:#fff; font-size:11px; font-weight:700; min-width:42px; height:28px; padding:0 10px; border-radius:999px; white-space:nowrap; display:inline-flex; align-items:center; justify-content:center; box-shadow:0 6px 14px rgba(15,23,42,0.18);">${sequenceLabel}</span>
+                    <span style="${badgeStyle}">${index + 1}</span>
                     <button onclick="event.stopPropagation(); window.SignEditor.removeField(${field.id})" title="削除" style="position:absolute; top:-14px; right:-14px; z-index:2; background:#fff; border:1px solid rgba(15,23,42,0.12); border-radius:50%; width:34px; height:34px; font-size:18px; cursor:pointer; color:#6b7280; display:flex; align-items:center; justify-content:center; box-shadow:0 6px 14px rgba(15,23,42,0.12); line-height:1;">&times;</button>
                 `
                     : `
                     <span>${this.escapeHtml(this.getPreviewDateValue(field.dateFormat))}</span>
-                    <span style="position:absolute; top:-14px; left:-8px; background:#111827; color:#fff; font-size:11px; font-weight:700; min-width:42px; height:28px; padding:0 10px; border-radius:999px; white-space:nowrap; display:inline-flex; align-items:center; justify-content:center; box-shadow:0 6px 14px rgba(15,23,42,0.18);">${sequenceLabel}</span>
+                    <span style="${badgeStyle}">${index + 1}</span>
                     <button onclick="event.stopPropagation(); window.SignEditor.removeField(${field.id})" title="削除" style="position:absolute; top:-14px; right:-14px; background:#fff; border:1px solid rgba(15,23,42,0.12); border-radius:50%; width:30px; height:30px; font-size:16px; cursor:pointer; color:#6b7280; display:flex; align-items:center; justify-content:center; box-shadow:0 6px 14px rgba(15,23,42,0.12); line-height:1;">&times;</button>
                 `;
                 div.addEventListener('click', (event) => {
