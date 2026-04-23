@@ -1736,12 +1736,7 @@ const Views = {
                                     </div>
                                     <div style="font-size:13px; color:#333; line-height:1.7; white-space:pre-wrap;">${diffData.summary || 'AI解析結果がありません'}</div>
                                 </div>
-                                ` : (contract.last_analyzed_at ? `
-                                <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 16px; margin-bottom: 24px; color: #991b1b; font-size: 13px;">
-                                    <i class="fa-solid fa-triangle-exclamation" style="margin-right: 8px;"></i>
-                                    AI解析結果を読み込めませんでした。再解析を試行してください。
-                                </div>
-                                ` : ''))}
+                                ` : '')}
 
                             </div>
 

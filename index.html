@@ -6,9 +6,10 @@
     <script src="js/env.js"></script>
     <script src="js/attribution.js?v=20260417a"></script>
     <script>
-        // Cloud Runウォームアップ
+        // APIウォームアップ
         (function() {
-            fetch('https://diffsense-api-707048573054.asia-northeast1.run.app/health', {
+            const apiBase = window.API_BASE || 'https://api-qf37m5ba2q-an.a.run.app';
+            fetch(apiBase + '/health', {
                 method: 'GET',
                 cache: 'no-store'
             }).catch(function() {});

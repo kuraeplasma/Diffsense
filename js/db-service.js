@@ -264,9 +264,21 @@ export const dbService = {
         return this.getContracts();
     },
 
-    _mergeContractIntoCache(contract) {
+    _mergeContractIntoCache(contract, tempId = null) {
         if (!contract) return;
         const contracts = this.getContracts();
+        
+        // 1. Try to find by tempId if provided (for new contracts)
+        if (tempId) {
+            const index = contracts.findIndex(c => String(c.id) === String(tempId));
+            if (index >= 0) {
+                contracts[index] = { ...contracts[index], ...contract };
+                localStorage.setItem(this.KEYS.CONTRACTS, JSON.stringify(contracts));
+                return;
+            }
+        }
+
+        // 2. Try to find by authoritative ID
         const index = contracts.findIndex(c => String(c.id) === String(contract.id));
         if (index >= 0) {
             const existing = contracts[index];
@@ -282,13 +294,13 @@ export const dbService = {
         localStorage.setItem(this.KEYS.CONTRACTS, JSON.stringify(contracts));
     },
 
-    _persistContractToApi(contract, method = 'PATCH') {
-        if (!contract?.id) return;
+    _persistContractToApi(contract, method = 'PATCH', tempId = null) {
+        if (!contract?.id && !tempId) return;
         (async () => {
             try {
-                const saved = await this.persistContractToApi(contract, method);
+                const saved = await this.persistContractToApi(contract, method, { tempId });
                 if (saved) {
-                    this._mergeContractIntoCache(saved);
+                    this._mergeContractIntoCache(saved, tempId);
                 }
             } catch (error) {
                 console.warn('Contract sync failed:', error);
@@ -297,11 +309,13 @@ export const dbService = {
     },
 
     async persistContractToApi(contract, method = 'PATCH', options = {}) {
-        if (!contract?.id) return null;
-        const endpoint = method === 'POST' ? '/api/contracts' : `/api/contracts/${contract.id}`;
+        const id = contract?.id || options.tempId;
+        if (!id && method !== 'POST') return null;
+        
+        const endpoint = method === 'POST' ? '/api/contracts' : `/api/contracts/${id}`;
         const saved = await this._callApi(endpoint, method, contract, options);
         if (saved) {
-            this._mergeContractIntoCache(saved);
+            this._mergeContractIntoCache(saved, options.tempId);
         }
         return saved;
     },
@@ -480,7 +494,7 @@ export const dbService = {
      */
     addContract(data) {
         const contracts = this.getContracts();
-        const newId = contracts.length > 0 ? Math.max(...contracts.map(c => c.id)) + 1 : 1;
+        const newId = Date.now();
         const newContract = {
             id: newId,
             name: data.name,
@@ -502,7 +516,7 @@ export const dbService = {
         contracts.unshift(newContract); // Add to top
         localStorage.setItem(this.KEYS.CONTRACTS, JSON.stringify(contracts));
         this.addActivityLog("新規登録", data.name, "ユーザー", "成功");
-        this._persistContractToApi(newContract, 'POST');
+        this._persistContractToApi(newContract, 'POST', newId);
         return newContract;
     },
 
