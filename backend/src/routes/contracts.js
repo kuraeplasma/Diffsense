@@ -15,6 +15,7 @@ const logger = require('../utils/logger');
 const crypto = require('crypto');
 const stringSimilarity = require('string-similarity');
 const mammoth = require('mammoth');
+const { bucket } = require('../firebase');
 
 router.get('/', async (req, res, next) => {
     try {
