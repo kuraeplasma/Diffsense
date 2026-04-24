@@ -236,6 +236,7 @@ ul {
     height: var(--header-height);
     display: flex;
     align-items: center;
+    gap: 8px;
     padding: 0 var(--space-lg);
     font-weight: 800;
     font-size: 22px;
@@ -243,6 +244,10 @@ ul {
     letter-spacing: 0.02em;
     color: #c5a059;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-logo i {
+    font-size: 19px;
 }
 
 .nav-menu {
@@ -2635,8 +2640,18 @@ ul {
         flex: 1;
         font-size: 15px;
         font-weight: 700;
-        color: #f5c842;
+        color: #c5a059;
         text-align: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+    }
+
+    .mobile-header-logo i {
+        font-size: 13px;
+        position: relative;
+        top: 1px;
     }
 
     .mobile-register-btn {
