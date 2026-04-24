@@ -1830,6 +1830,15 @@ ul {
     outline: none;
     border-color: #c49a3a;
     background-color: #fff;
+    box-shadow: none !important;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* Global select focus cleanup */
+select:focus {
+    outline: none !important;
+    box-shadow: none !important;
+    -webkit-tap-highlight-color: transparent !important;
 }
 
 /* Tab Interface */
