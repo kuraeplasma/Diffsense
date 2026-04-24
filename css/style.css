@@ -237,6 +237,13 @@ ul {
     line-height: 1;
     display: inline-flex;
     align-items: center;
+    gap: 8px;
+}
+
+.logo i {
+    font-size: 1.3rem;
+    position: relative;
+    top: 1px;
 }
 
 .logo-font {
@@ -1665,7 +1672,7 @@ ul {
     gap: 8px;
     font-size: 1.25rem;
     font-weight: 800;
-    color: #EDD060;
+    color: #c5a059;
     text-decoration: none;
     letter-spacing: 0.02em;
 }
