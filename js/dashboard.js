@@ -1746,7 +1746,7 @@ const Views = {
                                 <div class="skeleton-analysis" style="margin-bottom:24px;">
                                     <div class="analysis-section-title">
                                         <i class="fa-solid fa-spinner fa-spin text-primary"></i>
-                                        <span id="analysis-status-text">AIがリスクを解析中です（通常30〜90秒）</span>
+                                        <span id="analysis-status-text">AIがリスクを解析中です</span>
                                     </div>
                                     <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:16px;">
                                         <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
