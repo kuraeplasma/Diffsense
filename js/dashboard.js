@@ -3602,7 +3602,6 @@ class DashboardApp {
                     updatedContract.expiry_date
                     || updatedContract.renewal_deadline
                     || updatedContract.contract_start
-                    || updatedContract.contract_category
                 );
                 if (aiFailed) {
                     if (normalizedData.errorCode === 'AI_RATE_LIMITED') {
