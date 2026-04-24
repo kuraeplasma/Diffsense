@@ -237,6 +237,13 @@ ul {
     line-height: 1;
     display: inline-flex;
     align-items: center;
+    gap: 8px;
+}
+
+.logo i {
+    font-size: 1.3rem;
+    position: relative;
+    top: 1px;
 }
 
 .logo-font {
