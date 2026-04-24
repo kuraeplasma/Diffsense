@@ -19,7 +19,11 @@ const { bucket } = require('../firebase');
 
 router.get('/', async (req, res, next) => {
     try {
-        const ownerUid = req.user.uid;
+        const uid = req.user.uid;
+        const email = req.user.email;
+        const teamInfo = await dbService.getTeamRole(email, uid);
+        const ownerUid = teamInfo.ownerUid;
+
         const contracts = await dbService.getContracts(ownerUid);
         res.json({ success: true, data: contracts });
     } catch (error) {
@@ -30,7 +34,11 @@ router.get('/', async (req, res, next) => {
 
 router.post('/', async (req, res, next) => {
     try {
-        const ownerUid = req.user.uid;
+        const uid = req.user.uid;
+        const email = req.user.email;
+        const teamInfo = await dbService.getTeamRole(email, uid);
+        const ownerUid = teamInfo.ownerUid;
+
         // 登録数は全プランで無制限のためチェック不要
         const contracts = await dbService.getContracts(ownerUid);
 
@@ -78,7 +86,11 @@ router.post('/', async (req, res, next) => {
 
 router.patch('/:id', async (req, res, next) => {
     try {
-        const ownerUid = req.user.uid;
+        const uid = req.user.uid;
+        const email = req.user.email;
+        const teamInfo = await dbService.getTeamRole(email, uid);
+        const ownerUid = teamInfo.ownerUid;
+
         const contractId = Number(req.params.id);
         if (!Number.isFinite(contractId)) {
             return res.status(400).json({ success: false, error: '契約IDが不正です' });
@@ -530,15 +542,20 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
         const { contractId, method, source, previousVersion } = value;
         const skipAI = req.body.skipAI === true;
         const uid = req.user.uid;
+        const email = req.user.email;
 
-        logger.info(`Starting analysis for contract ${contractId} by user ${uid}`, { method });
+        // Resolve ownerUid for team members to check usage against owner's plan
+        const teamInfo = await dbService.getTeamRole(email, uid);
+        const ownerUid = teamInfo.ownerUid;
+
+        logger.info(`Starting analysis for contract ${contractId} by user ${uid} (owner: ${ownerUid})`, { method });
 
         // 0. Usage & Plan Limit Check (skip for text-only extraction)
-        const userProfile = await dbService.getUserProfile(uid);
+        const userProfile = await dbService.getUserProfile(ownerUid);
         const localUnlimited = isLocalUnlimitedMode(req);
         const limit = localUnlimited ? Number.MAX_SAFE_INTEGER : dbService.getUsageLimit(userProfile);
 
-        logger.info(`Usage check for ${uid}:`, {
+        logger.info(`Usage check for ${uid} (owner: ${ownerUid}):`, {
             plan: userProfile.plan,
             usageCount: userProfile.usageCount,
             limit: limit,
@@ -591,14 +608,14 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                 // Delete old PDF from Storage before uploading new one (prevents unbounded storage growth)
                 // Safety check: do NOT delete if there are pending sign requests referencing this contract
                 try {
-                    const existingContracts = await dbService.getContracts(uid);
+                    const existingContracts = await dbService.getContracts(ownerUid);
                     const existingContract = Array.isArray(existingContracts)
                         ? existingContracts.find(c => String(c.id) === String(contractId))
                         : null;
                     const oldStoragePath = existingContract?.pdf_storage_path || existingContract?.pdfStoragePath;
                     if (oldStoragePath && oldStoragePath.startsWith('contracts/')) {
                         // Check for pending sign requests (status: pending/sent/partially_signed)
-                        const signRequests = await dbService.getSignRequests(uid).catch(() => []);
+                        const signRequests = await dbService.getSignRequests(ownerUid).catch(() => []);
                         const pendingSignStatuses = ['pending', 'sent', 'partially_signed', 'in_progress'];
                         const hasPendingSign = Array.isArray(signRequests) && signRequests.some(sr =>
                             String(sr.contract_id) === String(contractId)
@@ -753,8 +770,8 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
 
                     // 3.1 Increment Usage Count ONLY on successful AI analysis
                     const aiSucceeded = aiResult && aiResult.summary && !isAiFailureSummary(aiResult.summary) && aiResult.isFallback !== true;
-                    if (aiSucceeded) {
-                        await dbService.incrementUsage(uid);
+                    if (aiSucceeded && !localUnlimited) {
+                        await dbService.incrementUsage(ownerUid);
                         // 3.2 Save contract_meta (deadline info) if extracted
                         const meta = aiResult.contract_meta;
                         if (meta && contractId) {
@@ -770,15 +787,16 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                                 alert_sent_7d: false,
                                 alert_sent_0d: false
                             };
-                            await dbService.updateContract(contractId, metaUpdate, uid);
+                            await dbService.updateContract(contractId, metaUpdate, ownerUid);
                             logger.info(`contract_meta saved for contract ${contractId}: expiry=${meta.expiry_date}, confidence=${meta.date_confidence}`);
                         }
-                    } else {
+                    } else if (!aiSucceeded) {
                         logger.info(`AI analysis failed for user ${uid} - usage count NOT incremented`);
                     }
                 } else {
                     logger.warn('No text extracted, skipping AI analysis');
                     aiResult.summary = 'テキストを抽出できませんでした（画像ベースの可能性があります）';
+                    aiResult.riskReason = 'テキストを抽出できませんでした';
                 }
             }
 
@@ -797,7 +815,6 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
 
         logger.info(`Response ready for contract ${contractId}`);
 
-        // 4. Feature Gating (Business+ only for detailed analysis)
         // 4. Feature Gating
         let gatedChanges = aiResult.changes || [];
         const plan = userProfile.plan || 'free';
@@ -836,6 +853,11 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
     try {
         const { contractId, source, previousVersion, skipAI } = req.body || {};
         const uid = req.user.uid;
+        const email = req.user.email;
+
+        // Resolve ownerUid for team members to check usage against owner's plan
+        const teamInfo = await dbService.getTeamRole(email, uid);
+        const ownerUid = teamInfo.ownerUid;
 
         if (!Number.isInteger(contractId) || contractId <= 0) {
             return res.status(400).json({ success: false, error: '"contractId" must be a positive integer' });
@@ -844,12 +866,34 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
             return res.status(400).json({ success: false, error: '"source" is required' });
         }
 
-        const userProfile = await dbService.getUserProfile(uid);
+        const userProfile = await dbService.getUserProfile(ownerUid);
         const localUnlimited = isLocalUnlimitedMode(req);
         const limit = localUnlimited ? Number.MAX_SAFE_INTEGER : dbService.getUsageLimit(userProfile);
 
         if (!skipAI && !localUnlimited && userProfile.usageCount >= limit) {
-            return res.status(403).json({ success: false, error: `プランの月間解析上限（${limit}回）に達しました。アップグレードをご検討ください。` });
+            const plan = userProfile.plan || 'free';
+            const nextPlanMap = {
+                'free': { name: 'Starter', limit: 50, price: '¥1,480' },
+                'trial': { name: 'Starter', limit: 50, price: '¥1,480' },
+                'starter': { name: 'Business', limit: 120, price: '¥4,980' },
+                'business': { name: 'Pro', limit: 400, price: '¥9,800' },
+                'pro': null
+            };
+            const next = nextPlanMap[plan];
+            let suggestion = '来月までお待ちいただくか、プランのアップグレードをご検討ください。';
+            if (next) {
+                suggestion = `${next.name}プラン（${next.price}/月）にアップグレードすると、月${next.limit}回までAI解析が可能です。`;
+            }
+            return res.status(403).json({
+                success: false,
+                code: 'ANALYSIS_LIMIT_EXCEEDED',
+                message: `今月のAI差分チェック回数の上限に達しました。\n\n${suggestion}`,
+                error: '今月のAI差分チェック回数の上限に達しました',
+                currentUsage: userProfile.usageCount,
+                limit: limit,
+                plan: plan,
+                nextPlan: next
+            });
         }
 
         const currentBuffer = decodeBase64Payload(source);
@@ -963,7 +1007,7 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
             last_updated_at: new Date().toISOString(),
             status: '解析済み',
             original_filename: filename
-        }, uid).catch(dbErr => logger.error('Firestore update failed for DOCX upload:', dbErr.message));
+        }, ownerUid).catch(dbErr => logger.error('Firestore update failed for DOCX upload:', dbErr.message));
 
         const diffChanges = previousArticles.length
             ? diffService.compare(previousArticles, currentArticles)
@@ -1004,8 +1048,8 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
                     };
 
                 const aiSucceeded = aiResult && aiResult.summary && !isAiFailureSummary(aiResult.summary) && aiResult.isFallback !== true;
-                if (aiSucceeded) {
-                    await dbService.incrementUsage(uid);
+                if (aiSucceeded && !localUnlimited) {
+                    await dbService.incrementUsage(ownerUid);
                     // Save contract_meta (deadline info) if extracted
                     const meta = aiResult.contract_meta;
                     if (meta && contractId) {
@@ -1021,7 +1065,7 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
                             alert_sent_7d: false,
                             alert_sent_0d: false
                         };
-                        await dbService.updateContract(contractId, metaUpdate, uid);
+                        await dbService.updateContract(contractId, metaUpdate, ownerUid);
                         logger.info(`contract_meta saved for DOCX contract ${contractId}: expiry=${meta.expiry_date}`);
                     }
                 }
@@ -1074,12 +1118,16 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
 router.get('/:id/original-file', async (req, res, next) => {
     try {
         const uid = req.user.uid;
+        const email = req.user.email;
+        const teamInfo = await dbService.getTeamRole(email, uid);
+        const ownerUid = teamInfo.ownerUid;
+
         const contractId = parseInt(req.params.id, 10);
         if (isNaN(contractId)) {
             return res.status(400).json({ success: false, error: '契約IDが不正です' });
         }
 
-        const contracts = await dbService.getContracts(uid);
+        const contracts = await dbService.getContracts(ownerUid);
         const contract = (Array.isArray(contracts) ? contracts : [])
             .find(c => String(c.id) === String(contractId));
         if (!contract) {
@@ -1138,6 +1186,10 @@ router.get('/:id/original-file', async (req, res, next) => {
 router.post('/storage/cleanup', async (req, res, next) => {
     try {
         const uid = req.user.uid;
+        const email = req.user.email;
+        const teamInfo = await dbService.getTeamRole(email, uid);
+        const ownerUid = teamInfo.ownerUid;
+
         const { bucket } = require('../firebase');
         if (!bucket) {
             return res.json({ success: true, message: 'Storage not available', deleted: 0 });
@@ -1147,7 +1199,7 @@ router.post('/storage/cleanup', async (req, res, next) => {
         const [allFiles] = await bucket.getFiles({ prefix: 'contracts/' });
 
         // 現在のユーザーの契約を取得し、有効なpdf_storage_pathを収集
-        const contracts = await dbService.getContracts(uid);
+        const contracts = await dbService.getContracts(ownerUid);
         const validPaths = new Set(
             (Array.isArray(contracts) ? contracts : [])
                 .map(c => c.pdf_storage_path || c.pdfStoragePath)
@@ -1182,19 +1234,42 @@ router.post('/storage/cleanup', async (req, res, next) => {
 router.post('/:id/reanalyze', rateLimit, async (req, res, next) => {
     try {
         const uid = req.user.uid;
+        const email = req.user.email;
         const contractId = parseInt(req.params.id, 10);
         if (isNaN(contractId)) {
             return res.status(400).json({ success: false, error: '契約IDが不正です' });
         }
 
-        const userProfile = await dbService.getUserProfile(uid);
-        const localUnlimited = process.env.LOCAL_UNLIMITED === 'true';
+        const teamInfo = await dbService.getTeamRole(email, uid);
+        const ownerUid = teamInfo.ownerUid;
+        const userProfile = await dbService.getUserProfile(ownerUid);
+        const localUnlimited = isLocalUnlimitedMode(req);
         const limit = localUnlimited ? Number.MAX_SAFE_INTEGER : dbService.getUsageLimit(userProfile);
 
         if (!localUnlimited && userProfile.usageCount >= limit) {
+            const plan = userProfile.plan || 'free';
+            const nextPlanMap = {
+                'free': { name: 'Starter', limit: 50, price: '¥1,480' },
+                'trial': { name: 'Starter', limit: 50, price: '¥1,480' },
+                'starter': { name: 'Business', limit: 120, price: '¥4,980' },
+                'business': { name: 'Pro', limit: 400, price: '¥9,800' },
+                'pro': null
+            };
+            const next = nextPlanMap[plan];
+            let suggestion = '来月までお待ちいただくか、プランのアップグレードをご検討ください。';
+            if (next) {
+                suggestion = `${next.name}プラン（${next.price}/月）にアップグレードすると、月${next.limit}回までAI解析が可能です。`;
+            }
+
             return res.status(403).json({
                 success: false,
-                error: `プランの月間解析上限（${limit}回）に達しました。`
+                code: 'ANALYSIS_LIMIT_EXCEEDED',
+                message: `今月のAI差分チェック回数の上限に達しました。\n\n${suggestion}`,
+                error: '今月のAI差分チェック回数の上限に達しました',
+                currentUsage: userProfile.usageCount,
+                limit: limit,
+                plan: plan,
+                nextPlan: next
             });
         }
 
@@ -1204,7 +1279,7 @@ router.post('/:id/reanalyze', rateLimit, async (req, res, next) => {
         let contractText = requestText;
 
         if (!contractText || contractText.length < 10) {
-            const savedContract = await dbService.getContractById(contractId, uid);
+            const savedContract = await dbService.getContractById(contractId, ownerUid);
             if (savedContract) {
                 const textCandidates = [
                     savedContract.original_content,
@@ -1229,29 +1304,43 @@ router.post('/:id/reanalyze', rateLimit, async (req, res, next) => {
         }
 
         // 単体解析（previousVersion = null）
-        // ローカル/本番で同じ実装を使うため、環境共通の設定値で制御する。
         let aiResult = null;
         const configuredReanalyzeAttempts = Number(process.env.REANALYZE_MAX_ATTEMPTS || 2);
         const maxReanalyzeAttempts = Number.isFinite(configuredReanalyzeAttempts) && configuredReanalyzeAttempts >= 1
             ? Math.min(Math.floor(configuredReanalyzeAttempts), 5)
             : 2;
+        const configuredRetryBaseMs = Number(process.env.REANALYZE_RETRY_BASE_MS || 1500);
+        const reanalyzeRetryBaseMs = Number.isFinite(configuredRetryBaseMs) && configuredRetryBaseMs >= 0
+            ? Math.floor(configuredRetryBaseMs)
+            : 1500;
+        const configuredRateLimitedRetryBaseMs = Number(process.env.REANALYZE_RATE_LIMIT_RETRY_BASE_MS || 6000);
+        const reanalyzeRateLimitedRetryBaseMs = Number.isFinite(configuredRateLimitedRetryBaseMs) && configuredRateLimitedRetryBaseMs >= 0
+            ? Math.floor(configuredRateLimitedRetryBaseMs)
+            : 6000;
         for (let attempt = 1; attempt <= maxReanalyzeAttempts; attempt++) {
             try {
                 aiResult = await geminiService.analyzeContract(contractText, null);
                 if (isAiResultReady(aiResult)) break;
                 if (attempt < maxReanalyzeAttempts) {
                     logger.warn(`Reanalyze attempt ${attempt} returned fallback, retrying...`);
-                    await new Promise(r => setTimeout(r, 1500 * attempt));
+                    const isRateLimited = aiResult?.errorCode === 'AI_RATE_LIMITED';
+                    const waitMs = (isRateLimited ? reanalyzeRateLimitedRetryBaseMs : reanalyzeRetryBaseMs) * attempt;
+                    await new Promise(r => setTimeout(r, waitMs));
                 }
             } catch (e) {
                 logger.warn(`Reanalyze attempt ${attempt} threw: ${e.message}`);
-                if (attempt < maxReanalyzeAttempts) await new Promise(r => setTimeout(r, 1500 * attempt));
+                if (attempt < maxReanalyzeAttempts) {
+                    const status = Number(e?.response?.status || 0);
+                    const isRateLimited = status === 429;
+                    const waitMs = (isRateLimited ? reanalyzeRateLimitedRetryBaseMs : reanalyzeRetryBaseMs) * attempt;
+                    await new Promise(r => setTimeout(r, waitMs));
+                }
             }
         }
 
         const aiReady = isAiResultReady(aiResult);
         if (!aiReady) {
-            // 解析失敗時でもステータスを確実に更新（フロントエンドでの再試行ボタン表示のため）
+            // 解析失敗時でもステータスを確実に更新
             const failedMetaUpdate = {
                 ai_succeeded: false,
                 last_analyzed_at: new Date().toISOString(),
@@ -1274,7 +1363,7 @@ router.post('/:id/reanalyze', rateLimit, async (req, res, next) => {
                 });
             }
 
-            await dbService.updateContract(contractId, failedMetaUpdate, uid);
+            await dbService.updateContract(contractId, failedMetaUpdate, ownerUid);
             logger.info(`Recorded AI failure for contract ${contractId}. meaningfulMeta=${!!fallbackMeta}`);
 
             return res.json({
@@ -1296,7 +1385,9 @@ router.post('/:id/reanalyze', rateLimit, async (req, res, next) => {
         }
 
         // 解析成功時のみ解析回数を消費
-        await dbService.incrementUsage(uid);
+        if (!localUnlimited) {
+            await dbService.incrementUsage(ownerUid);
+        }
 
         // contract_meta を Firestore に保存
         const meta = aiResult.contract_meta;
@@ -1322,7 +1413,7 @@ router.post('/:id/reanalyze', rateLimit, async (req, res, next) => {
                 alert_sent_0d: false,
             } : {})
         };
-        await dbService.updateContract(contractId, metaUpdate, uid);
+        await dbService.updateContract(contractId, metaUpdate, ownerUid);
 
         logger.info(`Reanalysis complete for contract ${contractId}, risk=${aiResult.riskLevel}, expiry=${meta?.expiry_date}`);
 

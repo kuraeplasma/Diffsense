@@ -59,6 +59,12 @@ function findSignRequestById(requests, signRequestId) {
     return (Array.isArray(requests) ? requests : []).find((item) => String(item.id) === String(signRequestId));
 }
 
+function isLocalUnlimitedMode(req) {
+    const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').toLowerCase();
+    const isLocalHost = host.includes('localhost') || host.includes('127.0.0.1');
+    return process.env.NODE_ENV === 'development' && process.env.AUTH_BYPASS === 'true' && isLocalHost;
+}
+
 function annotateFieldsWithRecipientEmail(fields, recipients) {
     return (Array.isArray(fields) ? fields : []).map((field) => {
         const recipientIndex = Number(field?.assigneeIndex ?? field?.recipientIndex ?? 0);
@@ -1128,10 +1134,15 @@ async function saveAuditEvent({ signRequestId, ownerUid, event, actorEmail, ipAd
     }
 }
 
-async function ensureSignQuota(ownerUid) {
+async function ensureSignQuota(ownerUid, req = null) {
     const userProfile = await dbService.getUserProfile(ownerUid);
     const limit = dbService.getSignUsageLimitForUser(userProfile);
     const plan = userProfile.plan || 'free';
+
+    // 開発環境かつ認証バイパス時は制限なし
+    if (req && isLocalUnlimitedMode(req)) {
+        return { limited: false, remaining: 999999 };
+    }
 
     if (plan === 'pro') {
         return { limited: false, remaining: 999999 };
@@ -1175,7 +1186,12 @@ async function ensureSignQuota(ownerUid) {
 router.post('/create', async (req, res) => {
     try {
         const { contractId, recipients, document_snapshot: documentSnapshot, document_name: documentName } = req.body;
-        const ownerUid = req.user.uid;
+        const uid = req.user.uid;
+        const email = req.user.email;
+
+        // Resolve ownerUid for team members
+        const teamInfo = await dbService.getTeamRole(email, uid);
+        const ownerUid = teamInfo.ownerUid;
 
         if ((!contractId && !documentSnapshot?.id) || !recipients || recipients.length === 0) {
             return res.status(400).json({ success: false, error: 'Missing parameters' });
@@ -1187,7 +1203,7 @@ router.post('/create', async (req, res) => {
         }
         const normalizedRecipients = recipientValidation.normalized;
 
-        const quota = await ensureSignQuota(ownerUid);
+        const quota = await ensureSignQuota(ownerUid, req);
         if (quota.limited) {
             return res.status(403).json({
                 success: false,
@@ -1288,7 +1304,8 @@ router.post('/create', async (req, res) => {
 
 router.get('/list', async (req, res) => {
     try {
-        const ownerUid = req.user.uid;
+        const teamInfo = await dbService.getTeamRole(req.user.email, req.user.uid);
+        const ownerUid = teamInfo.ownerUid;
         const requests = await syncExpiredSignRequests(await dbService.getSignRequests(ownerUid));
         res.json({ success: true, data: requests });
     } catch (error) {
@@ -1630,7 +1647,8 @@ router.get('/embed/:requestId/:actionId', async (req, res) => {
     try {
         const { requestId, actionId } = req.params;
         if (useFirmaProvider()) {
-            const requests = await dbService.getSignRequests(req.user.uid);
+            const teamInfo = await dbService.getTeamRole(req.user.email, req.user.uid);
+            const requests = await dbService.getSignRequests(teamInfo.ownerUid);
             const signRequest = requests.find((item) =>
                 String(item.firma_request_id || '') === String(requestId)
                 || String(item.id) === String(requestId)
@@ -1656,7 +1674,8 @@ router.get('/embed/:requestId/:actionId', async (req, res) => {
 
 router.get('/:id/audit-events', async (req, res) => {
     try {
-        const ownerUid = req.user.uid;
+        const teamInfo = await dbService.getTeamRole(req.user.email, req.user.uid);
+        const ownerUid = teamInfo.ownerUid;
         const signRequestId = req.params.id;
 
         const requests = await dbService.getSignRequests(ownerUid);
@@ -1687,7 +1706,8 @@ router.get('/:id/audit-events', async (req, res) => {
 
 router.get('/:id/completed-document', async (req, res) => {
     try {
-        const ownerUid = req.user.uid;
+        const teamInfo = await dbService.getTeamRole(req.user.email, req.user.uid);
+        const ownerUid = teamInfo.ownerUid;
         const signRequestId = req.params.id;
         const requests = await dbService.getSignRequests(ownerUid);
         const signRequest = findSignRequestById(requests, signRequestId);
@@ -1725,7 +1745,9 @@ router.get('/:id/completed-document', async (req, res) => {
 
 router.get('/:id/signing-url', async (req, res) => {
     try {
-        const requests = await dbService.getSignRequests(req.user.uid);
+        const teamInfo = await dbService.getTeamRole(req.user.email, req.user.uid);
+        const ownerUid = teamInfo.ownerUid;
+        const requests = await dbService.getSignRequests(ownerUid);
         const signRequest = requests.find((item) => String(item.id) === String(req.params.id));
         if (!signRequest) {
             return res.status(404).json({ success: false, error: 'Request not found' });
@@ -1743,7 +1765,8 @@ router.get('/:id/signing-url', async (req, res) => {
 
 router.get('/:id', async (req, res) => {
     try {
-        const ownerUid = req.user.uid;
+        const teamInfo = await dbService.getTeamRole(req.user.email, req.user.uid);
+        const ownerUid = teamInfo.ownerUid;
         const signRequestId = req.params.id;
         const requests = await dbService.getSignRequests(ownerUid);
         const signRequest = findSignRequestById(requests, signRequestId);
@@ -2039,7 +2062,8 @@ router.patch('/:id', async (req, res) => {
         console.log('[sign PATCH] called', { id: req.params.id, body: req.body, uid: req.user?.uid });
         const { id } = req.params;
         const updates = { ...req.body };
-        const ownerUid = req.user.uid;
+        const teamInfo = await dbService.getTeamRole(req.user.email, req.user.uid);
+        const ownerUid = teamInfo.ownerUid;
         const requests = await dbService.getSignRequests(ownerUid);
         const existing = requests.find((item) => String(item.id) === String(id));
 
@@ -2209,7 +2233,8 @@ router.patch('/:id', async (req, res) => {
 router.post('/:id/remind', remindRateLimit, async (req, res) => {
     try {
         const { id } = req.params;
-        const ownerUid = req.user.uid;
+        const teamInfo = await dbService.getTeamRole(req.user.email, req.user.uid);
+        const ownerUid = teamInfo.ownerUid;
         const requests = await dbService.getSignRequests(ownerUid);
         const signRequest = requests.find((item) => String(item.id) === String(id));
 

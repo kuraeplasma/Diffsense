@@ -60,7 +60,11 @@ router.get('/check-exists', async (req, res) => {
 router.get('/subscription', async (req, res) => {
     try {
         const uid = req.user.uid;
-        const userProfile = await dbService.getUserProfile(uid);
+        const email = req.user.email;
+        const teamInfo = await dbService.getTeamRole(email, uid);
+        const ownerUid = teamInfo.ownerUid;
+
+        const userProfile = await dbService.getUserProfile(ownerUid);
         const localUnlimited = isLocalUnlimitedMode(req);
         
         const plan = userProfile.plan || 'free';
@@ -79,7 +83,7 @@ router.get('/subscription', async (req, res) => {
             countBaselineTime = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
         }
 
-        const signRequests = await dbService.getSignRequests(uid);
+        const signRequests = await dbService.getSignRequests(ownerUid);
         const signUsageCount = localUnlimited
             ? 0
             : (Array.isArray(signRequests) ? signRequests : []).filter((request) => {
@@ -89,7 +93,7 @@ router.get('/subscription', async (req, res) => {
                 return createdTime >= countBaselineTime;
             }).length;
 
-        logger.info(`GET /subscription: uid=${uid}, plan=${plan}, AI=${userProfile.usageCount}/${limit}, Sign=${signUsageCount}/${signUsageLimit}`);
+        logger.info(`GET /subscription: uid=${uid} (owner=${ownerUid}), plan=${plan}, AI=${userProfile.usageCount}/${limit}, Sign=${signUsageCount}/${signUsageLimit}`);
 
         res.json({
             success: true,

@@ -3516,6 +3516,12 @@ class DashboardApp {
             Notify.warning('解析はボタン操作からのみ実行できます。');
             return;
         }
+        const usageCount = Number(this.subscription?.usageCount || 0);
+        const usageLimit = Number(this.subscription?.usageLimit);
+        if (Number.isFinite(usageLimit) && usageLimit > 0 && usageCount >= usageLimit) {
+            this.showAnalysisLimitError({ currentUsage: usageCount, limit: usageLimit });
+            return;
+        }
         const c = dbService.getContractById(contractId);
         if (!c) { Notify.error('契約が見つかりません'); return; }
 
@@ -3555,6 +3561,10 @@ class DashboardApp {
                 console.info('AI_RESPONSE', { contractId, data });
 
                 if (!data.success) {
+                    if (data.code === 'ANALYSIS_LIMIT_EXCEEDED') {
+                        await this.showAnalysisLimitError(data);
+                        return;
+                    }
                     Notify.error(data.error || '解析に失敗しました');
                     return;
                 }
@@ -3682,6 +3692,12 @@ class DashboardApp {
             Notify.warning('解析はボタン操作からのみ実行できます。');
             return;
         }
+        const usageCount = Number(this.subscription?.usageCount || 0);
+        const usageLimit = Number(this.subscription?.usageLimit);
+        if (Number.isFinite(usageLimit) && usageLimit > 0 && usageCount >= usageLimit) {
+            await this.showAnalysisLimitError({ currentUsage: usageCount, limit: usageLimit });
+            return;
+        }
         const contracts = dbService.getContracts();
         const c = contracts.find(x => String(x.id) === String(contractId));
         if (!c) { Notify.error('契約が見つかりません'); return; }
@@ -3735,6 +3751,11 @@ class DashboardApp {
             const data = await res.json();
 
             if (!data.success) {
+                if (data.code === 'ANALYSIS_LIMIT_EXCEEDED') {
+                    await this.showAnalysisLimitError(data);
+                    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-rotate" style="margin-right:4px;font-size:10px;"></i>再解析'; }
+                    return;
+                }
                 Notify.error(data.error || '再解析に失敗しました');
                 if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-rotate" style="margin-right:4px;font-size:10px;"></i>再解析'; }
                 return;

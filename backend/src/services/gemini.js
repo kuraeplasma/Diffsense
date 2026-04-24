@@ -908,6 +908,27 @@ function shouldRetryGeminiRequest(error) {
     return /timeout|ECONNRESET|ETIMEDOUT|socket hang up|network/i.test(message);
 }
 
+function getGeminiErrorStatus(error) {
+    const status = Number(error?.response?.status || 0);
+    return Number.isFinite(status) ? status : 0;
+}
+
+function parseRetryAfterMs(error) {
+    const headers = error?.response?.headers || {};
+    const raw = headers['retry-after'] ?? headers['Retry-After'];
+    if (raw === undefined || raw === null) return null;
+
+    const asNumber = Number(raw);
+    if (Number.isFinite(asNumber) && asNumber >= 0) {
+        return Math.floor(asNumber * 1000);
+    }
+
+    const asDate = new Date(String(raw)).getTime();
+    if (Number.isNaN(asDate)) return null;
+    const delta = asDate - Date.now();
+    return delta > 0 ? delta : 0;
+}
+
 function getGeminiRequestBudget() {
     // ローカル/本番で同一実装。必要時は環境変数で同じキーを調整する。
     const timeoutMsRaw = Number(process.env.GEMINI_TIMEOUT_MS || 45000);
@@ -973,6 +994,10 @@ class GeminiService {
                 } catch (error) {
                     lastError = error;
                     logger.warn(`${label} request failed (jsonMime=${enforceJsonMime}): ${error.message}`);
+                    // 429 は MIME 変更では解消しないため、不要な追加リクエストを抑制する。
+                    if (getGeminiErrorStatus(error) === 429) {
+                        throw error;
+                    }
                 }
             }
             throw lastError || new Error(`${label} request failed`);
@@ -1116,8 +1141,13 @@ class GeminiService {
                 if (attempt >= budget.maxAttempts - 1 || !shouldRetryGeminiRequest(error)) {
                     break;
                 }
-                const waitMs = budget.retryBaseMs * (attempt + 1);
-                logger.warn(`Gemini request retry ${attempt + 1}/${Math.max(0, budget.maxAttempts - 1)} after ${waitMs}ms: ${error.message}`);
+                const status = getGeminiErrorStatus(error);
+                const retryAfterMs = status === 429 ? parseRetryAfterMs(error) : null;
+                const linearWaitMs = budget.retryBaseMs * (attempt + 1);
+                const waitMs = status === 429
+                    ? Math.max(retryAfterMs ?? 0, Math.max(2000, linearWaitMs * 3))
+                    : linearWaitMs;
+                logger.warn(`Gemini request retry ${attempt + 1}/${Math.max(0, budget.maxAttempts - 1)} after ${waitMs}ms (status=${status || 'n/a'}): ${error.message}`);
                 await new Promise((resolve) => setTimeout(resolve, waitMs));
             }
         }
