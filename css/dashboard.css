@@ -2783,6 +2783,11 @@ select:focus {
         gap: 4px;
     }
 
+    /* Prevent iOS Auto-Zoom on Focus */
+    input, select, textarea {
+        font-size: 16px !important;
+    }
+
     /* Global touch cleanup */
     .stat-card,
     .bottom-nav-item,
