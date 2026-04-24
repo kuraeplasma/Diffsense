@@ -3540,6 +3540,13 @@ class DashboardApp {
             const start = Date.now();
             const btn = document.getElementById('btn-reanalyze');
             if (btn) {
+                // サイズが変わらないように現在の幅を固定し、中身をセンターに寄せる
+                const rect = btn.getBoundingClientRect();
+                btn.style.width = rect.width + 'px';
+                btn.style.display = 'inline-flex';
+                btn.style.justifyContent = 'center';
+                btn.style.alignItems = 'center';
+
                 btn.disabled = true;
                 btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right:6px;"></i>解析中...';
             }
@@ -3628,6 +3635,10 @@ class DashboardApp {
                 if (btn) {
                     btn.disabled = false;
                     btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i>AIリスク解析＋期限取得';
+                    btn.style.width = '';
+                    btn.style.display = '';
+                    btn.style.justifyContent = '';
+                    btn.style.alignItems = '';
                 }
                 console.log({
                     type: 'reanalyze_performance',
