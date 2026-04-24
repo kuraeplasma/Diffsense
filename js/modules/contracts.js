@@ -44,47 +44,36 @@ export function render({ app, dbService, escapeHtmlText, formatDisplayTimestamp,
     })();
 
     return `
-            <div class="flex justify-between items-center mb-md">
-                <h2 class="page-title" style="margin-bottom:0;">契約・規約管理</h2>
-                <div class="flex gap-sm">
-                </div>
-            </div>
+            <div class="dashboard-sticky-header">
+                <div class="filter-bar mb-md">
+                    <div class="contract-filters-grid">
+                        <div class="search-input-container">
+                            <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                            <input type="text" id="contract-search" placeholder="契約名・種別・担当者で検索..."
+                                   value="${appFilters.query || ''}"
+                                   class="search-input"
+                                   oninput="window.app.updateFilter('query', this.value)">
+                        </div>
 
-            <div class="filter-bar mb-md">
-                <div class="flex flex-wrap gap-md items-center">
-                    <div style="position:relative; flex:1; min-width:250px;">
-                        <i class="fa-solid fa-magnifying-glass" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:#999;"></i>
-                        <input type="text" id="contract-search" placeholder="契約名・種別・担当者で検索..."
-                               value="${appFilters.query || ''}"
-                               style="padding:8px 12px 8px 36px; border:1px solid #ddd; border-radius:4px; width:100%; font-size:13px;"
-                               oninput="window.app.updateFilter('query', this.value)">
-                    </div>
+                        <div class="filter-selects-row">
+                            <select onchange="window.app.updateFilter('risk', this.value)" class="filter-select">
+                                <option value="all" ${appFilters.risk === 'all' ? 'selected' : ''}>リスク: すべて</option>
+                                <option value="High" ${appFilters.risk === 'High' ? 'selected' : ''}>High</option>
+                                <option value="Medium" ${appFilters.risk === 'Medium' ? 'selected' : ''}>Medium</option>
+                                <option value="Low" ${appFilters.risk === 'Low' ? 'selected' : ''}>Low</option>
+                            </select>
 
-                    <div class="flex gap-sm items-center">
-                        <span class="text-muted" style="font-size:12px;">リスク:</span>
-                        <select onchange="window.app.updateFilter('risk', this.value)" style="padding:6px 8px; border:1px solid #ddd; border-radius:4px; font-size:13px;">
-                            <option value="all" ${appFilters.risk === 'all' ? 'selected' : ''}>すべて</option>
-                            <option value="High" ${appFilters.risk === 'High' ? 'selected' : ''}>High</option>
-                            <option value="Medium" ${appFilters.risk === 'Medium' ? 'selected' : ''}>Medium</option>
-                            <option value="Low" ${appFilters.risk === 'Low' ? 'selected' : ''}>Low</option>
-                        </select>
-                    </div>
+                            <select onchange="window.app.updateFilter('status', this.value)" class="filter-select">
+                                <option value="all" ${appFilters.status === 'all' ? 'selected' : ''}>状態: すべて</option>
+                                <option value="未確認" ${appFilters.status === '未確認' ? 'selected' : ''}>未確認</option>
+                                <option value="確認済み" ${isConfirmedStatus(appFilters.status) ? 'selected' : ''}>確認済み</option>
+                            </select>
 
-                    <div class="flex gap-sm items-center">
-                        <span class="text-muted" style="font-size:12px;">状態:</span>
-                        <select onchange="window.app.updateFilter('status', this.value)" style="padding:6px 8px; border:1px solid #ddd; border-radius:4px; font-size:13px;">
-                            <option value="all" ${appFilters.status === 'all' ? 'selected' : ''}>すべて</option>
-                            <option value="未確認" ${appFilters.status === '未確認' ? 'selected' : ''}>未確認</option>
-                            <option value="確認済み" ${isConfirmedStatus(appFilters.status) ? 'selected' : ''}>確認済み</option>
-                        </select>
-                    </div>
-
-                    <div class="flex gap-sm items-center">
-                        <span class="text-muted" style="font-size:12px;">種別:</span>
-                        <select onchange="window.app.updateFilter('type', this.value)" style="padding:6px 8px; border:1px solid #ddd; border-radius:4px; font-size:13px;">
-                            <option value="all" ${appFilters.type === 'all' ? 'selected' : ''}>すべて</option>
-                            ${typeOptions}
-                        </select>
+                            <select onchange="window.app.updateFilter('type', this.value)" class="filter-select">
+                                <option value="all" ${appFilters.type === 'all' ? 'selected' : ''}>種別: すべて</option>
+                                ${typeOptions}
+                            </select>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -105,12 +94,12 @@ export function render({ app, dbService, escapeHtmlText, formatDisplayTimestamp,
                 </table>
             </div>
 
-            <div class="flex justify-between items-center mt-md">
-                <div class="text-muted" style="font-size:13px;">全 ${totalItems} 件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, totalItems)} 件を表示</div>
+            <div class="flex justify-between items-center mt-md" style="padding-bottom:20px;">
+                <div class="text-muted" style="font-size:12px;">全 ${totalItems} 件</div>
                 <div class="flex gap-sm">
-                    <button class="btn-dashboard" ${page <= 1 ? 'disabled' : ''} onclick="window.app.changePage(${page - 1})">前へ</button>
-                    <div style="display:flex; align-items:center; padding:0 12px; font-size:13px; font-weight:600;">${page} / ${totalPages || 1}</div>
-                    <button class="btn-dashboard" ${page >= totalPages ? 'disabled' : ''} onclick="window.app.changePage(${page + 1})">次へ</button>
+                    <button class="btn-dashboard btn-sm" ${page <= 1 ? 'disabled' : ''} onclick="window.app.changePage(${page - 1})">前へ</button>
+                    <div style="display:flex; align-items:center; padding:0 8px; font-size:13px; font-weight:600;">${page} / ${totalPages || 1}</div>
+                    <button class="btn-dashboard btn-sm" ${page >= totalPages ? 'disabled' : ''} onclick="window.app.changePage(${page + 1})">次へ</button>
                 </div>
             </div>
 `;

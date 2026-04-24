@@ -1749,13 +1749,83 @@ ul {
 
 /* --- Added Features: Filtering & Source Data View --- */
 
-/* Filter Bar */
 .filter-bar {
     background: #fff;
     padding: 16px;
     border: 1px solid #eee;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.contract-filters-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+@media (min-width: 900px) {
+    .contract-filters-grid {
+        flex-direction: row;
+        align-items: center;
+    }
+}
+
+.search-input-container {
+    position: relative;
+    flex: 1;
+}
+
+.search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94a3b8;
+    font-size: 14px;
+}
+
+.search-input {
+    width: 100%;
+    padding: 10px 12px 10px 38px;
+    border: 1px solid #e2e8f0;
     border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    font-size: 14px;
+    transition: all 0.2s;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: #c49a3a;
+    box-shadow: 0 0 0 3px rgba(196, 154, 58, 0.1);
+}
+
+.filter-selects-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.filter-select {
+    flex: 1;
+    min-width: 100px;
+    padding: 8px 30px 8px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #475569;
+    background-color: #f8fafc;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 16px;
+}
+
+.filter-select:focus {
+    outline: none;
+    border-color: #c49a3a;
+    background-color: #fff;
 }
 
 /* Tab Interface */
@@ -2825,6 +2895,43 @@ ul {
         color: #666;
     }
 
+    .dashboard-sticky-header {
+        flex-shrink: 0;
+        background: #f5f7fa;
+        z-index: 10;
+    }
+
+    .filter-bar {
+        background: transparent !important;
+        border: none !important;
+        padding: 4px 16px 12px !important;
+        box-shadow: none !important;
+        margin-bottom: 4px !important;
+    }
+
+    .contract-filters-grid {
+        gap: 8px;
+    }
+
+    .filter-selects-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr; /* 2 columns */
+        gap: 8px;
+    }
+
+    .filter-selects-row .filter-select:last-child {
+        grid-column: span 2; /* Type filter takes full width in the second row */
+    }
+
+    .filter-select {
+        width: 100%;
+        padding: 10px 30px 10px 12px !important;
+        font-size: 13px !important; /* Readable size */
+        background-color: #fff !important;
+        border: 1px solid #e2e8f0 !important;
+        min-height: 42px; /* Easy to tap */
+    }
+
     #sidebar-toggle,
     .global-registration-btn {
         display: none !important;
@@ -2842,16 +2949,20 @@ ul {
         border-radius: 0;
     }
 
-    .dashboard-table thead {
+    .dashboard-table thead,
+    .contracts-table thead {
         display: none;
     }
 
     .dashboard-table,
-    .dashboard-table tbody {
+    .contracts-table,
+    .dashboard-table tbody,
+    .contracts-table tbody {
         display: block;
     }
 
-    .dashboard-table tr {
+    .dashboard-table tr,
+    .contracts-table tr {
         display: flex;
         flex-wrap: wrap;
         align-items: center;
@@ -2864,7 +2975,8 @@ ul {
         padding-right: 24px; /* Space for the chevron */
     }
 
-    .dashboard-table tr::after {
+    .dashboard-table tr::after,
+    .contracts-table tr::after {
         content: '\f054';
         font-family: 'Font Awesome 6 Free';
         font-weight: 900;
@@ -2877,21 +2989,24 @@ ul {
         opacity: 1;
     }
 
-    .dashboard-table tr:last-child {
+    .dashboard-table tr:last-child,
+    .contracts-table tr:last-child {
         border-bottom: none;
     }
 
-    .dashboard-table tr:active {
+    .dashboard-table tr:active,
+    .contracts-table tr:active {
         background: #faf8f5;
     }
 
-    .dashboard-table td {
+    .dashboard-table td,
+    .contracts-table td {
         padding: 0;
         border: none;
         font-size: 13px;
     }
 
-    /* 契約・規約名 — 1行目フル幅 */
+    /* --- Dashboard Table Columns --- */
     .dashboard-table td:nth-child(2) {
         order: 1;
         flex: 0 0 100%;
@@ -2902,31 +3017,49 @@ ul {
         text-overflow: ellipsis;
         color: #333333;
     }
+    .dashboard-table td:nth-child(1) { order: 2; flex: 0 0 auto; }
+    .dashboard-table td:nth-child(3) { order: 3; flex: 1 1 auto; font-size: 12px; color: #9ca3af; }
+    .dashboard-table td:nth-child(4) { order: 4; flex: 0 0 auto; margin-left: auto; }
+    .dashboard-table td:nth-child(5) { display: none; }
 
-    /* リスクバッジ */
-    .dashboard-table td:nth-child(1) {
+    /* --- Contracts Table Columns --- */
+    .contracts-table td:nth-child(1) {
+        order: 1;
+        flex: 0 0 100%;
+        font-size: 14px;
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: #333333;
+        margin-bottom: 2px;
+    }
+    .contracts-table td:nth-child(2) {
         order: 2;
         flex: 0 0 auto;
+        color: #666;
+        font-size: 11px;
+        background: #f3f4f6;
+        padding: 1px 6px;
+        border-radius: 4px;
     }
-
-    /* 日付 */
-    .dashboard-table td:nth-child(3) {
+    .contracts-table td:nth-child(3) {
         order: 3;
         flex: 1 1 auto;
         font-size: 12px;
         color: #9ca3af;
     }
-
-    /* ステータスバッジ — 右寄せ */
-    .dashboard-table td:nth-child(4) {
+    .contracts-table td:nth-child(4) {
         order: 4;
+        flex: 0 0 auto;
+    }
+    .contracts-table td:nth-child(5) {
+        order: 5;
         flex: 0 0 auto;
         margin-left: auto;
     }
-
-    /* アクションボタン — モバイルは行タップで代替 */
-    .dashboard-table td:nth-child(5) {
-        display: none;
+    .contracts-table td:nth-child(6) {
+        display: none; /* Hide assignee on mobile to save space */
     }
 
     #dashboard-section-title {

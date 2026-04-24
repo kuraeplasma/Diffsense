@@ -12,7 +12,7 @@ import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/fi
 // =========================================================================
 const routes = {
     dashboard: () => import('./modules/dashboard.js'),
-    contracts: () => import('./modules/contracts.js'),
+    contracts: () => import('./modules/contracts.js?v=18'),
     history: () => import('./modules/history.js'),
     team: () => import('./modules/team.js'),
 };
