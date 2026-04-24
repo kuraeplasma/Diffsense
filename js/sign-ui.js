@@ -15,50 +15,7 @@ export const SignUI = {
         query: '',
         sortBy: 'date_desc'
     },
-    localDummyContracts: [], /*
-        {
-            name: 'サンプル_業務委託基本契約書',
-            type: '業務委託契約',
-            last_updated_at: '2026-03-17',
-            risk_level: 'Medium',
-            status: '解析済み',
-            original_content: {
-                preamble: '本契約は、発注者と受託者の間で業務委託に関する基本事項を定めるものです。',
-                articles: [
-                    { articleNumber: '第1条', title: '委託業務', paragraphs: ['受託者は発注者の指定する制作業務を遂行します。'] },
-                    { articleNumber: '第2条', title: '報酬', paragraphs: ['報酬額、支払期日、検収条件は個別発注書で定めます。'] }
-                ]
-            }
-        },
-        {
-            name: 'サンプル_NDA_共同提案用',
-            type: '秘密保持契約',
-            last_updated_at: '2026-03-16',
-            risk_level: 'None',
-            status: '解析済み',
-            original_content: {
-                preamble: '本契約は、共同提案に関連して開示される秘密情報の取扱いを定めます。',
-                articles: [
-                    { articleNumber: '第1条', title: '秘密情報', paragraphs: ['秘密情報には書面、口頭、電磁的記録を含みます。'] },
-                    { articleNumber: '第2条', title: '利用制限', paragraphs: ['受領者は本目的以外に秘密情報を利用してはなりません。'] }
-                ]
-            }
-        },
-        {
-            name: 'サンプル_SaaS利用規約_2026春版',
-            type: '利用規約',
-            last_updated_at: '2026-03-15',
-            risk_level: 'High',
-            status: '解析済み',
-            original_content: {
-                preamble: '本利用規約は、当社サービスの利用条件を定めるものです。',
-                articles: [
-                    { articleNumber: '第1条', title: '適用', paragraphs: ['本規約は、全ての利用者に適用されます。'] },
-                    { articleNumber: '第2条', title: '禁止事項', paragraphs: ['不正アクセス、再配布、競合調査目的の利用を禁止します。'] }
-                ]
-            }
-        }
-    */ ],
+    localDummyContracts: [],
 
     isCompletedRequest(request) {
         return String(request?.status || '').toLowerCase() === 'completed';

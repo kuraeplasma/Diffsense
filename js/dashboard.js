@@ -5542,7 +5542,7 @@ class DashboardApp {
         if (viewId === 'sign') {
             this.renderInitialSkeleton('sign');
             console.trace('Routing to sign');
-            const { SignUI } = await import('./sign-ui.js?v=20260407_final_v10');
+            const { SignUI } = await import('./sign-ui.js?v=20260424_signfix_v11');
             this.mainContent.innerHTML = await SignUI.renderSignView(this);
             SignUI.refreshList(this);
             this.syncContractsInBackground(() => {
@@ -5554,7 +5554,7 @@ class DashboardApp {
         }
 
         if (viewId === 'sign-viewer') {
-            const { SignUI } = await import('./sign-ui.js?v=20260407_final_v10');
+            const { SignUI } = await import('./sign-ui.js?v=20260424_signfix_v11');
             const { SignViewer } = await import('./sign-viewer.js?v=20260407_final_v10');
             this.mainContent.innerHTML = await SignUI.renderSignViewer(this, params);
             await SignViewer.init(this, params);
@@ -5562,7 +5562,7 @@ class DashboardApp {
         }
         
         if (viewId === 'sign-editor') {
-            const { SignUI } = await import('./sign-ui.js?v=20260407_final_v10');
+            const { SignUI } = await import('./sign-ui.js?v=20260424_signfix_v11');
             const { SignEditor } = await import('./sign-editor.js?v=20260407_overflow');
             this.mainContent.innerHTML = await SignUI.renderSignEditor(this, params);
             await SignEditor.init(this, params);
@@ -5570,7 +5570,7 @@ class DashboardApp {
         }
 
         if (viewId === 'sign-recipient') {
-            const { SignUI } = await import('./sign-ui.js?v=20260407_final_v10');
+            const { SignUI } = await import('./sign-ui.js?v=20260424_signfix_v11');
             const { SignRecipient } = await import('./sign-recipient.js?v=20260407_overflow');
             this.mainContent.innerHTML = await SignUI.renderSignRecipient(this, params);
             await SignRecipient.init(this, params);

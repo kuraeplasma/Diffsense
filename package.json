@@ -1,5 +1,12 @@
 {
   "scripts": {
+    "check:sign-ui-syntax": "node scripts/check-sign-ui-syntax.mjs",
+    "check:prod-guard": "node scripts/check-prod-guard.mjs",
+    "preflight:prod": "npm run check:sign-ui-syntax && npm run check:prod-guard && npm run lint",
+    "predeploy:hosting": "npm run preflight:prod",
+    "deploy:prod": "npm run preflight:prod && netlify deploy --prod --dir . --site 63a3902a-8d74-4914-9d80-2e5cf53a28d8 --message \"safe prod deploy\"",
+    "deploy:hosting:prod": "npm run deploy:prod",
+    "deploy:firebase:prod": "firebase deploy --only hosting --project diffsense-9a718 --non-interactive",
     "lint": "eslint \"js/**/*.js\"",
     "security-patterns": "node scripts/security-scan.mjs",
     "security-check": "audit-ci --moderate",

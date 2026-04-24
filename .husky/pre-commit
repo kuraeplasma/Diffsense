@@ -3,5 +3,7 @@
 
 # Phase 1: lint new/non-legacy files only (legacy files are in .eslintignore).
 # Fails commit on ESLint errors and forbidden module patterns.
+npm run check:sign-ui-syntax
+npm run check:prod-guard
 npm run lint
 npm run security-patterns

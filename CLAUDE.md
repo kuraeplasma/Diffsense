@@ -13,8 +13,10 @@
 
 ## 2. 検証とデプロイ
 - **セルフチェック**: 修正直後に `git diff` で「指示していない箇所の変更」がないか、AI 自身が 1 行ずつ確認報告する。
+- **本番プリフライト必須**: 本番デプロイ前に必ず `npm run preflight:prod` を実行し、1つでも失敗したらデプロイしない。
 - **逐次コミット**: 修正が 1 つ完了するたびに、具体的な内容と共にコミットし、セーブポイントを作る。
-- **Netlify デプロイ**: Site ID を直接指定して行う（`netlify deploy --site 63a3902a-8d74-4914-9d80-2e5cf53a28d8 --dir d:\契約 --prod`）。
+- **Netlify デプロイ**: `npm run deploy:prod` を使い、Site ID 固定で実行する（`63a3902a-8d74-4914-9d80-2e5cf53a28d8`）。
+- **Firebase 誤配信の禁止**: `diffsense.spacegleam.co.jp` への本番反映に Firebase Hosting を使わない。
 - **即時ロールバック**: デプロイ後に少しでも挙動が怪しい、またはバグ報告があった場合は、迷わず直前のコミットまで `git checkout` または `git revert` で戻す。
 
 ## 3. システム整合性の維持
