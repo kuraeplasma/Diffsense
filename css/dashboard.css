@@ -2931,7 +2931,7 @@ select:focus {
     .filter-bar {
         background: transparent !important;
         border: none !important;
-        padding: 4px 16px 12px !important;
+        padding: 12px 16px 12px !important;
         box-shadow: none !important;
         margin-bottom: 4px !important;
     }
