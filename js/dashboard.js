@@ -1743,12 +1743,12 @@ const Views = {
                         <div class="pane-scroll-area">
                             <div class="desktop-only">
                                 ${isAnalyzingContract ? `
-                                <div class="skeleton-analysis" style="margin-bottom:24px;">
+                                <div class="skeleton-analysis-wrap">
                                     <div class="analysis-section-title">
                                         <i class="fa-solid fa-spinner fa-spin text-primary"></i>
                                         <span id="analysis-status-text">AIがリスクを解析中です</span>
                                     </div>
-                                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:16px;">
+                                    <div class="analysis-card">
                                         <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
                                             <div style="width:60px; height:20px; background:#e2e8f0; border-radius:4px; animation: pulse 1.5s infinite;"></div>
                                             <div style="width:140px; height:16px; background:#f1f5f9; border-radius:4px; animation: pulse 1.5s infinite;"></div>
@@ -1764,7 +1764,7 @@ const Views = {
                                 <div class="analysis-section-title">
                                     <span><i class="fa-solid fa-robot text-primary"></i> AIリスク要約</span>
                                 </div>
-                                <div style="margin-bottom:24px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:16px;">
+                                <div class="analysis-card">
                                     <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
                                         <span class="badge ${diffData.riskLevel >= 3 ? 'badge-danger' : diffData.riskLevel >= 2 ? 'badge-warning' : 'badge-success'}">
                                             ${diffData.riskLevel >= 3 ? 'High' : diffData.riskLevel >= 2 ? 'Medium' : 'Low'}
@@ -1774,7 +1774,7 @@ const Views = {
                                     <div style="font-size:13px; color:#333; line-height:1.7; white-space:pre-wrap;">${diffData.summary || 'AI解析結果がありません'}</div>
                                 </div>
                                 ` : (contract.ai_succeeded === false ? `
-                                <div style="margin-bottom:24px; background:#fff5f5; border:1px solid #feb2b2; border-radius:8px; padding:20px; text-align:center;">
+                                <div class="analysis-card-error">
                                     <div style="color:#c53030; font-weight:700; margin-bottom:12px;">
                                         <i class="fa-solid fa-circle-exclamation" style="margin-right:8px;"></i>AI解析に失敗しました
                                     </div>
@@ -1813,7 +1813,7 @@ const Views = {
                                     ? '<span style="font-size:10px;background:#fff8e1;color:#f57c00;border-radius:4px;padding:2px 6px;margin-left:6px;">一部手動確認推奨</span>'
                                     : '';
                                 const dayLabel = (days) => days === null ? '' : days === 0 ? '本日' : days < 0 ? '期限切れ' : `あと${days}日`;
-                                return `<div style="background:#f0f7ff;border:1px solid #bbdefb;border-radius:12px;padding:16px 20px;margin-bottom:20px;">
+                                return `<div class="deadline-card">
                                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
                                         <i class="fa-solid fa-calendar-check" style="color:#1976d2;"></i>
                                         <span style="font-size:14px;font-weight:700;color:#1976d2;">AIが検出した期限情報</span>
