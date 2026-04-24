@@ -2770,6 +2770,14 @@ ul {
         gap: 4px;
     }
 
+    /* Global touch cleanup */
+    .stat-card,
+    .bottom-nav-item,
+    .btn-dashboard,
+    .dashboard-table tbody tr {
+        -webkit-tap-highlight-color: transparent;
+    }
+
     /* Mobile Bottom Nav */
     .mobile-bottom-nav {
         position: fixed;
@@ -2800,6 +2808,7 @@ ul {
         padding: 6px 0;
         transition: color 0.15s;
         position: relative;
+        -webkit-tap-highlight-color: transparent;
     }
 
     .bottom-nav-item i {

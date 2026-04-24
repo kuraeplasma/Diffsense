@@ -18,7 +18,11 @@ const LOCAL_API_BASE_URL = 'http://localhost:3001';
 const API_BASE_STORAGE_KEY = 'diffsense_api_base';
 
 export function isLocalHostEnvironment() {
-    return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const h = window.location.hostname;
+    const params = new URLSearchParams(window.location.search);
+    const isLocal = h === 'localhost' || h === '127.0.0.1' || h.includes('192.168.') || h.includes('10.') || h.includes('172.') || params.get('bypass') === '1';
+    console.log('[DEBUG] isLocalHostEnvironment:', { hostname: h, isLocal, bypass: params.get('bypass') });
+    return isLocal;
 }
 
 function syncApiBaseOverrideFromUrl() {

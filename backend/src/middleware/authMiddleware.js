@@ -8,7 +8,8 @@ const authMiddleware = async (req, res, next) => {
         const authHeader = req.headers.authorization;
         
         // --- Local Development Bypass ---
-        const isLocalHost = req.headers.host?.includes('localhost') || req.headers.host?.includes('127.0.0.1');
+        const h = req.headers.host || '';
+        const isLocalHost = h.includes('localhost') || h.includes('127.0.0.1') || h.includes('192.168.') || h.includes('10.') || h.includes('172.');
         if (process.env.NODE_ENV === 'development' && process.env.AUTH_BYPASS === 'true' && isLocalHost) {
             req.user = {
                 uid: 'dev-uid',

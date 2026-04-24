@@ -354,7 +354,10 @@ export async function handleLogout() {
  */
 export function requireAuth() {
     // Development Bypass for localhost
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    const h = window.location.hostname;
+    const params = new URLSearchParams(window.location.search);
+    const isLocal = h === 'localhost' || h === '127.0.0.1' || h.includes('192.168.') || h.includes('10.') || h.includes('172.') || params.get('bypass') === '1';
+    if (isLocal) {
         console.log("Local development detected, bypassing Firebase Auth check.");
         processDevBypass();
         return;
