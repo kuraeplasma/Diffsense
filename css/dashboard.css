@@ -264,6 +264,8 @@ ul {
     border-radius: var(--radius-sm);
     margin-bottom: 4px;
     transition: all 0.2s;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .nav-item:hover,
@@ -851,6 +853,8 @@ ul {
     align-items: flex-start;
     text-align: left;
     gap: 6px;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .stat-card:hover {
