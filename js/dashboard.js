@@ -1073,23 +1073,23 @@ const renderDashboardOverview = (app) => {
     }).join('') : '<tr><td colspan="5" class="text-center text-muted" style="padding:40px;">該当するアイテムはありません</td></tr>';
 
     return `
-            <div class="page-title">ダッシュボード</div>
-            <div class="stats-grid">
-                <div class="stat-card ${currentFilter === 'pending' ? 'active' : ''}" onclick="window.app.setDashboardFilter('pending')">
-                    <div class="stat-label ${currentFilter === 'pending' ? 'text-warning' : ''}"><i class="fa-regular fa-square-check"></i> 未処理</div>
-                    <div class="stat-value">${stats.pending}件</div>
+            <div class="dashboard-sticky-header">
+                <div class="stats-grid">
+                    <div class="stat-card ${currentFilter === 'pending' ? 'active' : ''}" onclick="window.app.setDashboardFilter('pending')">
+                        <div class="stat-label ${currentFilter === 'pending' ? 'text-warning' : ''}"><i class="fa-regular fa-square-check"></i> 未処理</div>
+                        <div class="stat-value">${stats.pending}件</div>
+                    </div>
+                    <div class="stat-card ${currentFilter === 'risk' ? 'active' : ''}" onclick="window.app.setDashboardFilter('risk')">
+                        <div class="stat-label ${currentFilter === 'risk' ? 'text-danger' : ''}"><i class="fa-solid fa-triangle-exclamation"></i> リスク要判定</div>
+                        <div class="stat-value">${stats.highRisk}件</div>
+                    </div>
+                    <div class="stat-card ${currentFilter === 'total' ? 'active' : ''}" onclick="window.app.setDashboardFilter('total')">
+                        <div class="stat-label"><i class="fa-solid fa-satellite-dish"></i> 監視中</div>
+                        <div class="stat-value text-muted">${stats.total}</div>
+                    </div>
                 </div>
-                <div class="stat-card ${currentFilter === 'risk' ? 'active' : ''}" onclick="window.app.setDashboardFilter('risk')">
-                    <div class="stat-label ${currentFilter === 'risk' ? 'text-danger' : ''}"><i class="fa-solid fa-triangle-exclamation"></i> リスク要判定</div>
-                    <div class="stat-value">${stats.highRisk}件</div>
-                </div>
-                <div class="stat-card ${currentFilter === 'total' ? 'active' : ''}" onclick="window.app.setDashboardFilter('total')">
-                    <div class="stat-label"><i class="fa-solid fa-satellite-dish"></i> 監視中</div>
-                    <div class="stat-value text-muted">${stats.total}</div>
-                </div>
+                <h3 id="dashboard-section-title" style="font-size:16px; margin-bottom:16px; font-weight:600;">${sectionTitle}</h3>
             </div>
-
-            <h3 id="dashboard-section-title" style="font-size:16px; margin-bottom:16px; font-weight:600;">${sectionTitle}</h3>
             <div class="table-container">
                 <table class="data-table dashboard-table">
                     <thead>
@@ -1830,7 +1830,18 @@ const Views = {
                                         <a onclick="window.app.navigate('deadlines')" style="font-size:12px;color:#1976d2;cursor:pointer;"><i class="fa-solid fa-arrow-right" style="margin-right:4px;"></i>期限一覧を見る</a>
                                     </div>
                                 </div>`;
-                            })() : ''}
+                            })() : (hasAIResults && !isAnalyzingContract ? `
+                                <div class="deadline-card" style="border-style: dashed; background: #fafafa; padding: 20px; text-align: center;">
+                                    <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:10px;">
+                                        <i class="fa-solid fa-calendar-xmark" style="color:#999;"></i>
+                                        <span style="font-size:14px;font-weight:700;color:#666;">期限情報はありませんでした</span>
+                                    </div>
+                                    <div style="font-size:12px; color:#999; line-height:1.6;">
+                                        AIによる解析の結果、この書類には有効期限や更新期限に関する具体的な記述は見つかりませんでした。<br>
+                                        手動で期限を設定する場合は、右上のメニューまたは期限管理画面から編集可能です。
+                                    </div>
+                                </div>
+                            ` : '')}
                             ` : `
                             <div style="padding:40px 20px; text-align:center; color:#999;">
                                 <i class="fa-solid fa-file-invoice" style="font-size:32px; margin-bottom:16px; display:block; opacity:0.1;"></i>
@@ -3619,7 +3630,8 @@ class DashboardApp {
                 } else if (hasDeadline) {
                     Notify.success('解析完了。期限情報を期限・アラート管理に格納しました');
                 } else {
-                    Notify.warning('解析は完了しましたが期限情報を取得できませんでした。期限・アラート管理で手動入力してください。');
+                    // 解析は成功したが期限が見つからなかったケース
+                    Notify.success('解析が完了しました。この書類には期限に関する記述は見つかりませんでした。');
                 }
             } catch (err) {
                 const raw = String(err?.message || '');

@@ -69,8 +69,8 @@
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;700&family=Noto+Serif+JP:wght@400;700&display=swap"
         rel="stylesheet">
     <style>body{margin:0;background:#fafafa;color:#222;font-family:Inter,"Noto Sans JP",sans-serif}#app-sidebar{width:250px;position:fixed;left:0;top:0;bottom:0;background:#111827;color:#fff;z-index:20}#app-main{margin-left:250px;min-height:100vh}#app-content{padding:24px;min-height:100vh}.shell-skeleton{display:grid;gap:14px}.skeleton-block{height:18px;background:linear-gradient(90deg,#eceff3,#f5f7fa,#eceff3);background-size:200% 100%;border-radius:6px;animation:skel 1.2s ease-in-out infinite}.skeleton-card{height:110px;border-radius:12px;background:#fff;border:1px solid #eceff3}.skeleton-row{height:46px;border-radius:8px;background:#fff;border:1px solid #eceff3}@keyframes skel{0%{background-position:200% 0}100%{background-position:-200% 0}}@media (max-width:900px){#app-main{margin-left:0}#app-content{padding:16px}}.toggle-switch{position:relative;display:inline-block;width:48px;height:26px}.toggle-switch input{opacity:0;width:0;height:0}.toggle-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#444;border-radius:26px;transition:.3s}.toggle-slider:before{position:absolute;content:"";height:20px;width:20px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s}input:checked+.toggle-slider{background:#4CAF50}input:checked+.toggle-slider:before{transform:translateX(22px)}</style>
-    <link rel="preload" as="style" href="css/dashboard.css?v=5" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="css/dashboard.css?v=5"></noscript>
+    <link rel="preload" as="style" href="css/dashboard.css?v=16" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="css/dashboard.css?v=15"></noscript>
     <link rel="stylesheet" href="css/sign.css?v=premiumv53">
     <link rel="stylesheet" href="css/dashboard-structured-fix.css?v=20260310local1">
     <!-- FontAwesome for Icons (CDN) -->
@@ -150,13 +150,7 @@
 
     <!-- Mobile Header (スマホ専用) -->
     <header class="mobile-header mobile-only">
-        <button class="mobile-menu-button" id="bnav-menu" onclick="window.app?.toggleMobileMenu()" aria-expanded="false" aria-label="メニュー">
-            <i class="fa-solid fa-bars"></i>
-        </button>
         <span class="mobile-header-logo"><i class="fa-solid fa-scale-balanced"></i> DIFFsense</span>
-        <button class="mobile-register-btn" onclick="if(window.app?.can('operate_contract')){window.app.registration?.open()}else{window.Notify?.warning('閲覧のみの権限では新規登録できません')}" aria-label="新規登録">
-            <i class="fa-solid fa-plus"></i> 新規登録
-        </button>
     </header>
 
     <!-- Mobile Menu Panel (スマホ専用) -->
@@ -176,7 +170,6 @@
     <main id="app-main">
         <!-- Dynamic Content Area -->
         <div id="app-content">
-            <div class="page-title">ダッシュボード</div>
             <div class="stats-grid">
                 <div class="stat-card active">
                     <div class="stat-label text-warning"><i class="fa-regular fa-square-check"></i> 未処理</div>
@@ -375,9 +368,9 @@
     </div>
 
     <!-- App Logic -->
-    <script type="module" src="/js/dashboard.js?v=20260424_ui_centering_fix_v7"></script>
+    <script type="module" src="/js/dashboard.js?v=20260424_deadline_ui_fix_v13"></script>
     <script type="module">
-        import { requireAuth, handleLogout } from '/js/auth.js?v=20260423_docx_async_fix';
+        import { requireAuth, handleLogout } from '/js/auth.js?v=20260424_deadline_ui_fix_v8';
 
         // Protect Route
         requireAuth();
@@ -440,16 +433,16 @@
             <i class="fa-solid fa-file-lines"></i>
             <span>書類</span>
         </button>
-        <button class="bottom-nav-item bottom-nav-fab" data-mobile-action="register">
-            <span class="bottom-nav-fab-inner"><i class="fa-solid fa-plus"></i></span>
+        <button class="bottom-nav-item" data-mobile-action="register">
+            <i class="fa-solid fa-plus"></i>
             <span>登録</span>
         </button>
         <button class="bottom-nav-item" data-mobile-view="sign">
             <i class="fa-solid fa-file-signature"></i>
-            <span>著名</span>
+            <span>署名</span>
         </button>
         <button class="bottom-nav-item" id="bnav-menu-bottom" data-mobile-action="menu">
-            <i class="fa-solid fa-ellipsis"></i>
+            <i class="fa-solid fa-bars"></i>
             <span>メニュー</span>
         </button>
     </nav>
