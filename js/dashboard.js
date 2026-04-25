@@ -2446,36 +2446,31 @@ class RegistrationFlow {
         content.addEventListener('touchend', onTouchEnd);
     }
 
-    renderStep() {
+        renderStep() {
         if (!this.modalBody) return;
 
         if (this.currentStep === 1) {
             this.modalTitle.textContent = "新規登録 - 登録方法の選択";
             this.modalBody.innerHTML = `
-                <div class="reg-method-grid">
+                <div class="registration-swipe-bar mobile-only"></div>
+                <div class="reg-method-grid slim-grid">
                     <div class="reg-method-card" id="reg-card-docx">
                         <div class="reg-method-icon"><i class="fa-solid fa-file-word"></i></div>
-                        <div class="reg-method-info">
-                            <h4>Wordをアップロード</h4>
-                            <p>ファイルをここにドロップするか、クリックして選択</p>
-                        </div>
+                        <div class="reg-method-label">Word</div>
                     </div>
                     <div class="reg-method-card" id="reg-card-pdf">
                         <div class="reg-method-icon"><i class="fa-solid fa-file-pdf"></i></div>
-                        <div class="reg-method-info">
-                            <h4>PDFをアップロード</h4>
-                            <p>ファイルをここにドロップするか、クリックして選択</p>
-                        </div>
+                        <div class="reg-method-label">PDF</div>
                     </div>
                     <div class="reg-method-card" id="reg-card-url">
                         <div class="reg-method-icon"><i class="fa-solid fa-globe"></i></div>
-                        <div class="reg-method-info">
-                            <h4>URLを登録 (Web規約)</h4>
-                            <p>公開URLを監視対象に設定します</p>
-                        </div>
+                        <div class="reg-method-label">URL</div>
                     </div>
                 </div>
-    `;
+                <div class="reg-mobile-actions mobile-only">
+                    <button class="btn-dashboard" onclick="event.stopPropagation(); window.app.registration.close()">キャンセル</button>
+                </div>
+            `;
             this.bindCardEvents();
         } else if (this.currentStep === 2) {
             const isPdf = this.tempData.method === 'pdf';
