@@ -3352,9 +3352,10 @@ select:focus {
     #registration-modal.active {
         background: rgba(0,0,0,0.45);
     }
-    /* Sheet starts off-screen */
+    /* Sheet starts off-screen / slide-down transition on close */
     #registration-modal .modal-content {
         transform: translateY(105%) !important;
+        transition: transform 0.38s cubic-bezier(0.2, 0.8, 0.2, 1) !important;
         animation: none !important;
     }
     /* Slide up when active — same specificity as old blocks so "last wins" */
