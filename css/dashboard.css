@@ -3363,4 +3363,8 @@ select:focus {
         transition: transform 0.38s cubic-bezier(0.2, 0.8, 0.2, 1) !important;
         animation: none !important;
     }
+    /* 閉じアニメーション中のタップブロック防止 */
+    #registration-modal:not(.active) {
+        pointer-events: none !important;
+    }
 }
