@@ -3112,3 +3112,206 @@ select:focus {
     }
 }
 
+
+/* ============================================================
+   Mobile Registration Modal (Bottom Sheet UI) - v19
+   ============================================================ */
+@media (max-width: 900px) {
+    #registration-modal.active .modal-content {
+        display: flex !important;
+        flex-direction: column !important;
+        position: fixed !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        height: auto !important;
+        min-height: 320px !important;
+        border-radius: 28px 28px 0 0 !important;
+        margin: 0 !important;
+        padding: 0 0 env(safe-area-inset-bottom) 0 !important;
+        transform: translateY(0) !important;
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        animation: slideUpModal 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) !important;
+        background: #fff !important;
+        box-shadow: 0 -10px 40px rgba(0,0,0,0.15) !important;
+    }
+
+    .registration-swipe-bar {
+        width: 36px;
+        height: 4px;
+        background: #e2e8f0;
+        border-radius: 2px;
+        margin: 12px auto 8px;
+        flex-shrink: 0;
+    }
+
+    .slim-grid {
+        display: grid !important;
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 12px !important;
+        padding: 20px !important;
+    }
+
+    .slim-grid .reg-method-card {
+        flex-direction: column !important;
+        align-items: center !important;
+        text-align: center !important;
+        padding: 16px 4px !important;
+        border-radius: 20px !important;
+        background: #f8fafc !important;
+        border: 1px solid #f1f5f9 !important;
+        min-height: 110px !important;
+        transition: all 0.2s ease !important;
+    }
+
+    .slim-grid .reg-method-card:active {
+        background: #f1f5f9 !important;
+        transform: scale(0.96);
+    }
+
+    .slim-grid .reg-method-icon {
+        width: 56px !important;
+        height: 56px !important;
+        font-size: 24px !important;
+        margin: 0 0 10px 0 !important;
+        background: #fff !important;
+        border-radius: 16px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.06) !important;
+    }
+
+    .reg-method-label {
+        font-size: 13px !important;
+        font-weight: 600 !important;
+        color: #334155 !important;
+    }
+
+    .reg-mobile-actions {
+        padding: 0 20px 24px !important;
+        display: flex !important;
+    }
+
+    .reg-mobile-actions .btn-dashboard {
+        width: 100% !important;
+        height: 54px !important;
+        border-radius: 16px !important;
+        font-size: 16px !important;
+        font-weight: 700 !important;
+        background: #f1f5f9 !important;
+        color: #475569 !important;
+        border: none !important;
+    }
+
+    @keyframes slideUpModal {
+        from { transform: translateY(100%); }
+        to { transform: translateY(0); }
+    }
+}
+
+/* ============================================================
+   Mobile Registration Modal (Final Screenshot Match) - v20
+   ============================================================ */
+@media (max-width: 900px) {
+    #registration-modal.active .modal-content {
+        display: flex !important;
+        flex-direction: column !important;
+        position: fixed !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        height: auto !important;
+        min-height: 380px !important;
+        border-radius: 40px 40px 0 0 !important;
+        margin: 0 !important;
+        padding: 0 0 env(safe-area-inset-bottom) 0 !important;
+        transform: translateY(0) !important;
+        background: #fff !important;
+        box-shadow: 0 -10px 40px rgba(0,0,0,0.12) !important;
+        border: none !important;
+    }
+
+    #registration-modal .modal-header {
+        border: none !important;
+        padding: 24px 20px 0 !important;
+        text-align: center !important;
+    }
+
+    #registration-modal .modal-title {
+        width: 100% !important;
+        font-size: 17px !important;
+        font-weight: 700 !important;
+        color: #111827 !important;
+        text-align: center !important;
+    }
+
+    /* Swipe Handle */
+    .registration-swipe-bar {
+        width: 36px;
+        height: 4px;
+        background: #e5e7eb;
+        border-radius: 2px;
+        margin: 12px auto 0;
+    }
+
+    .slim-grid {
+        display: flex !important;
+        justify-content: space-around !important;
+        padding: 40px 20px !important;
+        gap: 0 !important;
+    }
+
+    .slim-grid .reg-method-card {
+        flex: 1 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        background: transparent !important;
+        border: none !important;
+        padding: 0 !important;
+    }
+
+    .slim-grid .reg-method-icon {
+        width: 80px !important;
+        height: 80px !important;
+        background: #fff !important;
+        border: 1px solid #f1f5f9 !important;
+        border-radius: 24px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-size: 32px !important;
+        color: #c5a059 !important;
+        margin-bottom: 12px !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.03) !important;
+    }
+
+    .reg-method-label {
+        font-size: 13px !important;
+        font-weight: 500 !important;
+        color: #64748b !important;
+    }
+
+    .reg-mobile-actions {
+        padding: 0 24px 32px !important;
+    }
+
+    .reg-mobile-actions .btn-dashboard {
+        width: 100% !important;
+        height: 56px !important;
+        background: #f1f5f9 !important;
+        color: #1e293b !important;
+        border-radius: 20px !important;
+        font-size: 16px !important;
+        font-weight: 700 !important;
+        border: none !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+}
