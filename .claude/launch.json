@@ -8,6 +8,13 @@
       "port": 3002
     },
     {
+      "name": "local3010",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-c", "import http.server, os; os.chdir('D:/契約'); http.server.test(HandlerClass=http.server.SimpleHTTPRequestHandler, port=3010, bind='127.0.0.1')"],
+      "port": 3010,
+      "url": "/dashboard.html?bypass=1"
+    },
+    {
       "name": "frontend",
       "runtimeExecutable": "python",
       "runtimeArgs": ["-c", "import http.server, os; os.chdir('D:/契約'); port=int(os.environ.get('PORT',3000)); http.server.test(HandlerClass=http.server.SimpleHTTPRequestHandler, port=port, bind='127.0.0.1')"],
