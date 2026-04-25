@@ -44,6 +44,7 @@ export function render({ app, dbService, escapeHtmlText, formatDisplayTimestamp,
     })();
 
     return `
+            <h2 id="page-header-title" class="page-title pc-only">契約・規約管理</h2>
             <div class="dashboard-sticky-header">
                 <div class="filter-bar mb-md">
                     <div class="contract-filters-grid">

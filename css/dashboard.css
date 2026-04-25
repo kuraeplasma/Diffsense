@@ -2199,7 +2199,7 @@ select:focus {
         order: -1;
     }
 
-    /* Hide cramped header action buttons — primary action is in mobile-decision-bar */
+    /* Hide cramped header action buttons  Eprimary action is in mobile-decision-bar */
     .detail-split-header .flex.gap-sm {
         display: none !important;
     }
@@ -2964,7 +2964,7 @@ select:focus {
         display: none !important;
     }
 
-    /* Dashboard table → native card list */
+    /* Dashboard table ↁEnative card list */
     .table-container {
         flex: 1;
         overflow-y: auto;
@@ -3102,4 +3102,12 @@ select:focus {
     0% { opacity: 1; }
     50% { opacity: 0.4; }
     100% { opacity: 1; }
+}
+
+
+/* Device-specific Visibility Rules */
+@media (max-width: 900px) {
+    .pc-only {
+        display: none !important;
+    }
 }

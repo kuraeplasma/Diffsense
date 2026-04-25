@@ -11,10 +11,10 @@ import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/fi
 // module extraction. See /js/modules/.
 // =========================================================================
 const routes = {
-    dashboard: () => import('./modules/dashboard.js'),
-    contracts: () => import('./modules/contracts.js?v=18'),
-    history: () => import('./modules/history.js'),
-    team: () => import('./modules/team.js'),
+    dashboard: () => import('./modules/dashboard.js?v=12'),
+    contracts: () => import('./modules/contracts.js?v=12'),
+    history: () => import('./modules/history.js?v=12'),
+    team: () => import('./modules/team.js?v=12'),
 };
 
 async function navigateLazy(page, renderOptions = {}) {
@@ -1073,6 +1073,7 @@ const renderDashboardOverview = (app) => {
     }).join('') : '<tr><td colspan="5" class="text-center text-muted" style="padding:40px;">該当するアイテムはありません</td></tr>';
 
     return `
+            <h2 id="page-header-title" class="page-title pc-only">ダッシュボード</h2>
             <div class="dashboard-sticky-header">
                 <div class="stats-grid">
                     <div class="stat-card ${currentFilter === 'pending' ? 'active' : ''}" onclick="window.app.setDashboardFilter('pending')">
