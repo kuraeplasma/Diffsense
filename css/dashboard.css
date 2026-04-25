@@ -3341,3 +3341,26 @@ select:focus {
         padding-top: 8px !important;
     }
 }
+
+/* ---- Bottom Sheet slide animation v22 ---- */
+@media (max-width: 900px) {
+    /* Overlay background fade (display toggled by JS) */
+    #registration-modal {
+        background: rgba(0,0,0,0);
+        transition: background 0.3s ease;
+    }
+    #registration-modal.active {
+        background: rgba(0,0,0,0.45);
+    }
+    /* Sheet starts off-screen */
+    #registration-modal .modal-content {
+        transform: translateY(105%) !important;
+        animation: none !important;
+    }
+    /* Slide up when active — same specificity as old blocks so "last wins" */
+    #registration-modal.active .modal-content {
+        transform: translateY(0) !important;
+        transition: transform 0.38s cubic-bezier(0.2, 0.8, 0.2, 1) !important;
+        animation: none !important;
+    }
+}

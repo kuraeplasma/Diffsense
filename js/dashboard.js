@@ -2388,25 +2388,41 @@ class RegistrationFlow {
         // 先にレンダリング
         this.renderStep();
 
-        // スマホならスワイプで閉じれるように
+        // display:flex を先にセット（CSS transition が display:none からは効かないため）
+        if (this.modal) {
+            this.modal.style.display = 'flex';
+            // inline transform/transition をリセットして CSS 側に委ねる
+            const content = this.modal.querySelector('.modal-content');
+            if (content) { content.style.transform = ''; content.style.transition = ''; }
+        }
+
+        // スマホならスワイプで閉じれるように（重複バインド防止）
         if (window.innerWidth <= 900) {
             this.setupSwipeToClose();
         }
 
-        // 次のフレームで表示（描画のちらつき防止＆滑らかさ向上）
-        requestAnimationFrame(() => {
+        // 2フレーム待ってから .active 付与 → CSS transition でスライドアップ
+        requestAnimationFrame(() => requestAnimationFrame(() => {
             if (this.modal) this.modal.classList.add('active');
-        });
+        }));
     }
 
     close() {
-        // Reset swipe transform before closing
-        const content = this.modal?.querySelector('.modal-content');
-        if (content) content.style.transform = '';
-        if (typeof this.app.closeModal === 'function') {
-            this.app.closeModal('registration-modal');
+        if (window.innerWidth <= 900 && this.modal) {
+            // .active を外す → CSS transition でスライドダウン
+            this.modal.classList.remove('active');
+            // アニメーション完了後に display を元に戻す
+            setTimeout(() => {
+                if (this.modal) this.modal.style.display = '';
+            }, 400);
         } else {
-            if (this.modal) this.modal.classList.remove('active');
+            const content = this.modal?.querySelector('.modal-content');
+            if (content) content.style.transform = '';
+            if (typeof this.app.closeModal === 'function') {
+                this.app.closeModal('registration-modal');
+            } else {
+                if (this.modal) this.modal.classList.remove('active');
+            }
         }
         if (this.fileInput) this.fileInput.value = '';
         if (this.compareFileInput) this.compareFileInput.value = '';
@@ -2414,12 +2430,16 @@ class RegistrationFlow {
     }
 
     setupSwipeToClose() {
+        // 重複バインドを防ぐ
+        if (this._swipeBound) return;
+        this._swipeBound = true;
+
         const content = this.modal.querySelector('.modal-content');
         if (!content) return;
 
         let startY = 0;
         let currentY = 0;
-        const threshold = 100;
+        const threshold = 80;
 
         const onTouchStart = (e) => {
             startY = e.touches[0].clientY;
@@ -2434,10 +2454,13 @@ class RegistrationFlow {
         };
 
         const onTouchEnd = () => {
-            content.style.transition = 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
             if (currentY > threshold) {
-                this.close();
+                // 先に画面外へスライドさせてから close
+                content.style.transition = 'transform 0.25s ease';
+                content.style.transform = 'translateY(105%)';
+                setTimeout(() => this.close(), 260);
             } else {
+                content.style.transition = 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
                 content.style.transform = 'translateY(0)';
             }
             startY = 0;
