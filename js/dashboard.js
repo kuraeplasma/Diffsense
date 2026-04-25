@@ -1,4 +1,4 @@
-import { Notify } from './notify.js';
+﻿import { Notify } from './notify.js';
 import { dbService } from './db-service.js?v=20260422_stability';
 import { aiService } from './ai-service.js?v=20260422_trigger_guard';
 import { getApiBaseUrl, shouldUseLocalDevAuthBypass, isLocalHostEnvironment } from './api-base.js';
@@ -2388,6 +2388,11 @@ class RegistrationFlow {
         // 先にレンダリング
         this.renderStep();
 
+        // スマホならスワイプで閉じれるように
+        if (window.innerWidth <= 900) {
+            this.setupSwipeToClose();
+        }
+
         // 次のフレームで表示（描画のちらつき防止＆滑らかさ向上）
         requestAnimationFrame(() => {
             if (this.modal) this.modal.classList.add('active');
@@ -2395,10 +2400,50 @@ class RegistrationFlow {
     }
 
     close() {
-        if (this.modal) this.modal.classList.remove('active');
+        if (typeof this.app.closeModal === 'function') {
+            this.app.closeModal('registration-modal');
+        } else {
+            if (this.modal) this.modal.classList.remove('active');
+        }
         if (this.fileInput) this.fileInput.value = '';
         if (this.compareFileInput) this.compareFileInput.value = '';
         this.compareFile = null;
+    }
+
+    setupSwipeToClose() {
+        const content = this.modal.querySelector('.modal-content');
+        if (!content) return;
+
+        let startY = 0;
+        let currentY = 0;
+        const threshold = 100;
+
+        const onTouchStart = (e) => {
+            startY = e.touches[0].clientY;
+            content.style.transition = 'none';
+        };
+
+        const onTouchMove = (e) => {
+            currentY = e.touches[0].clientY - startY;
+            if (currentY > 0) {
+                content.style.transform = `translateY(${currentY}px)`;
+            }
+        };
+
+        const onTouchEnd = () => {
+            content.style.transition = 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+            if (currentY > threshold) {
+                this.close();
+            } else {
+                content.style.transform = 'translateY(0)';
+            }
+            startY = 0;
+            currentY = 0;
+        };
+
+        content.addEventListener('touchstart', onTouchStart, { passive: true });
+        content.addEventListener('touchmove', onTouchMove, { passive: true });
+        content.addEventListener('touchend', onTouchEnd);
     }
 
     renderStep() {

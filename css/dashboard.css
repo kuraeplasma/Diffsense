@@ -1,4 +1,4 @@
-/* DIFFsense Dashboard Design System (Quiet UI) */
+﻿/* DIFFsense Dashboard Design System (Quiet UI) */
 :root {
     /* Palette - Desaturated & Professional */
     --bg-app: #F5F7FA;
@@ -61,7 +61,7 @@ body {
     flex-direction: column;
 }
 
-@media (min-width: 769px) {
+@media (min-width: 901px) {
     body {
         font-size: 14px;
         line-height: 1.5;
@@ -88,7 +88,7 @@ ul {
 }
 
 /* Mobile-only elements: hidden on desktop only. Mobile side keeps natural/specific display. */
-@media (min-width: 769px) {
+@media (min-width: 901px) {
     .mobile-only,
     .mobile-risk-sticky,
     .mobile-decision-bar,
@@ -195,7 +195,7 @@ ul {
     width: 100%;
 }
 
-@media (min-width: 769px) {
+@media (min-width: 901px) {
     #app-sidebar,
     #app-sidebar.active {
         width: var(--sidebar-width);
@@ -538,7 +538,7 @@ ul {
     margin-bottom: 24px;
 }
 
-@media (min-width: 769px) {
+@media (min-width: 901px) {
     .plan-grid {
         grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: 20px;
@@ -895,7 +895,7 @@ ul {
     line-height: 1.1;
 }
 
-@media (min-width: 769px) {
+@media (min-width: 901px) {
     .stats-grid {
         grid-template-columns: repeat(3, 1fr);
         gap: 20px;
@@ -1239,7 +1239,7 @@ ul {
     justify-content: center;
 }
 
-@media (min-width: 769px) {
+@media (min-width: 901px) {
     .btn-dashboard {
         padding: 6px 16px;
         min-height: 0;
@@ -1312,7 +1312,7 @@ ul {
     transform: translateY(-0.5px);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
 
     /* Layout */
     /* Sidebar */
@@ -1535,7 +1535,7 @@ ul {
 }
 
 /* Mobile: make close buttons round (match clause-nav-close style) */
-@media (max-width: 768px) {
+@media (max-width: 900px) {
     .btn-close,
     .btn-close-modal {
         display: inline-flex;
@@ -2089,7 +2089,7 @@ select:focus {
 /* --- Responsive Overrides --- */
 
 /* Mobile Drawer Logic */
-@media (max-width: 768px) {
+@media (max-width: 900px) {
     #app-sidebar {
         position: fixed;
         left: -240px;
@@ -2157,7 +2157,7 @@ select:focus {
 }
 
 /* Detail Split View Responsive */
-@media (max-width: 768px) {
+@media (max-width: 900px) {
     .detail-split-body {
         flex-direction: column;
         overflow-y: auto;
@@ -2193,13 +2193,13 @@ select:focus {
 }
 
 /* Detail Screen Mobile UX */
-@media (max-width: 768px) {
+@media (max-width: 900px) {
     /* Document pane shows first, analysis pane below */
     .detail-split-body .pane:last-of-type {
         order: -1;
     }
 
-    /* Hide cramped header action buttons  Eprimary action is in mobile-decision-bar */
+    /* Hide cramped header action buttons 窶・primary action is in mobile-decision-bar */
     .detail-split-header .flex.gap-sm {
         display: none !important;
     }
@@ -2716,7 +2716,7 @@ select:focus {
 }
 
 /* ===== MOBILE UI COMPONENTS ===== */
-@media (max-width: 768px) {
+@media (max-width: 900px) {
 
     /* Mobile Header */
     .mobile-header {
@@ -2964,7 +2964,7 @@ select:focus {
         display: none !important;
     }
 
-    /* Dashboard table ↁEnative card list */
+    /* Dashboard table 竊・native card list */
     .table-container {
         flex: 1;
         overflow-y: auto;
@@ -3111,3 +3111,4 @@ select:focus {
         display: none !important;
     }
 }
+
