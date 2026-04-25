@@ -3314,4 +3314,30 @@ select:focus {
         align-items: center !important;
         justify-content: center !important;
     }
+
+    /* ---- Bottom Sheet refinements v21 ---- */
+    /* Swipe handle always at very top of sheet */
+    #registration-modal .modal-content::before {
+        content: '';
+        display: block;
+        width: 36px;
+        height: 4px;
+        background: #e2e8f0;
+        border-radius: 2px;
+        margin: 14px auto 4px;
+        flex-shrink: 0;
+    }
+
+    /* Hide × button – close via swipe or キャンセル only */
+    #registration-modal .btn-close-modal,
+    #registration-modal .btn-close,
+    #close-registration-modal {
+        display: none !important;
+    }
+
+    /* Center title now that × is gone */
+    #registration-modal .modal-header {
+        justify-content: center !important;
+        padding-top: 8px !important;
+    }
 }

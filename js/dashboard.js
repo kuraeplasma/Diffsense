@@ -2400,6 +2400,9 @@ class RegistrationFlow {
     }
 
     close() {
+        // Reset swipe transform before closing
+        const content = this.modal?.querySelector('.modal-content');
+        if (content) content.style.transform = '';
         if (typeof this.app.closeModal === 'function') {
             this.app.closeModal('registration-modal');
         } else {
@@ -2452,7 +2455,6 @@ class RegistrationFlow {
         if (this.currentStep === 1) {
             this.modalTitle.textContent = "新規登録 - 登録方法の選択";
             this.modalBody.innerHTML = `
-                <div class="registration-swipe-bar mobile-only"></div>
                 <div class="reg-method-grid slim-grid">
                     <div class="reg-method-card" id="reg-card-docx">
                         <div class="reg-method-icon"><i class="fa-solid fa-file-word"></i></div>
