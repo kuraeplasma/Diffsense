@@ -6383,7 +6383,7 @@ class DashboardApp {
             if (detailContainer) {
                 detailContainer.style.display = 'block';
                 detailContainer.style.flexDirection = '';
-                detailContainer.style.flex = '';
+                detailContainer.style.flex = 'none';  // CSS flex:1 を上書き → #app-content がコンテンツ高さを認識してスクロール
                 detailContainer.style.minHeight = '';
                 detailContainer.style.height = 'auto';
             }
@@ -8200,6 +8200,11 @@ class DashboardApp {
     }
 
     async showAnalysisLimitError(error = {}) {
+        // ローカル/LAN環境のownerプランはAPI上限エラーを無視する
+        const _h = window.location.hostname;
+        const _isLocalOwner = (_h === 'localhost' || _h === '127.0.0.1' || _h === '[::1]' || _h.endsWith('.local') || _h.startsWith('192.168.') || _h.startsWith('10.')) && this.subscription?.plan === 'owner';
+        if (_isLocalOwner) return;
+
         let cu = error.currentUsage;
         let lim = error.limit;
         let next = error.nextPlan;
