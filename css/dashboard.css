@@ -2032,6 +2032,22 @@ select:focus {
     box-sizing: border-box;
 }
 
+/* Doc pane header layout */
+.doc-pane-header {
+    gap: 8px;
+}
+.doc-pane-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    overflow: hidden;
+}
+/* Short upload text: hidden on desktop, visible on mobile */
+.upload-btn-short {
+    display: none;
+}
+
 .pane-scroll-area {
     flex: 1;
     min-height: 0;
@@ -2240,6 +2256,42 @@ select:focus {
     .detail-split-body .pane .pane-scroll-area {
         max-height: none;
         overflow-y: visible;
+    }
+
+    /* Doc pane header: compact on mobile */
+    .doc-pane-header {
+        flex-wrap: nowrap;
+        min-height: 44px !important;
+        height: auto !important;
+        padding: 8px 12px;
+        gap: 6px;
+    }
+    .doc-pane-label {
+        display: none;
+    }
+    .doc-pane-info {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+    }
+    .doc-source-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 100%;
+        font-size: 12px;
+    }
+    .btn-upload-doc {
+        flex-shrink: 0;
+        font-size: 11px !important;
+        padding: 6px 10px !important;
+        white-space: nowrap;
+    }
+    .upload-btn-text {
+        display: none;
+    }
+    .upload-btn-short {
+        display: inline;
     }
 }
 

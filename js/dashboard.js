@@ -1930,14 +1930,14 @@ const Views = {
                     </div>
 
                     <div class="pane">
-                        <div class="pane-header" style="display:flex; justify-content:space-between; align-items:center; min-height:56px; box-sizing:border-box;">
-                            <div style="display:flex; align-items:center; gap:8px; min-width:0;">
-                                <span><i class="fa-solid fa-file-contract"></i> ドキュメント表示</span>
+                        <div class="pane-header doc-pane-header">
+                            <div class="doc-pane-info">
+                                <span class="doc-pane-label"><i class="fa-solid fa-file-contract"></i> ドキュメント表示</span>
                                 ${contract.original_filename ? `<span class="doc-source-name" title="${contract.original_filename}"><i class="fa-solid fa-file-lines"></i> ${contract.original_filename}</span>` : ''}
                             </div>
                             ${app?.can('operate_contract') ? `
-                            <button class="btn-upload-version" onclick="window.app.uploadNewVersion(${id})">
-                                <i class="fa-solid fa-cloud-arrow-up"></i> 新しいバージョンをアップロード
+                            <button class="btn-upload-version btn-upload-doc" onclick="window.app.uploadNewVersion(${id})">
+                                <i class="fa-solid fa-cloud-arrow-up"></i><span class="upload-btn-text"> 新しいバージョンをアップロード</span><span class="upload-btn-short"> アップロード</span>
                             </button>` : ''}
                         </div>
                         <div class="tabs-row">
