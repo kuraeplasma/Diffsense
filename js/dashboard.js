@@ -1739,7 +1739,7 @@ const Views = {
                     <div class="pane">
                         <div class="pane-header" style="min-height:56px; box-sizing:border-box;">
                             <span><i class="fa-solid fa-magnifying-glass-chart" style="margin-right:8px;"></i> AI解析・差分判定</span>
-                            <button id="btn-reanalyze" class="btn-upload-version desktop-only" onclick="window.app.confirmReanalyze('${contract.id}')" style="margin-left:auto">
+                            <button id="btn-reanalyze" class="btn-upload-version" onclick="window.app.confirmReanalyze('${contract.id}')" style="margin-left:auto">
                                 <i class="fa-solid fa-wand-magic-sparkles"></i>リスク解析＋期限取得
                             </button>
                         </div>
@@ -4642,7 +4642,9 @@ class DashboardApp {
         try {
             const authModule = await import('./auth.js');
             const token = await authModule.getIdToken();
-            if (token) {
+            const _h = window.location.hostname;
+            const _isLocal = _h === 'localhost' || _h === '127.0.0.1' || _h.startsWith('192.168.') || _h.startsWith('10.');
+            if (token || _isLocal) {
                 await this.fetchSubscriptionStatus(token);
             }
         } catch (error) {
