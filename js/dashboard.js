@@ -1738,14 +1738,14 @@ const Views = {
                 <div class="detail-split-body">
                     <div class="pane">
                         <div class="pane-header" style="min-height:56px; box-sizing:border-box;">
-                            <span><i class="fa-solid fa-magnifying-glass-chart"></i> AI解析・差分判定</span>
-                            ${mobilePrimaryAction ? `<button class="btn-dashboard btn-primary-action mobile-only" onclick="${mobilePrimaryAction.action}" style="padding:6px 12px; font-size:12px; margin-left:auto;"><i class="fa-solid ${mobilePrimaryAction.icon}"></i> ${mobilePrimaryAction.label}</button>` : ''}
+                            <span><i class="fa-solid fa-magnifying-glass-chart" style="margin-right:8px;"></i> AI解析・差分判定</span>
+                            ${mobilePrimaryAction ? `<button class="btn-dashboard btn-primary-action mobile-only" onclick="${mobilePrimaryAction.action}" style="padding:6px 12px; font-size:12px; margin-left:auto;"><i class="fa-solid ${mobilePrimaryAction.icon}" style="margin-right:6px;"></i> ${mobilePrimaryAction.label}</button>` : ''}
                             <button id="btn-reanalyze" class="btn-upload-version desktop-only" onclick="window.app.confirmReanalyze('${contract.id}')" style="margin-left: ${mobilePrimaryAction ? '8px' : 'auto'}">
                                 <i class="fa-solid fa-wand-magic-sparkles"></i>リスク解析＋期限取得
                             </button>
                         </div>
                         <div class="pane-scroll-area">
-                            <div class="desktop-only">
+                            <div class="analysis-pane-content">
                                 ${isAnalyzingContract ? `
                                 <div class="skeleton-analysis-wrap">
                                     <div class="analysis-section-title">
@@ -2603,22 +2603,24 @@ class RegistrationFlow {
             const defaultName = this.tempData.fileName ? this.tempData.fileName.replace(/\.[^/.]+$/, "") : "";
 
             this.modalBody.innerHTML = `
-                <div class="form-group">
-                    <label>管理名 (必須)</label>
-                    <input type="text" id="reg-name" class="form-control" placeholder="例: 利用規約 (2026年版)" value="${defaultName}">
-                </div>
-                <div class="form-group">
-                    <label>種別</label>
-                    <select id="reg-type" class="form-control">
-                        ${(() => { const fixed = ['利用規約','NDA','業務委託契約','プライバシーポリシー']; const dynamic = (typeof dbService !== 'undefined' && dbService.getContracts) ? dbService.getContracts().map(c => c.type).filter(Boolean) : []; const types = [...new Set([...fixed, ...dynamic.filter(t => t !== 'その他')])]; types.push('その他'); return types.map(t => `<option value="${t}">${t}</option>`).join(''); })()}
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>${methodLabel}</label>
-                    <input type="text" id="reg-source" class="form-control" 
-                        placeholder="${(isPdf || isDocx) ? '' : 'https://example.com/terms'}" 
-                        value="${sourceVal}" 
-                        ${(isPdf || isDocx) ? 'readonly style="background:#f5f5f5; cursor:not-allowed;"' : ''}>
+                <div class="reg-form-container">
+                    <div class="form-group">
+                        <label>管理名 (必須)</label>
+                        <input type="text" id="reg-name" class="form-control" placeholder="例: 利用規約 (2026年版)" value="${defaultName}">
+                    </div>
+                    <div class="form-group">
+                        <label>種別</label>
+                        <select id="reg-type" class="form-control">
+                            ${(() => { const fixed = ['利用規約','NDA','業務委託契約','プライバシーポリシー']; const dynamic = (typeof dbService !== 'undefined' && dbService.getContracts) ? dbService.getContracts().map(c => c.type).filter(Boolean) : []; const types = [...new Set([...fixed, ...dynamic.filter(t => t !== 'その他')])]; types.push('その他'); return types.map(t => `<option value="${t}">${t}</option>`).join(''); })()}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>${methodLabel}</label>
+                        <input type="text" id="reg-source" class="form-control" 
+                            placeholder="${(isPdf || isDocx) ? '' : 'https://example.com/terms'}" 
+                            value="${sourceVal}" 
+                            ${(isPdf || isDocx) ? 'readonly style="background:#f5f5f5; cursor:not-allowed;"' : ''}>
+                    </div>
                 </div>
                 
                 <div class="${window.innerWidth <= 900 ? 'reg-mobile-actions' : 'reg-actions'}">
@@ -2628,10 +2630,12 @@ class RegistrationFlow {
         } else if (this.currentStep === 3) {
             this.modalTitle.textContent = "登録完了";
             this.modalBody.innerHTML = `
-                <div class="reg-success-icon"><i class="fa-solid fa-check-circle"></i></div>
-                <div class="reg-success-text">
-                    <h4>登録を受け付けました</h4>
-                    <p>「${this.tempData.name}」を監視対象として登録しました。ダッシュボードから確認できます。</p>
+                <div class="reg-form-container">
+                    <div class="reg-success-icon"><i class="fa-solid fa-check-circle"></i></div>
+                    <div class="reg-success-text">
+                        <h4>登録を受け付けました</h4>
+                        <p>「${this.tempData.name}」を監視対象として登録しました。ダッシュボードから確認できます。</p>
+                    </div>
                 </div>
                 <div class="${window.innerWidth <= 900 ? 'reg-mobile-actions' : 'reg-actions'}">
                     <button class="btn-dashboard btn-primary-action" onclick="event.stopPropagation(); window.app.registration.close()">ダッシュボードへ</button>

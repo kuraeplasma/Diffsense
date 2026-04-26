@@ -2250,6 +2250,38 @@ select:focus {
     }
 }
 
+/* Mobile: Analysis pane content visible */
+@media (max-width: 900px) {
+    /* Show analysis content on mobile */
+    .analysis-pane-content {
+        display: block;
+    }
+
+    /* Analysis cards: full width, comfortable padding */
+    .analysis-pane-content .analysis-card,
+    .analysis-pane-content .analysis-card-error,
+    .analysis-pane-content .analysis-section-title {
+        margin-left: 0;
+        margin-right: 0;
+    }
+
+    /* Changes grid: 2-col → 1-col on mobile */
+    .analysis-pane-content .analysis-card > div[style*="grid-template-columns:1fr 1fr"],
+    .analysis-pane-content .analysis-card > div[style*="grid-template-columns: 1fr 1fr"] {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* Deadline card inner grid: stack on mobile */
+    .deadline-card > div[style*="grid-template-columns"] {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* Mobile-risk-sticky: hide when full analysis is visible below */
+    .mobile-risk-sticky {
+        display: none !important;
+    }
+}
+
 /* Toast Modal Notifications (Center) */
 .toast-modal {
     position: fixed;
@@ -3255,6 +3287,10 @@ select:focus {
         color: #475569 !important;
     }
 
+    .reg-form-container {
+        padding: 24px 20px !important;
+    }
+
     .reg-mobile-actions {
         display: block !important;
         width: 100% !important;
@@ -3272,6 +3308,79 @@ select:focus {
         background: #f1f5f9 !important;
         color: #475569 !important;
         border: none !important;
+    }
+
+    /* Document Detail View (Mobile) */
+    #app-content.is-detail-view {
+        padding: 0 !important;
+        background: #fff !important;
+    }
+
+    .detail-split-container {
+        padding: 0 !important;
+        gap: 0 !important;
+    }
+
+    .detail-split-header {
+        padding: 16px 16px 12px !important;
+        margin-bottom: 0 !important;
+        border-bottom: 1px solid #f1f5f9;
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 12px !important;
+    }
+
+    .detail-header-main {
+        width: 100%;
+        align-items: center !important;
+    }
+
+    .detail-header-title-wrap h2 {
+        font-size: 16px !important;
+    }
+
+    .detail-split-body {
+        flex-direction: column !important;
+        gap: 0 !important;
+        overflow: visible !important;
+    }
+
+    .detail-split-body .pane {
+        width: 100% !important;
+        border: none !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        min-height: 0 !important;
+        height: auto !important;
+    }
+
+    .pane-header {
+        padding: 12px 16px !important;
+        background: #f8fafc !important;
+        border-bottom: 1px solid #e2e8f0;
+        min-height: 0 !important;
+    }
+
+    .pane-scroll-area {
+        padding: 16px !important;
+    }
+
+    .detail-split-header .flex.gap-sm {
+        width: 100%;
+        overflow-x: auto;
+        padding-bottom: 4px;
+        -webkit-overflow-scrolling: touch;
+        display: flex !important;
+    }
+
+    .detail-split-header .btn-dashboard {
+        padding: 8px 12px !important;
+        font-size: 12px !important;
+        white-space: nowrap;
+    }
+
+    .desktop-only {
+        display: none !important;
     }
 
     #registration-modal .btn-close-modal,
