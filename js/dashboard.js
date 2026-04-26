@@ -4652,7 +4652,8 @@ class DashboardApp {
 
     async fetchSubscriptionStatus(token) {
         // ローカル環境ではデフォルトで 'owner' プランを適用（全機能解放・全機能無制限）
-        const _isLocalEnv = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '[::1]' || window.location.hostname.endsWith('.local');
+        const _h = window.location.hostname;
+        const _isLocalEnv = _h === 'localhost' || _h === '127.0.0.1' || _h === '[::1]' || _h.endsWith('.local') || _h.startsWith('192.168.') || _h.startsWith('10.') || /^172\.(1[6-9]|2\d|3[01])\./.test(_h);
         let forcedPlan = _isLocalEnv ? (new URLSearchParams(window.location.search).get('forcePlan') || 'owner') : null;
         
         if (forcedPlan) {
