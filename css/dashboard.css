@@ -3256,7 +3256,10 @@ select:focus {
     }
 
     .reg-mobile-actions {
+        display: block !important;
+        width: 100% !important;
         padding: 0 20px 24px !important;
+        box-sizing: border-box !important;
     }
 
     .reg-mobile-actions .btn-dashboard {
