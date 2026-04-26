@@ -543,8 +543,8 @@ function normalizeStructuredClauseResult(parsed, index) {
         return {
             sectionId,
             change: false,
-            summary: '',
-            riskLevel: 1,
+            summary: '未取得',
+                riskLevel: 1,
             risk: 'LOW'
         };
     }
@@ -958,7 +958,7 @@ class GeminiService {
         if (previousText && currentText && previousText.trim() === currentText.trim()) {
             logger.info('No changes detected, skipping AI analysis');
             return {
-                summary: "前バージョンからの変更は検出されませんでした。契約内容は維持されています。",
+                summary: "前ヴァージョンからの変更は検出されぴせんでした。契約内容は維持されています。",
                 riskLevel: 1,
                 riskReason: "変更なし",
                 changes: [],
@@ -1160,7 +1160,7 @@ class GeminiService {
             return {
                 summary: 'AI差分要約を取得できませんでした。再解析を実行してください。',
                 riskLevel: 1,
-                riskReason: 'AI差分要約未取得',
+                riskReason: '未取得',
                 results: [],
                 isFallback: true
             };
