@@ -917,12 +917,13 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
             const docxTmpPath = path.join(tmpDir, `upload-${Date.now()}.docx`);
             fs.writeFileSync(docxTmpPath, currentBuffer);
             
+            let pdfBuffer = null;
             try {
                 const pdfPath = await docxService.convertToPdf(docxTmpPath);
                 if (fs.existsSync(pdfPath)) {
-                    const pdfBuffer = fs.readFileSync(pdfPath);
-                    const pdfData = await pdfService.extractTextFromPdf(pdfBuffer);
-                    extractedRawText = pdfData.text;
+                    pdfBuffer = fs.readFileSync(pdfPath);
+                    const pdfData = await pdfService.extractText(pdfBuffer.toString('base64'));
+                    extractedRawText = pdfData.rawText || pdfData.text || '';
                     conversionMethod = 'libreoffice_pdf';
                     logger.info(`DOCX conversion success via LibreOffice: ${filename}`);
                     
