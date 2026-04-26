@@ -2851,7 +2851,7 @@ class RegistrationFlow {
                 if (!extractedContent) {
                     throw new Error('抽出結果に本文データが含まれていません');
                 }
-                // 抽出されたテキストのみを保存（AI解析結果は保存しない）
+                // 抽出されたテキストと、もしあれば差分結果も保存
                 dbService.updateContractText(contractId, {
                     extractedText: extractedContent,
                     rawExtractedText: data.rawExtractedText,
@@ -2861,7 +2861,13 @@ class RegistrationFlow {
                     pdfStoragePath: String(data.sourceType || '').toUpperCase() === 'DOCX' ? null : data.pdfStoragePath,
                     pdfUrl: String(data.sourceType || '').toUpperCase() === 'DOCX' ? null : data.pdfUrl,
                     doc: data.doc || null,
-                    status: '未処理'  // 差分がまだないので未処理
+                    status: data.changes && data.changes.length > 0 ? '要確認' : (data.status || '未処理'),
+                    ai_changes: data.changes || [],
+                    summary: data.summary || null,
+                    ai_summary: data.summary || null,
+                    risk_level: data.riskLevel === 3 || data.riskLevel === "3" ? 'High' : (data.riskLevel === 2 || data.riskLevel === "2" ? 'Medium' : 'Low'),
+                    ai_risk_reason: data.riskReason || null,
+                    contract_meta: data.contract_meta || null
                 });
 
                 console.log('Text extraction completed');

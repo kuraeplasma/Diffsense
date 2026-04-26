@@ -792,6 +792,15 @@ export const dbService = {
             }
 
             // ステータスを更新
+            // 解析・差分データがあれば保存
+            if (data.ai_changes) contract.ai_changes = data.ai_changes;
+            if (data.summary) contract.summary = data.summary;
+            if (data.ai_summary) contract.ai_summary = data.ai_summary;
+            if (data.risk_level) contract.risk_level = data.risk_level;
+            if (data.ai_risk_reason) contract.ai_risk_reason = data.ai_risk_reason;
+            if (data.contract_meta) contract.contract_meta = data.contract_meta;
+            if (data.ai_succeeded !== undefined) contract.ai_succeeded = data.ai_succeeded;
+
             contract.extract_status = 'success';
             contract.status = data.status || '未処理';
             contract.last_updated_at = this.nowIso();

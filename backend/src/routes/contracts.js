@@ -906,7 +906,8 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
 
         try {
             // 1. まずはLibreOfficeでのPDF変換を試みる（原本性が高いため）
-            const tmpDir = path.join(__dirname, '../../tmp/docx-convert');
+            const os = require('os');
+            const tmpDir = path.join(os.tmpdir(), 'docx-convert');
             if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
             
             const docxTmpPath = path.join(tmpDir, `upload-${Date.now()}.docx`);
@@ -932,15 +933,28 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
                 extractedRawText = mammothResult.value;
                 conversionMethod = 'mammoth';
             } finally {
-                if (fs.existsSync(docxTmpPath)) fs.unlinkSync(docxTmpPath);
+                if (fs.existsSync(docxTmpPath)) {
+                    try {
+                        fs.unlinkSync(docxTmpPath);
+                    } catch (e) {
+                        logger.warn('Failed to cleanup tmp docx:', e.message);
+                    }
+                }
             }
         } catch (extractError) {
-            logger.error('DOCX_CONVERT_ERROR', extractError);
-            return res.status(500).json({ 
-                success: false, 
-                error: 'DOCX_CONVERT_FAILED',
-                detail: extractError.message
-            });
+            logger.warn('Initial DOCX setup failed, trying direct mammoth fallback:', extractError.message);
+            try {
+                const mammothResult = await mammoth.extractRawText({ buffer: currentBuffer });
+                extractedRawText = mammothResult.value;
+                conversionMethod = 'mammoth';
+            } catch (mammothError) {
+                logger.error('DOCX_EXTRACT_ALL_FAILED', mammothError);
+                return res.status(500).json({ 
+                    success: false, 
+                    error: 'DOCX_CONVERT_FAILED',
+                    detail: mammothError.message
+                });
+            }
         }
 
         const currentArticles = docxService.parseTextToArticles(extractedRawText);
