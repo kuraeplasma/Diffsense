@@ -1250,8 +1250,6 @@ class GeminiService {
             }),
             error: null
         };
-            isFallback: false
-        });
     }
 
     async analyzeMcpDiff(changes, options = {}) {
@@ -1742,3 +1740,4 @@ ${truncatedText}
 }
 
 module.exports = new GeminiService();
+module.exports.normalizeAnalyzeResult = normalizeAnalyzeResult;
