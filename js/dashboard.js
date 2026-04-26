@@ -6373,11 +6373,12 @@ class DashboardApp {
         const isMobileDetailLayout = typeof window.matchMedia === 'function'
             && window.matchMedia('(max-width: 900px)').matches;
         if (isMobileDetailLayout) {
-            this.mainContent.style.display = 'block';
-            this.mainContent.style.flexDirection = '';
-            this.mainContent.style.minHeight = '';
-            this.mainContent.style.height = 'auto';
-            this.mainContent.style.overflowY = 'visible';
+            // #app-content をスクロールコンテナとして保持（flex:1で高さ拘束 → overflow-y:auto でスクロール）
+            this.mainContent.style.display = 'flex';
+            this.mainContent.style.flexDirection = 'column';
+            this.mainContent.style.minHeight = '0';
+            this.mainContent.style.height = '';
+            this.mainContent.style.overflowY = 'auto';
             this.mainContent.style.overflowX = 'hidden';
 
             const detailContainer = this.mainContent.querySelector('.detail-split-container');
