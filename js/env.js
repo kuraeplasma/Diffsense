@@ -15,7 +15,9 @@
     return;
   }
 
-  window.API_BASE = (isLocal && !forceProdApi) ? localBase : PROD_API_BASE;
+  // ローカルバックエンド（localhost:3001）は存在しないため、ローカルでも本番APIを使用する。
+  // ローカルバックエンドが必要な場合は ?apiBase=http://localhost:3001 で明示指定すること。
+  window.API_BASE = PROD_API_BASE;
 })();
 
 if (!window.API_BASE) {
