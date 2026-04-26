@@ -353,6 +353,13 @@ export async function handleLogout() {
  * Call this on pages that require login (e.g. dashboard)
  */
 export function requireAuth() {
+    // ローカル/LAN環境ではログインなしでオーナーとして動作（開発用）
+    const _rh = window.location.hostname;
+    const _isLocalAuth = _rh === 'localhost' || _rh === '127.0.0.1' || _rh === '[::1]' || _rh.endsWith('.local') || _rh.startsWith('192.168.') || _rh.startsWith('10.');
+    if (_isLocalAuth) {
+        console.log('[Local] requireAuth skipped — local/LAN environment, owner mode.');
+        return;
+    }
     onAuthStateChanged(auth, (user) => {
         if (!user) {
             console.log("No user found, redirecting to login.");

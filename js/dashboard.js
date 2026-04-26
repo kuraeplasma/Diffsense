@@ -3005,7 +3005,7 @@ class DashboardApp {
         this.stripePublishableKey = '';
 
         // 初期表示をOwnerプランに設定 (ローカル開発・全機能解放)
-        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '[::1]' || window.location.hostname.endsWith('.local');
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '[::1]' || window.location.hostname.endsWith('.local') || window.location.hostname.startsWith('192.168.') || window.location.hostname.startsWith('10.');
         this.subscription = { 
             plan: isLocal ? 'owner' : 'free', 
             billingCycle: 'monthly', 
@@ -3427,21 +3427,19 @@ class DashboardApp {
         if (urlParams.get('forcePlan')) return;
 
         // ローカル環境（Owner）の場合はキャッシュでの上書きを制限する
-        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '[::1]' || window.location.hostname.endsWith('.local');
-        
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '[::1]' || window.location.hostname.endsWith('.local') || window.location.hostname.startsWith('192.168.') || window.location.hostname.startsWith('10.');
+
+        // ローカルかつownerなら、キャッシュは一切適用しない（古いusageLimitなどで上書きを防ぐ）
+        if (isLocal && this.userPlan === 'owner') return;
+
         const cachedSub = this.getCachedItem(DASHBOARD_CACHE_KEYS.SUBSCRIPTION, 10 * 60 * 1000);
         if (cachedSub && cachedSub.plan) {
-            // ローカルかつ現在がownerなら、キャッシュがowner以外なら上書きしない
-            if (isLocal && this.userPlan === 'owner' && cachedSub.plan !== 'owner') {
-                // Keep owner
-            } else {
-                this.subscription = {
-                    ...this.subscription,
-                    ...cachedSub,
-                    billingCycle: cachedSub.billingCycle === 'annual' ? 'annual' : 'monthly'
-                };
-                this.userPlan = cachedSub.plan;
-            }
+            this.subscription = {
+                ...this.subscription,
+                ...cachedSub,
+                billingCycle: cachedSub.billingCycle === 'annual' ? 'annual' : 'monthly'
+            };
+            this.userPlan = cachedSub.plan;
         }
 
         const cachedUser = this.getCachedItem(DASHBOARD_CACHE_KEYS.USER_META, 30 * 60 * 1000);
