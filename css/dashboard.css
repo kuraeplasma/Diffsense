@@ -3162,7 +3162,7 @@ select:focus {
         width: 100% !important;
         max-width: 100% !important;
         height: auto !important;
-        min-height: 380px !important;
+        min-height: 0 !important;
         background: #fff !important;
         border-radius: 32px 32px 0 0 !important;
         box-shadow: 0 -10px 40px rgba(0,0,0,0.12) !important;
@@ -3260,6 +3260,7 @@ select:focus {
     }
 
     .reg-mobile-actions .btn-dashboard {
+        display: flex !important;
         width: 100% !important;
         height: 52px !important;
         border-radius: 14px !important;

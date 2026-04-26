@@ -2675,13 +2675,6 @@ class RegistrationFlow {
 
         if (cardUrl) {
             const isPro = ['owner', 'pro'].includes(this.app?.subscription?.plan);
-            if (!isPro) {
-                cardUrl.style.opacity = '0.55';
-                cardUrl.style.position = 'relative';
-                cardUrl.insertAdjacentHTML('beforeend',
-                    '<div style="position:absolute;top:8px;right:8px;background:#c5a059;color:#fff;border-radius:10px;padding:2px 8px;font-size:10px;font-weight:700;letter-spacing:0.03em;">Pro</div>'
-                );
-            }
             cardUrl.onclick = () => {
                 if (!isPro) {
                     window.app.showProFeatureModal('URLを登録して定期的に変更を監視し、差分をSlack・メールで通知する機能はProプラン限定です。');
