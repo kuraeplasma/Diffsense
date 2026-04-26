@@ -2254,8 +2254,11 @@ select:focus {
 
     /* More breathing room for scroll area on mobile */
     .detail-split-body .pane .pane-scroll-area {
+        flex: none;
+        height: auto;
         max-height: none;
         overflow-y: visible;
+        min-height: 0;
     }
 
     /* Doc pane header: compact on mobile */
