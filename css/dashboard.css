@@ -2186,9 +2186,17 @@ select:focus {
 
 /* Detail Split View Responsive */
 @media (max-width: 900px) {
+    .detail-split-container {
+        flex: none;
+        height: auto;
+    }
+
     .detail-split-body {
+        flex: none;
+        height: auto;
         flex-direction: column;
         overflow: visible;
+        min-height: 0;
     }
 
     #app-content.is-detail-view {
