@@ -2226,6 +2226,19 @@ select:focus {
     .document-paper {
         padding: 30px 15px;
     }
+
+    /* モバイルではdocument-viewerの独自スクロールを解除 → #app-contentで一本化 */
+    .document-viewer {
+        max-height: none !important;
+        overflow-y: visible !important;
+        overflow-x: hidden !important;
+    }
+
+    /* diff-paneの独自スクロールも解除 */
+    .diff-pane {
+        overflow-y: visible !important;
+        height: auto !important;
+    }
 }
 
 /* Detail Screen Mobile UX */
