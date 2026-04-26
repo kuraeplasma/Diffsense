@@ -1,6 +1,6 @@
 import { Notify } from './notify.js';
-import { dbService } from './db-service.js?v=20260426_fix';
-import { aiService } from './ai-service.js?v=20260426_fix';
+import { dbService } from './db-service.js?v=20260426_final';
+import { aiService } from './ai-service.js?v=20260426_final';
 import { getApiBaseUrl, shouldUseLocalDevAuthBypass, isLocalHostEnvironment } from './api-base.js';
 import { auth } from './firebase-config.js?v=20260422_auth_timeout';
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -1382,7 +1382,9 @@ const Views = {
         const displaySourceDoc = selectedSourceDoc;
         const displayTargetDoc = selectedTargetDoc;
 
-        const selectedDiffPayload = null;
+        const selectedDiffPayload = (selectedSourceDoc && selectedTargetDoc)
+            ? (dbService.getDiffResult(selectedSourceDoc.id, selectedTargetDoc.id, id) || null)
+            : null;
         const effectiveSelectedDiffData = selectedDiffPayload?.isFallback === true
             ? null
             : selectedDiffPayload;
@@ -1774,6 +1776,31 @@ const Views = {
                                     </div>
                                     <div style="font-size:13px; color:#333; line-height:1.7; white-space:pre-wrap;">${diffData.summary || 'AI解析結果がありません'}</div>
                                 </div>
+                                ${(effectiveSelectedDiffData && displayChanges.length > 0) ? (() => {
+                                    return '<div class="analysis-section-title" style="margin-top:16px;"><span><i class="fa-solid fa-list-check text-primary"></i> 検出された重要な変更点</span></div>'
+                                        + displayChanges.map((c) => {
+                                            const _t = String(c.type || '').toUpperCase();
+                                            const _ct = _t === 'ADD' ? '追加' : _t === 'DELETE' ? '削除' : '変更';
+                                            const _old = escapeHtmlText(typeof c.old === 'string' ? c.old : JSON.stringify(c.old || ''));
+                                            const _new = escapeHtmlText(typeof c.new === 'string' ? c.new : JSON.stringify(c.new || ''));
+                                            return '<div class="analysis-card" style="margin-top:8px; padding:12px 14px;">'
+                                                + '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">'
+                                                + '<span style="font-size:12px; font-weight:700; color:#2b2623;">' + escapeHtmlText(c.section || '変更点') + '</span>'
+                                                + '<span style="font-size:11px; background:#f0f0f0; border-radius:4px; padding:2px 8px; color:#555;">' + _ct + '</span>'
+                                                + '</div>'
+                                                + '<div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:' + ((c.impact || c.concern) ? '10px' : '0') + ';">'
+                                                + '<div><div style="font-size:10px; color:#999; margin-bottom:4px;">変更前</div><div style="font-size:12px; background:#fff5f5; border-left:3px solid #fc8181; padding:6px 8px; border-radius:0 4px 4px 0; color:#742a2a; white-space:pre-wrap;">' + (_old || '（該当なし）') + '</div></div>'
+                                                + '<div><div style="font-size:10px; color:#999; margin-bottom:4px;">変更後</div><div style="font-size:12px; background:#f0fff4; border-left:3px solid #68d391; padding:6px 8px; border-radius:0 4px 4px 0; color:#22543d; white-space:pre-wrap;">' + (_new || '（該当なし）') + '</div></div>'
+                                                + '</div>'
+                                                + ((c.impact || c.concern)
+                                                    ? '<div style="font-size:12px; color:#5e544d; line-height:1.6; border-top:1px solid #f0ede8; padding-top:8px;">'
+                                                        + (c.impact ? '<div style="margin-bottom:4px;"><strong><i class="fa-solid fa-scale-balanced" style="color:#1976d2; margin-right:4px;"></i>法的影響:</strong> ' + escapeHtmlText(c.impact) + '</div>' : '')
+                                                        + (c.concern ? '<div><strong><i class="fa-solid fa-triangle-exclamation" style="color:#f57c00; margin-right:4px;"></i>懸念点:</strong> ' + escapeHtmlText(c.concern) + '</div>' : '')
+                                                        + '</div>'
+                                                    : '')
+                                                + '</div>';
+                                        }).join('');
+                                })() : ''}
                                 ` : (contract.ai_succeeded === false ? `
                                 <div class="analysis-card-error">
                                     <div style="color:#c53030; font-weight:700; margin-bottom:12px;">
@@ -1839,7 +1866,7 @@ const Views = {
                                     </div>
                                     <div style="font-size:12px; color:#999; line-height:1.6;">
                                         AIによる解析の結果、この書類には有効期限や更新期限に関する具体的な記述は見つかりませんでした。<br>
-                                        手動で期限を設定する場合は、右上のメニューまたは期限管理画面から編集可能です。
+                                        手動で期限を設定する場合は、期限管理画面から編集可能です。
                                     </div>
                                 </div>
                             ` : '')}
@@ -2152,11 +2179,11 @@ const Views = {
     // 5. Team is lazy-loaded from js/modules/team.js.
     team: null,
     mcp: () => {
-        const mc利用規約ey = window.app.mc利用規約ey || '';
-        const maskedKey = window.app.mc利用規約eyMasked || (mc利用規約ey ? `mcp_••••••••••••${mc利用規約ey.slice(-4)}` : '未発行');
-        const hasVisibleKey = Boolean(mc利用規約ey);
-        const isKeyHidden = window.app.isMc利用規約eyHidden !== false;
-        const displayKey = (!hasVisibleKey || isKeyHidden) ? maskedKey : mc利用規約ey;
+        const mcpKey = window.app.mcpKey || '';
+        const maskedKey = window.app.mcpKeyMasked || (mcpKey ? `mcp_••••••••••••${mcpKey.slice(-4)}` : '未発行');
+        const hasVisibleKey = Boolean(mcpKey);
+        const isKeyHidden = window.app.isMcpKeyHidden !== false;
+        const displayKey = (!hasVisibleKey || isKeyHidden) ? maskedKey : mcpKey;
         const activeTab = window.app.mcpActiveTab || 'cloud';
 
         return `
@@ -3006,28 +3033,28 @@ class DashboardApp {
         try {
             const data = await dbService.getMcpApiKey();
             if (this.currentView !== requestedView || this.mainContent !== main) return;
-            this.mc利用規約ey = data?.mcpApiKey || '';
-            this.mc利用規約eyMasked = data?.maskedKey || '未発行';
+            this.mcpKey = data?.mcpApiKey || '';
+            this.mcpKeyMasked = data?.maskedKey || '未発行';
             this.mcpHasKey = Boolean(data?.hasKey || data?.mcpApiKey);
         } catch (error) {
             if (this.currentView !== requestedView || this.mainContent !== main) return;
             console.error('Failed to load MCP settings:', error);
-            this.mc利用規約ey = '';
-            this.mc利用規約eyMasked = 'エラー';
+            this.mcpKey = '';
+            this.mcpKeyMasked = 'エラー';
             this.mcpHasKey = false;
         }
         if (this.currentView !== requestedView || this.mainContent !== main) return;
-        this.renderMc利用規約eyCard();
+        this.renderMcpKeyCard();
     }
 
-    renderMc利用規約eyCard() {
+    renderMcpKeyCard() {
         const el = document.getElementById('mcp-key-card-inner');
         if (el) {
-            const mc利用規約ey = this.mc利用規約ey || '';
-            const maskedKey = this.mc利用規約eyMasked || (mc利用規約ey ? `mcp_••••••••••••${mc利用規約ey.slice(-4)}` : '未発行');
-            const hasVisibleKey = Boolean(mc利用規約ey);
-            const isKeyHidden = this.isMc利用規約eyHidden !== false;
-            const displayKey = (!hasVisibleKey || isKeyHidden) ? maskedKey : mc利用規約ey;
+            const mcpKey = this.mcpKey || '';
+            const maskedKey = this.mcpKeyMasked || (mcpKey ? `mcp_••••••••••••${mcpKey.slice(-4)}` : '未発行');
+            const hasVisibleKey = Boolean(mcpKey);
+            const isKeyHidden = this.isMcpKeyHidden !== false;
+            const displayKey = (!hasVisibleKey || isKeyHidden) ? maskedKey : mcpKey;
             
             el.innerHTML = `
                 <div style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:10px; padding:16px; margin-bottom:16px;">
@@ -3036,16 +3063,16 @@ class DashboardApp {
                         <code style="flex:1; font-family:monospace; font-size:13px; color:#fff; word-break:break-all;">${displayKey}</code>
                     </div>
                     <div style="display:flex; gap:8px; margin-top:12px;">
-                        <button class="btn-dashboard" style="flex:1; background:rgba(255,255,255,0.1); border:none; color:#fff; font-size:11px; padding:6px; ${hasVisibleKey ? '' : 'opacity:0.5; cursor:not-allowed;'}" onclick="${hasVisibleKey ? 'window.app.toggleMc利用規約eyVisibility()' : 'Notify.info(`既存キーは安全のため再表示されません。必要なら新規発行してください`)'}">
+                        <button class="btn-dashboard" style="flex:1; background:rgba(255,255,255,0.1); border:none; color:#fff; font-size:11px; padding:6px; ${hasVisibleKey ? '' : 'opacity:0.5; cursor:not-allowed;'}" onclick="${hasVisibleKey ? 'window.app.toggleMcpKeyVisibility()' : 'Notify.info(`既存キーは安全のため再表示されません。必要なら新規発行してください`)'}">
                             <i class="fa-solid ${hasVisibleKey && !isKeyHidden ? 'fa-eye-slash' : 'fa-eye'}"></i> ${hasVisibleKey ? (isKeyHidden ? '新規キーを表示' : '非表示にする') : '既存キーは再表示不可'}
                         </button>
-                        <button class="btn-dashboard" style="flex:1; background:rgba(255,255,255,0.1); border:none; color:#fff; font-size:11px; padding:6px; ${hasVisibleKey ? '' : 'opacity:0.5; cursor:not-allowed;'}" onclick="${hasVisibleKey ? `navigator.clipboard.writeText('${mc利用規約ey}'); Notify.success('キーをコピーしました')` : `Notify.info('コピーできるのは新規発行直後のキーのみです')`}">
+                        <button class="btn-dashboard" style="flex:1; background:rgba(255,255,255,0.1); border:none; color:#fff; font-size:11px; padding:6px; ${hasVisibleKey ? '' : 'opacity:0.5; cursor:not-allowed;'}" onclick="${hasVisibleKey ? `navigator.clipboard.writeText('${mcpKey}'); Notify.success('キーをコピーしました')` : `Notify.info('コピーできるのは新規発行直後のキーのみです')`}">
                             <i class="fa-solid fa-copy"></i> コピー
                         </button>
                     </div>
                 </div>
                 
-                <button class="btn-dashboard" style="width:100%; background:#c19b4a; border:none; color:#fff; font-weight:700; font-size:13px; padding:10px;" onclick="window.app.generateMc利用規約ey()">
+                <button class="btn-dashboard" style="width:100%; background:#c19b4a; border:none; color:#fff; font-weight:700; font-size:13px; padding:10px;" onclick="window.app.generateMcpKey()">
                     <i class="fa-solid fa-rotate"></i> 新規キーを発行
                 </button>
                 <p style="font-size:10px; color:#94a3b8; margin-top:12px; line-height:1.4;">
@@ -3055,22 +3082,22 @@ class DashboardApp {
         }
     }
 
-    toggleMc利用規約eyVisibility() {
-        this.isMc利用規約eyHidden = this.isMc利用規約eyHidden === false ? true : false;
-        this.renderMc利用規約eyCard();
+    toggleMcpKeyVisibility() {
+        this.isMcpKeyHidden = this.isMcpKeyHidden === false ? true : false;
+        this.renderMcpKeyCard();
     }
 
-    async generateMc利用規約ey() {
+    async generateMcpKey() {
         if (!await Notify.confirm('MCP APIキーを生成しますか？\n以前のキーは使えなくなります。', { title: '確認', type: 'warning' })) return;
         const loading = Notify.info('生成中...', { duration: 0 });
         try {
             const data = await dbService.generateMcpApiKey();
             if (data && data.mcpApiKey) {
-                this.mc利用規約ey = data.mcpApiKey;
-                this.mc利用規約eyMasked = data.maskedKey || `mcp_••••••••••••${data.mcpApiKey.slice(-4)}`;
+                this.mcpKey = data.mcpApiKey;
+                this.mcpKeyMasked = data.maskedKey || `mcp_••••••••••••${data.mcpApiKey.slice(-4)}`;
                 this.mcpHasKey = true;
-                this.isMc利用規約eyHidden = false;
-                this.renderMc利用規約eyCard();
+                this.isMcpKeyHidden = false;
+                this.renderMcpKeyCard();
                 Notify.success('APIキーを更新しました');
             } else {
                 Notify.error('生成に失敗しました');
@@ -3101,9 +3128,9 @@ class DashboardApp {
         });
     }
 
-    copyMc利用規約eyToClipboard() {
-        if (!this.mc利用規約ey) { Notify.warning('コピーできるキーがありません'); return; }
-        navigator.clipboard.writeText(this.mc利用規約ey);
+    copyMcpKeyToClipboard() {
+        if (!this.mcpKey) { Notify.warning('コピーできるキーがありません'); return; }
+        navigator.clipboard.writeText(this.mcpKey);
         Notify.success('APIキーをコピーしました');
     }
 
@@ -3603,6 +3630,15 @@ class DashboardApp {
      * Show confirmation popup before running single-doc reanalysis.
      */
     confirmReanalyze(contractId) {
+        // Use detailState (always current) to detect if two docs are selected for comparison
+        const detailState = (this.detailState?.contractId && String(this.detailState.contractId) === String(contractId))
+            ? this.detailState : null;
+        const selectedSourceDoc = detailState?.comparison?.selectedSourceDoc;
+        const selectedTargetDoc = detailState?.comparison?.selectedTargetDoc;
+        const hasPair = Boolean(detailState?.diff?.canTriggerPairAnalysis && selectedSourceDoc && selectedTargetDoc);
+        const docAId = hasPair ? selectedSourceDoc.id : '';
+        const docBId = hasPair ? selectedTargetDoc.id : '';
+
         const overlay = document.createElement('div');
         overlay.id = 'reanalyze-confirm-overlay';
         overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9500;display:flex;align-items:center;justify-content:center;';
@@ -3622,12 +3658,12 @@ class DashboardApp {
                 </div>
                 <div style="background:#f8f6f3;border-radius:8px;padding:12px 14px;margin-bottom:20px;font-size:12px;color:#7a6a5a;line-height:1.6;">
                     <i class="fa-solid fa-circle-info" style="color:#c5a059;margin-right:6px;"></i>
-                    差分チェックなしでも、AIが書類全体のリスクと契約期限を抽出します。
+                    ${hasPair ? 'AIが書類全体のリスク・期限取得に加え、新旧差分のリスクも解析します。' : '差分チェックなしでも、AIが書類全体のリスクと契約期限を抽出します。'}
                 </div>
                 <div style="display:flex;gap:10px;justify-content:flex-end;">
                     <button onclick="document.getElementById('reanalyze-confirm-overlay').remove()"
                         style="padding:9px 20px;border:1px solid #ddd;border-radius:6px;background:#fff;color:#5e544d;font-size:14px;cursor:pointer;">キャンセル</button>
-                    <button onclick="document.getElementById('reanalyze-confirm-overlay').remove();window.app.runReanalyze('${contractId}', { userTriggered: true })"
+                    <button onclick="document.getElementById('reanalyze-confirm-overlay').remove();window.app.runFullAnalysis('${contractId}', '${docAId}', '${docBId}')"
                         style="padding:9px 22px;border:none;border-radius:6px;background:#c5a059;color:#fff;font-size:14px;font-weight:600;cursor:pointer;">
                         <i class="fa-solid fa-play" style="margin-right:6px;"></i>解析する
                     </button>
@@ -3635,6 +3671,30 @@ class DashboardApp {
             </div>`;
         document.body.appendChild(overlay);
         overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+    }
+
+    /**
+     * Run both single-doc reanalysis (risk + deadline) and diff pair analysis if a pair is selected.
+     */
+    runFullAnalysis(contractId, docAId, docBId) {
+        this.runReanalyze(contractId, { userTriggered: true });
+        if (docAId && docBId) {
+            this.runDiffAnalyze(contractId, docAId, docBId);
+        }
+    }
+
+    /**
+     * Execute diff pair analysis between two selected documents.
+     */
+    runDiffAnalyze(contractId, docAId, docBId) {
+        const docs = dbService.getDocumentsByContractId(contractId);
+        const sourceDoc = docs.find(d => String(d.id) === String(docAId));
+        const targetDoc = docs.find(d => String(d.id) === String(docBId));
+        if (!sourceDoc || !targetDoc) {
+            Notify.error('比較文書が見つかりません');
+            return;
+        }
+        this.analyzeDocumentPair(contractId, sourceDoc, targetDoc, { force: true, userTriggered: true });
     }
 
     /**
@@ -7703,6 +7763,13 @@ class DashboardApp {
                 created_at: new Date().toISOString()
             });
             if (isCurrentVsLatestHistoryPair(docs, sourceDoc, targetDoc)) {
+                const deadlineFields = {};
+                if (diffPayload.expiry_date !== undefined) deadlineFields.expiry_date = diffPayload.expiry_date;
+                if (diffPayload.renewal_deadline !== undefined) deadlineFields.renewal_deadline = diffPayload.renewal_deadline;
+                if (diffPayload.contract_start !== undefined) deadlineFields.contract_start = diffPayload.contract_start;
+                if (diffPayload.auto_renewal !== undefined) deadlineFields.auto_renewal = diffPayload.auto_renewal;
+                if (diffPayload.date_confidence !== undefined) deadlineFields.date_confidence = diffPayload.date_confidence;
+                if (diffPayload.contract_category !== undefined) deadlineFields.contract_category = diffPayload.contract_category;
                 dbService.updateContractAnalysis(contractId, {
                     summary: diffPayload.summary,
                     riskLevel: diffPayload.riskLevel,
@@ -7710,8 +7777,13 @@ class DashboardApp {
                     changes: Array.isArray(diffPayload.changes) ? diffPayload.changes : [],
                     isFallback: diffPayload.isFallback === true,
                     aiFailed: diffPayload.aiFailed === true,
-                    status: '未確認'
+                    aiSucceeded: !diffPayload.aiFailed,
+                    status: '未確認',
+                    ...deadlineFields
                 });
+            }
+            if (!silent) {
+                Notify.success('差分AI解析が完了しました。');
             }
             if (requestedRemoteAnalysis) {
                 await this.refreshSubscriptionStatusSafe();
