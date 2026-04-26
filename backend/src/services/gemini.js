@@ -931,11 +931,11 @@ function parseRetryAfterMs(error) {
 
 function getGeminiRequestBudget() {
     // ローカル/本番で同一実装。必要時は環境変数で同じキーを調整する。
-    const timeoutMsRaw = Number(process.env.GEMINI_TIMEOUT_MS || 45000);
+    const timeoutMsRaw = Number(process.env.GEMINI_TIMEOUT_MS || 15000);
     const maxAttemptsRaw = Number(process.env.GEMINI_MAX_ATTEMPTS || 2);
     const retryBaseMsRaw = Number(process.env.GEMINI_RETRY_BASE_MS || 1000);
     return {
-        timeoutMs: Number.isFinite(timeoutMsRaw) && timeoutMsRaw >= 5000 ? Math.floor(timeoutMsRaw) : 45000,
+        timeoutMs: Number.isFinite(timeoutMsRaw) && timeoutMsRaw >= 5000 ? Math.floor(timeoutMsRaw) : 15000,
         maxAttempts: Number.isFinite(maxAttemptsRaw) && maxAttemptsRaw >= 1 ? Math.min(Math.floor(maxAttemptsRaw), 5) : 2,
         retryBaseMs: Number.isFinite(retryBaseMsRaw) && retryBaseMsRaw >= 0 ? Math.floor(retryBaseMsRaw) : 1000
     };
@@ -1003,13 +1003,7 @@ class GeminiService {
             throw lastError || new Error(`${label} request failed`);
         };
 
-        try {
-            const res = await requestWithMimeFallback(prompt, 'unified_analysis');
-            
-            if (!res) {
-                throw new Error('Unified request returned empty result');
-            }
-
+            logger.info("Gemini raw response:", JSON.stringify(res));
             const result = {
                 ...normalizeAnalyzeResult(res),
                 changes: normalizeChanges(res?.changes),
@@ -1019,23 +1013,28 @@ class GeminiService {
             };
 
             logger.info(`Analysis complete. duration=${Date.now() - start}ms`);
-            return result;
+            return {
+                success: true,
+                data: result,
+                error: null
+            };
 
         } catch (error) {
             logger.error('Gemini unified analysis failed:', error);
             const status = Number(error?.response?.status || 0);
+            const fallback = buildHeuristicFallbackAnalysis(currentText, previousText);
+            
             if (status === 429) {
-                const limited = buildHeuristicFallbackAnalysis(currentText, previousText);
-                limited.errorCode = 'AI_RATE_LIMITED';
-                limited.errorMessage = '現在アクセスが集中しています。数分後にもう一度お試しください。';
-                return limited;
+                fallback.errorCode = 'AI_RATE_LIMITED';
+                fallback.errorMessage = '現在アクセスが集中しています。数分後にもう一度お試しください。';
             }
-            if (shouldUseLocalAiFallback()) {
-                return previousText
-                    ? buildLocalDiffAnalysis(currentText, previousText)
-                    : buildLocalSingleAnalysis(currentText);
-            }
-            return buildHeuristicFallbackAnalysis(currentText, previousText);
+
+            return {
+                success: false,
+                data: fallback,
+                error: error.message || 'AI解析失敗',
+                isFallback: true
+            };
         }
     }
 
@@ -1083,23 +1082,37 @@ class GeminiService {
 
         try {
             const primary = await this.requestGeminiJson(prompt, true);
+            logger.info("Gemini raw response (MCP):", JSON.stringify(primary));
             return {
-                ...normalizeMcpSingleAnalysisResult(primary),
-                isFallback: false
+                success: true,
+                data: {
+                    ...normalizeMcpSingleAnalysisResult(primary),
+                    isFallback: false
+                },
+                error: null
             };
         } catch (error) {
             logger.warn('Gemini analyzeMcpContract primary request failed, retrying without JSON mime type:', error.message);
             try {
                 const fallback = await this.requestGeminiJson(prompt, false);
+                logger.info("Gemini raw response (MCP fallback):", JSON.stringify(fallback));
                 return {
-                    ...normalizeMcpSingleAnalysisResult(fallback),
-                    isFallback: false
+                    success: true,
+                    data: {
+                        ...normalizeMcpSingleAnalysisResult(fallback),
+                        isFallback: false
+                    },
+                    error: null
                 };
             } catch (retryError) {
                 logger.error('Gemini analyzeMcpContract failed:', retryError);
+                return {
+                    success: false,
+                    data: buildLocalMcpSingleAnalysis(currentText),
+                    error: retryError.message || 'MCP解析失敗',
+                    isFallback: true
+                };
             }
-            logger.warn('Returning local MCP single-contract fallback analysis instead of AI failure');
-            return buildLocalMcpSingleAnalysis(currentText);
         }
     }
 
@@ -1122,6 +1135,7 @@ class GeminiService {
         let lastError = null;
         for (let attempt = 0; attempt < budget.maxAttempts; attempt += 1) {
             try {
+                logger.info("Gemini request started");
                 const response = await axios.post(
                     `${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`,
                     body,
@@ -1133,7 +1147,7 @@ class GeminiService {
                         }
                     }
                 );
-
+                logger.info("Gemini response received");
                 const aiText = extractCandidateText(response?.data);
                 return parseGeminiJsonResponse(aiText);
             } catch (error) {
@@ -1192,22 +1206,33 @@ class GeminiService {
         const successfulResults = clauseResults.filter(Boolean);
         const changedResults = successfulResults.filter((item) => item.change === true);
         if (successfulResults.length === 0 || (successfulResults.length < modifiedChanges.length && changedResults.length === 0)) {
-            return normalizeAnalyzeResult({
-                summary: 'AI差分要約を取得できませんでした。再解析を実行してください。',
-                riskLevel: 1,
-                riskReason: 'AI差分要約未取得',
-                changes: [],
+            return {
+                success: false,
+                data: normalizeAnalyzeResult({
+                    summary: 'AI差分要約を取得できませんでした。再解析を実行してください。',
+                    riskLevel: 1,
+                    riskReason: 'AI差分要約未取得',
+                    changes: [],
+                    isFallback: true
+                }),
+                error: '差分解析結果が不完全です',
                 isFallback: true
-            });
+            };
         }
 
-        return normalizeAnalyzeResult({
-            summary: buildStructuredResultsSummary(successfulResults, modifiedChanges),
-            riskLevel: changedResults.length > 0
-                ? Math.max(...changedResults.map((item) => normalizeRiskLevelValue(item.riskLevel)))
-                : 1,
-            riskReason: buildStructuredResultsRiskReason(successfulResults),
-            changes: successfulResults,
+        return {
+            success: true,
+            data: normalizeAnalyzeResult({
+                summary: buildStructuredResultsSummary(successfulResults, modifiedChanges),
+                riskLevel: changedResults.length > 0
+                    ? Math.max(...changedResults.map((item) => normalizeRiskLevelValue(item.riskLevel)))
+                    : 1,
+                riskReason: buildStructuredResultsRiskReason(successfulResults),
+                changes: successfulResults,
+                isFallback: false
+            }),
+            error: null
+        };
             isFallback: false
         });
     }

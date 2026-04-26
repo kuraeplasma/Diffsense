@@ -1,4 +1,4 @@
-﻿/* DIFFsense Dashboard Design System (Quiet UI) */
+/* DIFFsense Dashboard Design System (Quiet UI) */
 :root {
     /* Palette - Desaturated & Professional */
     --bg-app: #F5F7FA;
@@ -1477,8 +1477,9 @@ ul {
     backdrop-filter: blur(4px);
 }
 
-.modal-overlay.active {
-    display: flex;
+.modal-overlay.active,
+.modal-overlay.closing {
+    display: flex !important;
 }
 
 .modal-content {
@@ -1488,19 +1489,33 @@ ul {
     border-radius: var(--radius-md);
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
     overflow: hidden;
-    animation: modal-slide-up 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+    animation: modal-slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes modal-slide-up {
     from {
-        transform: translateY(10px);
+        transform: translateY(40px);
         opacity: 0;
     }
-
     to {
         transform: translateY(0);
         opacity: 1;
     }
+}
+
+@keyframes modal-slide-down {
+    from {
+        transform: translateY(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateY(40px);
+        opacity: 0;
+    }
+}
+
+.modal-overlay.closing .modal-content {
+    animation: modal-slide-down 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .modal-header {
@@ -1610,7 +1625,6 @@ ul {
 
 .reg-method-icon {
     width: 56px;
-    /* Larger icon container */
     height: 56px;
     background: #fff;
     border: 1px solid var(--border-subtle);
@@ -1621,57 +1635,55 @@ ul {
     margin-right: 24px;
     color: var(--color-primary);
     font-size: 24px;
+}
 
-    /* Header Dropdown Menu */
-    .header-dropdown-container {
-        position: relative;
-        display: inline-block;
-    }
+/* Header Dropdown Menu (Moved out of nested block) */
+.header-dropdown-container {
+    position: relative;
+    display: inline-block;
+}
 
-    .header-dropdown-menu {
-        display: none;
-        position: absolute;
-        right: 0;
-        top: 100%;
-        background-color: #fff;
-        min-width: 200px;
-        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
-        z-index: 1000;
-        border-radius: var(--radius-sm);
-        border: 1px solid var(--border-subtle);
-        padding: 8px 0;
-        margin-top: 8px;
-    }
+.header-dropdown-menu {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: 100%;
+    background-color: #fff;
+    min-width: 200px;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-subtle);
+    padding: 8px 0;
+    margin-top: 8px;
+}
 
-    /* Header Dropdown Menu */
+.header-dropdown-item {
+    padding: 10px 16px;
+    text-decoration: none;
+    display: block;
+    color: var(--text-main);
+    font-size: 13px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
 
-    .header-dropdown-item {
-        padding: 10px 16px;
-        text-decoration: none;
-        display: block;
-        color: var(--text-main);
-        font-size: 13px;
-        cursor: pointer;
-        transition: background-color 0.2s;
-    }
+.header-dropdown-item:hover {
+    background-color: #f8f9fa;
+}
 
-    .header-dropdown-item:hover {
-        background-color: #f8f9fa;
-    }
+.header-dropdown-item i {
+    width: 20px;
+    color: #999;
+}
 
-    .header-dropdown-item i {
-        width: 20px;
-        color: #999;
-    }
-
-    .header-dropdown-header {
-        padding: 8px 16px;
-        font-size: 11px;
-        color: var(--text-muted);
-        border-bottom: 1px solid #eee;
-        margin-bottom: 4px;
-        font-weight: 600;
-    }
+.header-dropdown-header {
+    padding: 8px 16px;
+    font-size: 11px;
+    color: var(--text-muted);
+    border-bottom: 1px solid #eee;
+    margin-bottom: 4px;
+    font-weight: 600;
 }
 
 /* Document Content (Preserve Layout) */
@@ -3113,92 +3125,144 @@ select:focus {
 }
 
 
+    /* Keyframes moved to consolidation block */
 /* ============================================================
-   Mobile Registration Modal (Bottom Sheet UI) - v19
+   Mobile Registration Modal (Bottom Sheet UI) - v23 Consolidated
    ============================================================ */
 @media (max-width: 900px) {
-    #registration-modal.active .modal-content {
+    #registration-modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: transparent !important;
+        transition: none !important;
+        z-index: 10000 !important;
+        align-items: flex-end !important;
+        justify-content: center !important;
+        backdrop-filter: none !important;
+        pointer-events: none;
+    }
+
+    #registration-modal.active,
+    #registration-modal.closing {
+        display: flex !important;
+        pointer-events: auto;
+    }
+
+    #registration-modal.active {
+        background: transparent !important;
+    }
+
+    #registration-modal .modal-content {
         display: flex !important;
         flex-direction: column !important;
-        position: fixed !important;
-        bottom: 0 !important;
-        left: 0 !important;
-        right: 0 !important;
         width: 100% !important;
         max-width: 100% !important;
         height: auto !important;
-        min-height: 320px !important;
-        border-radius: 28px 28px 0 0 !important;
+        min-height: 380px !important;
+        background: #fff !important;
+        border-radius: 32px 32px 0 0 !important;
+        box-shadow: 0 -10px 40px rgba(0,0,0,0.12) !important;
         margin: 0 !important;
         padding: 0 0 env(safe-area-inset-bottom) 0 !important;
-        transform: translateY(0) !important;
-        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-        animation: slideUpModal 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) !important;
-        background: #fff !important;
-        box-shadow: 0 -10px 40px rgba(0,0,0,0.15) !important;
+        transform: translateY(100%);
+        transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1) !important;
+        will-change: transform;
+        touch-action: none; /* Critical for native feel */
+        border: none !important;
+        overflow: hidden !important;
+    }
+
+    #registration-modal.active .modal-content {
+        transform: translateY(0);
+    }
+
+    #registration-modal.closing .modal-content {
+        transform: translateY(100%);
+    }
+
+    #registration-modal .modal-header {
+        border: none !important;
+        padding: 12px 20px 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+    }
+
+    #registration-modal .modal-title {
+        font-size: 17px !important;
+        font-weight: 700 !important;
+        color: #111827 !important;
+        margin-top: 8px !important;
     }
 
     .registration-swipe-bar {
         width: 36px;
         height: 4px;
-        background: #e2e8f0;
+        background: #e5e7eb;
         border-radius: 2px;
-        margin: 12px auto 8px;
+        margin: 0 auto;
         flex-shrink: 0;
+    }
+
+    #registration-modal .modal-body {
+        padding: 0 !important;
+        overflow-y: auto !important;
+        max-height: 70vh !important;
     }
 
     .slim-grid {
         display: grid !important;
         grid-template-columns: repeat(3, 1fr) !important;
         gap: 12px !important;
-        padding: 20px !important;
+        padding: 24px 20px !important;
     }
 
-    .slim-grid .reg-method-card {
+    .reg-method-card {
+        display: flex !important;
         flex-direction: column !important;
         align-items: center !important;
-        text-align: center !important;
-        padding: 16px 4px !important;
-        border-radius: 20px !important;
+        padding: 16px 8px !important;
         background: #f8fafc !important;
-        border: 1px solid #f1f5f9 !important;
-        min-height: 110px !important;
+        border-radius: 20px !important;
         transition: all 0.2s ease !important;
     }
 
-    .slim-grid .reg-method-card:active {
+    .reg-method-card:active {
         background: #f1f5f9 !important;
         transform: scale(0.96);
     }
 
-    .slim-grid .reg-method-icon {
-        width: 56px !important;
-        height: 56px !important;
-        font-size: 24px !important;
-        margin: 0 0 10px 0 !important;
+    .reg-method-icon {
+        width: 52px !important;
+        height: 52px !important;
+        font-size: 22px !important;
         background: #fff !important;
-        border-radius: 16px !important;
+        border-radius: 14px !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.06) !important;
+        margin-bottom: 10px !important;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.05) !important;
     }
 
     .reg-method-label {
         font-size: 13px !important;
         font-weight: 600 !important;
-        color: #334155 !important;
+        color: #475569 !important;
     }
 
     .reg-mobile-actions {
         padding: 0 20px 24px !important;
-        display: flex !important;
     }
 
     .reg-mobile-actions .btn-dashboard {
         width: 100% !important;
-        height: 54px !important;
-        border-radius: 16px !important;
+        height: 52px !important;
+        border-radius: 14px !important;
         font-size: 16px !important;
         font-weight: 700 !important;
         background: #f1f5f9 !important;
@@ -3206,166 +3270,8 @@ select:focus {
         border: none !important;
     }
 
-    @keyframes slideUpModal {
-        from { transform: translateY(100%); }
-        to { transform: translateY(0); }
-    }
-}
-
-/* ============================================================
-   Mobile Registration Modal (Final Screenshot Match) - v20
-   ============================================================ */
-@media (max-width: 900px) {
-    #registration-modal.active .modal-content {
-        display: flex !important;
-        flex-direction: column !important;
-        position: fixed !important;
-        bottom: 0 !important;
-        left: 0 !important;
-        right: 0 !important;
-        width: 100% !important;
-        max-width: 100% !important;
-        height: auto !important;
-        min-height: 380px !important;
-        border-radius: 40px 40px 0 0 !important;
-        margin: 0 !important;
-        padding: 0 0 env(safe-area-inset-bottom) 0 !important;
-        transform: translateY(0) !important;
-        background: #fff !important;
-        box-shadow: 0 -10px 40px rgba(0,0,0,0.12) !important;
-        border: none !important;
-    }
-
-    #registration-modal .modal-header {
-        border: none !important;
-        padding: 24px 20px 0 !important;
-        text-align: center !important;
-    }
-
-    #registration-modal .modal-title {
-        width: 100% !important;
-        font-size: 17px !important;
-        font-weight: 700 !important;
-        color: #111827 !important;
-        text-align: center !important;
-    }
-
-    /* Swipe Handle */
-    .registration-swipe-bar {
-        width: 36px;
-        height: 4px;
-        background: #e5e7eb;
-        border-radius: 2px;
-        margin: 12px auto 0;
-    }
-
-    .slim-grid {
-        display: flex !important;
-        justify-content: space-around !important;
-        padding: 40px 20px !important;
-        gap: 0 !important;
-    }
-
-    .slim-grid .reg-method-card {
-        flex: 1 !important;
-        display: flex !important;
-        flex-direction: column !important;
-        align-items: center !important;
-        background: transparent !important;
-        border: none !important;
-        padding: 0 !important;
-    }
-
-    .slim-grid .reg-method-icon {
-        width: 80px !important;
-        height: 80px !important;
-        background: #fff !important;
-        border: 1px solid #f1f5f9 !important;
-        border-radius: 24px !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        font-size: 32px !important;
-        color: #c5a059 !important;
-        margin-bottom: 12px !important;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.03) !important;
-    }
-
-    .reg-method-label {
-        font-size: 13px !important;
-        font-weight: 500 !important;
-        color: #64748b !important;
-    }
-
-    .reg-mobile-actions {
-        padding: 0 24px 32px !important;
-    }
-
-    .reg-mobile-actions .btn-dashboard {
-        width: 100% !important;
-        height: 56px !important;
-        background: #f1f5f9 !important;
-        color: #1e293b !important;
-        border-radius: 20px !important;
-        font-size: 16px !important;
-        font-weight: 700 !important;
-        border: none !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-    }
-
-    /* ---- Bottom Sheet refinements v21 ---- */
-    /* Swipe handle always at very top of sheet */
-    #registration-modal .modal-content::before {
-        content: '';
-        display: block;
-        width: 36px;
-        height: 4px;
-        background: #e2e8f0;
-        border-radius: 2px;
-        margin: 14px auto 4px;
-        flex-shrink: 0;
-    }
-
-    /* Hide × button – close via swipe or キャンセル only */
     #registration-modal .btn-close-modal,
-    #registration-modal .btn-close,
-    #close-registration-modal {
+    #registration-modal .btn-close {
         display: none !important;
-    }
-
-    /* Center title now that × is gone */
-    #registration-modal .modal-header {
-        justify-content: center !important;
-        padding-top: 8px !important;
-    }
-}
-
-/* ---- Bottom Sheet slide animation v22 ---- */
-@media (max-width: 900px) {
-    /* Overlay background fade (display toggled by JS) */
-    #registration-modal {
-        background: rgba(0,0,0,0);
-        transition: background 0.3s ease;
-    }
-    #registration-modal.active {
-        background: rgba(0,0,0,0.45);
-    }
-    /* Sheet starts off-screen / slide-down transition on close */
-    #registration-modal .modal-content {
-        transform: translateY(105%) !important;
-        transition: transform 0.38s cubic-bezier(0.2, 0.8, 0.2, 1) !important;
-        animation: none !important;
-    }
-    /* Slide up when active — same specificity as old blocks so "last wins" */
-    #registration-modal.active .modal-content {
-        transform: translateY(0) !important;
-        transition: transform 0.38s cubic-bezier(0.2, 0.8, 0.2, 1) !important;
-        animation: none !important;
-    }
-    /* 閉じアニメーション中のタップブロック防止 */
-    #registration-modal:not(.active) {
-        pointer-events: none !important;
     }
 }

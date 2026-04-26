@@ -76,51 +76,33 @@ export const aiService = {
                 body: JSON.stringify(body)
             });
 
-            let result = null;
-            try {
-                result = await response.json();
-            } catch {
-                throw new Error(`APIレスポンスの解析に失敗しました (HTTP ${response.status})`);
-            }
+            const data = await response.json();
 
-            if (!response.ok) {
-                const apiError = new Error(result.error || result.message || `HTTP error! status: ${response.status}`);
-                if (result.code) apiError.code = result.code;
-                if (result.currentUsage !== undefined) apiError.currentUsage = result.currentUsage;
-                if (result.limit !== undefined) apiError.limit = result.limit;
-                if (result.plan !== undefined) apiError.plan = result.plan;
-                if (result.nextPlan !== undefined) apiError.nextPlan = result.nextPlan;
+            if (!response.ok || !data.success) {
+                const apiError = new Error(data?.error || data?.message || `解析失敗 (HTTP ${response.status})`);
+                if (data?.code) apiError.code = data.code;
                 throw apiError;
             }
 
+            const result = data.data;
+            
             // Normalize DOCX full-analysis response shape.
-            // /contracts/upload-docx returns `articles`, while the app expects `extractedText`.
-            if (result?.success && result?.data) {
-                if (result.data.extractedText === undefined && Array.isArray(result.data.articles)) {
-                    result.data.extractedText = result.data.articles;
+            if (result) {
+                if (result.extractedText === undefined && Array.isArray(result.articles)) {
+                    result.extractedText = result.articles;
                 }
-                if (result.data.extractedText === undefined && result.data.structuredContract !== undefined) {
-                    result.data.extractedText = result.data.structuredContract;
+                if (result.extractedText === undefined && result.structuredContract !== undefined) {
+                    result.extractedText = result.structuredContract;
                 }
-                // Unify summary key
-                if (result.data.summary === undefined && result.data.changeSummary !== undefined) {
-                    result.data.summary = result.data.changeSummary;
+                if (result.summary === undefined && result.changeSummary !== undefined) {
+                    result.summary = result.changeSummary;
                 }
-            }
-            if (method === 'docx' && result?.success && result?.data) {
-                if (!result.data.sourceType) {
-                    result.data.sourceType = 'DOCX';
+                if (method === 'docx' && !result.sourceType) {
+                    result.sourceType = 'DOCX';
                 }
             }
 
-            // Debug logs
             console.log("AI RESULT:", result);
-            if (result?.data) {
-                console.log("SUMMARY:", result.data.summary);
-                console.log("SUCCESS:", result.success);
-                console.log("LIMITED:", result.data.isLimited);
-            }
-
             return result;
 
         } catch (error) {

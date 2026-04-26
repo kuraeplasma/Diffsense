@@ -395,8 +395,9 @@ async function buildStructuredPairAnalysis(oldArticles, newArticles) {
         };
     }
 
-    const analysis = await geminiService.analyzeStructuredDiff(diffChanges);
-    if (analysis?.isFallback === true) {
+    const analysisResult = await geminiService.analyzeStructuredDiff(diffChanges);
+    const analysis = analysisResult.data;
+    if (analysisResult.success === false || analysis?.isFallback === true) {
         const guardrailChanges = diffChanges.filter(isLikelyMaterialStructuredChange).map(buildGuardrailStructuredChange);
         logger.warn('Structured pair analysis fell back', {
             diffChanges: diffChanges.length,
@@ -528,6 +529,7 @@ async function resolvePreviousDocxArticles(previousVersion) {
  * Analyze a contract from PDF or URL
  */
 router.post('/analyze', rateLimit, async (req, res, next) => {
+    logger.info('API /analyze request received');
     try {
         // Validate request
         const { error, value } = validateAnalyzeRequest(req.body);
@@ -721,7 +723,7 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                     extractedText = pdfResult;
                 }
             } else if (method === 'docx') {
-                const docxBuffer = decodeBase64Payload(source);
+                const docxBuffer = Buffer.from(source, 'base64');
                 rawExtractedText = await extractTextFromDocx(docxBuffer);
                 extractedText = docxService.parseTextToArticles(rawExtractedText);
                 structuredContract = fromLegacyArticleArray(extractedText);
@@ -748,12 +750,13 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                         : null;
 
                     const shouldRunGenericAnalysis = Boolean(previousVersionText);
-                    const genericAnalysis = shouldRunGenericAnalysis
+                    const genericAnalysisResult = shouldRunGenericAnalysis
                         ? await geminiService.analyzeContract(
                             textToAnalyze,
                             previousVersionText
                         )
                         : null;
+                    const genericAnalysis = genericAnalysisResult ? genericAnalysisResult.data : null;
 
                     if (hasStructuredChanges(structuredPairAnalysis)) {
                         aiResult = mergeStructuredAndGeneralAnalysis(structuredPairAnalysis, genericAnalysis);
@@ -762,10 +765,11 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                     } else if (structuredPairAnalysis) {
                         aiResult = structuredPairAnalysis;
                     } else {
-                        aiResult = await geminiService.analyzeContract(
+                        const directAnalysisResult = await geminiService.analyzeContract(
                             textToAnalyze,
                             previousVersionText
                         );
+                        aiResult = directAnalysisResult.data;
                     }
 
                     // 3.1 Increment Usage Count ONLY on successful AI analysis
@@ -776,65 +780,32 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                         const meta = aiResult.contract_meta;
                         if (meta && contractId) {
                             const metaUpdate = {
-                                expiry_date: meta.expiry_date || null,
-                                renewal_deadline: meta.renewal_deadline || null,
-                                contract_start: meta.contract_start || null,
-                                auto_renewal: meta.auto_renewal === true,
-                                notice_period_days: Number(meta.notice_period_days) || null,
-                                contract_category: meta.contract_category || null,
-                                date_confidence: meta.date_confidence || 'unknown',
-                                alert_sent_30d: false,
-                                alert_sent_7d: false,
-                                alert_sent_0d: false
+                                expiry_date: meta.expiry_date || null, renewal_deadline: meta.renewal_deadline || null, contract_start: meta.contract_start || null, auto_renewal: meta.auto_renewal === true, notice_period_days: Number(meta.notice_period_days) || null, contract_category: meta.contract_category || null, date_confidence: meta.date_confidence || 'unknown', alert_sent_30d: false, alert_sent_7d: false, alert_sent_0d: false
                             };
                             await dbService.updateContract(contractId, metaUpdate, ownerUid);
-                            logger.info(`contract_meta saved for contract ${contractId}: expiry=${meta.expiry_date}, confidence=${meta.date_confidence}`);
                         }
-                    } else if (!aiSucceeded) {
-                        logger.info(`AI analysis failed for user ${uid} - usage count NOT incremented`);
                     }
-                } else {
-                    logger.warn('No text extracted, skipping AI analysis');
-                    aiResult.summary = 'テキストを抽出できませんでした（画像ベースの可能性があります）';
-                    aiResult.riskReason = 'テキストを抽出できませんでした';
                 }
             }
-
         } catch (error) {
             logger.error('Non-fatal analysis error:', error);
-            // We don't rethrow, just return what we have (file is saved)
-            aiResult.summary = `解析中にエラーが発生しました: ${error.message}`;
-            aiResult.riskReason = 'エラーにより解析中断';
+            aiResult.summary = '解析中にエラーが発生しました: ' + error.message;
         }
 
-        const textForHash = (extractedText && typeof extractedText === 'object')
-            ? JSON.stringify(extractedText)
-            : String(extractedText || '');
+        const textForHash = (extractedText && typeof extractedText === 'object') ? JSON.stringify(extractedText) : String(extractedText || '');
         const extractedTextHash = crypto.createHash('sha256').update(textForHash).digest('hex');
-        const extractedTextLength = textForHash.length;
-
-        logger.info(`Response ready for contract ${contractId}`);
-
-        // 4. Feature Gating
-        let gatedChanges = aiResult.changes || [];
-        const plan = userProfile.plan || 'free';
-        const isFree = plan === 'free';
-        const isStarter = plan === 'starter';
-
-        const isLimited = isFree || isStarter || aiResult.isLimited === true;
-
-        logger.info(`analyze response contractId=${contractId} success=${aiResult.success} aiSucceeded=${aiResult.aiSucceeded} isLimited=${isLimited}`);
+        
         res.json({
             success: true,
             data: {
                 ...aiResult,
                 extractedText,
                 extractedTextHash,
-                extractedTextLength,
+                extractedTextLength: textForHash.length,
                 sourceType: method.toUpperCase(),
                 pdfStoragePath,
                 pdfUrl,
-                isLimited,
+                isLimited: (userProfile.plan === 'free' || userProfile.plan === 'starter' || aiResult.isLimited === true),
                 structuredContract,
                 rawExtractedText
             }
@@ -850,6 +821,7 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
  * Parse DOCX and compare by article blocks
  */
 router.post('/upload-docx', rateLimit, async (req, res, next) => {
+    logger.info('API /upload-docx request received');
     try {
         const { contractId, source, previousVersion, skipAI } = req.body || {};
         const uid = req.user.uid;
@@ -1037,7 +1009,8 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
             const previousText = normalizeContentToText(previousArticles);
 
             if (currentText.trim().length > 0) {
-                const geminiResult = await geminiService.analyzeContract(currentText, previousText);
+                const geminiResultRaw = await geminiService.analyzeContract(currentText, previousText);
+                const geminiResult = geminiResultRaw.data;
                 aiResult = structuredPairAnalysis
                     ? mergeStructuredAndGeneralAnalysis(structuredPairAnalysis, geminiResult)
                     : {

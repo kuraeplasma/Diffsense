@@ -1,4 +1,4 @@
-﻿import { Notify } from './notify.js';
+import { Notify } from './notify.js';
 import { dbService } from './db-service.js?v=20260422_stability';
 import { aiService } from './ai-service.js?v=20260422_trigger_guard';
 import { getApiBaseUrl, shouldUseLocalDevAuthBypass, isLocalHostEnvironment } from './api-base.js';
@@ -2152,11 +2152,11 @@ const Views = {
     // 5. Team is lazy-loaded from js/modules/team.js.
     team: null,
     mcp: () => {
-        const mcpKey = window.app.mcpKey || '';
-        const maskedKey = window.app.mcpKeyMasked || (mcpKey ? `mcp_••••••••••••${mcpKey.slice(-4)}` : '未発行');
-        const hasVisibleKey = Boolean(mcpKey);
-        const isKeyHidden = window.app.isMcpKeyHidden !== false;
-        const displayKey = (!hasVisibleKey || isKeyHidden) ? maskedKey : mcpKey;
+        const mc利用規約ey = window.app.mc利用規約ey || '';
+        const maskedKey = window.app.mc利用規約eyMasked || (mc利用規約ey ? `mcp_••••••••••••${mc利用規約ey.slice(-4)}` : '未発行');
+        const hasVisibleKey = Boolean(mc利用規約ey);
+        const isKeyHidden = window.app.isMc利用規約eyHidden !== false;
+        const displayKey = (!hasVisibleKey || isKeyHidden) ? maskedKey : mc利用規約ey;
         const activeTab = window.app.mcpActiveTab || 'cloud';
 
         return `
@@ -2388,8 +2388,8 @@ class RegistrationFlow {
         // 先にレンダリング
         this.renderStep();
 
-        // display:flex を先にセット（CSS transition が display:none からは効かないため）
         if (this.modal) {
+            this.modal.classList.remove('closing');
             this.modal.style.display = 'flex';
             // inline transform/transition をリセットして CSS 側に委ねる
             const content = this.modal.querySelector('.modal-content');
@@ -2401,29 +2401,52 @@ class RegistrationFlow {
             this.setupSwipeToClose();
         }
 
-        // 2フレーム待ってから .active 付与 → CSS transition でスライドアップ
-        requestAnimationFrame(() => requestAnimationFrame(() => {
-            if (this.modal) this.modal.classList.add('active');
-        }));
+        // Use double rAF for reliable transition start
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                if (this.modal) this.modal.classList.add('active');
+            });
+        });
     }
 
     close() {
-        if (window.innerWidth <= 900 && this.modal) {
-            // .active を外す → CSS transition でスライドダウン
+        if (!this.modal) return;
+        const content = this.modal.querySelector('.modal-content');
+
+        if (window.innerWidth <= 900) {
+            // Mobile: Bottom Sheet Slide-down with consolidated CSS
+            this.modal.classList.add('closing');
             this.modal.classList.remove('active');
-            // アニメーション完了後に display を元に戻す
+            
+            // Clear inline styles to allow CSS .closing class to take over
+            if (content) {
+                content.style.transition = '';
+                content.style.transform = '';
+            }
+            
+            // Wait for CSS transition (0.28s) before hiding
             setTimeout(() => {
-                if (this.modal) this.modal.style.display = '';
+                if (this.modal && !this.modal.classList.contains('active')) {
+                    this.modal.style.display = 'none';
+                    this.modal.classList.remove('closing');
+                    this.currentStep = 1;
+                    this.renderStep(1);
+                }
             }, 400);
         } else {
-            const content = this.modal?.querySelector('.modal-content');
-            if (content) content.style.transform = '';
+            // Desktop logic
             if (typeof this.app.closeModal === 'function') {
                 this.app.closeModal('registration-modal');
             } else {
-                if (this.modal) this.modal.classList.remove('active');
+                this.modal.classList.remove('active');
+                this.modal.style.display = 'none';
             }
+            this.currentStep = 1;
+            this.renderStep(1);
         }
+        
+        // Ensure body scroll is restored
+        document.body.style.overflow = '';
         if (this.fileInput) this.fileInput.value = '';
         if (this.compareFileInput) this.compareFileInput.value = '';
         this.compareFile = null;
@@ -2439,32 +2462,56 @@ class RegistrationFlow {
 
         let startY = 0;
         let currentY = 0;
-        const threshold = 80;
+        let isDragging = false;
+        let lastY = 0;
+        let lastTime = 0;
+        let velocity = 0;
 
         const onTouchStart = (e) => {
+            isDragging = true;
             startY = e.touches[0].clientY;
+            lastY = startY;
+            lastTime = Date.now();
             content.style.transition = 'none';
         };
 
         const onTouchMove = (e) => {
-            currentY = e.touches[0].clientY - startY;
-            if (currentY > 0) {
-                content.style.transform = `translateY(${currentY}px)`;
+            if (!isDragging) return;
+            const y = e.touches[0].clientY;
+            const now = Date.now();
+            
+            // Calculate velocity for flick gestures
+            const timeDiff = now - lastTime;
+            if (timeDiff > 0) {
+                velocity = (y - lastY) / timeDiff;
+            }
+            
+            currentY = y;
+            lastY = y;
+            lastTime = now;
+
+            const diff = currentY - startY;
+            if (diff > 0) {
+                content.style.transform = `translateY(${diff}px)`;
             }
         };
 
         const onTouchEnd = () => {
-            if (currentY > threshold) {
-                // 先に画面外へスライドさせてから close
-                content.style.transition = 'transform 0.25s ease';
-                content.style.transform = 'translateY(105%)';
-                setTimeout(() => this.close(), 260);
+            isDragging = false;
+            content.style.transition = 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)';
+            const diff = currentY - startY;
+
+            // Close if swiped past threshold or flicked with velocity
+            if (diff > 120 || velocity > 0.5) {
+                this.close();
             } else {
-                content.style.transition = 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
                 content.style.transform = 'translateY(0)';
             }
+            
+            // Reset state
             startY = 0;
             currentY = 0;
+            velocity = 0;
         };
 
         content.addEventListener('touchstart', onTouchStart, { passive: true });
@@ -2476,7 +2523,7 @@ class RegistrationFlow {
         if (!this.modalBody) return;
 
         if (this.currentStep === 1) {
-            this.modalTitle.textContent = "新規登録 - 登録方法の選択";
+            this.modalTitle.textContent = window.innerWidth <= 900 ? "登録方法の選択" : "新規登録 - 登録方法の選択";
             this.modalBody.innerHTML = `
                 <div class="reg-method-grid slim-grid">
                     <div class="reg-method-card" id="reg-card-docx">
@@ -2493,11 +2540,12 @@ class RegistrationFlow {
                     </div>
                 </div>
                 <div class="reg-mobile-actions mobile-only">
-                    <button class="btn-dashboard" onclick="event.stopPropagation(); window.app.registration.close()">キャンセル</button>
+                    <button class="btn-dashboard" onclick="event.preventDefault(); event.stopPropagation(); window.app.registration.close()">キャンセル</button>
                 </div>
             `;
             this.bindCardEvents();
         } else if (this.currentStep === 2) {
+            this.modalTitle.textContent = "管理情報の入力";
             const isPdf = this.tempData.method === 'pdf';
             const isDocx = this.tempData.method === 'docx';
             const methodLabel = (isPdf || isDocx) ? 'アップロードされたファイル' : '監視対象のURL';
@@ -2512,7 +2560,7 @@ class RegistrationFlow {
                 <div class="form-group">
                     <label>種別</label>
                     <select id="reg-type" class="form-control">
-                        ${(() => { const fixed = ['利用規約','NDA','業務委託契約','プライバシーポリシー']; const dynamic = dbService.getContracts().map(c => c.type).filter(Boolean); const types = [...new Set([...fixed, ...dynamic.filter(t => t !== 'その他')])]; types.push('その他'); return types.map(t => `<option value="${t}">${t}</option>`).join(''); })()}
+                        ${(() => { const fixed = ['利用規約','NDA','業務委託契約','プライバシーポリシー']; const dynamic = (typeof dbService !== 'undefined' && dbService.getContracts) ? dbService.getContracts().map(c => c.type).filter(Boolean) : []; const types = [...new Set([...fixed, ...dynamic.filter(t => t !== 'その他')])]; types.push('その他'); return types.map(t => `<option value="${t}">${t}</option>`).join(''); })()}
                     </select>
                 </div>
                 <div class="form-group">
@@ -2523,23 +2571,23 @@ class RegistrationFlow {
                         ${(isPdf || isDocx) ? 'readonly style="background:#f5f5f5; cursor:not-allowed;"' : ''}>
                 </div>
                 
-<div class="reg-actions">
-    <button class="btn-dashboard" onclick="window.app.registration.nextStep(1)">戻る</button>
-    <button class="btn-dashboard btn-primary-action" onclick="window.app.registration.submit()">登録する</button>
-</div>
-`;
+                <div class="${window.innerWidth <= 900 ? 'reg-mobile-actions' : 'reg-actions'}">
+                    <button class="btn-dashboard btn-primary-action" onclick="event.stopPropagation(); window.app.registration.submit()">登録を完了する</button>
+                    <button class="btn-dashboard" onclick="event.stopPropagation(); window.app.registration.nextStep(1)">戻る</button>
+                </div>
+            `;
         } else if (this.currentStep === 3) {
             this.modalTitle.textContent = "登録完了";
             this.modalBody.innerHTML = `
-    <div class="reg-success-icon"><i class="fa-solid fa-check-circle"></i></div>
+                <div class="reg-success-icon"><i class="fa-solid fa-check-circle"></i></div>
                 <div class="reg-success-text">
                     <h4>登録を受け付けました</h4>
                     <p>「${this.tempData.name}」を監視対象として登録しました。ダッシュボードから確認できます。</p>
                 </div>
-                <div class="reg-actions">
-                    <button class="btn-dashboard btn-primary-action" onclick="window.app.registration.close()">ダッシュボードへ</button>
+                <div class="${window.innerWidth <= 900 ? 'reg-mobile-actions' : 'reg-actions'}">
+                    <button class="btn-dashboard btn-primary-action" onclick="event.stopPropagation(); window.app.registration.close()">ダッシュボードへ</button>
                 </div>
-`;
+            `;
         }
     }
 
@@ -2946,28 +2994,28 @@ class DashboardApp {
         try {
             const data = await dbService.getMcpApiKey();
             if (this.currentView !== requestedView || this.mainContent !== main) return;
-            this.mcpKey = data?.mcpApiKey || '';
-            this.mcpKeyMasked = data?.maskedKey || '未発行';
+            this.mc利用規約ey = data?.mcpApiKey || '';
+            this.mc利用規約eyMasked = data?.maskedKey || '未発行';
             this.mcpHasKey = Boolean(data?.hasKey || data?.mcpApiKey);
         } catch (error) {
             if (this.currentView !== requestedView || this.mainContent !== main) return;
             console.error('Failed to load MCP settings:', error);
-            this.mcpKey = '';
-            this.mcpKeyMasked = 'エラー';
+            this.mc利用規約ey = '';
+            this.mc利用規約eyMasked = 'エラー';
             this.mcpHasKey = false;
         }
         if (this.currentView !== requestedView || this.mainContent !== main) return;
-        this.renderMcpKeyCard();
+        this.renderMc利用規約eyCard();
     }
 
-    renderMcpKeyCard() {
+    renderMc利用規約eyCard() {
         const el = document.getElementById('mcp-key-card-inner');
         if (el) {
-            const mcpKey = this.mcpKey || '';
-            const maskedKey = this.mcpKeyMasked || (mcpKey ? `mcp_••••••••••••${mcpKey.slice(-4)}` : '未発行');
-            const hasVisibleKey = Boolean(mcpKey);
-            const isKeyHidden = this.isMcpKeyHidden !== false;
-            const displayKey = (!hasVisibleKey || isKeyHidden) ? maskedKey : mcpKey;
+            const mc利用規約ey = this.mc利用規約ey || '';
+            const maskedKey = this.mc利用規約eyMasked || (mc利用規約ey ? `mcp_••••••••••••${mc利用規約ey.slice(-4)}` : '未発行');
+            const hasVisibleKey = Boolean(mc利用規約ey);
+            const isKeyHidden = this.isMc利用規約eyHidden !== false;
+            const displayKey = (!hasVisibleKey || isKeyHidden) ? maskedKey : mc利用規約ey;
             
             el.innerHTML = `
                 <div style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:10px; padding:16px; margin-bottom:16px;">
@@ -2976,16 +3024,16 @@ class DashboardApp {
                         <code style="flex:1; font-family:monospace; font-size:13px; color:#fff; word-break:break-all;">${displayKey}</code>
                     </div>
                     <div style="display:flex; gap:8px; margin-top:12px;">
-                        <button class="btn-dashboard" style="flex:1; background:rgba(255,255,255,0.1); border:none; color:#fff; font-size:11px; padding:6px; ${hasVisibleKey ? '' : 'opacity:0.5; cursor:not-allowed;'}" onclick="${hasVisibleKey ? 'window.app.toggleMcpKeyVisibility()' : 'Notify.info(`既存キーは安全のため再表示されません。必要なら新規発行してください`)'}">
+                        <button class="btn-dashboard" style="flex:1; background:rgba(255,255,255,0.1); border:none; color:#fff; font-size:11px; padding:6px; ${hasVisibleKey ? '' : 'opacity:0.5; cursor:not-allowed;'}" onclick="${hasVisibleKey ? 'window.app.toggleMc利用規約eyVisibility()' : 'Notify.info(`既存キーは安全のため再表示されません。必要なら新規発行してください`)'}">
                             <i class="fa-solid ${hasVisibleKey && !isKeyHidden ? 'fa-eye-slash' : 'fa-eye'}"></i> ${hasVisibleKey ? (isKeyHidden ? '新規キーを表示' : '非表示にする') : '既存キーは再表示不可'}
                         </button>
-                        <button class="btn-dashboard" style="flex:1; background:rgba(255,255,255,0.1); border:none; color:#fff; font-size:11px; padding:6px; ${hasVisibleKey ? '' : 'opacity:0.5; cursor:not-allowed;'}" onclick="${hasVisibleKey ? `navigator.clipboard.writeText('${mcpKey}'); Notify.success('キーをコピーしました')` : `Notify.info('コピーできるのは新規発行直後のキーのみです')`}">
+                        <button class="btn-dashboard" style="flex:1; background:rgba(255,255,255,0.1); border:none; color:#fff; font-size:11px; padding:6px; ${hasVisibleKey ? '' : 'opacity:0.5; cursor:not-allowed;'}" onclick="${hasVisibleKey ? `navigator.clipboard.writeText('${mc利用規約ey}'); Notify.success('キーをコピーしました')` : `Notify.info('コピーできるのは新規発行直後のキーのみです')`}">
                             <i class="fa-solid fa-copy"></i> コピー
                         </button>
                     </div>
                 </div>
                 
-                <button class="btn-dashboard" style="width:100%; background:#c19b4a; border:none; color:#fff; font-weight:700; font-size:13px; padding:10px;" onclick="window.app.generateMcpKey()">
+                <button class="btn-dashboard" style="width:100%; background:#c19b4a; border:none; color:#fff; font-weight:700; font-size:13px; padding:10px;" onclick="window.app.generateMc利用規約ey()">
                     <i class="fa-solid fa-rotate"></i> 新規キーを発行
                 </button>
                 <p style="font-size:10px; color:#94a3b8; margin-top:12px; line-height:1.4;">
@@ -2995,22 +3043,22 @@ class DashboardApp {
         }
     }
 
-    toggleMcpKeyVisibility() {
-        this.isMcpKeyHidden = this.isMcpKeyHidden === false ? true : false;
-        this.renderMcpKeyCard();
+    toggleMc利用規約eyVisibility() {
+        this.isMc利用規約eyHidden = this.isMc利用規約eyHidden === false ? true : false;
+        this.renderMc利用規約eyCard();
     }
 
-    async generateMcpKey() {
+    async generateMc利用規約ey() {
         if (!await Notify.confirm('MCP APIキーを生成しますか？\n以前のキーは使えなくなります。', { title: '確認', type: 'warning' })) return;
         const loading = Notify.info('生成中...', { duration: 0 });
         try {
             const data = await dbService.generateMcpApiKey();
             if (data && data.mcpApiKey) {
-                this.mcpKey = data.mcpApiKey;
-                this.mcpKeyMasked = data.maskedKey || `mcp_••••••••••••${data.mcpApiKey.slice(-4)}`;
+                this.mc利用規約ey = data.mcpApiKey;
+                this.mc利用規約eyMasked = data.maskedKey || `mcp_••••••••••••${data.mcpApiKey.slice(-4)}`;
                 this.mcpHasKey = true;
-                this.isMcpKeyHidden = false;
-                this.renderMcpKeyCard();
+                this.isMc利用規約eyHidden = false;
+                this.renderMc利用規約eyCard();
                 Notify.success('APIキーを更新しました');
             } else {
                 Notify.error('生成に失敗しました');
@@ -3041,9 +3089,9 @@ class DashboardApp {
         });
     }
 
-    copyMcpKeyToClipboard() {
-        if (!this.mcpKey) { Notify.warning('コピーできるキーがありません'); return; }
-        navigator.clipboard.writeText(this.mcpKey);
+    copyMc利用規約eyToClipboard() {
+        if (!this.mc利用規約ey) { Notify.warning('コピーできるキーがありません'); return; }
+        navigator.clipboard.writeText(this.mc利用規約ey);
         Notify.success('APIキーをコピーしました');
     }
 
@@ -5902,6 +5950,20 @@ class DashboardApp {
                     this.mainContent.innerHTML = '<div class="p-md text-danger">画面の表示中にエラーが発生しました。</div>';
                 }
             }
+        }
+    }
+
+    closeModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.classList.add('closing');
+            modal.classList.remove('active');
+            setTimeout(() => {
+                if (!modal.classList.contains('active')) {
+                    modal.style.display = 'none';
+                    modal.classList.remove('closing');
+                }
+            }, 400);
         }
     }
 
