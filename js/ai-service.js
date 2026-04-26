@@ -103,7 +103,7 @@ export const aiService = {
             }
 
             console.log("AI RESULT:", result);
-            return result;
+            return { success: true, data: result };
 
         } catch (error) {
             console.error('AI Service Error:', error);

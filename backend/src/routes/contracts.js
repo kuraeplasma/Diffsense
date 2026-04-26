@@ -733,23 +733,30 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                 extractedText = source;
             }
 
-            // 3. Analyze with Gemini AI (skip if text-only extraction)
+            // 3. Analyze with Gemini AI
             if (skipAI) {
                 logger.info('skipAI=true: Skipping Gemini analysis, text extraction only');
-                aiResult.summary = 'テキスト抽出のみ完了（AI解析はスキップ）';
+                aiResult = {
+                    changes: [],
+                    riskLevel: 1,
+                    riskReason: 'AI解析スキップ',
+                    summary: 'テキスト抽出のみ完了（AI解析はスキップ）',
+                    isFallback: false
+                };
             } else {
                 const textToAnalyze = normalizeContentToText(extractedText);
-                const previousVersionText = normalizeContentToText(previousVersion);
+                const previousVersionArticles = previousVersion ? await resolvePreviousDocxArticles(previousVersion) : null;
+                const previousVersionText = previousVersionArticles ? normalizeContentToText(previousVersionArticles) : null;
 
                 if (textToAnalyze.trim().length > 0) {
-                    const structuredPairAnalysis = previousVersionText
+                    const structuredPairAnalysis = previousVersionArticles
                         ? await buildStructuredPairAnalysis(
-                            normalizeContentToLegacyArticles(previousVersion),
+                            normalizeContentToLegacyArticles(previousVersionArticles),
                             normalizeContentToLegacyArticles(extractedText)
                         )
                         : null;
 
-                    const shouldRunGenericAnalysis = Boolean(previousVersionText);
+                    const shouldRunGenericAnalysis = !structuredPairAnalysis || !hasStructuredChanges(structuredPairAnalysis);
                     const genericAnalysisResult = shouldRunGenericAnalysis
                         ? await geminiService.analyzeContract(
                             textToAnalyze,
@@ -761,7 +768,7 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                     if (hasStructuredChanges(structuredPairAnalysis)) {
                         aiResult = mergeStructuredAndGeneralAnalysis(structuredPairAnalysis, genericAnalysis);
                     } else if (genericAnalysis) {
-                        aiResult = mergeStructuredAndGeneralAnalysis(structuredPairAnalysis, genericAnalysis);
+                        aiResult = genericAnalysis;
                     } else if (structuredPairAnalysis) {
                         aiResult = structuredPairAnalysis;
                     } else {
@@ -780,7 +787,16 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                         const meta = aiResult.contract_meta;
                         if (meta && contractId) {
                             const metaUpdate = {
-                                expiry_date: meta.expiry_date || null, renewal_deadline: meta.renewal_deadline || null, contract_start: meta.contract_start || null, auto_renewal: meta.auto_renewal === true, notice_period_days: Number(meta.notice_period_days) || null, contract_category: meta.contract_category || null, date_confidence: meta.date_confidence || 'unknown', alert_sent_30d: false, alert_sent_7d: false, alert_sent_0d: false
+                                expiry_date: meta.expiry_date || null,
+                                renewal_deadline: meta.renewal_deadline || null,
+                                contract_start: meta.contract_start || null,
+                                auto_renewal: meta.auto_renewal === true,
+                                notice_period_days: Number(meta.notice_period_days) || null,
+                                contract_category: meta.contract_category || null,
+                                date_confidence: meta.date_confidence || 'unknown',
+                                alert_sent_30d: false,
+                                alert_sent_7d: false,
+                                alert_sent_0d: false
                             };
                             await dbService.updateContract(contractId, metaUpdate, ownerUid);
                         }
@@ -790,29 +806,36 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
         } catch (error) {
             logger.error('Non-fatal analysis error:', error);
             aiResult.summary = '解析中にエラーが発生しました: ' + error.message;
+            aiResult.isFallback = true;
         }
 
         const textForHash = (extractedText && typeof extractedText === 'object') ? JSON.stringify(extractedText) : String(extractedText || '');
         const extractedTextHash = crypto.createHash('sha256').update(textForHash).digest('hex');
         
-        res.json({
+        const resultData = {
+            ...aiResult,
+            extractedText,
+            extractedTextHash,
+            extractedTextLength: textForHash.length,
+            sourceType: method.toUpperCase(),
+            pdfStoragePath,
+            pdfUrl,
+            isLimited: (userProfile.plan === 'free' || userProfile.plan === 'starter' || aiResult.isLimited === true),
+            structuredContract,
+            rawExtractedText
+        };
+
+        return res.json({
             success: true,
-            data: {
-                ...aiResult,
-                extractedText,
-                extractedTextHash,
-                extractedTextLength: textForHash.length,
-                sourceType: method.toUpperCase(),
-                pdfStoragePath,
-                pdfUrl,
-                isLimited: (userProfile.plan === 'free' || userProfile.plan === 'starter' || aiResult.isLimited === true),
-                structuredContract,
-                rawExtractedText
-            }
+            data: resultData
         });
     } catch (error) {
-        logger.error('Analysis error:', error);
-        next(error);
+        logger.error('Critical analysis error:', error);
+        return res.json({
+            success: false,
+            error: error.message || '解析失敗',
+            data: null
+        });
     }
 });
 
@@ -1247,8 +1270,6 @@ router.post('/:id/reanalyze', rateLimit, async (req, res, next) => {
             });
         }
 
-        // フロントから本文を受け取る（キャッシュ済みテキスト）
-        // 受け取れなかった場合は保存済み本文から復元して解析する。
         const requestText = typeof req.body?.contractText === 'string' ? req.body.contractText.trim() : '';
         let contractText = requestText;
 
@@ -1277,27 +1298,23 @@ router.post('/:id/reanalyze', rateLimit, async (req, res, next) => {
             return res.status(400).json({ success: false, error: '解析対象のテキストがありません' });
         }
 
-        // 単体解析（previousVersion = null）
         let aiResult = null;
         const configuredReanalyzeAttempts = Number(process.env.REANALYZE_MAX_ATTEMPTS || 2);
-        const maxReanalyzeAttempts = Number.isFinite(configuredReanalyzeAttempts) && configuredReanalyzeAttempts >= 1
-            ? Math.min(Math.floor(configuredReanalyzeAttempts), 5)
-            : 2;
+        const maxReanalyzeAttempts = Math.min(Math.max(Math.floor(configuredReanalyzeAttempts), 1), 5);
         const configuredRetryBaseMs = Number(process.env.REANALYZE_RETRY_BASE_MS || 1500);
-        const reanalyzeRetryBaseMs = Number.isFinite(configuredRetryBaseMs) && configuredRetryBaseMs >= 0
-            ? Math.floor(configuredRetryBaseMs)
-            : 1500;
+        const reanalyzeRetryBaseMs = Math.max(Math.floor(configuredRetryBaseMs), 0);
         const configuredRateLimitedRetryBaseMs = Number(process.env.REANALYZE_RATE_LIMIT_RETRY_BASE_MS || 6000);
-        const reanalyzeRateLimitedRetryBaseMs = Number.isFinite(configuredRateLimitedRetryBaseMs) && configuredRateLimitedRetryBaseMs >= 0
-            ? Math.floor(configuredRateLimitedRetryBaseMs)
-            : 6000;
+        const reanalyzeRateLimitedRetryBaseMs = Math.max(Math.floor(configuredRateLimitedRetryBaseMs), 0);
+
         for (let attempt = 1; attempt <= maxReanalyzeAttempts; attempt++) {
             try {
-                aiResult = await geminiService.analyzeContract(contractText, null);
+                const serviceResponse = await geminiService.analyzeContract(contractText, null);
+                aiResult = serviceResponse.data;
                 if (isAiResultReady(aiResult)) break;
+                
                 if (attempt < maxReanalyzeAttempts) {
                     logger.warn(`Reanalyze attempt ${attempt} returned fallback, retrying...`);
-                    const isRateLimited = aiResult?.errorCode === 'AI_RATE_LIMITED';
+                    const isRateLimited = serviceResponse?.errorCode === 'AI_RATE_LIMITED';
                     const waitMs = (isRateLimited ? reanalyzeRateLimitedRetryBaseMs : reanalyzeRetryBaseMs) * attempt;
                     await new Promise(r => setTimeout(r, waitMs));
                 }
@@ -1314,16 +1331,13 @@ router.post('/:id/reanalyze', rateLimit, async (req, res, next) => {
 
         const aiReady = isAiResultReady(aiResult);
         if (!aiReady) {
-            // 解析失敗時でもステータスを確実に更新
             const failedMetaUpdate = {
                 ai_succeeded: false,
                 last_analyzed_at: new Date().toISOString(),
                 ai_failed_at: new Date().toISOString()
             };
 
-            const fallbackMeta = (aiResult && typeof aiResult.contract_meta === 'object')
-                ? aiResult.contract_meta
-                : null;
+            const fallbackMeta = (aiResult && typeof aiResult.contract_meta === 'object') ? aiResult.contract_meta : null;
 
             if (hasMeaningfulContractMeta(fallbackMeta)) {
                 Object.assign(failedMetaUpdate, {
@@ -1358,12 +1372,10 @@ router.post('/:id/reanalyze', rateLimit, async (req, res, next) => {
             });
         }
 
-        // 解析成功時のみ解析回数を消費
         if (!localUnlimited) {
             await dbService.incrementUsage(ownerUid);
         }
 
-        // contract_meta を Firestore に保存
         const meta = aiResult.contract_meta;
         const metaUpdate = {
             summary: aiResult.summary || null,
@@ -1391,8 +1403,6 @@ router.post('/:id/reanalyze', rateLimit, async (req, res, next) => {
 
         logger.info(`Reanalysis complete for contract ${contractId}, risk=${aiResult.riskLevel}, expiry=${meta?.expiry_date}`);
 
-        const responseMeta = meta || null;
-
         res.json({
             success: true,
             data: {
@@ -1403,9 +1413,10 @@ router.post('/:id/reanalyze', rateLimit, async (req, res, next) => {
                 riskLevel: aiResult.riskLevel,
                 riskReason: aiResult.riskReason,
                 changes: aiResult.changes,
-                contract_meta: responseMeta,
+                contract_meta: meta || null,
             }
         });
+    } catch (error) {
     } catch (error) {
         logger.error('Reanalyze error:', error);
         next(error);

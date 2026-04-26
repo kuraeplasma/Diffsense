@@ -1,6 +1,6 @@
 import { Notify } from './notify.js';
-import { dbService } from './db-service.js?v=20260422_stability';
-import { aiService } from './ai-service.js?v=20260422_trigger_guard';
+import { dbService } from './db-service.js?v=20260426_fix';
+import { aiService } from './ai-service.js?v=20260426_fix';
 import { getApiBaseUrl, shouldUseLocalDevAuthBypass, isLocalHostEnvironment } from './api-base.js';
 import { auth } from './firebase-config.js?v=20260422_auth_timeout';
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -2776,6 +2776,10 @@ class RegistrationFlow {
             console.error('Registration Error:', error);
             if (document.getElementById('reg-loading')) document.getElementById('reg-loading').remove();
             if (document.getElementById('reg-overlay')) document.getElementById('reg-overlay').remove();
+            
+            // 登録失敗時もモーダルを閉じて、ユーザーが再試行や他操作をできるようにする
+            this.close();
+            
             Notify.error('登録中にエラーが発生しました: ' + error.message);
         }
     }
@@ -2840,28 +2844,30 @@ class RegistrationFlow {
                 { skipAI: true, userTriggered: true }
             );
 
-            if (result.success) {
-                const extractedContent = resolveExtractedContentPayload(result.data);
+            // APIレスポンス形式 { success, data } を前提にチェック
+            if (result && result.success) {
+                const data = result.data || {};
+                const extractedContent = resolveExtractedContentPayload(data);
                 if (!extractedContent) {
                     throw new Error('抽出結果に本文データが含まれていません');
                 }
                 // 抽出されたテキストのみを保存（AI解析結果は保存しない）
                 dbService.updateContractText(contractId, {
                     extractedText: extractedContent,
-                    rawExtractedText: result.data.rawExtractedText,
-                    extractedTextHash: result.data.extractedTextHash,
-                    extractedTextLength: result.data.extractedTextLength,
-                    sourceType: result.data.sourceType,
-                    pdfStoragePath: String(result.data.sourceType || '').toUpperCase() === 'DOCX' ? null : result.data.pdfStoragePath,
-                    pdfUrl: String(result.data.sourceType || '').toUpperCase() === 'DOCX' ? null : result.data.pdfUrl,
-                    doc: result.data.doc || null,
+                    rawExtractedText: data.rawExtractedText,
+                    extractedTextHash: data.extractedTextHash,
+                    extractedTextLength: data.extractedTextLength,
+                    sourceType: data.sourceType,
+                    pdfStoragePath: String(data.sourceType || '').toUpperCase() === 'DOCX' ? null : data.pdfStoragePath,
+                    pdfUrl: String(data.sourceType || '').toUpperCase() === 'DOCX' ? null : data.pdfUrl,
+                    doc: data.doc || null,
                     status: '未処理'  // 差分がまだないので未処理
                 });
 
                 console.log('Text extraction completed');
                 return true;
             } else {
-                throw new Error(result.error || 'テキスト抽出に失敗しました');
+                throw new Error(result?.error || 'テキスト抽出に失敗しました');
             }
 
         } catch (error) {

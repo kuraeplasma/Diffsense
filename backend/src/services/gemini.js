@@ -948,6 +948,7 @@ class GeminiService {
     }
 
     async analyzeContract(contractText, previousVersion = null) {
+        console.log('request受信');
         const currentText = typeof contractText === 'string'
             ? contractText
             : JSON.stringify(contractText || '');
@@ -957,23 +958,34 @@ class GeminiService {
 
         if (previousText && currentText && previousText.trim() === currentText.trim()) {
             logger.info('No changes detected, skipping AI analysis');
+            console.log('最終return');
             return {
-                summary: "前ヴァージョンからの変更は検出されぴせんでした。契約内容は維持されています。",
-                riskLevel: 1,
-                riskReason: "変更なし",
-                changes: [],
-                aiSucceeded: true,
-                isLimited: false,
-                isFallback: false
+                success: true,
+                data: {
+                    summary: "前ヴァージョンからの変更は検出されませんでした。契約内容は維持されています。",
+                    riskLevel: 1,
+                    riskReason: "変更なし",
+                    changes: [],
+                    aiSucceeded: true,
+                    isLimited: false,
+                    isFallback: false
+                },
+                error: null
             };
         }
 
         if (shouldUseLocalAiFallback()) {
             if (!GEMINI_API_KEY || process.env.LOCAL_AI_ONLY === 'true') {
                 logger.info('Using local AI fallback analysis');
-                return previousText
+                const result = previousText
                     ? buildLocalDiffAnalysis(currentText, previousText)
                     : buildLocalSingleAnalysis(currentText);
+                console.log('最終return');
+                return {
+                    success: true,
+                    data: result,
+                    error: null
+                };
             }
         }
 
@@ -994,7 +1006,6 @@ class GeminiService {
                 } catch (error) {
                     lastError = error;
                     logger.warn(`${label} request failed (jsonMime=${enforceJsonMime}): ${error.message}`);
-                    // 429 は MIME 変更では解消しないため、不要な追加リクエストを抑制する。
                     if (getGeminiErrorStatus(error) === 429) {
                         throw error;
                     }
@@ -1002,6 +1013,11 @@ class GeminiService {
             }
             throw lastError || new Error(`${label} request failed`);
         };
+
+        try {
+            console.log('Geminiリクエスト開始');
+            const res = await requestWithMimeFallback(prompt, 'Unified Analysis');
+            console.log('Geminiレスポンス取得');
 
             logger.info("Gemini raw response:", JSON.stringify(res));
             const result = {
@@ -1013,6 +1029,7 @@ class GeminiService {
             };
 
             logger.info(`Analysis complete. duration=${Date.now() - start}ms`);
+            console.log('最終return');
             return {
                 success: true,
                 data: result,
@@ -1029,11 +1046,11 @@ class GeminiService {
                 fallback.errorMessage = '現在アクセスが集中しています。数分後にもう一度お試しください。';
             }
 
+            console.log('最終return');
             return {
                 success: false,
                 data: fallback,
-                error: error.message || 'AI解析失敗',
-                isFallback: true
+                error: error.message || 'AI解析失敗'
             };
         }
     }
@@ -1135,7 +1152,7 @@ class GeminiService {
         let lastError = null;
         for (let attempt = 0; attempt < budget.maxAttempts; attempt += 1) {
             try {
-                logger.info("Gemini request started");
+                console.log('Geminiリクエスト開始');
                 const response = await axios.post(
                     `${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`,
                     body,
@@ -1147,7 +1164,7 @@ class GeminiService {
                         }
                     }
                 );
-                logger.info("Gemini response received");
+                console.log('Geminiレスポンス取得');
                 const aiText = extractCandidateText(response?.data);
                 return parseGeminiJsonResponse(aiText);
             } catch (error) {
