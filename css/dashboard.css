@@ -2228,19 +2228,12 @@ select:focus {
         font-size: 13px;
     }
 
-    /* Upload & reanalyze buttons: icon-only on narrow screens */
-    .pane-header .btn-upload-version,
-    #btn-reanalyze {
-        font-size: 0;
-        padding: 8px;
-        min-width: 36px;
-        width: 36px;
-        height: 36px;
-        justify-content: center;
-    }
-    .pane-header .btn-upload-version i,
-    #btn-reanalyze i {
-        font-size: 15px;
+    /* Upload button: compact but readable on mobile */
+    .pane-header .btn-upload-version {
+        font-size: 11px;
+        padding: 6px 10px;
+        white-space: nowrap;
+        flex-shrink: 0;
     }
 
     /* More breathing room for scroll area on mobile */

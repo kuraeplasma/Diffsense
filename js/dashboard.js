@@ -1739,8 +1739,7 @@ const Views = {
                     <div class="pane">
                         <div class="pane-header" style="min-height:56px; box-sizing:border-box;">
                             <span><i class="fa-solid fa-magnifying-glass-chart" style="margin-right:8px;"></i> AI解析・差分判定</span>
-                            ${mobilePrimaryAction ? `<button class="btn-dashboard btn-primary-action mobile-only" onclick="${mobilePrimaryAction.action}" style="padding:6px 12px; font-size:12px; margin-left:auto;"><i class="fa-solid ${mobilePrimaryAction.icon}" style="margin-right:6px;"></i> ${mobilePrimaryAction.label}</button>` : ''}
-                            <button id="btn-reanalyze" class="btn-upload-version desktop-only" onclick="window.app.confirmReanalyze('${contract.id}')" style="margin-left: ${mobilePrimaryAction ? '8px' : 'auto'}">
+                            <button id="btn-reanalyze" class="btn-upload-version desktop-only" onclick="window.app.confirmReanalyze('${contract.id}')" style="margin-left:auto">
                                 <i class="fa-solid fa-wand-magic-sparkles"></i>リスク解析＋期限取得
                             </button>
                         </div>
