@@ -110,9 +110,9 @@ export const dbService = {
             const token = await getIdToken();
             if (token) {
                 fetchOptions.headers.Authorization = `Bearer ${token}`;
-            } else if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-                // Local development uses backend AUTH_BYPASS, so allow API access without Firebase login.
-                console.warn(`API Call proceeding without authenticated user in local dev: ${endpoint}`);
+            } else if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '[::1]' || window.location.hostname.endsWith('.local') || window.location.hostname.startsWith('192.168.') || window.location.hostname.startsWith('10.')) {
+                // Local/LAN development uses backend AUTH_BYPASS, so allow API access without Firebase login.
+                console.warn(`API Call proceeding without authenticated user in local/LAN dev: ${endpoint}`);
             } else {
                 console.error('API Call failed: No authenticated user');
                 return null;
