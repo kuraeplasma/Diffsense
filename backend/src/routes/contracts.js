@@ -127,10 +127,10 @@ function isAiFailureSummary(summary) {
     return /AI解析に失敗|AI分析に失敗|エラーが発生/.test(String(summary || ''));
 }
 
-function isAiResultReady(result) {
+function isAiResultReady(result, allowFallback = false) {
     const summary = String(result?.summary || '').trim();
     if (!summary) return false;
-    if (result?.isFallback === true) return false;
+    if (!allowFallback && result?.isFallback === true) return false;
     if (isAiFailureSummary(summary)) return false;
     if (result?.aiSucceeded === false) return false;
     return true;
@@ -1343,7 +1343,8 @@ router.post('/:id/reanalyze', rateLimit, async (req, res, next) => {
             }
         }
 
-        const aiReady = isAiResultReady(aiResult);
+        // 保存判定ではフォールバック（補完解析）も許容する
+        const aiReady = isAiResultReady(aiResult, true);
         if (!aiReady) {
             const failedMetaUpdate = {
                 ai_succeeded: false,
@@ -1396,7 +1397,8 @@ router.post('/:id/reanalyze', rateLimit, async (req, res, next) => {
             ai_summary: aiResult.summary || null,
             risk_level: aiResult.riskLevel === "3" || aiResult.riskLevel === 3 ? 'High' : (aiResult.riskLevel === "2" || aiResult.riskLevel === 2 ? 'Medium' : 'Low'),
             ai_risk_reason: aiResult.riskReason || null,
-            ai_changes: aiResult.changes || [],
+            // 差分データがある場合のみ更新し、空配列での上書き（＝過去の差分消失）を防ぐ
+            ...(Array.isArray(aiResult.changes) && aiResult.changes.length > 0 ? { ai_changes: aiResult.changes } : {}),
             last_analyzed_at: new Date().toISOString(),
             ai_succeeded: aiReady,
             ai_limited: aiResult.isLimited === true,
@@ -1430,7 +1432,6 @@ router.post('/:id/reanalyze', rateLimit, async (req, res, next) => {
                 contract_meta: meta || null,
             }
         });
-    } catch (error) {
     } catch (error) {
         logger.error('Reanalyze error:', error);
         next(error);

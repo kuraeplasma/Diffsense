@@ -1,7 +1,7 @@
 import { Notify } from './notify.js';
 import { dbService } from './db-service.js?v=20260426_final';
 import { aiService } from './ai-service.js?v=20260426_final';
-import { getApiBaseUrl, shouldUseLocalDevAuthBypass, isLocalHostEnvironment } from './api-base.js';
+import { getApiBaseUrl, shouldUseLocalDevAuthBypass } from './api-base.js';
 import { auth } from './firebase-config.js?v=20260422_auth_timeout';
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
@@ -1382,9 +1382,10 @@ const Views = {
         const displaySourceDoc = selectedSourceDoc;
         const displayTargetDoc = selectedTargetDoc;
 
-        const selectedDiffPayload = (selectedSourceDoc && selectedTargetDoc)
+        const rawDiffItem = (selectedSourceDoc && selectedTargetDoc)
             ? (dbService.getDiffResult(selectedSourceDoc.id, selectedTargetDoc.id, id) || null)
             : null;
+        const selectedDiffPayload = rawDiffItem?.diff_data || rawDiffItem;
         const effectiveSelectedDiffData = selectedDiffPayload?.isFallback === true
             ? null
             : selectedDiffPayload;
@@ -2551,19 +2552,41 @@ class RegistrationFlow {
 
         if (this.currentStep === 1) {
             this.modalTitle.textContent = window.innerWidth <= 900 ? "登録方法の選択" : "新規登録 - 登録方法の選択";
+            const isMobile = window.innerWidth <= 900;
             this.modalBody.innerHTML = `
-                <div class="reg-method-grid slim-grid">
+                <div class="reg-method-grid ${isMobile ? 'slim-grid' : ''}">
                     <div class="reg-method-card" id="reg-card-docx">
                         <div class="reg-method-icon"><i class="fa-solid fa-file-word"></i></div>
-                        <div class="reg-method-label">Word</div>
+                        ${isMobile ? `
+                            <div class="reg-method-label">Word</div>
+                        ` : `
+                            <div class="reg-method-info">
+                                <h4>Wordをアップロード</h4>
+                                <p>Wordファイル(.docx)を解析・比較します</p>
+                            </div>
+                        `}
                     </div>
                     <div class="reg-method-card" id="reg-card-pdf">
                         <div class="reg-method-icon"><i class="fa-solid fa-file-pdf"></i></div>
-                        <div class="reg-method-label">PDF</div>
+                        ${isMobile ? `
+                            <div class="reg-method-label">PDF</div>
+                        ` : `
+                            <div class="reg-method-info">
+                                <h4>PDFをアップロード</h4>
+                                <p>ファイルをここにドロップするか、クリックして選択</p>
+                            </div>
+                        `}
                     </div>
                     <div class="reg-method-card" id="reg-card-url">
                         <div class="reg-method-icon"><i class="fa-solid fa-globe"></i></div>
-                        <div class="reg-method-label">URL</div>
+                        ${isMobile ? `
+                            <div class="reg-method-label">URL</div>
+                        ` : `
+                            <div class="reg-method-info">
+                                <h4>URLを登録 (Web規約)</h4>
+                                <p>公開URLを監視対象に設定します</p>
+                            </div>
+                        `}
                     </div>
                 </div>
                 <div class="reg-mobile-actions mobile-only">
@@ -3676,9 +3699,12 @@ class DashboardApp {
      * Run both single-doc reanalysis (risk + deadline) and diff pair analysis if a pair is selected.
      */
     runFullAnalysis(contractId, docAId, docBId) {
-        this.runReanalyze(contractId, { userTriggered: true });
         if (docAId && docBId) {
+            // 文書ペアが選択されている場合は差分解析のみ実行（差分解析にリスク・期限取得も含まれるため）
             this.runDiffAnalyze(contractId, docAId, docBId);
+        } else {
+            // 単体解析のみ実行
+            this.runReanalyze(contractId, { userTriggered: true });
         }
     }
 
@@ -4403,7 +4429,8 @@ class DashboardApp {
 
             const fbConfig = await import('./firebase-config.js');
             const auth = fbConfig.auth;
-            const user = auth.currentUser;
+            let user = auth.currentUser;
+
 
             if (user) {
                 this.currentUser = user; // Store for later use

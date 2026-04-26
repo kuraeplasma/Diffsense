@@ -353,16 +353,6 @@ export async function handleLogout() {
  * Call this on pages that require login (e.g. dashboard)
  */
 export function requireAuth() {
-    // Development Bypass for localhost
-    const h = window.location.hostname;
-    const params = new URLSearchParams(window.location.search);
-    const isLocal = h === 'localhost' || h === '127.0.0.1' || h.includes('192.168.') || h.includes('10.') || h.includes('172.') || params.get('bypass') === '1';
-    if (isLocal) {
-        console.log("Local development detected, bypassing Firebase Auth check.");
-        processDevBypass();
-        return;
-    }
-
     onAuthStateChanged(auth, (user) => {
         if (!user) {
             console.log("No user found, redirecting to login.");
@@ -376,18 +366,6 @@ export function requireAuth() {
             }
         }
     });
-}
-
-function processDevBypass() {
-    console.log("DEV AUTH BYPASS ACTIVE");
-    const userEmailEl = document.getElementById('user-email-display');
-    if (userEmailEl) {
-        userEmailEl.textContent = 'dev@localhost';
-    }
-    const userNameEl = document.getElementById('user-name-display');
-    if (userNameEl) {
-        userNameEl.textContent = 'テストユーザー';
-    }
 }
 /**
  * Get current user's ID Token

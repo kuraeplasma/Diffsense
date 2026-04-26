@@ -177,10 +177,6 @@ export const dbService = {
         'business': 3,
         'pro': 5
     },
-
-    /**
-     * Initialize DB if not already done
-     */
     init() {
         // Migrate legacy data (no UID prefix) to current user if needed
         this._migrateLegacyData();

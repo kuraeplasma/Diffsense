@@ -1,7 +1,15 @@
 {
   "permissions": {
     "allow": [
-      "Bash(grep -n \"dashboard-table\\\\|data-table\" D:/契約/css/*.css)"
+      "Bash(grep -n \"dashboard-table\\\\|data-table\" D:/契約/css/*.css)",
+      "mcp__plugin_context-mode_context-mode__ctx_batch_execute",
+      "PowerShell(gcloud run services describe api --region asia-northeast1 --format=\"yaml\\(spec.template.spec.containers[0].env, spec.template.spec.containers[0].resources, metadata.annotations\\)\" 2>&1)",
+      "PowerShell(Start-Sleep -Seconds 5; $r = Invoke-WebRequest -Uri \"https://api-qf37m5ba2q-an.a.run.app/health\" -UseBasicParsing -TimeoutSec 15 2>&1; Write-Host \"Status: $\\($r.StatusCode\\)\"; Write-Host $r.Content)",
+      "Bash(cd /d \"D:\\\\契約\")",
+      "Bash(rtk npm *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(npm run *)"
     ]
   }
 }
