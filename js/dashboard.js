@@ -6371,7 +6371,7 @@ class DashboardApp {
         }
 
         const isMobileDetailLayout = typeof window.matchMedia === 'function'
-            && window.matchMedia('(max-width: 1024px)').matches;
+            && window.matchMedia('(max-width: 900px)').matches;
         if (isMobileDetailLayout) {
             this.mainContent.style.display = 'block';
             this.mainContent.style.flexDirection = '';
