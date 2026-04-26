@@ -2188,11 +2188,11 @@ select:focus {
 @media (max-width: 900px) {
     .detail-split-body {
         flex-direction: column;
-        overflow-y: auto;
+        overflow: visible;
     }
 
     #app-content.is-detail-view {
-        overflow-y: auto;
+        overflow: visible;
         height: auto;
     }
 
