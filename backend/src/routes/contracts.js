@@ -975,7 +975,7 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
                 if (conversionMethod === 'libreoffice_pdf' && typeof pdfBuffer !== 'undefined') {
                     pdfStoragePath = `contracts/${contractId}/${Date.now()}.pdf`;
                     const pdfFile = bucket.file(pdfStoragePath);
-                    const downloadToken = crypto.randomUUID();
+                    const downloadToken = crypto.randomBytes(16).toString('hex');
                     await pdfFile.save(pdfBuffer, {
                         metadata: {
                             contentType: 'application/pdf',
