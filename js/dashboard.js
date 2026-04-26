@@ -2600,7 +2600,6 @@ class RegistrationFlow {
                 
                 <div class="${window.innerWidth <= 900 ? 'reg-mobile-actions' : 'reg-actions'}">
                     <button class="btn-dashboard btn-primary-action" onclick="event.stopPropagation(); window.app.registration.submit()">登録を完了する</button>
-                    <button class="btn-dashboard" onclick="event.stopPropagation(); window.app.registration.nextStep(1)">戻る</button>
                 </div>
             `;
         } else if (this.currentStep === 3) {
