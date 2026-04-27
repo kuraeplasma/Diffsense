@@ -4719,4 +4719,15 @@ select:focus {
         color: #d1d5db;
         pointer-events: none;
     }
+    /* Menu Toggle Active State */
+    #bnav-menu[aria-expanded="true"],
+    .mobile-menu-button[aria-expanded="true"],
+    .sidebar-floating-toggle:active {
+        color: var(--color-primary) !important;
+    }
+    #bnav-menu[aria-expanded="true"] i,
+    .mobile-menu-button[aria-expanded="true"] i,
+    .sidebar-floating-toggle:active i {
+        color: var(--color-primary) !important;
+    }
 }
