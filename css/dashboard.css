@@ -205,12 +205,20 @@ ul {
     font-size: 16px;
     font-weight: 800;
     color: #0f172a;
-    margin-bottom: 24px;
     display: flex;
     align-items: center;
     gap: 12px;
 }
 .card-title i { color: var(--sign-primary); }
+.detail-card[open] .card-title {
+    margin-bottom: 24px;
+}
+.detail-card .fa-chevron-down {
+    transition: transform 0.3s ease;
+}
+.detail-card[open] .fa-chevron-down {
+    transform: rotate(180deg);
+}
 
 /* details/summary normalization */
 .detail-card summary {
@@ -3685,6 +3693,8 @@ select:focus {
     }
     .card-title {
         font-size: 14px !important;
+    }
+    .detail-card[open] .card-title {
         margin-bottom: 16px !important;
     }
     .recipient-avatar {

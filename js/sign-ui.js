@@ -1342,7 +1342,7 @@ export const SignUI = {
                     </div>
 
                     <div class="sign-viewer-detail-pane">
-                        <details class="detail-card signer-card" open>
+                        <details class="detail-card signer-card">
                             <summary class="card-title">
                                 <i class="fa-solid fa-users-line"></i> 署名者の状況
                                 <i class="fa-solid fa-chevron-down mobile-only" style="margin-left:auto; font-size:14px; opacity:0.5;"></i>
@@ -1388,7 +1388,7 @@ export const SignUI = {
                             </div>
                         </details>
 
-                        <details class="detail-card audit-card" open>
+                        <details class="detail-card audit-card">
                             <summary class="card-title">
                                 <i class="fa-solid fa-shield-halved"></i> 監査証跡
                                 <i class="fa-solid fa-chevron-down mobile-only" style="margin-left:auto; font-size:14px; opacity:0.5;"></i>
