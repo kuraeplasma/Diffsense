@@ -4320,7 +4320,7 @@ class DashboardApp {
         if (isCurrentlyOpen === shouldBeOpen) return;
 
         this._menuToggleLock = true;
-        setTimeout(() => { this._menuToggleLock = false; }, 1000); // 1-second solid lock for menu toggle
+        setTimeout(() => { this._menuToggleLock = false; }, 350); // Faster response
 
         const shouldOpen = shouldBeOpen;
         this._mobileMenuOpen = shouldOpen; // Track state explicitly
@@ -5685,7 +5685,7 @@ class DashboardApp {
                     return;
                 }
                 this._navActionLock = true;
-                setTimeout(() => { this._navActionLock = false; }, 800);
+                setTimeout(() => { this._navActionLock = false; }, 350);
 
                 const view = button.getAttribute('data-mobile-view');
                 const action = button.getAttribute('data-mobile-action');
