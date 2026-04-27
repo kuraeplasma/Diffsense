@@ -91,7 +91,13 @@ ul {
 /* Mobile-only elements: hidden on desktop only. Mobile side keeps natural/specific display. */
 @media (min-width: 901px) {
     .mobile-only,
-    .mobile-diff-header-bar {
+    .mobile-risk-sticky,
+    .mobile-decision-bar,
+    .mobile-clause-nav-fab,
+    .mobile-diff-header-bar,
+    .sign-mobile-next-btn,
+    .sign-mobile-step2-bar,
+    .sign-mobile-confirm {
         display: none !important;
     }
     /* PC版: 署名エディターのアクションエリアを表示 */
