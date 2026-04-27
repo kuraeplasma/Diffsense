@@ -1080,6 +1080,18 @@ ul {
     }
 }
 
+.mcp-tab-item {
+    -webkit-tap-highlight-color: transparent;
+    outline: none;
+}
+
+.mcp-tab-item.active {
+    border-bottom-color: #c19b4a !important;
+    color: #0f172a !important;
+    background: #fff !important;
+    font-weight: 700 !important;
+}
+
 @media (max-width: 1024px) {
     .plan-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1686,6 +1698,21 @@ ul {
 
     .plan-meta-slot {
         min-height: 102px;
+    }
+
+    .plan-cycle-switch {
+        width: 100% !important;
+        display: flex !important;
+        margin: 0 auto 12px !important;
+        max-width: none !important;
+    }
+
+    .plan-cycle-btn {
+        flex: 1 !important;
+        padding: 10px 0 !important;
+        font-size: 14px !important;
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
     }
 
     .plan-pricing-block {
@@ -3305,9 +3332,9 @@ select:focus {
     }
 
     .mobile-menu-divider {
-        height: 8px;
+        height: 1px;
         background: #f3f4f6;
-        margin: 4px 0;
+        margin: 8px 0;
     }
 
     #app-main {
@@ -4208,10 +4235,20 @@ select:focus {
         display: none !important;
     }
     .page-title {
-        font-size: 18px !important;
-        margin-bottom: 20px !important;
+        font-size: 20px !important;
+        margin-bottom: 0 !important;
         font-weight: 700 !important;
-        padding: 24px 0 0 0 !important; /* Left padding removed to use container padding */
+        padding: 24px 0 16px 0 !important; /* Added bottom padding and kept 0 left padding to use container padding */
+        background: transparent !important;
+        border-bottom: none !important;
+        box-shadow: none !important;
+    }
+
+    .plan-view-container {
+        display: block !important;
+        padding: 0 20px 160px !important;
+        box-sizing: border-box !important;
+        width: 100% !important;
     }
 
     /* History Table Mobile Optimization */

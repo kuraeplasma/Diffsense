@@ -4292,17 +4292,19 @@ class DashboardApp {
             }
         });
 
+        const isSubMenuView = ['history', 'deadlines', 'plan', 'notifications', 'mcp', 'team'].includes(viewId);
         const mobileMenuOpen = document.getElementById('mobile-menu-panel')?.classList.contains('is-open');
 
         document.querySelectorAll('.mobile-bottom-nav .bottom-nav-item').forEach((item) => {
             const isMenuBtn = item.id === 'bnav-menu' || item.id === 'bnav-menu-bottom' || item.getAttribute('data-mobile-action') === 'menu';
             if (isMenuBtn) {
-                item.classList.toggle('active', !!mobileMenuOpen);
+                // Keep gold if menu is open OR if we are in a sub-view that came from the menu
+                item.classList.toggle('active', !!mobileMenuOpen || isSubMenuView);
                 return;
             }
             const targetView = item.getAttribute('data-mobile-view');
-            // If menu is open, others shouldn't be active
-            const isActive = !mobileMenuOpen && targetView && (targetView === groupedViewId);
+            // If menu is open or in a sub-view, others shouldn't be active (except the menu icon itself)
+            const isActive = !mobileMenuOpen && !isSubMenuView && targetView && (targetView === groupedViewId);
             item.classList.toggle('active', isActive);
         });
     }
@@ -5766,8 +5768,8 @@ class DashboardApp {
     }
 
     async navigate(viewId, params = null) {
-        // Prevent redundant navigation to the same view (unless it's contracts/deadlines which need re-renders for filters)
-        if (this.currentView === viewId && viewId !== 'contracts' && viewId !== 'deadlines' && !params) {
+        // Prevent redundant navigation to the same view (unless it's contracts/deadlines/plan/mcp which need re-renders for filters/tabs)
+        if (this.currentView === viewId && !['contracts', 'deadlines', 'plan', 'mcp'].includes(viewId) && !params) {
             console.log(`Skipped redundant navigation to ${viewId}`);
             return;
         }
