@@ -1095,23 +1095,23 @@ export const SignUI = {
                             <i class="fa-regular fa-calendar"></i> 日付枠
                         </button>
                         <button class="sign-mob-btn sign-mob-send" id="mob-send-btn"
-                            onclick="var f=window.SignEditor&&window.SignEditor._fields||[];if(f.length===0){window.Notify&&Notify.warning('署名枠または日付枠を書類に配置してください');return;}document.getElementById('sign-mobile-confirm').style.display='flex';">
+                            onclick="var f=window.SignEditor&&window.SignEditor._fields||[];if(f.length===0){window.Notify&&Notify.warning('署名枠または日付枠を書類に配置してください');return;}document.getElementById('sign-mobile-confirm').classList.add('is-open');">
                             送信 <i class="fa-solid fa-paper-plane"></i>
                         </button>
                     </div>
 
-                    <!-- Mobile: 送信確認ポップアップ -->
-                    <div id="sign-mobile-confirm" class="sign-mobile-confirm" style="display:none;">
-                        <div class="sign-mobile-confirm-overlay" onclick="document.getElementById('sign-mobile-confirm').style.display='none';"></div>
+                    <!-- Mobile: 送信確認ポップアップ (is-openクラスで表示) -->
+                    <div id="sign-mobile-confirm" class="sign-mobile-confirm">
+                        <div class="sign-mobile-confirm-overlay" onclick="document.getElementById('sign-mobile-confirm').classList.remove('is-open');"></div>
                         <div class="sign-mobile-confirm-sheet">
                             <p class="sign-mobile-confirm-title">署名依頼を送信しますか？</p>
                             <p class="sign-mobile-confirm-desc">設定した宛先へ署名依頼メールを送信します。この操作は取り消せません。</p>
                             <button class="sign-mob-btn sign-mob-send sign-mobile-confirm-send-btn"
-                                onclick="document.getElementById('sign-mobile-confirm').style.display='none';window.SignEditor&&window.SignEditor.saveAndSend();">
+                                onclick="document.getElementById('sign-mobile-confirm').classList.remove('is-open');window.SignEditor&&window.SignEditor.saveAndSend();">
                                 送信する <i class="fa-solid fa-paper-plane"></i>
                             </button>
                             <button class="sign-mob-btn sign-mob-back sign-mobile-confirm-cancel-btn"
-                                onclick="document.getElementById('sign-mobile-confirm').style.display='none';">
+                                onclick="document.getElementById('sign-mobile-confirm').classList.remove('is-open');">
                                 キャンセル
                             </button>
                         </div>

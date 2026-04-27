@@ -3335,8 +3335,9 @@ select:focus {
         gap: 8px;
     }
 
-    /* --- モバイル Step2 浮遊ツールバー --- */
-    .sign-mobile-step2-bar {
+    /* --- モバイル Step2 浮遊ツールバー ---
+       sign-editor-container内でのみ有効 (sign管理ページへの漏れを防ぐ) */
+    .sign-editor-container .sign-mobile-step2-bar {
         display: flex !important;
         position: fixed !important;
         bottom: 0 !important;
@@ -3350,6 +3351,10 @@ select:focus {
         padding: 0 12px !important;
         gap: 8px !important;
         z-index: 999 !important;
+    }
+    /* Step1ではビューポートごと非表示なので追加ガード不要だが念のため */
+    .sign-editor-container[data-mobile-step="1"] .sign-mobile-step2-bar {
+        display: none !important;
     }
     .sign-mob-btn {
         display: flex;
@@ -3402,12 +3407,17 @@ select:focus {
         display: none !important;
     }
 
-    /* --- 送信確認ポップアップ --- */
+    /* --- 送信確認ポップアップ ---
+       display:none をCSSでも明示。sign-editor内でのみ表示 */
     .sign-mobile-confirm {
+        display: none;
         position: fixed !important;
         inset: 0 !important;
         z-index: 1100 !important;
         align-items: flex-end !important;
+    }
+    .sign-mobile-confirm.is-open {
+        display: flex !important;
     }
     .sign-mobile-confirm-overlay {
         position: absolute;
