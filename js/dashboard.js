@@ -4295,13 +4295,14 @@ class DashboardApp {
         const mobileMenuOpen = document.getElementById('mobile-menu-panel')?.classList.contains('is-open');
 
         document.querySelectorAll('.mobile-bottom-nav .bottom-nav-item').forEach((item) => {
-            if (item.id === 'bnav-menu') {
+            const isMenuBtn = item.id === 'bnav-menu' || item.id === 'bnav-menu-bottom' || item.getAttribute('data-mobile-action') === 'menu';
+            if (isMenuBtn) {
                 item.classList.toggle('active', !!mobileMenuOpen);
                 return;
             }
             const targetView = item.getAttribute('data-mobile-view');
             // If menu is open, others shouldn't be active
-            const isActive = !mobileMenuOpen && (targetView === groupedViewId);
+            const isActive = !mobileMenuOpen && targetView && (targetView === groupedViewId);
             item.classList.toggle('active', isActive);
         });
     }
@@ -4315,7 +4316,7 @@ class DashboardApp {
             : !panel.classList.contains('is-open');
 
         panel.classList.toggle('is-open', shouldOpen);
-        document.querySelectorAll('.mobile-menu-button, #bnav-menu').forEach((button) => {
+        document.querySelectorAll('.mobile-menu-button, #bnav-menu, #bnav-menu-bottom, [data-mobile-action="menu"]').forEach((button) => {
             button.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
         });
 
