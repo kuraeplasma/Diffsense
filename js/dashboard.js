@@ -4188,7 +4188,17 @@ class DashboardApp {
                         style="padding:8px 12px 8px 36px;border:1px solid #ddd;border-radius:4px;width:100%;font-size:13px;box-sizing:border-box;"
                         oninput="window.app.navigate('deadlines', {query:this.value,filterRange:'${filterRange}',sortKey:'${sortKey}',sortDir:'${sortDir}'})">
                 </div>
-                <div class="flex gap-sm items-center flex-wrap">
+                <div class="mobile-only" style="width:100%;margin-top:8px;">
+                    <select onchange="window.app.navigate('deadlines', {query:'${query}',filterRange:this.value,sortKey:'${sortKey}',sortDir:'${sortDir}'})"
+                            style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;font-size:14px;background:#fff;color:#5e544d;">
+                        <option value="all" ${filterRange === 'all' ? 'selected' : ''}>期限表示: すべて (${counts.all})</option>
+                        <option value="urgent" ${filterRange === 'urgent' ? 'selected' : ''}>7日以内 (${counts.urgent})</option>
+                        <option value="warning" ${filterRange === 'warning' ? 'selected' : ''}>30日以内 (${counts.warning})</option>
+                        <option value="upcoming" ${filterRange === 'upcoming' ? 'selected' : ''}>90日以内 (${counts.upcoming})</option>
+                        <option value="nodate" ${filterRange === 'nodate' ? 'selected' : ''}>期限未設定 (${counts.nodate})</option>
+                    </select>
+                </div>
+                <div class="pc-only flex gap-sm items-center flex-wrap">
                     ${tabBtn('all', 'すべて', '')}
                     ${tabBtn('urgent', '7日以内', '')}
                     ${tabBtn('warning', '30日以内', '')}
