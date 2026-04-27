@@ -1649,7 +1649,7 @@ ul {
     }
 
     .plan-view-container {
-        padding: 0 20px 40px; /* Unified side padding to match title */
+        padding: 0 20px 100px; /* Increased bottom padding to prevent cutoff */
     }
 
     .plan-grid {
