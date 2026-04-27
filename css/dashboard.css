@@ -505,8 +505,14 @@ ul {
 .nav-item:hover,
 .nav-item.active {
     background-color: rgba(255, 255, 255, 0.1);
-    color: #fff;
+    color: var(--color-primary) !important;
     cursor: pointer;
+}
+
+.nav-item:hover .nav-icon,
+.nav-item.active .nav-icon {
+    color: var(--color-primary) !important;
+    opacity: 1;
 }
 
 .nav-icon {
@@ -3220,7 +3226,7 @@ select:focus {
     }
 
     .bottom-nav-item.active {
-        color: #c49a3a;
+        color: var(--color-primary);
     }
 
     /* Mobile Menu Panel */
