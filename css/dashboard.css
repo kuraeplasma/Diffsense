@@ -4759,8 +4759,10 @@ select:focus {
 
     @media (max-width: 900px) {
         .deadline-modal-container {
-            height: 100vh !important;
-            border-radius: 0 !important;
+            height: 94vh !important; /* Slightly smaller for popup feel */
+            width: 94vw !important;
+            border-radius: 20px !important; /* Rounded corners */
+            margin: auto !important;
         }
         .deadline-modal-body {
             flex-direction: column !important;

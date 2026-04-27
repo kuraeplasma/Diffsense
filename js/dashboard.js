@@ -4308,6 +4308,10 @@ class DashboardApp {
     }
 
     toggleMobileMenu(forceOpen = null) {
+        if (this._menuToggleLock) return;
+        this._menuToggleLock = true;
+        setTimeout(() => { this._menuToggleLock = false; }, 300);
+
         const panel = document.getElementById('mobile-menu-panel');
         if (!panel) return;
 
