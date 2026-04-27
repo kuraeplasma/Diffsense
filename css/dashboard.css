@@ -3219,6 +3219,7 @@ select:focus {
         transition: color 0.15s;
         position: relative;
         -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
     }
 
     .bottom-nav-item i {

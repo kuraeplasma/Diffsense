@@ -4309,15 +4309,20 @@ class DashboardApp {
 
     toggleMobileMenu(forceOpen = null) {
         if (this._menuToggleLock) return;
-        this._menuToggleLock = true;
-        setTimeout(() => { this._menuToggleLock = false; }, 300);
-
+        
         const panel = document.getElementById('mobile-menu-panel');
         if (!panel) return;
 
-        const shouldOpen = typeof forceOpen === 'boolean'
-            ? forceOpen
-            : !panel.classList.contains('is-open');
+        const isCurrentlyOpen = panel.classList.contains('is-open');
+        const shouldBeOpen = (forceOpen !== null) ? forceOpen : !isCurrentlyOpen;
+
+        // Prevent redundant toggles or rapid fire
+        if (isCurrentlyOpen === shouldBeOpen) return;
+
+        this._menuToggleLock = true;
+        setTimeout(() => { this._menuToggleLock = false; }, 800); // More aggressive lock
+
+        const shouldOpen = shouldBeOpen;
 
         panel.classList.toggle('is-open', shouldOpen);
         document.querySelectorAll('.mobile-menu-button, #bnav-menu, #bnav-menu-bottom, [data-mobile-action="menu"]').forEach((button) => {
