@@ -5670,6 +5670,14 @@ class DashboardApp {
                 const button = event.target?.closest?.('.mobile-bottom-nav .bottom-nav-item');
                 if (!button) return;
 
+                if (this._navActionLock) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    return;
+                }
+                this._navActionLock = true;
+                setTimeout(() => { this._navActionLock = false; }, 500);
+
                 const view = button.getAttribute('data-mobile-view');
                 const action = button.getAttribute('data-mobile-action');
                 if (!view && !action) return;
