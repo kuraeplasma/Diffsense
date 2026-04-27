@@ -1649,7 +1649,7 @@ ul {
     }
 
     .plan-view-container {
-        padding: 0 20px 100px; /* Increased bottom padding to prevent cutoff */
+        padding: 0 20px 160px; /* Further increased bottom padding for generous spacing */
     }
 
     .plan-grid {
