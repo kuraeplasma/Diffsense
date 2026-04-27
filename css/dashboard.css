@@ -3236,65 +3236,69 @@ select:focus {
    テーブル → カードリスト変換
    =================================================== */
 @media (max-width: 900px) {
-    /* 署名エディター: スプリットレイアウト → モバイル縦積み
-       インラインstyleを!importantで上書き */
+    /* =============================================
+       署名エディター: 縦積みレイアウト
+       上: フォーム / 下: PDF
+       ============================================= */
     .sign-editor-container {
         flex-direction: column !important;
         height: auto !important;
-        min-height: 100% !important;
         overflow: visible !important;
     }
+
+    /* サイドバー(フォーム): 全幅・ブロック展開 */
     .sign-editor-sidebar {
         width: 100% !important;
         max-width: 100% !important;
         border-right: none !important;
-        border-bottom: none !important;
+        border-bottom: 1px solid #e0e0e0 !important;
         box-shadow: none !important;
-        display: block !important;      /* flexを解除してブロックに */
+        display: block !important;
         background: #f5f7fa !important;
     }
-    /* sidebar-body: sign.css の flex:1;overflow:hidden を解除してスクロール可能に */
+    /* sidebar-body: sign.css の flex:1;overflow:hidden を解除 */
     .sign-editor-sidebar-body {
         flex: none !important;
         overflow: visible !important;
         height: auto !important;
         padding: 0 !important;
     }
-    /* 受信者リスト: 高さ制限を解除 */
+    /* 受信者リスト: 高さ制限解除 */
     .sign-editor-recipient-list {
         max-height: none !important;
         overflow-y: visible !important;
     }
-    /* フィールド配置セクション: モバイルではD&D不可のため非表示 */
-    .sign-editor-sidebar-section:not(.is-recipient) {
-        display: none !important;
-    }
-    /* 各セクション: カード風に */
-    .sign-editor-sidebar-section.is-recipient {
+    /* 各セクション: カード風 */
+    .sign-editor-sidebar-section {
         background: #fff;
-        margin: 12px 16px;
+        margin: 12px 16px !important;
         border-radius: 12px;
-        padding: 20px !important;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-    }
-    /* 送信エリア: 画面下部に固定 (ネイティブアプリ風) */
-    .sign-editor-sidebar > div:last-child {
-        position: sticky !important;
-        bottom: 60px !important; /* ボトムナビの高さ分上げる */
-        background: #fff !important;
         padding: 16px !important;
-        border-top: 1px solid #eee !important;
-        z-index: 10;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.07);
     }
-    /* 送信ボタン: 大きく */
+    /* 送信エリア: フォームの末尾に自然配置 */
+    .sign-editor-sidebar > div:last-child {
+        padding: 16px !important;
+        background: #f5f7fa !important;
+        border-top: none !important;
+    }
+    /* 送信ボタン: 大きく押しやすく */
     #sign-editor-send-btn {
         min-height: 52px !important;
         font-size: 16px !important;
         border-radius: 14px !important;
     }
-    /* PDFプレビューエリア: 非表示 */
+
+    /* PDFビューポート: フォームの下に全幅表示 */
     .sign-editor-viewport {
-        display: none !important;
+        display: block !important;
+        flex: none !important;
+        width: 100% !important;
+        height: 70vh !important;   /* 画面の7割 */
+        min-height: 400px !important;
+        overflow: auto !important;
+        padding: 16px !important;
+        background: #dfe1e5 !important;
     }
 
     /* 署名管理ヘッダー(タイトル+説明文)を非表示
