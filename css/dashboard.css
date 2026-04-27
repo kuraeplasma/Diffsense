@@ -1814,6 +1814,20 @@ ul {
         background: #f9fafb;
         color: #111827;
     }
+
+    /* Modals should be scrollable on mobile */
+    .modal-content {
+        max-height: 85vh !important;
+        display: flex !important;
+        flex-direction: column !important;
+        margin-top: 20px;
+    }
+    .modal-body {
+        overflow-y: auto !important;
+        flex: 1 !important;
+        -webkit-overflow-scrolling: touch;
+        padding: 24px 20px !important;
+    }
 }
 
 .modal-body {
@@ -4424,5 +4438,6 @@ select:focus {
         margin-left: 0 !important;
         font-size: 12px !important;
         display: block !important;
+        word-break: break-all !important;
     }
 }
