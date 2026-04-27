@@ -781,10 +781,7 @@ const renderStructuredDiffView = (previousContent, currentContent, options = {})
 
         return `
             <div class="contract-structured-container structured-diff-shell">
-                <button class="mobile-clause-nav-fab mobile-only" type="button" onclick="window.app?.toggleMobileClauseNav(this)" aria-label="条文目次">
-                    <i class="fa-solid fa-list-ul"></i>
-                    <span>条文</span>
-                </button>
+
                 ${navHtml}
                 <div class="clause-cards-container structured-diff-stack">
                     ${cards}
@@ -1024,10 +1021,7 @@ const renderStructuredView = (content, idPrefix = 'clause') => {
 
         return `
             <div class="contract-structured-container">
-                <button class="mobile-clause-nav-fab mobile-only" type="button" onclick="window.app?.toggleMobileClauseNav(this)" aria-label="条文目次">
-                    <i class="fa-solid fa-list-ul"></i>
-                    <span>条文</span>
-                </button>
+
                 ${navHtml}
                 ${cardsHtml}
             </div>
@@ -1687,7 +1681,7 @@ const Views = {
                             </div>
                         </div>
                     </div>
-                    <div class="flex gap-sm">
+                    <div class="flex gap-sm" style="flex-wrap: wrap; justify-content: flex-end; margin-left: auto;">
                         ${app?.can('operate_contract') ? `<button class="btn-dashboard" onclick="window.app.shareReport(${contract.id})"><i class="fa-solid fa-share-nodes"></i> 共有</button>` : ''}
                         ${(['owner', 'pro', 'business'].includes(app?.subscription?.plan)) ? `<button class="btn-dashboard" onclick="window.app.exportPDF(${contract.id})"><i class="fa-solid fa-file-pdf"></i> PDF出力</button>` : ''}
                         ${app?.can('operate_contract') ? `<button class="btn-dashboard" onclick="window.app.showHistoryModal(${id})"><i class="fa-solid fa-note-sticky"></i> メモ</button>` : ''}
