@@ -3614,14 +3614,14 @@ class DashboardApp {
 
                     <!-- Deadline input form -->
                     <div class="deadline-form-sidebar">
-                        <div style="font-size:13px;font-weight:700;color:#2b2623;margin-bottom:4px;"><i class="fa-solid fa-calendar-days" style="color:#c5a059;margin-right:6px;"></i>期限を入力</div>
+                        <div style="flex:1;"></div>
+                        <div style="font-size:13px;font-weight:700;color:#2b2623;margin-bottom:2px;"><i class="fa-solid fa-calendar-days" style="color:#c5a059;margin-right:6px;"></i>期限を入力</div>
                         <div>
-                            <label style="font-size:11px;font-weight:600;color:#5e544d;display:block;margin-bottom:5px;">契約終了日</label>
+                            <label style="font-size:11px;font-weight:600;color:#5e544d;display:block;margin-bottom:3px;">契約終了日</label>
                             <input type="date" id="dl-expiry" value="${c.expiry_date || ''}"
                                 style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;box-sizing:border-box;">
                         </div>
-                        <div style="flex:1;"></div>
-                        <div style="display:flex;flex-direction:column;gap:8px;">
+                        <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px;">
                             <button onclick="window.app.saveDeadlineInput('${contractId}')"
                                 style="padding:10px;border:none;border-radius:6px;background:#c5a059;color:#fff;font-size:13px;font-weight:600;cursor:pointer;width:100%;">
                                 <i class="fa-solid fa-check" style="margin-right:6px;"></i>保存

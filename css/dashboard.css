@@ -4768,14 +4768,15 @@ select:focus {
         .deadline-doc-viewer {
             border-right: none !important;
             border-bottom: 1px solid #eee !important;
-            height: 50% !important; /* Document on top, half height */
+            height: 70% !important; /* Larger document space */
             flex: none !important;
         }
         .deadline-form-sidebar {
             width: 100% !important;
-            height: auto !important;
-            flex: 1 !important;
-            padding: 16px 20px !important;
+            height: 30% !important; /* Smaller form space */
+            flex: none !important;
+            padding: 12px 20px !important;
+            gap: 8px !important;
         }
     }
 }
