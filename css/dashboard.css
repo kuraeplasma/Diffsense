@@ -3229,6 +3229,13 @@ select:focus {
    テーブル → カードリスト変換
    =================================================== */
 @media (max-width: 900px) {
+    /* 署名管理ヘッダー(タイトル+説明文)を非表示
+       sign-container:not([style]) = 管理画面のみ対象
+       sign-container[style=...] = ビューア(戻るボタンあり)は除外 */
+    .sign-container:not([style]) .sign-header {
+        display: none !important;
+    }
+
     /* タブ: 横スクロール・折り返し禁止 */
     .sign-tabs {
         display: flex;
