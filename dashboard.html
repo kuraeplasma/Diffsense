@@ -110,12 +110,10 @@
                 <div class="nav-icon"><i class="fa-solid fa-calendar-days"></i></div>
                 <span>期限・アラート管理</span>
             </div>
-            <!--
             <div class="nav-item" onclick="window.app.navigate('history')">
                 <div class="nav-icon"><i class="fa-solid fa-clock-rotate-left"></i></div>
                 <span>解析履歴</span>
             </div>
-            -->
             <div class="nav-item" id="nav-sign" onclick="window.app.navigate('sign')">
                 <div class="nav-icon"><i class="fa-solid fa-file-signature"></i></div>
                 <span class="nav-label">署名管理</span>
@@ -165,7 +163,7 @@
     <!-- Mobile Menu Panel (スマホ専用) -->
     <div id="mobile-menu-panel" class="mobile-menu-panel mobile-only" aria-hidden="true">
         <div class="mobile-menu-inner">
-            <!-- <div class="mobile-menu-item" onclick="window.app?.navigate('history');window.app?.closeMobileMenu()"><i class="fa-solid fa-clock-rotate-left"></i> 解析履歴</div> -->
+            <div class="mobile-menu-item" onclick="window.app?.navigate('history');window.app?.closeMobileMenu()"><i class="fa-solid fa-clock-rotate-left"></i> 解析履歴</div>
             <div class="mobile-menu-item" onclick="window.app?.navigate('deadlines');window.app?.closeMobileMenu()"><i class="fa-solid fa-calendar-days"></i> 期限・アラート管理</div>
             <div class="mobile-menu-item" onclick="window.app?.navigate('plan');window.app?.closeMobileMenu()"><i class="fa-solid fa-credit-card"></i> プラン管理</div>
             <div class="mobile-menu-item" onclick="window.app?.navigate('notifications');window.app?.closeMobileMenu()"><i class="fa-solid fa-bell"></i> 通知設定</div>

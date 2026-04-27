@@ -27,7 +27,6 @@ export function render({ app, dbService, DASHBOARD_CACHE_KEYS, escapeHtmlText } 
     }).join('');
 
     return `
-            <h2 class="page-title">解析ログ・監査履歴</h2>
             <div class="table-container">
             <table class="data-table history-table">
                 <thead>
