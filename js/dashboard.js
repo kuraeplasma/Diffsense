@@ -4304,15 +4304,6 @@ class DashboardApp {
             const isActive = !mobileMenuOpen && (targetView === groupedViewId);
             item.classList.toggle('active', isActive);
         });
-
-        document.querySelectorAll('.mobile-menu-item').forEach((item) => {
-            const onclick = item.getAttribute('onclick') || '';
-            if (onclick.includes(`navigate('${groupedViewId}')`) || onclick.includes(`navigate("${groupedViewId}")`)) {
-                item.classList.add('active');
-            } else {
-                item.classList.remove('active');
-            }
-        });
     }
 
     toggleMobileMenu(forceOpen = null) {

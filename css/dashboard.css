@@ -4677,19 +4677,6 @@ select:focus {
         color: var(--color-primary) !important;
     }
     
-    /* Mobile Menu Item Active State */
-    .mobile-menu-item:active,
-    .mobile-menu-item.active {
-        background-color: #f9fafb !important;
-    }
-    .mobile-menu-item.active {
-        color: var(--color-primary) !important;
-        font-weight: 600 !important;
-    }
-    .mobile-menu-item.active i {
-        color: var(--color-primary) !important;
-    }
-
     /* Card Interaction Indicators (Chevron Right) */
     .deadlines-table tbody tr,
     .contracts-table tbody tr {
