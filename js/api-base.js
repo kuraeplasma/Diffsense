@@ -69,13 +69,33 @@ function shouldIgnoreExplicitBase(explicitBase) {
     }
 }
 
+/**
+ * LAN IP経由アクセス時に localhost API URLを現在のホスト名にリマップ
+ * 例: http://localhost:3001 → http://192.168.1.3:3001
+ * スマホ(192.168.x.x)からlocalhost:3001に接続してもスマホ自身のlocalhostになるため
+ */
+function remapLocalhostForLan(apiUrl) {
+    const h = window.location.hostname;
+    if (h === 'localhost' || h === '127.0.0.1' || h === '[::1]') return apiUrl;
+    const isLan = h.startsWith('192.168.') || h.startsWith('10.') || h.startsWith('172.');
+    if (!isLan) return apiUrl;
+    try {
+        const parsed = new URL(apiUrl);
+        if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
+            parsed.hostname = h;
+            return parsed.toString().replace(/\/$/, '');
+        }
+    } catch { /* noop */ }
+    return apiUrl;
+}
+
 export function getApiBaseUrl() {
     syncApiBaseOverrideFromUrl();
     const params = new URLSearchParams(window.location.search);
     const hasRuntimeApiOverride = Boolean(window.__DIFFSENSE_API_BASE__ || params.get('apiBase'));
 
     // 1. Check window.API_BASE (from env.js)
-    if (window.API_BASE) return normalizeBaseUrl(window.API_BASE);
+    if (window.API_BASE) return remapLocalhostForLan(normalizeBaseUrl(window.API_BASE));
 
     // 2. Check explicit overrides
     const explicit = readExplicitApiBase();

@@ -364,19 +364,20 @@ export const SignUI = {
     },
 
     /**
-     * Refreshes the list based on the active tab
+     * Refreshes the list based on the active tab (Optimistic Rendering)
      */
-    async refreshList(app) {
+    refreshList(app) {
         const listBody = document.getElementById('sign-list-body');
         const tableHead = document.getElementById('sign-table-head');
         if (!listBody || !tableHead) return;
 
+        // Note: No 'await' here to allow immediate shell rendering
         if (this.currentTab === 'new-request') {
-            await this.renderNewRequestTab(tableHead, listBody);
+            this.renderNewRequestTab(tableHead, listBody);
         } else if (this.currentTab === 'completed-requests') {
-            await this.renderCompletedRequestsTab(tableHead, listBody);
+            this.renderCompletedRequestsTab(tableHead, listBody);
         } else {
-            await this.renderSentRequestsTab(tableHead, listBody);
+            this.renderSentRequestsTab(tableHead, listBody);
         }
     },
 
@@ -391,12 +392,25 @@ export const SignUI = {
                 <th>解析ステータス</th>
                 <th>リスク</th>
                 <th>最終更新</th>
-                <th style="width:180px; text-align:left;">操作</th>
+                <th style="width:180px; text-align:right;">操作</th>
             </tr>
         `;
 
-        await dbService.syncContractsFromApi();
-        const contracts = this.applyContractFiltersAndSort(await this.ensureLocalDummyContracts());
+        // 1. Initial render from cache
+        const initialContracts = await this.ensureLocalDummyContracts();
+        this._renderNewRequestList(initialContracts, listBody);
+
+        // 2. Background sync (Optional: only if needed or periodically)
+        dbService.syncContractsFromApi().then(async () => {
+            if (this.currentTab === 'new-request') {
+                const updated = await this.ensureLocalDummyContracts();
+                this._renderNewRequestList(updated, listBody);
+            }
+        }).catch(err => console.warn('Background sync failed:', err));
+    },
+
+    _renderNewRequestList(allContracts, listBody) {
+        const contracts = this.applyContractFiltersAndSort(allContracts);
         
         if (contracts.length === 0) {
             const hasFilter = Boolean(String(this.filters.query || '').trim());
@@ -435,7 +449,7 @@ export const SignUI = {
                     </td>
                     <td><span class="badge ${riskClass}">${riskLabel}</span></td>
                     <td>${updatedAt}</td>
-                    <td style="text-align:left;" onclick="event.stopPropagation()">
+                    <td style="text-align:right;" onclick="event.stopPropagation()">
                         <button class="btn-dashboard btn-primary-action" style="font-size:12px; min-width:140px; justify-content:center;${startDisabled ? ' opacity:0.5; cursor:not-allowed;' : ''}" onclick="window.signUI.startSingleRequest(${c.id})" ${startDisabled ? 'disabled' : ''} title="${!signable ? 'PDF原本または本文プレビューがある書類のみ署名依頼できます' : ''}">
                             署名依頼を開始
                         </button>
@@ -455,12 +469,25 @@ export const SignUI = {
                 <th>送信者</th>
                 <th>ステータス</th>
                 <th>作成日</th>
-                <th>アクション</th>
+                <th style="text-align:right;">アクション</th>
             </tr>
         `;
 
+        // 1. Initial render from cache
+        const cached = JSON.parse(localStorage.getItem(dbService.KEYS.SIGN_REQUESTS) || '[]');
+        this._renderSentRequestsList(cached, listBody);
+
+        // 2. Background sync
+        dbService.getSignRequests().then(updated => {
+            if (this.currentTab === 'sent-requests') {
+                this._renderSentRequestsList(updated, listBody);
+            }
+        }).catch(err => console.warn('Background sync failed:', err));
+    },
+
+    _renderSentRequestsList(allRequests, listBody) {
         const requests = this.applyRequestFiltersAndSort(
-            (await dbService.getSignRequests()).filter((request) => !this.isTerminalRequest(request))
+            (allRequests || []).filter((request) => !this.isTerminalRequest(request))
         );
 
         if (requests.length === 0) {
@@ -479,8 +506,8 @@ export const SignUI = {
                     <td>${this.escapeHtml(r.sender)}</td>
                     <td><span class="sign-badge ${statusMeta.className}">${statusMeta.label}</span></td>
                     <td>${dateStr}</td>
-                    <td>
-                        <div style="display:flex; gap:8px;">
+                    <td style="text-align:right;">
+                        <div style="display:flex; gap:8px; justify-content:flex-end;">
                             ${this.isDraftRequest(r) ? `
                                 <button class="btn-dashboard" onclick="window.app.navigate('sign-editor', ${r.id})">
                                     <i class="fa-solid fa-pen-nib"></i> 配置
@@ -512,12 +539,25 @@ export const SignUI = {
                 <th>送信者</th>
                 <th>ステータス</th>
                 <th>完了日</th>
-                <th>アクション</th>
+                <th style="text-align:right;">アクション</th>
             </tr>
         `;
 
+        // 1. Initial render from cache
+        const cached = JSON.parse(localStorage.getItem(dbService.KEYS.SIGN_REQUESTS) || '[]');
+        this._renderCompletedRequestsList(cached, listBody);
+
+        // 2. Background sync
+        dbService.getSignRequests().then(updated => {
+            if (this.currentTab === 'completed-requests') {
+                this._renderCompletedRequestsList(updated, listBody);
+            }
+        }).catch(err => console.warn('Background sync failed:', err));
+    },
+
+    _renderCompletedRequestsList(allRequests, listBody) {
         const requests = this.applyRequestFiltersAndSort(
-            (await dbService.getSignRequests()).filter((request) => this.isTerminalRequest(request))
+            (allRequests || []).filter((request) => this.isTerminalRequest(request))
         );
 
         if (requests.length === 0) {
@@ -535,8 +575,8 @@ export const SignUI = {
                     <td>${this.escapeHtml(r.sender)}</td>
                     <td><span class="sign-badge ${statusMeta.className}">${statusMeta.label}</span></td>
                     <td>${completedDate}</td>
-                    <td>
-                        <div style="display:flex; gap:8px;">
+                    <td style="text-align:right;">
+                        <div style="display:flex; gap:8px; justify-content:flex-end;">
                             <button class="btn-dashboard" style="font-size:11px;" onclick="window.app.navigate('sign-viewer', ${r.id})">詳細</button>
                         </div>
                     </td>
@@ -1011,7 +1051,7 @@ export const SignUI = {
                         <button class="btn-dashboard" onclick="window.app.navigate('sign')" style="margin-bottom:16px; font-size:12px; background:none; border:none; padding:0; color:#666;">
                             <i class="fa-solid fa-chevron-left"></i> 戻る
                         </button>
-                        <h2 style="font-size:18px; margin:0; color:var(--sign-primary); font-weight:700;">この契約に署名を依頼する</h2>
+                        <h2 style="font-size:18px; margin:0; color:#111827 !important; font-weight:700;">この契約に署名を依頼する</h2>
                     </div>
 
                     <div class="sign-editor-sidebar-body">
@@ -1023,7 +1063,7 @@ export const SignUI = {
                             </div>
                             <!-- モバイル: 宛先入力完了チェック (src="data:,x"は必ずonerrorになる) -->
                             <img src="data:,x" style="display:none;position:absolute;" alt=""
-                                 onerror="(function(){function chk(){var w=document.getElementById('sign-mobile-next-wrap');if(!w){clearInterval(window._signMobTimer);document.removeEventListener('input',chk,true);return;}if(window.innerWidth>900)return;var rs=window.SignEditor&&window.SignEditor._recipients||[];var ok=rs.length>0&&rs.every(function(r){return(r.email||'').trim()&&(r.name||'').trim();});w.style.display=ok?'flex':'none';}if(window._signMobTimer)clearInterval(window._signMobTimer);window._signMobTimer=setInterval(chk,300);document.addEventListener('input',chk,true);})()">
+                                 onerror="(function(){function chk(){var w=document.getElementById('sign-mobile-next-wrap');if(!w){clearInterval(window._signMobTimer);document.removeEventListener('input',chk,true);return;}if(window.innerWidth>900)return;var rs=window.SignEditor&&window.SignEditor._recipients||[];var ok=rs.length>0&&rs.every(function(r){return(r.email||'').trim()&&(r.name||'').trim();});w.style.setProperty('display', ok?'flex':'none', 'important');}if(window._signMobTimer)clearInterval(window._signMobTimer);window._signMobTimer=setInterval(chk,300);document.addEventListener('input',chk,true);})()">
                             <button class="btn-dashboard" onclick="window.SignEditor.addRecipientRow()" style="width:100%; border:1px dashed #ccc; background:#fafafa; font-size:11px; margin-top:12px; border-radius:8px; height:36px;">
                                 <i class="fa-solid fa-plus"></i> 署名者を追加
                             </button>
@@ -1069,8 +1109,8 @@ export const SignUI = {
                     </div>
 
                     <!-- Mobile Step 1: 次へボタン (email+name入力後に表示) -->
-                    <div class="sign-mobile-next-btn" id="sign-mobile-next-wrap" style="display:none;">
-                        <button onclick="document.querySelector('.sign-editor-container').dataset.mobileStep='2';">
+                    <div class="sign-mobile-next-btn" id="sign-mobile-next-wrap" style="display:none !important;">
+                        <button onclick="document.querySelector('.sign-editor-container').dataset.mobileStep='2';" style="background:#c5a059 !important; color:#fff !important;">
                             次へ：書類で枠を設置する <i class="fa-solid fa-chevron-right"></i>
                         </button>
                     </div>

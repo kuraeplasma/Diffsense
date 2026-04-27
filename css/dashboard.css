@@ -15,6 +15,7 @@
     --text-faint: #959DA5;
 
     --color-primary: #c5a059;
+    --sign-primary: #c5a059;
     /* Mantaining Brand Identity */
     --color-primary-dim: rgba(197, 160, 89, 0.1);
 
@@ -90,12 +91,7 @@ ul {
 /* Mobile-only elements: hidden on desktop only. Mobile side keeps natural/specific display. */
 @media (min-width: 901px) {
     .mobile-only,
-    .mobile-risk-sticky,
-    .mobile-decision-bar,
-    .mobile-clause-nav-fab,
-    .mobile-diff-header-bar,
-    .sign-mobile-next-btn,
-    .sign-mobile-step2-bar {
+    .mobile-diff-header-bar {
         display: none !important;
     }
     /* PC版: 署名エディターのアクションエリアを表示 */
@@ -1259,10 +1255,47 @@ ul {
     border-color: #b1b1b1;
 }
 
-.btn-primary-action {
+/* Specific Gold for Primary Actions - Removed !important from broad rule to restore text colors */
+.btn-primary-action, 
+.btn-sign-primary {
     background: var(--color-primary);
+    background-color: var(--color-primary);
     color: #fff;
     border-color: var(--color-primary);
+}
+
+.btn-primary-action:hover,
+.btn-sign-primary:hover {
+    background: #b38f4d;
+    border-color: #b38f4d;
+}
+
+/* Mobile Next Button & Step 2 Toolbar - Forced Gold */
+.sign-mobile-next-btn button,
+.sign-mob-btn.sign-mob-send,
+.sign-mob-btn.sign-mob-tool {
+    background: var(--color-primary) !important;
+    color: #fff !important;
+    border: none !important;
+    border-radius: 8px !important;
+}
+
+.sign-mobile-next-btn {
+    display: none; /* Controlled by JS but set base flex if shown */
+    padding: 16px;
+    background: #fff;
+    border-top: 1px solid #eee;
+    position: sticky;
+    bottom: 0;
+    width: 100%;
+    z-index: 1000;
+}
+
+.sign-mobile-next-btn button {
+    width: 100%;
+    height: 48px;
+    font-size: 15px;
+    font-weight: 700;
 }
 
 .btn-primary-action:hover {
@@ -3031,7 +3064,8 @@ select:focus {
         height: 100%;
         display: flex;
         flex-direction: column;
-        overflow: hidden;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
         padding: 0; /* Reset global padding */
     }
 
@@ -3098,8 +3132,8 @@ select:focus {
 
     /* Dashboard table 竊・native card list */
     .table-container {
-        flex: 1;
-        overflow-y: auto;
+        flex: none;
+        overflow: visible;
         overflow-x: hidden;
         -webkit-overflow-scrolling: touch;
         padding: 0 16px 20px;
