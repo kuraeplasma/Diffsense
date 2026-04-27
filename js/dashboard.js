@@ -1328,18 +1328,20 @@ const Views = {
         `;
 
         return `
-            <div class="page-title">プラン管理</div>
-            <div class="plan-billing-toolbar">
-                <div class="plan-cycle-switch" role="group" aria-label="請求サイクル切替">
-                    <button class="plan-cycle-btn ${selectedBillingCycle === 'monthly' ? 'active' : ''}" onclick="window.app.setPlanBillingCycle('monthly')">月額</button>
-                    <button class="plan-cycle-btn ${selectedBillingCycle === 'annual' ? 'active' : ''}" onclick="window.app.setPlanBillingCycle('annual')" ${annualKnownUnavailable ? 'disabled' : ''}>年額（2ヶ月分お得）</button>
+            <div class="plan-view-container">
+                <div class="page-title">プラン管理</div>
+                <div class="plan-billing-toolbar">
+                    <div class="plan-cycle-switch" role="group" aria-label="請求サイクル切替">
+                        <button class="plan-cycle-btn ${selectedBillingCycle === 'monthly' ? 'active' : ''}" onclick="window.app.setPlanBillingCycle('monthly')">月額</button>
+                        <button class="plan-cycle-btn ${selectedBillingCycle === 'annual' ? 'active' : ''}" onclick="window.app.setPlanBillingCycle('annual')" ${annualKnownUnavailable ? 'disabled' : ''}>年額（2ヶ月分お得）</button>
+                    </div>
+                    <p class="plan-cycle-note">${annualKnownUnavailable ? '年額プランは現在準備中です。' : ''}</p>
                 </div>
-                <p class="plan-cycle-note">${annualKnownUnavailable ? '年額プランは現在準備中です。' : ''}</p>
-            </div>
-            ${paymentSection}
-            ${cancelSection}
-            <div class="plan-grid">
-                ${cards}
+                ${paymentSection}
+                ${cancelSection}
+                <div class="plan-grid">
+                    ${cards}
+                </div>
             </div>
         `;
     },
