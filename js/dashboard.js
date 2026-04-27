@@ -4320,9 +4320,10 @@ class DashboardApp {
         if (isCurrentlyOpen === shouldBeOpen) return;
 
         this._menuToggleLock = true;
-        setTimeout(() => { this._menuToggleLock = false; }, 800); // More aggressive lock
+        setTimeout(() => { this._menuToggleLock = false; }, 1000); // 1-second solid lock for menu toggle
 
         const shouldOpen = shouldBeOpen;
+        this._mobileMenuOpen = shouldOpen; // Track state explicitly
 
         panel.classList.toggle('is-open', shouldOpen);
         document.querySelectorAll('.mobile-menu-button, #bnav-menu, #bnav-menu-bottom, [data-mobile-action="menu"]').forEach((button) => {
@@ -5762,6 +5763,11 @@ class DashboardApp {
     }
 
     async navigate(viewId, params = null) {
+        // Prevent redundant navigation to the same view (unless it's contracts/deadlines which need re-renders for filters)
+        if (this.currentView === viewId && viewId !== 'contracts' && viewId !== 'deadlines' && !params) {
+            console.log(`Skipped redundant navigation to ${viewId}`);
+            return;
+        }
         console.log(`Navigating to ${viewId}`, params);
 
         this.resetExecutionState(viewId);
