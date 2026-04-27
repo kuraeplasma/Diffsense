@@ -1313,6 +1313,8 @@ export const SignUI = {
         }
 
         const dateStr = this.formatDateTime(request.created_at);
+        const isMobile = window.innerWidth <= 900;
+        const openAttr = isMobile ? 'open' : '';
         
         return `
             <div class="sign-container sign-viewer-container">
@@ -1342,7 +1344,7 @@ export const SignUI = {
                     </div>
 
                     <div class="sign-viewer-detail-pane">
-                        <details class="detail-card signer-card">
+                        <details class="detail-card signer-card" ${openAttr}>
                             <summary class="card-title">
                                 <i class="fa-solid fa-users-line"></i> 署名者の状況
                                 <i class="fa-solid fa-chevron-down mobile-only" style="margin-left:auto; font-size:14px; opacity:0.5;"></i>
@@ -1388,7 +1390,7 @@ export const SignUI = {
                             </div>
                         </details>
 
-                        <details class="detail-card audit-card">
+                        <details class="detail-card audit-card" ${openAttr}>
                             <summary class="card-title">
                                 <i class="fa-solid fa-shield-halved"></i> 監査証跡
                                 <i class="fa-solid fa-chevron-down mobile-only" style="margin-left:auto; font-size:14px; opacity:0.5;"></i>

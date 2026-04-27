@@ -50,7 +50,7 @@ export const SignViewer = {
         console.log('Initializing SignViewer for ID:', requestId);
         this.cleanupObjectUrls();
         this._activePage = 1;
-        this._currentScale = 1.2;
+        this._currentScale = (window.innerWidth <= 900) ? 0.4 : 1.2;
         this._currentPdfUrl = null;
         this._currentDownloadUrl = null;
         this._currentRequest = null;
@@ -254,7 +254,8 @@ export const SignViewer = {
     async renderPdf(url, container) {
         this._currentPdfUrl = await this.resolvePdfViewerUrl(url);
         this._currentDownloadUrl = this._currentDownloadUrl || this._currentPdfUrl;
-        this._currentScale = this._currentScale || 1.2;
+        const isMobile = window.innerWidth <= 900;
+        this._currentScale = this._currentScale || (isMobile ? 0.4 : 1.2);
 
         container.innerHTML = `
             <div class="pdf-viewer-wrapper" style="display:flex; flex-direction:column; width:100%; height:100%; background:#525659; position:relative;">
