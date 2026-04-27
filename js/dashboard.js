@@ -4354,6 +4354,8 @@ class DashboardApp {
     }
 
     async init() {
+        if (this._appInitialized) return;
+        this._appInitialized = true;
         try {
             console.log('Dashboard App Initializing...');
             const initStartMs = performance.now();
@@ -5678,10 +5680,11 @@ class DashboardApp {
                 if (this._navActionLock) {
                     event.preventDefault();
                     event.stopPropagation();
+                    event.stopImmediatePropagation();
                     return;
                 }
                 this._navActionLock = true;
-                setTimeout(() => { this._navActionLock = false; }, 500);
+                setTimeout(() => { this._navActionLock = false; }, 800);
 
                 const view = button.getAttribute('data-mobile-view');
                 const action = button.getAttribute('data-mobile-action');
