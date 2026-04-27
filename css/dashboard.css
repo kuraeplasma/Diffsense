@@ -93,8 +93,14 @@ ul {
     .mobile-risk-sticky,
     .mobile-decision-bar,
     .mobile-clause-nav-fab,
-    .mobile-diff-header-bar {
+    .mobile-diff-header-bar,
+    .sign-mobile-next-btn,
+    .sign-mobile-step2-bar {
         display: none !important;
+    }
+    /* PC版: 署名エディターのアクションエリアを表示 */
+    .sign-editor-sidebar > .sign-editor-pc-actions {
+        display: block !important;
     }
 }
 
@@ -3237,30 +3243,54 @@ select:focus {
    =================================================== */
 @media (max-width: 900px) {
     /* =============================================
-       署名エディター: 縦積みレイアウト
-       上: フォーム / 下: PDF
+       署名エディター: ステップ式モバイルUI
+       Step1=宛先入力, Step2=書類+フィールド配置
        ============================================= */
     .sign-editor-container {
         flex-direction: column !important;
-        height: auto !important;
-        overflow: visible !important;
+        height: 100dvh !important;
+        overflow: hidden !important;
     }
 
-    /* サイドバー(フォーム): 全幅・ブロック展開 */
-    .sign-editor-sidebar {
+    /* --- Step 1: サイドバーのみ表示 --- */
+    .sign-editor-container[data-mobile-step="1"] .sign-editor-sidebar {
+        display: flex !important;
+        flex-direction: column !important;
         width: 100% !important;
         max-width: 100% !important;
+        height: 100% !important;
         border-right: none !important;
-        border-bottom: 1px solid #e0e0e0 !important;
+        border-bottom: none !important;
         box-shadow: none !important;
-        display: block !important;
         background: #f5f7fa !important;
+        overflow: hidden !important;
     }
-    /* sidebar-body: sign.css の flex:1;overflow:hidden を解除 */
+    .sign-editor-container[data-mobile-step="1"] .sign-editor-viewport {
+        display: none !important;
+    }
+
+    /* --- Step 2: ビューポートのみ表示 --- */
+    .sign-editor-container[data-mobile-step="2"] .sign-editor-sidebar {
+        display: none !important;
+    }
+    .sign-editor-container[data-mobile-step="2"] .sign-editor-viewport {
+        display: block !important;
+        flex: 1 !important;
+        width: 100% !important;
+        height: calc(100% - 68px) !important;
+        min-height: 0 !important;
+        overflow: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        padding: 16px 16px 80px !important;
+        background: #dfe1e5 !important;
+    }
+
+    /* サイドバー内スクロール (Step1) */
     .sign-editor-sidebar-body {
-        flex: none !important;
-        overflow: visible !important;
-        height: auto !important;
+        flex: 1 !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        height: 0 !important;
         padding: 0 !important;
     }
     /* 受信者リスト: 高さ制限解除 */
@@ -3276,29 +3306,84 @@ select:focus {
         padding: 16px !important;
         box-shadow: 0 1px 4px rgba(0,0,0,0.07);
     }
-    /* 送信エリア: フォームの末尾に自然配置 */
-    .sign-editor-sidebar > div:last-child {
-        padding: 16px !important;
-        background: #f5f7fa !important;
-        border-top: none !important;
-    }
-    /* 送信ボタン: 大きく押しやすく */
-    #sign-editor-send-btn {
-        min-height: 52px !important;
-        font-size: 16px !important;
-        border-radius: 14px !important;
+    /* PC送信エリア(プレビュー+送信ボタン)はモバイルでは非表示 → 浮遊バーで代替 */
+    .sign-editor-sidebar > .sign-editor-pc-actions {
+        display: none !important;
     }
 
-    /* PDFビューポート: フォームの下に全幅表示 */
-    .sign-editor-viewport {
-        display: block !important;
-        flex: none !important;
-        width: 100% !important;
-        height: 70vh !important;   /* 画面の7割 */
-        min-height: 400px !important;
-        overflow: auto !important;
+    /* --- モバイル 次へボタンエリア (Step1 下部) --- */
+    .sign-mobile-next-btn {
+        display: flex !important;
+        flex-shrink: 0;
         padding: 16px !important;
-        background: #dfe1e5 !important;
+        background: #fff !important;
+        border-top: 1px solid #eee !important;
+    }
+    .sign-mobile-next-btn button {
+        width: 100%;
+        height: 54px;
+        font-size: 16px;
+        font-weight: 700;
+        border-radius: 14px;
+        background: var(--sign-primary, #2563eb);
+        color: #fff;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+    }
+
+    /* --- モバイル Step2 浮遊ツールバー --- */
+    .sign-mobile-step2-bar {
+        display: flex !important;
+        position: fixed !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        height: 68px !important;
+        background: #fff !important;
+        border-top: 1px solid #ddd !important;
+        box-shadow: 0 -4px 20px rgba(0,0,0,0.15) !important;
+        align-items: center !important;
+        padding: 0 12px !important;
+        gap: 8px !important;
+        z-index: 999 !important;
+    }
+    .sign-mob-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        border: none;
+        border-radius: 10px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        padding: 0 12px;
+        height: 44px;
+        white-space: nowrap;
+    }
+    .sign-mob-back {
+        background: #f3f4f6;
+        color: #374151;
+        flex-shrink: 0;
+    }
+    .sign-mob-tool {
+        background: #eff6ff;
+        color: var(--sign-primary, #2563eb);
+        flex: 1;
+    }
+    .sign-mob-tool.active {
+        background: var(--sign-primary, #2563eb);
+        color: #fff;
+    }
+    .sign-mob-send {
+        background: #059669;
+        color: #fff;
+        flex-shrink: 0;
+        padding: 0 16px;
     }
 
     /* 署名管理ヘッダー(タイトル+説明文)を非表示

@@ -1004,7 +1004,7 @@ export const SignUI = {
      */
     renderSignEditor(app, requestId) {
         return `
-            <div class="sign-editor-container" style="display:flex; height:calc(100vh - 64px); background:#f0f2f5; overflow:hidden;">
+            <div class="sign-editor-container" data-mobile-step="1" style="display:flex; height:calc(100vh - 64px); background:#f0f2f5; overflow:hidden;">
                 <!-- Left Sidebar: Recipients & Tools -->
                 <div class="sign-editor-sidebar" style="width:340px; background:#fff; border-right:1px solid #ddd; display:flex; flex-direction:column; box-shadow:2px 0 12px rgba(0,0,0,0.08); z-index:100;">
                     <div style="padding:24px; border-bottom:1px solid #eee;">
@@ -1055,8 +1055,8 @@ export const SignUI = {
                         </div>
                     </div>
 
-                    <!-- Bottom Action -->
-                    <div style="padding:24px; border-top:1px solid #eee; background:#fff;">
+                    <!-- Bottom Action (PC only) -->
+                    <div class="sign-editor-pc-actions" style="padding:24px; border-top:1px solid #eee; background:#fff;">
                         <button id="sign-editor-preview-toggle" class="btn-dashboard" onclick="window.SignEditor.openRecipientPreview()" style="width:100%; height:46px; font-size:14px; font-weight:600; border-radius:12px; margin-bottom:12px; justify-content:center;">
                             受信者プレビュー
                         </button>
@@ -1064,10 +1064,34 @@ export const SignUI = {
                             この内容で署名依頼を送信 <i class="fa-solid fa-paper-plane" style="margin-left:8px;"></i>
                         </button>
                     </div>
+
+                    <!-- Mobile Step 1: 次へボタン -->
+                    <div class="sign-mobile-next-btn">
+                        <button onclick="document.querySelector('.sign-editor-container').dataset.mobileStep='2';">
+                            書類を確認して署名枠を配置する <i class="fa-solid fa-chevron-right"></i>
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Center: PDF Viewer -->
                 <div class="sign-editor-viewport" style="flex:1; min-width:0; min-height:0; position:relative; overflow:auto; padding:24px 40px 40px; background:#dfe1e5;">
+
+                    <!-- Mobile Step 2: 浮遊ツールバー -->
+                    <div class="sign-mobile-step2-bar">
+                        <button class="sign-mob-btn sign-mob-back" onclick="document.querySelector('.sign-editor-container').dataset.mobileStep='1';">
+                            <i class="fa-solid fa-chevron-left"></i> 戻る
+                        </button>
+                        <button class="sign-mob-btn sign-mob-tool" id="mob-tool-signature" onclick="window.SignEditor&&window.SignEditor.setTool('signature'); document.querySelectorAll('.sign-mob-tool').forEach(b=>b.classList.remove('active')); this.classList.add('active');">
+                            <i class="fa-solid fa-signature"></i> 署名枠
+                        </button>
+                        <button class="sign-mob-btn sign-mob-tool" id="mob-tool-date" onclick="window.SignEditor&&window.SignEditor.setTool('date'); document.querySelectorAll('.sign-mob-tool').forEach(b=>b.classList.remove('active')); this.classList.add('active');">
+                            <i class="fa-regular fa-calendar"></i> 日付枠
+                        </button>
+                        <button class="sign-mob-btn sign-mob-send" onclick="window.SignEditor&&window.SignEditor.saveAndSend();">
+                            送信 <i class="fa-solid fa-paper-plane"></i>
+                        </button>
+                    </div>
+
                     <div id="sign-editor-preview-toolbar" style="position:sticky; top:0; z-index:6; display:flex; justify-content:flex-end; margin:0 0 16px;">
                         <div style="display:inline-flex; align-items:center; gap:8px; padding:8px 10px; border-radius:999px; background:rgba(255,255,255,0.92); box-shadow:0 8px 20px rgba(15,23,42,0.12); backdrop-filter:blur(8px);">
                             <button id="sign-editor-zoom-out" class="btn-pdf-tool" type="button" onclick="window.SignEditor?.zoomOut()" aria-label="縮小">
