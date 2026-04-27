@@ -228,7 +228,7 @@ ul {
 }
 
 #app-content.is-detail-view {
-    overflow: hidden;
+    overflow: hidden; /* Desktop keeps internal scroll in panes */
 }
 
 /* Sidebar Components */
@@ -2192,16 +2192,21 @@ select:focus {
     }
 
     .detail-split-body {
-        flex: none;
+        flex: 1 1 auto;
+        /* [scroll-fix] structured-fix.cssと同じflex:1 1 autoにしてheightを継承させスクロールを可能にする */
         height: auto;
         flex-direction: column;
-        overflow: visible;
+        overflow-y: auto;
+        overflow-x: hidden;
         min-height: 0;
+        -webkit-overflow-scrolling: touch;
     }
 
     #app-content.is-detail-view {
-        overflow: visible;
-        height: auto;
+        /* [scroll-fix-v2] モバイルでは #app-content をスクロールコンテナにする */
+        height: 100% !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch;
     }
 
     .pane {
@@ -2278,6 +2283,7 @@ select:focus {
         flex: none;
         height: auto;
         max-height: none;
+        /* [scroll-fix] スクロールは.detail-split-bodyが担当するためvisibleのまま */
         overflow-y: visible;
         min-height: 0;
     }
@@ -3217,6 +3223,60 @@ select:focus {
     100% { opacity: 1; }
 }
 
+/* ===================================================
+   署名管理 モバイル対応 (max-width: 900px)
+   sign-ui.js のHTML構造・クラス名は変更せず
+   CSSのみで対応
+   =================================================== */
+@media (max-width: 900px) {
+    /* タブボタン: 横スクロール、折り返し禁止 */
+    .sign-tabs {
+        display: flex;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        gap: 6px;
+        padding-bottom: 4px;
+    }
+    .sign-tab {
+        flex-shrink: 0;
+        white-space: nowrap;
+        font-size: 13px;
+        padding: 8px 14px;
+    }
+
+    /* フィルターバー: 縦積みに */
+    .sign-container .filter-bar .flex.flex-wrap {
+        flex-direction: column;
+        align-items: stretch !important;
+    }
+    .sign-container .filter-bar .flex.flex-wrap > div {
+        min-width: unset !important;
+        width: 100%;
+    }
+
+    /* テーブルエリア: 横スクロール */
+    .sign-list-card {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    .sign-table {
+        min-width: 560px;
+        font-size: 13px;
+    }
+    .sign-table th,
+    .sign-table td {
+        padding: 10px 8px;
+        white-space: nowrap;
+    }
+    /* 操作ボタン: スマホでも押しやすいサイズ */
+    .sign-table .btn-dashboard {
+        font-size: 12px !important;
+        min-width: unset !important;
+        padding: 8px 10px !important;
+    }
+}
+
 
 /* Device-specific Visibility Rules */
 @media (max-width: 900px) {
@@ -3380,9 +3440,19 @@ select:focus {
     }
 
     /* Document Detail View (Mobile) */
+    /* [scroll-fix final] #app-contentがJSのoverflowY:autoでスクロールコンテナになる。
+       #app-mainはoverflow:hiddenを保ちfixed境界内にコンテンツを収める（visibleにするとタッチ届かない）。
+       height:autoを削除（2202行修正済み）によりheight:100%が正しく効くため#app-contentがスクロール可能になる。 */
+    #app-main.has-detail-view {
+        overflow: hidden;
+    }
     #app-content.is-detail-view {
         padding: 0 !important;
         background: #fff !important;
+        height: 100% !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        -webkit-overflow-scrolling: touch;
     }
 
     .detail-split-container {
@@ -3411,7 +3481,10 @@ select:focus {
     .detail-split-body {
         flex-direction: column !important;
         gap: 0 !important;
-        overflow: visible !important;
+        /* [scroll-fix] visible→autoに変更: structured-fix.cssの設計通り.detail-split-bodyをスクロールコンテナとして機能させる */
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        -webkit-overflow-scrolling: touch;
     }
 
     .detail-split-body .pane {
