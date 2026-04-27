@@ -4282,14 +4282,21 @@ class DashboardApp {
             }
         });
 
+        const mobileMenuOpen = document.getElementById('mobile-menu-panel')?.classList.contains('is-open');
+
         document.querySelectorAll('.mobile-bottom-nav .bottom-nav-item').forEach((item) => {
+            if (item.id === 'bnav-menu') {
+                item.classList.toggle('active', !!mobileMenuOpen);
+                return;
+            }
             const targetView = item.getAttribute('data-mobile-view');
-            item.classList.toggle('active', targetView === groupedViewId);
+            // If menu is open, others shouldn't be active
+            const isActive = !mobileMenuOpen && (targetView === groupedViewId);
+            item.classList.toggle('active', isActive);
         });
 
         document.querySelectorAll('.mobile-menu-item').forEach((item) => {
             const onclick = item.getAttribute('onclick') || '';
-            // Match 'navigate(viewId)' or 'navigate(\'viewId\')'
             if (onclick.includes(`navigate('${groupedViewId}')`) || onclick.includes(`navigate("${groupedViewId}")`)) {
                 item.classList.add('active');
             } else {
@@ -4310,6 +4317,8 @@ class DashboardApp {
         document.querySelectorAll('.mobile-menu-button, #bnav-menu').forEach((button) => {
             button.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
         });
+
+        this.updateActiveMenu();
     }
 
     closeMobileMenu() {
