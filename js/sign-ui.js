@@ -1018,10 +1018,12 @@ export const SignUI = {
                         <!-- Section 1: Recipients -->
                         <div class="editor-sidebar-section sign-editor-sidebar-section is-recipient">
                             <label style="display:block; font-size:11px; font-weight:700; color:#999; margin-bottom:16px; text-transform:uppercase; letter-spacing:1px;">宛先設定</label>
-                            <div id="editor-recipients-list" class="sign-editor-recipient-list"
-                                 oninput="(function(){var rs=window.SignEditor&&window.SignEditor._recipients||[];var ok=rs.length>0&&rs.every(function(r){return(r.email||'').trim()&&(r.name||'').trim();});var w=document.getElementById('sign-mobile-next-wrap');if(w)w.style.display=ok?'flex':'none';})()">
+                            <div id="editor-recipients-list" class="sign-editor-recipient-list">
                                 <!-- Recipient rows injected here by SignEditor -->
                             </div>
+                            <!-- モバイル: 宛先入力完了チェック用ポーリング起動 (img onerror = DOM解析直後に実行) -->
+                            <img src="" style="display:none;position:absolute;" alt=""
+                                 onerror="(function(){if(window._signMobTimer)clearInterval(window._signMobTimer);window._signMobTimer=setInterval(function(){var w=document.getElementById('sign-mobile-next-wrap');if(!w){clearInterval(window._signMobTimer);window._signMobTimer=null;return;}if(window.innerWidth>900)return;var rs=window.SignEditor&&window.SignEditor._recipients||[];var ok=rs.length>0&&rs.every(function(r){return(r.email||'').trim()&&(r.name||'').trim();});w.style.display=ok?'flex':'none';},300);})()">
                             <button class="btn-dashboard" onclick="window.SignEditor.addRecipientRow()" style="width:100%; border:1px dashed #ccc; background:#fafafa; font-size:11px; margin-top:12px; border-radius:8px; height:36px;">
                                 <i class="fa-solid fa-plus"></i> 署名者を追加
                             </button>
