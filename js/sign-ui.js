@@ -1076,15 +1076,19 @@ export const SignUI = {
                 <!-- Center: PDF Viewer -->
                 <div class="sign-editor-viewport" style="flex:1; min-width:0; min-height:0; position:relative; overflow:auto; padding:24px 40px 40px; background:#dfe1e5;">
 
-                    <!-- Mobile Step 2: 浮遊ツールバー -->
+                    <!-- Mobile Step 2: 浮遊ツールバー
+                         ツールボタンは pointerdown で startPointerDrag を直接呼び出す
+                         → 指をボタンから書類へドラッグして離すと枠が配置される -->
                     <div class="sign-mobile-step2-bar">
                         <button class="sign-mob-btn sign-mob-back" onclick="document.querySelector('.sign-editor-container').dataset.mobileStep='1';">
                             <i class="fa-solid fa-chevron-left"></i> 戻る
                         </button>
-                        <button class="sign-mob-btn sign-mob-tool" id="mob-tool-signature" onclick="window.SignEditor&&window.SignEditor.setTool('signature'); document.querySelectorAll('.sign-mob-tool').forEach(b=>b.classList.remove('active')); this.classList.add('active');">
+                        <button class="sign-mob-btn sign-mob-tool" id="mob-tool-signature"
+                            onpointerdown="event.preventDefault(); if(window.SignEditor) window.SignEditor.startPointerDrag({mode:'new',type:'signature',pointerId:event.pointerId,originEvent:event});">
                             <i class="fa-solid fa-signature"></i> 署名枠
                         </button>
-                        <button class="sign-mob-btn sign-mob-tool" id="mob-tool-date" onclick="window.SignEditor&&window.SignEditor.setTool('date'); document.querySelectorAll('.sign-mob-tool').forEach(b=>b.classList.remove('active')); this.classList.add('active');">
+                        <button class="sign-mob-btn sign-mob-tool" id="mob-tool-date"
+                            onpointerdown="event.preventDefault(); if(window.SignEditor) window.SignEditor.startPointerDrag({mode:'new',type:'date',pointerId:event.pointerId,originEvent:event});">
                             <i class="fa-regular fa-calendar"></i> 日付枠
                         </button>
                         <button class="sign-mob-btn sign-mob-send" onclick="window.SignEditor&&window.SignEditor.saveAndSend();">

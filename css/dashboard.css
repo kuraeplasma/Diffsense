@@ -3386,6 +3386,17 @@ select:focus {
         padding: 0 16px;
     }
 
+    /* canvas-container: ドラッグ中にブラウザスクロールが割り込まないよう制御
+       ツールボタンのpointerdown でpreventDefault済みだが念のため */
+    #sign-editor-canvas-container {
+        touch-action: pan-x pan-y;
+    }
+    /* ページ枠: ドロップターゲット。pointer-events を確保 */
+    .editor-page-wrapper {
+        touch-action: none;
+        user-select: none;
+    }
+
     /* 署名管理ヘッダー(タイトル+説明文)を非表示
        sign-container:not([style]) = 管理画面のみ対象
        sign-container[style=...] = ビューア(戻るボタンあり)は除外 */
