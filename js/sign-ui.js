@@ -1063,7 +1063,7 @@ export const SignUI = {
                             </div>
                             <!-- モバイル: 宛先入力完了チェック (src="data:,x"は必ずonerrorになる) -->
                             <img src="data:,x" style="display:none;position:absolute;" alt=""
-                                 onerror="(function(){function chk(){var w=document.getElementById('sign-mobile-next-wrap');if(!w){clearInterval(window._signMobTimer);document.removeEventListener('input',chk,true);return;}if(window.innerWidth>900)return;var rs=window.SignEditor&&window.SignEditor._recipients||[];var ok=rs.length>0&&rs.every(function(r){return(r.email||'').trim()&&(r.name||'').trim();});w.style.setProperty('display', ok?'flex':'none', 'important');}if(window._signMobTimer)clearInterval(window._signMobTimer);window._signMobTimer=setInterval(chk,300);document.addEventListener('input',chk,true);})()">
+                                 onerror="(function(){function chk(){var b=document.getElementById('sign-mobile-next-btn');if(!b){clearInterval(window._signMobTimer);document.removeEventListener('input',chk,true);return;}if(window.innerWidth>900)return;var rs=window.SignEditor&&window.SignEditor._recipients||[];var ok=rs.length>0&&rs.every(function(r){return(r.email||'').trim()&&(r.name||'').trim();});b.disabled=!ok;}if(window._signMobTimer)clearInterval(window._signMobTimer);window._signMobTimer=setInterval(chk,300);document.addEventListener('input',chk,true);})()">
                             <button class="btn-dashboard" onclick="window.SignEditor.addRecipientRow()" style="width:100%; border:1px dashed #ccc; background:#fafafa; font-size:11px; margin-top:12px; border-radius:8px; height:36px;">
                                 <i class="fa-solid fa-plus"></i> 署名者を追加
                             </button>
@@ -1108,9 +1108,10 @@ export const SignUI = {
                         </button>
                     </div>
 
-                    <!-- Mobile Step 1: 次へボタン (email+name入力後に表示) -->
-                    <div class="sign-mobile-next-btn" id="sign-mobile-next-wrap" style="display:none !important;">
-                        <button onclick="document.querySelector('.sign-editor-container').dataset.mobileStep='2';" style="background:#c5a059 !important; color:#fff !important;">
+                    <!-- Mobile Step 1: 次へボタン (常時表示・入力完了で活性化) -->
+                    <div class="sign-mobile-next-btn" id="sign-mobile-next-wrap">
+                        <button id="sign-mobile-next-btn" disabled
+                            onclick="document.querySelector('.sign-editor-container').dataset.mobileStep='2';">
                             次へ：書類で枠を設置する <i class="fa-solid fa-chevron-right"></i>
                         </button>
                     </div>

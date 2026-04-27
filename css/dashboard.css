@@ -3454,6 +3454,25 @@ select:focus {
         display: none !important;
     }
 
+    /* 宛先入力フォーム: focus時の文字色を黒に固定 (sign.cssの金色上書き) */
+    .sign-editor-container .recipient-edit-row input:focus {
+        color: #111827 !important;
+    }
+
+    /* 次へボタン: 非活性(disabled)状態 */
+    .sign-mobile-next-btn button:disabled {
+        background: #d1d5db !important;
+        color: #9ca3af !important;
+        cursor: not-allowed !important;
+        opacity: 1 !important;
+    }
+    /* 次へボタン: 活性状態 */
+    .sign-mobile-next-btn button:not(:disabled) {
+        background: var(--color-primary, #c5a059) !important;
+        color: #fff !important;
+        cursor: pointer !important;
+    }
+
     /* --- 送信確認ポップアップ ---
        display:none をCSSでも明示。sign-editor内でのみ表示 */
     .sign-mobile-confirm {
