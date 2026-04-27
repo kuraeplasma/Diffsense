@@ -3225,55 +3225,106 @@ select:focus {
 
 /* ===================================================
    署名管理 モバイル対応 (max-width: 900px)
-   sign-ui.js のHTML構造・クラス名は変更せず
-   CSSのみで対応
+   sign-ui.js のHTML構造・クラス名は変更せず CSS のみで対応
+   テーブル → カードリスト変換
    =================================================== */
 @media (max-width: 900px) {
-    /* タブボタン: 横スクロール、折り返し禁止 */
+    /* タブ: 横スクロール・折り返し禁止 */
     .sign-tabs {
         display: flex;
         flex-wrap: nowrap;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
-        gap: 6px;
-        padding-bottom: 4px;
+        gap: 0;
+        padding-bottom: 2px;
     }
     .sign-tab {
-        flex-shrink: 0;
+        flex: 1 1 0;
         white-space: nowrap;
-        font-size: 13px;
-        padding: 8px 14px;
+        font-size: 12px !important;
+        padding: 10px 8px !important;
+        text-align: center;
     }
 
-    /* フィルターバー: 縦積みに */
+    /* フィルターバー: 縦積み */
     .sign-container .filter-bar .flex.flex-wrap {
         flex-direction: column;
         align-items: stretch !important;
+        gap: 8px !important;
     }
     .sign-container .filter-bar .flex.flex-wrap > div {
         min-width: unset !important;
         width: 100%;
     }
 
-    /* テーブルエリア: 横スクロール */
+    /* テーブル → カードリスト変換 */
     .sign-list-card {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
+        background: transparent !important;
+        border: none !important;
+        padding: 0 !important;
+        box-shadow: none !important;
     }
     .sign-table {
-        min-width: 560px;
-        font-size: 13px;
+        display: block;
+        width: 100%;
     }
-    .sign-table th,
-    .sign-table td {
-        padding: 10px 8px;
-        white-space: nowrap;
+    .sign-table thead {
+        display: none; /* ヘッダー非表示 */
     }
-    /* 操作ボタン: スマホでも押しやすいサイズ */
-    .sign-table .btn-dashboard {
-        font-size: 12px !important;
+    .sign-table tbody {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    .sign-table tbody tr {
+        display: flex;
+        flex-direction: column;
+        background: #fff;
+        border: 1px solid #e8eaed;
+        border-radius: 10px;
+        padding: 14px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    /* 書類名 (1列目): 大きく表示 */
+    .sign-table tbody td:nth-child(1) {
+        font-size: 15px;
+        font-weight: 700;
+        color: #1a1a1a;
+        padding: 0 0 6px 0;
+        border-bottom: 1px solid #f0f0f0;
+        margin-bottom: 8px;
+        white-space: normal;
+        word-break: break-all;
+    }
+    /* 2〜5列目: 小さいメタ情報として横並び */
+    .sign-table tbody td:nth-child(2),
+    .sign-table tbody td:nth-child(3),
+    .sign-table tbody td:nth-child(4),
+    .sign-table tbody td:nth-child(5) {
+        display: inline-flex;
+        align-items: center;
+        font-size: 12px;
+        color: #666;
+        padding: 2px 6px 2px 0;
+    }
+    /* 操作列 (最終列): 幅いっぱいのボタン */
+    .sign-table tbody td:last-child {
+        margin-top: 10px;
+        padding: 0;
+    }
+    .sign-table tbody td:last-child .btn-dashboard {
+        width: 100% !important;
         min-width: unset !important;
-        padding: 8px 10px !important;
+        justify-content: center !important;
+        padding: 12px !important;
+        font-size: 14px !important;
+        border-radius: 8px !important;
+    }
+    /* バッジ */
+    .sign-table .badge,
+    .sign-table .sign-badge {
+        font-size: 11px;
+        padding: 2px 7px;
     }
 }
 
