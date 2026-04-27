@@ -3248,10 +3248,51 @@ select:focus {
         width: 100% !important;
         max-width: 100% !important;
         border-right: none !important;
-        border-bottom: 1px solid #ddd !important;
+        border-bottom: none !important;
         box-shadow: none !important;
+        display: block !important;      /* flexを解除してブロックに */
+        background: #f5f7fa !important;
     }
-    /* PDFプレビューエリア: モバイルでは非表示（フィールド配置はPC操作） */
+    /* sidebar-body: sign.css の flex:1;overflow:hidden を解除してスクロール可能に */
+    .sign-editor-sidebar-body {
+        flex: none !important;
+        overflow: visible !important;
+        height: auto !important;
+        padding: 0 !important;
+    }
+    /* 受信者リスト: 高さ制限を解除 */
+    .sign-editor-recipient-list {
+        max-height: none !important;
+        overflow-y: visible !important;
+    }
+    /* フィールド配置セクション: モバイルではD&D不可のため非表示 */
+    .sign-editor-sidebar-section:not(.is-recipient) {
+        display: none !important;
+    }
+    /* 各セクション: カード風に */
+    .sign-editor-sidebar-section.is-recipient {
+        background: #fff;
+        margin: 12px 16px;
+        border-radius: 12px;
+        padding: 20px !important;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    /* 送信エリア: 画面下部に固定 (ネイティブアプリ風) */
+    .sign-editor-sidebar > div:last-child {
+        position: sticky !important;
+        bottom: 60px !important; /* ボトムナビの高さ分上げる */
+        background: #fff !important;
+        padding: 16px !important;
+        border-top: 1px solid #eee !important;
+        z-index: 10;
+    }
+    /* 送信ボタン: 大きく */
+    #sign-editor-send-btn {
+        min-height: 52px !important;
+        font-size: 16px !important;
+        border-radius: 14px !important;
+    }
+    /* PDFプレビューエリア: 非表示 */
     .sign-editor-viewport {
         display: none !important;
     }
