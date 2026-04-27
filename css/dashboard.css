@@ -3397,6 +3397,70 @@ select:focus {
         user-select: none;
     }
 
+    /* フィールドツールセクション: mobile では Step2 の浮遊バーで代替するため非表示 */
+    .sign-editor-field-tools-section {
+        display: none !important;
+    }
+
+    /* --- 送信確認ポップアップ --- */
+    .sign-mobile-confirm {
+        position: fixed !important;
+        inset: 0 !important;
+        z-index: 1100 !important;
+        align-items: flex-end !important;
+    }
+    .sign-mobile-confirm-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(0,0,0,0.45);
+    }
+    .sign-mobile-confirm-sheet {
+        position: relative;
+        width: 100%;
+        background: #fff;
+        border-radius: 24px 24px 0 0;
+        padding: 28px 24px 40px;
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        animation: slideUpSheet 0.25s ease;
+    }
+    @keyframes slideUpSheet {
+        from { transform: translateY(100%); }
+        to   { transform: translateY(0); }
+    }
+    .sign-mobile-confirm-title {
+        font-size: 17px;
+        font-weight: 700;
+        color: #111827;
+        margin: 0 0 8px;
+        text-align: center;
+    }
+    .sign-mobile-confirm-desc {
+        font-size: 13px;
+        color: #6b7280;
+        margin: 0 0 24px;
+        text-align: center;
+        line-height: 1.6;
+    }
+    .sign-mobile-confirm-send-btn {
+        width: 100% !important;
+        height: 52px !important;
+        border-radius: 14px !important;
+        font-size: 16px !important;
+        justify-content: center !important;
+        margin-bottom: 10px;
+    }
+    .sign-mobile-confirm-cancel-btn {
+        width: 100% !important;
+        height: 44px !important;
+        border-radius: 12px !important;
+        font-size: 14px !important;
+        justify-content: center !important;
+        background: #f3f4f6 !important;
+        color: #374151 !important;
+    }
+
     /* 署名管理ヘッダー(タイトル+説明文)を非表示
        sign-container:not([style]) = 管理画面のみ対象
        sign-container[style=...] = ビューア(戻るボタンあり)は除外 */

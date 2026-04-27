@@ -1018,7 +1018,8 @@ export const SignUI = {
                         <!-- Section 1: Recipients -->
                         <div class="editor-sidebar-section sign-editor-sidebar-section is-recipient">
                             <label style="display:block; font-size:11px; font-weight:700; color:#999; margin-bottom:16px; text-transform:uppercase; letter-spacing:1px;">宛先設定</label>
-                            <div id="editor-recipients-list" class="sign-editor-recipient-list">
+                            <div id="editor-recipients-list" class="sign-editor-recipient-list"
+                                 oninput="(function(){var rs=window.SignEditor&&window.SignEditor._recipients||[];var ok=rs.length>0&&rs.every(function(r){return(r.email||'').trim()&&(r.name||'').trim();});var w=document.getElementById('sign-mobile-next-wrap');if(w)w.style.display=ok?'flex':'none';})()">
                                 <!-- Recipient rows injected here by SignEditor -->
                             </div>
                             <button class="btn-dashboard" onclick="window.SignEditor.addRecipientRow()" style="width:100%; border:1px dashed #ccc; background:#fafafa; font-size:11px; margin-top:12px; border-radius:8px; height:36px;">
@@ -1028,8 +1029,8 @@ export const SignUI = {
 
                         <div class="sign-editor-sidebar-divider"></div>
 
-                        <!-- Section 2: Fields -->
-                        <div class="editor-sidebar-section sign-editor-sidebar-section">
+                        <!-- Section 2: Fields (PC only, mobile では sign-mobile-step2-bar のボタンで代替) -->
+                        <div class="editor-sidebar-section sign-editor-sidebar-section sign-editor-field-tools-section">
                             <label style="display:block; font-size:11px; font-weight:700; color:#999; margin-bottom:16px; text-transform:uppercase; letter-spacing:1px;">フィールド配置</label>
                             <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
                                 <button class="btn-dashboard field-tool" id="tool-signature" onclick="window.SignEditor.setTool('signature')" style="height:auto; padding:16px; flex-direction:column; gap:8px; border-radius:12px; cursor:grab;">
@@ -1065,10 +1066,10 @@ export const SignUI = {
                         </button>
                     </div>
 
-                    <!-- Mobile Step 1: 次へボタン -->
-                    <div class="sign-mobile-next-btn">
+                    <!-- Mobile Step 1: 次へボタン (email+name入力後に表示) -->
+                    <div class="sign-mobile-next-btn" id="sign-mobile-next-wrap" style="display:none;">
                         <button onclick="document.querySelector('.sign-editor-container').dataset.mobileStep='2';">
-                            書類を確認して署名枠を配置する <i class="fa-solid fa-chevron-right"></i>
+                            次へ：書類で枠を設置する <i class="fa-solid fa-chevron-right"></i>
                         </button>
                     </div>
                 </div>
@@ -1091,9 +1092,27 @@ export const SignUI = {
                             onpointerdown="event.preventDefault(); if(window.SignEditor) window.SignEditor.startPointerDrag({mode:'new',type:'date',pointerId:event.pointerId,originEvent:event});">
                             <i class="fa-regular fa-calendar"></i> 日付枠
                         </button>
-                        <button class="sign-mob-btn sign-mob-send" onclick="window.SignEditor&&window.SignEditor.saveAndSend();">
+                        <button class="sign-mob-btn sign-mob-send" id="mob-send-btn"
+                            onclick="var f=window.SignEditor&&window.SignEditor._fields||[];if(f.length===0){window.Notify&&Notify.warning('署名枠または日付枠を書類に配置してください');return;}document.getElementById('sign-mobile-confirm').style.display='flex';">
                             送信 <i class="fa-solid fa-paper-plane"></i>
                         </button>
+                    </div>
+
+                    <!-- Mobile: 送信確認ポップアップ -->
+                    <div id="sign-mobile-confirm" class="sign-mobile-confirm" style="display:none;">
+                        <div class="sign-mobile-confirm-overlay" onclick="document.getElementById('sign-mobile-confirm').style.display='none';"></div>
+                        <div class="sign-mobile-confirm-sheet">
+                            <p class="sign-mobile-confirm-title">署名依頼を送信しますか？</p>
+                            <p class="sign-mobile-confirm-desc">設定した宛先へ署名依頼メールを送信します。この操作は取り消せません。</p>
+                            <button class="sign-mob-btn sign-mob-send sign-mobile-confirm-send-btn"
+                                onclick="document.getElementById('sign-mobile-confirm').style.display='none';window.SignEditor&&window.SignEditor.saveAndSend();">
+                                送信する <i class="fa-solid fa-paper-plane"></i>
+                            </button>
+                            <button class="sign-mob-btn sign-mob-back sign-mobile-confirm-cancel-btn"
+                                onclick="document.getElementById('sign-mobile-confirm').style.display='none';">
+                                キャンセル
+                            </button>
+                        </div>
                     </div>
 
                     <div id="sign-editor-preview-toolbar" style="position:sticky; top:0; z-index:6; display:flex; justify-content:flex-end; margin:0 0 16px;">
