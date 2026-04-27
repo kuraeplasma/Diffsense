@@ -4663,20 +4663,28 @@ select:focus {
         grid-template-columns: 1fr !important;
     }
 
-    /* Filter Tabs Optimization */
+    /* Filter Tabs Optimization - Stacked Version */
+    .filter-bar .flex.flex-wrap {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 12px !important;
+    }
+    
     .filter-bar .flex.gap-sm {
         display: flex !important;
-        flex-wrap: nowrap !important;
-        overflow-x: auto !important;
-        -webkit-overflow-scrolling: touch !important;
+        flex-wrap: wrap !important;
+        overflow-x: visible !important;
         gap: 8px !important;
-        padding-bottom: 8px !important;
+        padding-bottom: 0 !important;
         width: 100% !important;
     }
     .filter-bar .flex.gap-sm button {
         white-space: nowrap !important;
-        flex: 0 0 auto !important;
-        min-width: max-content !important;
+        flex: 1 1 auto !important; /* Allow growing to fill row */
+        min-width: calc(33.33% - 8px) !important; /* Show ~3 items per row */
+        justify-content: center !important;
+        font-size: 12px !important;
+        padding: 8px 10px !important;
     }
 
     /* Active Icon Colors */
