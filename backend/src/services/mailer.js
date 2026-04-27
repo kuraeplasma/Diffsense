@@ -58,9 +58,13 @@ function _frontendBaseUrl() {
     if (explicit) {
         return explicit.replace(/\/$/, '');
     }
-    const appUrl = String(process.env.APP_URL || '').trim();
-    if (appUrl) {
-        return appUrl.replace('://localhost:3001', '://localhost:3000').replace(/\/$/, '');
+    // Only fallback to localhost if NODE_ENV is explicitly development
+    if (String(process.env.NODE_ENV).trim() === 'development') {
+        const appUrl = String(process.env.APP_URL || '').trim();
+        if (appUrl) {
+            return appUrl.replace('://localhost:3001', '://localhost:3000').replace(/\/$/, '');
+        }
+        return 'http://localhost:3000';
     }
     return 'https://diffsense.spacegleam.co.jp';
 }
@@ -68,10 +72,21 @@ function _frontendBaseUrl() {
 function _wrapSigningUrl(signingUrl, fileName = '') {
     const normalized = String(signingUrl || '').trim();
     if (!normalized) return '';
+    
+    // If it's already a signing link or has a token, return as is
     if (/\/signing\.html\?/i.test(normalized) || /[?&]token=/i.test(normalized)) {
         return normalized;
     }
+    
+    // If it's an absolute URL that doesn't point to our frontend, it's likely a provider URL (Firma, etc.)
+    // We should NOT wrap these in our signing.html as it doesn't support them.
+    if (/^https?:\/\//i.test(normalized) && !normalized.includes('diffsense.spacegleam.co.jp')) {
+        return normalized;
+    }
+
     const base = _frontendBaseUrl();
+    // Legacy support or fallback - but signing.html currently requires a token.
+    // If we have no token, wrapping in signing.html will just show the preview/sample.
     return `${base}/signing.html?url=${encodeURIComponent(normalized)}&name=${encodeURIComponent(fileName || '')}`;
 }
 

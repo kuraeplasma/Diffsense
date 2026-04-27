@@ -144,11 +144,26 @@ export const SignViewer = {
                 try {
                     const token = await getIdToken();
                     if (initSeq !== this._initSeq) return;
-                    const res = await fetch(toApiUrl(`/api/sign/${requestId}/audit-events`), {
-                        headers: { 'Authorization': token ? `Bearer ${token}` : '' }
-                    });
-                    const json = await res.json();
-                    if (json.success && json.data.length > 0) {
+                    
+                    let auditData = [];
+                    try {
+                        const res = await fetch(toApiUrl(`/api/sign/${requestId}/audit-events`), {
+                            headers: { 'Authorization': token ? `Bearer ${token}` : '' }
+                        });
+                        const json = await res.json();
+                        if (json.success) auditData = json.data;
+                    } catch (e) {
+                        console.warn('Audit API fetch failed, checking local mock:', e);
+                        // Mock data for local testing
+                        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                            auditData = [
+                                { event: 'created', timestamp: request.created_at || new Date().toISOString(), actorEmail: request.sender || 'system@diffsense.jp' },
+                                { event: 'viewed', timestamp: new Date().toISOString(), actorEmail: 'jkj@example.com', ipAddress: '192.168.1.1' }
+                            ];
+                        }
+                    }
+
+                    if (auditData.length > 0) {
                         const eventLabels = {
                             created: '📄 作成',
                             signed: '✅ 署名',
@@ -156,24 +171,24 @@ export const SignViewer = {
                             completed: '🎉 完了',
                             viewed: '👁 閲覧'
                         };
-                        auditContainer.innerHTML = json.data.map((ev) => `
-                            <div style="display:flex; gap:10px; padding:8px 0; border-bottom:1px solid #f0f0f0; font-size:12px;">
-                                <div style="white-space:nowrap; color:var(--text-muted);">
+                        auditContainer.innerHTML = auditData.map((ev) => `
+                            <div class="audit-item">
+                                <div class="audit-time">
                                     ${this.formatJstDateTime(ev.timestamp, true)}
                                 </div>
-                                <div>
+                                <div class="audit-desc">
                                     <span>${eventLabels[ev.event] || this.escapeHtml(ev.event)}</span>
-                                    <span style="color:#888; margin-left:6px;">${this.escapeHtml(ev.actorEmail || '')}</span>
-                                    ${ev.ipAddress ? `<span style="color:#aaa; margin-left:6px;">IP: ${this.escapeHtml(ev.ipAddress)}</span>` : ''}
+                                    <span class="audit-actor">${this.escapeHtml(ev.actorEmail || '')}</span>
+                                    ${ev.ipAddress ? `<span class="audit-actor" style="opacity:0.6;">(IP: ${this.escapeHtml(ev.ipAddress)})</span>` : ''}
                                 </div>
                             </div>
                         `).join('');
                     } else {
-                        auditContainer.innerHTML = '<div style="font-size:12px; color:var(--text-muted);">記録なし</div>';
+                        auditContainer.innerHTML = '<div class="audit-item" style="color:#94a3b8; justify-content:center; padding:20px 0;">記録がありません</div>';
                     }
                 } catch (e) {
-                    console.error('監査証跡取得失敗:', e);
-                    auditContainer.innerHTML = '<div style="font-size:12px; color:var(--text-muted);">取得失敗</div>';
+                    console.error('監査証跡処理失敗:', e);
+                    auditContainer.innerHTML = '<div class="audit-item" style="color:#ea4335; justify-content:center; padding:20px 0;">取得に失敗しました</div>';
                 }
             }
         } finally {
@@ -490,20 +505,14 @@ export const SignViewer = {
     },
 
     renderTextFallback(contract, container) {
+        const contentHtml = buildSignDocumentPreviewHtml(contract.original_content);
         container.innerHTML = `
-            <div class="text-fallback-wrapper" style="width:100%; height:100%; display:flex; flex-direction:column; background:#fff; border-radius:var(--radius-md); overflow:hidden; border:1px solid var(--border-subtle);">
-                ${contract.source_url ? `
-                <div style="padding:16px; background:#f8f9fa; border-bottom:1px solid #eee; display:flex; justify-content:flex-end; align-items:center;">
-                    <a href="${contract.source_url}" target="_blank" style="font-size:12px; color:var(--color-primary);">
-                        元のソースを表示 <i class="fa-solid fa-external-link"></i>
-                    </a>
+            <div class="text-fallback-wrapper" style="width:100%; height:100%; display:flex; flex-direction:column; background:#fff; overflow:hidden;">
+                <div style="flex:1; padding:24px; overflow-y:auto; line-height:1.8; color:#333; font-family:'Noto Sans JP', sans-serif; font-size:14px; background:#fff;">
+                    ${contentHtml}
                 </div>
-                ` : ''}
-                <div style="flex:1; padding:32px; overflow-y:auto; line-height:1.8; color:#333; font-family:'Noto Sans JP', sans-serif; font-size:14px;">
-                    ${buildSignDocumentPreviewHtml(contract.original_content)}
-                </div>
-                <div style="padding:12px; background:#fff9e6; border-top:1px solid #ffeeba; font-size:11px; color:#856404; text-align:center;">
-                    <i class="fa-solid fa-circle-info"></i> このドキュメントはテキストプレビューで表示しています。原本と一部レイアウトが異なる場合があります。
+                <div class="preview-notice" style="border-radius:0; border-left:none; border-right:none; border-bottom:none;">
+                    <i class="fa-solid fa-circle-info"></i> <span>このドキュメントはテキストプレビューです。原本とレイアウトが異なる場合があります。</span>
                 </div>
             </div>
         `;

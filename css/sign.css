@@ -309,6 +309,14 @@
     border-color: #9e8047;
 }
 
+.btn-sign-primary:disabled {
+    background: #e0e0e0 !important;
+    border-color: #d0d0d0 !important;
+    color: #a0a0a0 !important;
+    cursor: not-allowed !important;
+    box-shadow: none !important;
+}
+
 .sign-page-switcher {
     display: flex;
     align-items: center;

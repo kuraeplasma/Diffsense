@@ -1670,7 +1670,7 @@ const Views = {
             <div class="detail-split-container">
                 <div class="detail-split-header flex justify-between items-center">
                     <div class="detail-header-main">
-                        <a onclick="window.app.navigate('contracts')" style="display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:50%; background:#f8fafc; color:#5e544d; font-size:14px; cursor:pointer;" title="戻る">
+                        <a class="btn-viewer-back" onclick="window.app.navigate('contracts')" title="戻る">
                             <i class="fa-solid fa-chevron-left"></i>
                         </a>
                         <div class="detail-header-title-wrap">
@@ -5790,21 +5790,62 @@ class DashboardApp {
         }
 
         if (viewId === 'sign') {
-            this.renderInitialSkeleton('sign');
-            console.trace('Routing to sign');
-            const { SignUI } = await import('./sign-ui.js?v=20260424_signfix_v11');
-            this.mainContent.innerHTML = await SignUI.renderSignView(this);
-            SignUI.refreshList(this);
-            this.syncContractsInBackground(() => {
-                if (this.currentView === 'sign') {
-                    SignUI.refreshList(this);
-                }
+            // シェルを即時同期描画（スケルトン不要）
+            this.mainContent.innerHTML = `
+                <div class="sign-container">
+                    <div class="sign-header">
+                        <div class="sign-title">
+                            <h1>署名管理</h1>
+                            <p>契約済み書類や未解析の書類から、電子署名の依頼を開始・管理できます</p>
+                        </div>
+                    </div>
+                    <div class="sign-tabs">
+                        <button class="sign-tab active" onclick="window.signUI&&window.signUI.switchTab('new-request')">署名依頼の新規作成</button>
+                        <button class="sign-tab" onclick="window.signUI&&window.signUI.switchTab('sent-requests')">送信済み一覧</button>
+                        <button class="sign-tab" onclick="window.signUI&&window.signUI.switchTab('completed-requests')">完了一覧</button>
+                    </div>
+                    <div class="filter-bar mb-md">
+                        <div class="flex flex-wrap gap-md items-center">
+                            <div style="position:relative; flex:1; min-width:250px;">
+                                <i class="fa-solid fa-magnifying-glass" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:#999;"></i>
+                                <input type="text" id="sign-search" placeholder="書類名・送信者・署名者で検索..."
+                                       style="padding:8px 12px 8px 36px; border:1px solid #ddd; border-radius:4px; width:100%; font-size:13px;"
+                                       oninput="window.signUI&&window.signUI.updateFilter('query', this.value)">
+                            </div>
+                            <div class="flex gap-sm items-center">
+                                <span class="text-muted" style="font-size:12px;">並び順:</span>
+                                <select onchange="window.signUI&&window.signUI.updateFilter('sortBy', this.value)" style="padding:6px 8px; border:1px solid #ddd; border-radius:4px; font-size:13px;">
+                                    <option value="date_desc">最新順</option>
+                                    <option value="date_asc">古い順</option>
+                                    <option value="name_asc">書類名 A-Z</option>
+                                    <option value="name_desc">書類名 Z-A</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="sign-list-card">
+                        <table class="sign-table">
+                            <thead id="sign-table-head"></thead>
+                            <tbody id="sign-list-body">
+                                <tr><td colspan="6" style="text-align:center;padding:40px;color:#999;">読み込み中...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>`;
+            // sign-ui.js をバックグラウンドでロードしてリスト描画
+            import('./sign-ui.js?v=20260428_v1').then(({ SignUI }) => {
+                if (this.currentView !== 'sign') return;
+                SignUI.selectedDocIds.clear();
+                SignUI.refreshList(this);
+                this.syncContractsInBackground(() => {
+                    if (this.currentView === 'sign') SignUI.refreshList(this);
+                });
             });
             return;
         }
 
         if (viewId === 'sign-viewer') {
-            const { SignUI } = await import('./sign-ui.js?v=20260424_signfix_v11');
+            const { SignUI } = await import('./sign-ui.js?v=20260428_v1');
             const { SignViewer } = await import('./sign-viewer.js?v=20260407_final_v10');
             this.mainContent.innerHTML = await SignUI.renderSignViewer(this, params);
             await SignViewer.init(this, params);
@@ -5812,15 +5853,15 @@ class DashboardApp {
         }
         
         if (viewId === 'sign-editor') {
-            const { SignUI } = await import('./sign-ui.js?v=20260424_signfix_v11');
-            const { SignEditor } = await import('./sign-editor.js?v=20260407_overflow');
+            const { SignUI } = await import('./sign-ui.js?v=20260428_v1');
+            const { SignEditor } = await import('./sign-editor.js?v=20260427_v4');
             this.mainContent.innerHTML = await SignUI.renderSignEditor(this, params);
             await SignEditor.init(this, params);
             return;
         }
 
         if (viewId === 'sign-recipient') {
-            const { SignUI } = await import('./sign-ui.js?v=20260424_signfix_v11');
+            const { SignUI } = await import('./sign-ui.js?v=20260428_v1');
             const { SignRecipient } = await import('./sign-recipient.js?v=20260407_overflow');
             this.mainContent.innerHTML = await SignUI.renderSignRecipient(this, params);
             await SignRecipient.init(this, params);
@@ -8324,7 +8365,11 @@ class DashboardApp {
 
 // Global App Instance
 window.app = new DashboardApp();
-document.addEventListener('DOMContentLoaded', () => window.app.init());
+document.addEventListener('DOMContentLoaded', () => {
+    window.app.init();
+    // sign-ui.js をバックグラウンドで事前評価（署名管理クリック時に即時使用可能にする）
+    setTimeout(() => import('./sign-ui.js?v=20260428_v1').catch(() => {}), 1500);
+});
 
 
 

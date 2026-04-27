@@ -38,13 +38,15 @@ function useFirmaProvider() {
 }
 
 function getFrontendBaseUrl() {
+    // FRONTEND_URL takes highest priority (explicit production override)
+    const explicit = String(process.env.FRONTEND_URL || '').trim();
+    if (explicit) return explicit.replace(/\/$/, '');
+
+    // Only fallback to localhost if NODE_ENV is explicitly development
     if (String(process.env.NODE_ENV || '').trim() === 'development') {
         return String(process.env.LOCAL_FRONTEND_URL || 'http://127.0.0.1:3000').trim().replace(/\/$/, '');
     }
-    const explicit = String(process.env.FRONTEND_URL || '').trim();
-    if (explicit) return explicit.replace(/\/$/, '');
-    const appUrl = String(process.env.APP_URL || '').trim();
-    if (appUrl) return appUrl.replace('://localhost:3001', '://localhost:3000').replace(/\/$/, '');
+
     return 'https://diffsense.spacegleam.co.jp';
 }
 

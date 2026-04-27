@@ -83,6 +83,224 @@ ul {
     list-style: none;
 }
 
+/* --- Sign Viewer Base Styles --- */
+.sign-viewer-container {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 112px);
+    min-height: 0;
+    overflow: hidden;
+    background: #f8fafc;
+}
+.sign-viewer-header {
+    background: #fff;
+    padding: 16px 32px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-shrink: 0;
+}
+.btn-viewer-back {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50% !important;
+    background: #f8fafc;
+    color: #5e544d;
+    font-size: 14px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    padding: 0 !important;
+    flex-shrink: 0;
+}
+.btn-viewer-back:hover {
+    background: #f1f5f9;
+    color: #2b2623;
+}
+.btn-viewer-back i {
+    font-size: 14px;
+}
+.sign-viewer-title-area {
+    flex: 1;
+    min-width: 0;
+}
+.sign-viewer-title-area h1 {
+    font-size: 19px;
+    font-weight: 800;
+    margin: 0;
+    color: #1e293b;
+    letter-spacing: -0.02em;
+}
+.sign-viewer-title-area .document-meta {
+    font-size: 13px;
+    color: #64748b;
+    margin: 6px 0 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.sign-viewer-title-area .divider { color: #cbd5e1; }
+
+.sign-viewer-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(360px, 1fr);
+    gap: 32px;
+    padding: 32px;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+.sign-viewer-preview-pane {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-height: 0;
+}
+.sign-preview-box {
+    flex: 1;
+    background: #fff;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border: 2px dashed #e2e8f0;
+    box-shadow: inset 0 2px 10px rgba(0,0,0,0.02);
+}
+.preview-placeholder {
+    text-align: center;
+    color: #94a3b8;
+}
+.preview-placeholder i { font-size: 56px; margin-bottom: 16px; color: #cbd5e1; }
+.preview-placeholder p { font-size: 15px; font-weight: 600; margin-bottom: 6px; color: #64748b; }
+.preview-placeholder .engine-status { font-size: 12px; opacity: 0.8; }
+
+.preview-notice {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: 12px;
+    padding: 14px 18px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    font-size: 12px;
+    color: #92400e;
+    line-height: 1.6;
+}
+.preview-notice i { color: #f59e0b; margin-top: 3px; font-size: 14px; }
+
+.detail-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 20px;
+    padding: 28px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+}
+.card-title {
+    font-size: 16px;
+    font-weight: 800;
+    color: #0f172a;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.card-title i { color: var(--sign-primary); }
+
+/* details/summary normalization */
+.detail-card summary {
+    list-style: none;
+    outline: none;
+}
+.detail-card summary::-webkit-details-marker {
+    display: none;
+}
+@media (min-width: 901px) {
+    .detail-card summary {
+        pointer-events: none; /* Disable collapse on desktop */
+    }
+}
+
+.recipient-item {
+    display: flex;
+    gap: 18px;
+    padding: 20px 0;
+    border-bottom: 1px solid #f1f5f9;
+}
+.recipient-item:last-child { border-bottom: none; }
+.recipient-avatar {
+    width: 44px;
+    height: 44px;
+    background: #f1f5f9;
+    color: #64748b;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+}
+.recipient-info { flex: 1; min-width: 0; }
+.recipient-info .name-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.recipient-info .name { font-weight: 800; font-size: 15px; color: #1e293b; }
+.recipient-info .email { font-size: 13px; color: #64748b; }
+.recipient-info .timestamp { font-size: 11px; color: #94a3b8; margin-top: 8px; display: flex; align-items: center; gap: 6px; background: #f8fafc; padding: 4px 10px; border-radius: 6px; width: fit-content; }
+
+.btn-viewer-action {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    height: 52px;
+    border-radius: 14px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+    margin-top: 14px;
+}
+.btn-viewer-action.primary { background: var(--sign-primary); color: #fff; box-shadow: 0 4px 12px rgba(197, 160, 89, 0.3); }
+.btn-viewer-action.secondary { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
+
+.audit-timeline { 
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+.audit-item {
+    display: flex;
+    gap: 14px;
+    padding: 12px 0;
+    border-bottom: 1px solid #f8fafc;
+    font-size: 12px;
+}
+.audit-item:last-child { border-bottom: none; }
+.audit-time {
+    white-space: nowrap;
+    color: #94a3b8;
+    font-family: var(--font-mono);
+    width: 120px;
+}
+.audit-desc {
+    flex: 1;
+    color: #475569;
+}
+.audit-actor {
+    color: #94a3b8;
+    margin-left: 6px;
+    font-size: 11px;
+}
+.loading-status { display: flex; align-items: center; gap: 12px; padding: 12px 0; }
+.shimmer { width: 16px; height: 16px; background: #e2e8f0; border-radius: 50%; animation: pulse 1.5s infinite; }
+@keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+
 /* Utilities */
 .text-muted {
     color: var(--text-muted);
@@ -1276,33 +1494,8 @@ ul {
     border-color: #b38f4d;
 }
 
-/* Mobile Next Button & Step 2 Toolbar - Forced Gold */
-.sign-mobile-next-btn button,
-.sign-mob-btn.sign-mob-send,
-.sign-mob-btn.sign-mob-tool {
-    background: var(--color-primary) !important;
-    color: #fff !important;
-    border: none !important;
-    border-radius: 8px !important;
-}
-
-.sign-mobile-next-btn {
-    display: none; /* Controlled by JS but set base flex if shown */
-    padding: 16px;
-    background: #fff;
-    border-top: 1px solid #eee;
-    position: sticky;
-    bottom: 0;
-    width: 100%;
-    z-index: 1000;
-}
-
-.sign-mobile-next-btn button {
-    width: 100%;
-    height: 48px;
-    font-size: 15px;
-    font-weight: 700;
-}
+/* sign-mobile-next-btn はモバイルのみ対象。グローバルルール不要。
+   @media (max-width:900px) ブロック内で定義済み */
 
 .btn-primary-action:hover {
     background: #9e8047;
@@ -3293,10 +3486,213 @@ select:focus {
        署名エディター: ステップ式モバイルUI
        Step1=宛先入力, Step2=書類+フィールド配置
        ============================================= */
+    /* --- Sign Request Table (Mobile Card List) --- */
+    .sign-request-table {
+        background: transparent !important;
+        border: none !important;
+        display: block !important;
+        padding-bottom: 120px !important;
+    }
+    .sign-container {
+        padding-bottom: 40px !important;
+    }
+    .sign-request-table tbody {
+        display: block !important;
+    }
+    .sign-request-table tr {
+        display: block !important;
+        padding: 16px !important;
+        background: #fff !important;
+        border-radius: 12px !important;
+        border: 1px solid #eee !important;
+        margin-bottom: 16px !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04) !important;
+        position: relative !important;
+    }
+    .sign-request-table tr::after { display: none !important; } /* Remove the default chevron */
+    
+    .sign-request-table td {
+        display: block !important;
+        width: 100% !important;
+        padding: 0 !important;
+        margin-bottom: 8px !important;
+        text-align: left !important;
+    }
+    .sign-request-table td:nth-child(1) {
+        font-size: 16px !important;
+        font-weight: 700 !important;
+        color: #111827 !important;
+        margin-bottom: 12px !important;
+        border-bottom: 1px solid #f3f4f6 !important;
+        padding-bottom: 10px !important;
+    }
+    .sign-request-table td:nth-child(2) {
+        font-size: 13px !important;
+        color: #6b7280 !important;
+        margin-bottom: 6px !important;
+        display: inline-block !important;
+        width: auto !important;
+        margin-right: 12px !important;
+    }
+    .sign-request-table td:nth-child(2)::before {
+        content: ''; /* Remove '宛先' prefix as it varies by tab */
+    }
+    .sign-request-table td:nth-child(3),
+    .sign-request-table td:nth-child(4) {
+        display: inline-block !important;
+        width: auto !important;
+        margin-right: 8px !important;
+        margin-bottom: 6px !important;
+    }
+    .sign-request-table td:nth-child(5) {
+        display: block !important;
+        width: 100% !important;
+        color: #9ca3af !important;
+        font-size: 11px !important;
+        margin-top: 4px !important;
+    }
+    .sign-request-table td:nth-child(6) {
+        margin-top: 12px !important;
+        padding-top: 12px !important;
+        border-top: 1px solid #f3f4f6 !important;
+        display: block !important;
+    }
+    /* Adjust for Sent Requests tab which has only 5 columns */
+    .sign-request-table:not(:has(th:nth-child(6))) td:nth-child(2) {
+        display: block !important;
+        width: 100% !important;
+    }
+    .sign-request-table:not(:has(th:nth-child(6))) td:nth-child(2)::before {
+        content: '宛先: ';
+    }
+    .sign-request-table:not(:has(th:nth-child(6))) td:nth-child(5) {
+        margin-top: 12px !important;
+        padding-top: 12px !important;
+        border-top: 1px solid #f3f4f6 !important;
+    }
+    .sign-request-table td:nth-child(5) div {
+        justify-content: flex-start !important;
+        gap: 10px !important;
+    }
+    .sign-request-table .btn-dashboard {
+        height: 38px !important;
+        padding: 0 20px !important;
+        font-size: 13px !important;
+        border-radius: 10px !important;
+        background: #f8fafc !important;
+        border: 1px solid #e2e8f0 !important;
+        color: #475569 !important;
+        min-width: 0 !important;
+    }
+    .sign-request-table .btn-primary-action {
+        background: var(--sign-primary, #c5a059) !important;
+        border-color: var(--sign-primary, #c5a059) !important;
+        color: #fff !important;
+        font-weight: 700 !important;
+    }
+    .sign-request-table .btn-icon-only {
+        width: 38px !important;
+        padding: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    /* --- Sign Viewer (Mobile Refined) --- */
+    .sign-viewer-container {
+        height: 100% !important;
+        min-height: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        overflow: hidden !important;
+        background: #f8fafc !important;
+    }
+    .sign-viewer-header {
+        padding: 12px 16px !important;
+        gap: 12px !important;
+        position: sticky !important;
+        top: 0 !important;
+        z-index: 100 !important;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
+    }
+    .sign-viewer-title-area h1 {
+        font-size: 16px !important;
+    }
+    .sign-viewer-title-area .document-meta {
+        font-size: 11px !important;
+        flex-wrap: wrap !important;
+        gap: 4px !important;
+    }
+    .sign-viewer-title-area .divider { display: none !important; }
+
+    .sign-viewer-grid {
+        flex: 1 !important;
+        min-height: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        padding: 12px 12px 100px !important; /* Bottom padding to clear nav bar */
+        gap: 12px !important;
+        overflow-y: auto !important;
+    }
+    .sign-viewer-preview-pane {
+        display: flex !important;
+        flex: 1 !important;
+        min-height: 0 !important;
+        flex-direction: column !important;
+    }
+    .sign-preview-box {
+        flex: 1 !important;
+        min-height: 320px !important; /* Minimum useful height on mobile */
+        border-radius: 12px !important;
+        background: #fff !important;
+        border: 1px solid #e2e8f0 !important;
+        overflow: hidden !important;
+    }
+    .sign-viewer-detail-pane {
+        flex: none !important;
+        height: auto !important;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 12px !important;
+        overflow: visible !important;
+    }
+    .preview-notice {
+        padding: 10px 12px !important;
+        font-size: 11px !important;
+        border-radius: 10px !important;
+    }
+    .preview-placeholder i { font-size: 32px !important; }
+
+    .detail-card {
+        padding: 20px 16px !important;
+        margin-bottom: 0 !important;
+        border-radius: 14px !important;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
+    }
+    .card-title {
+        font-size: 14px !important;
+        margin-bottom: 16px !important;
+    }
+    .recipient-avatar {
+        width: 36px !important;
+        height: 36px !important;
+        font-size: 14px !important;
+    }
+    .recipient-info .name { font-size: 13px !important; }
+    .status-badge {
+        font-size: 10px !important;
+        padding: 2px 8px !important;
+    }
+    .btn-viewer-action {
+        height: 44px !important;
+        font-size: 13px !important;
+    }
+    
     .sign-editor-container {
         flex-direction: column !important;
         height: 100dvh !important;
         overflow: hidden !important;
+        -webkit-tap-highlight-color: transparent !important;
     }
 
     /* --- Step 1: サイドバーのみ表示 --- */
@@ -3328,7 +3724,7 @@ select:focus {
         min-height: 0 !important;
         overflow: auto !important;
         -webkit-overflow-scrolling: touch !important;
-        padding: 16px 16px 80px !important;
+        padding: 16px 16px 180px !important;
         background: #dfe1e5 !important;
     }
 
@@ -3338,7 +3734,7 @@ select:focus {
         overflow-y: auto !important;
         -webkit-overflow-scrolling: touch !important;
         height: 0 !important;
-        padding: 0 !important;
+        padding: 0 0 160px !important;
     }
     /* 受信者リスト: 高さ制限解除 */
     .sign-editor-recipient-list {
@@ -3360,11 +3756,18 @@ select:focus {
 
     /* --- モバイル 次へボタンエリア (Step1 下部) --- */
     .sign-mobile-next-btn {
+        position: fixed !important;
+        bottom: 72px !important;
+        left: 0 !important;
+        right: 0 !important;
+        height: 80px !important;
         display: flex !important;
-        flex-shrink: 0;
-        padding: 16px !important;
+        align-items: center !important;
+        padding: 0 16px !important;
         background: #fff !important;
         border-top: 1px solid #eee !important;
+        box-shadow: 0 -8px 20px rgba(0,0,0,0.06);
+        z-index: 2100 !important;
     }
     .sign-mobile-next-btn button {
         width: 100%;
@@ -3387,17 +3790,17 @@ select:focus {
     .sign-editor-container .sign-mobile-step2-bar {
         display: flex !important;
         position: fixed !important;
-        bottom: 0 !important;
+        bottom: 72px !important;
         left: 0 !important;
         right: 0 !important;
-        height: 68px !important;
+        height: 80px !important;
         background: #fff !important;
-        border-top: 1px solid #ddd !important;
-        box-shadow: 0 -4px 20px rgba(0,0,0,0.15) !important;
-        align-items: center !important;
-        padding: 0 12px !important;
+        border-top: 1px solid #eee !important;
+        box-shadow: 0 -8px 20px rgba(0,0,0,0.08) !important;
+        align-items: stretch !important;
+        padding: 8px !important;
         gap: 8px !important;
-        z-index: 999 !important;
+        z-index: 2200 !important;
     }
     /* Step1ではビューポートごと非表示なので追加ガード不要だが念のため */
     .sign-editor-container[data-mobile-step="1"] .sign-mobile-step2-bar {
@@ -3416,6 +3819,8 @@ select:focus {
         padding: 0 12px;
         height: 44px;
         white-space: nowrap;
+        -webkit-tap-highlight-color: transparent !important;
+        outline: none !important;
     }
     .sign-mob-back {
         background: #f3f4f6;
@@ -3465,6 +3870,88 @@ select:focus {
         color: #9ca3af !important;
         cursor: not-allowed !important;
         opacity: 1 !important;
+    }
+
+    /* 送信確認ポップアップ (Mobile) */
+    .sign-mobile-confirm {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 9999 !important;
+        visibility: hidden;
+        pointer-events: none;
+        transition: visibility 0.3s;
+    }
+    .sign-mobile-confirm.is-open {
+        visibility: visible;
+        pointer-events: auto;
+    }
+    .sign-mobile-confirm-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.4);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        opacity: 0;
+        transition: opacity 0.3s;
+    }
+    .sign-mobile-confirm.is-open .sign-mobile-confirm-overlay {
+        opacity: 1;
+    }
+    .sign-mobile-confirm.is-open ~ .sign-mobile-step2-bar {
+        display: none !important;
+    }
+    .sign-mobile-confirm-sheet {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: #fff;
+        border-radius: 28px 28px 0 0;
+        padding: 24px 24px calc(24px + 72px) !important; /* Clear only bottom nav */
+        transform: translateY(100%);
+        transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        text-align: center;
+        box-shadow: 0 -10px 40px rgba(0,0,0,0.15);
+        z-index: 10000 !important;
+    }
+    .sign-mobile-confirm-handle {
+        width: 40px;
+        height: 4px;
+        background: #e5e7eb;
+        border-radius: 2px;
+        margin: 0 auto 24px;
+    }
+    .sign-mobile-confirm.is-open .sign-mobile-confirm-sheet {
+        transform: translateY(0);
+    }
+    .sign-mobile-confirm-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: #111827;
+        margin-bottom: 12px;
+    }
+    .sign-mobile-confirm-desc {
+        font-size: 14px;
+        color: #6b7280;
+        line-height: 1.6;
+        margin-bottom: 32px;
+    }
+    .sign-mobile-confirm-cancel-btn {
+        background: #f3f4f6 !important;
+        color: #4b5563 !important;
+        width: 100%;
+        height: 50px;
+        border-radius: 12px;
+        font-size: 15px;
+        font-weight: 600;
+        border: none;
+        cursor: pointer;
     }
     /* 次へボタン: 活性状態 */
     .sign-mobile-next-btn button:not(:disabled) {
@@ -3912,5 +4399,30 @@ select:focus {
     #registration-modal .btn-close-modal,
     #registration-modal .btn-close {
         display: none !important;
+    }
+
+    /* --- Audit Trail (Mobile Refined) --- */
+    .audit-item {
+        flex-direction: column !important;
+        gap: 6px !important;
+        padding: 14px 0 !important;
+    }
+    .audit-time {
+        width: auto !important;
+        font-size: 11px !important;
+        color: #94a3b8 !important;
+    }
+    .audit-desc {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 4px !important;
+        font-size: 13px !important;
+        line-height: 1.5 !important;
+        word-break: break-all !important;
+    }
+    .audit-actor {
+        margin-left: 0 !important;
+        font-size: 12px !important;
+        display: block !important;
     }
 }

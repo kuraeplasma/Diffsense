@@ -282,6 +282,23 @@ export const SignEditor = {
             sendButton.style.opacity = '1';
             sendButton.style.cursor = 'pointer';
         }
+
+        // Mobile "Next" button validation
+        const nextButton = document.getElementById('sign-mobile-next-btn');
+        if (nextButton) {
+            const isMobile = window.innerWidth <= 900;
+            if (isMobile) {
+                const ok = this._recipients.length > 0 && this._recipients.every(r => 
+                    (r.name || '').trim() && 
+                    (r.email || '').trim() && 
+                    this.validateEmail(r.email)
+                );
+                nextButton.disabled = !ok;
+            } else {
+                nextButton.disabled = false;
+            }
+        }
+
         return validations;
     },
 
@@ -679,18 +696,34 @@ export const SignEditor = {
     },
 
     updateToolUI() {
-        const sigBtn = document.getElementById('tool-signature');
-        const dateBtn = document.getElementById('tool-date');
-        
-        if (sigBtn) sigBtn.style.background = this._addMode === 'signature' ? 'var(--sign-bg-light)' : '';
-        if (sigBtn) sigBtn.style.borderColor = this._addMode === 'signature' ? 'var(--sign-primary)' : '';
-        
-        if (dateBtn) dateBtn.style.background = this._addMode === 'date' ? 'var(--sign-bg-light)' : '';
-        if (dateBtn) dateBtn.style.borderColor = this._addMode === 'date' ? 'var(--sign-primary)' : '';
-        if (sigBtn) sigBtn.disabled = this._inlinePreviewMode;
-        if (dateBtn) dateBtn.disabled = this._inlinePreviewMode;
-        if (sigBtn) sigBtn.style.opacity = this._inlinePreviewMode ? '0.55' : '1';
-        if (dateBtn) dateBtn.style.opacity = this._inlinePreviewMode ? '0.55' : '1';
+        const tools = [
+            { id: 'tool-signature', type: 'signature' },
+            { id: 'tool-date', type: 'date' },
+            { id: 'mob-tool-signature', type: 'signature' },
+            { id: 'mob-tool-date', type: 'date' }
+        ];
+
+        tools.forEach(({ id, type }) => {
+            const btn = document.getElementById(id);
+            if (!btn) return;
+            const isActive = this._addMode === type;
+            
+            if (id.startsWith('mob-')) {
+                // Mobile style
+                btn.style.background = isActive ? 'var(--color-primary-dim, rgba(197, 160, 89, 0.1))' : '#fff';
+                btn.style.borderColor = isActive ? 'var(--sign-primary)' : '#eee';
+                const icon = btn.querySelector('i');
+                const text = btn.querySelector('span');
+                if (icon) icon.style.color = isActive ? 'var(--sign-primary)' : '#333';
+                if (text) text.style.color = isActive ? 'var(--sign-primary)' : '#333';
+            } else {
+                // PC style
+                btn.style.background = isActive ? 'var(--sign-bg-light, rgba(197, 160, 89, 0.05))' : '';
+                btn.style.borderColor = isActive ? 'var(--sign-primary)' : '';
+            }
+            btn.disabled = this._inlinePreviewMode;
+            btn.style.opacity = this._inlinePreviewMode ? '0.55' : '1';
+        });
         
         const viewport = document.querySelector('.sign-editor-viewport');
         if (viewport) viewport.style.cursor = this._inlinePreviewMode ? 'default' : (this._addMode ? 'copy' : '');
@@ -1541,6 +1574,16 @@ export const SignEditor = {
             }
             wrapper.appendChild(div);
         });
+        
+        // Update mobile send button state
+        this.updateMobileSendButtonState();
+    },
+
+    updateMobileSendButtonState() {
+        const sendBtn = document.getElementById('mob-send-btn');
+        if (!sendBtn) return;
+        const hasFields = this._fields.length > 0;
+        sendBtn.disabled = !hasFields;
     },
 
     removeField(id) {
