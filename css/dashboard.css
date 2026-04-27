@@ -4662,4 +4662,61 @@ select:focus {
     .contract-filters-grid {
         grid-template-columns: 1fr !important;
     }
+
+    /* Filter Tabs Optimization */
+    .filter-bar .flex.gap-sm {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        gap: 8px !important;
+        padding-bottom: 8px !important;
+        width: 100% !important;
+    }
+    .filter-bar .flex.gap-sm button {
+        white-space: nowrap !important;
+        flex: 0 0 auto !important;
+        min-width: max-content !important;
+    }
+
+    /* Active Icon Colors */
+    .bottom-nav-item.active i {
+        color: var(--color-primary) !important;
+    }
+    .nav-item.active .nav-icon i {
+        color: var(--color-primary) !important;
+    }
+    
+    /* Mobile Menu Item Active State */
+    .mobile-menu-item:active,
+    .mobile-menu-item.active {
+        background-color: #f9fafb !important;
+    }
+    .mobile-menu-item.active {
+        color: var(--color-primary) !important;
+        font-weight: 600 !important;
+    }
+    .mobile-menu-item.active i {
+        color: var(--color-primary) !important;
+    }
+
+    /* Card Interaction Indicators (Chevron Right) */
+    .deadlines-table tbody tr,
+    .contracts-table tbody tr {
+        position: relative !important;
+        padding-right: 40px !important; /* Space for chevron */
+    }
+    .deadlines-table tbody tr::after,
+    .contracts-table tbody tr::after {
+        content: '\f054';
+        font-family: 'Font Awesome 6 Free';
+        font-weight: 900;
+        position: absolute;
+        right: 16px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 13px;
+        color: #d1d5db;
+        pointer-events: none;
+    }
 }
