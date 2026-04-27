@@ -449,7 +449,9 @@
     /* Handled by direct mobile-first rules above */
 }
 
-/* Root fix: keep one reliable scroll container in detail view at browser zoom 100%. */
+/* Root fix: keep one reliable scroll container in detail view.
+   PC (>=1025px): detail-split-body scrolls per-pane.
+   Mobile (<1025px): #app-content scrolls the entire page. */
 #app-content.is-detail-view {
     display: flex;
     flex-direction: column;
@@ -470,10 +472,18 @@
     flex: 1 1 auto;
     min-height: 0;
     overflow-x: hidden;
-    overflow-y: auto; /* Allow scroll on body for mobile */
+    overflow-y: auto; /* PC default: body scrolls */
+    -webkit-overflow-scrolling: touch;
 }
 
 @media (min-width: 1025px) {
+    #app-content.is-detail-view {
+        height: 100%;
+        overflow: hidden;
+    }
+    #app-content.is-detail-view .detail-split-container {
+        height: 100%;
+    }
     #app-content.is-detail-view .detail-split-body {
         overflow: hidden;
     }
@@ -483,6 +493,7 @@
     min-height: 0;
 }
 
+/* PC: pane-scroll-area enables per-pane scrolling */
 #app-content.is-detail-view .detail-split-body .pane-scroll-area {
     flex: 1 1 auto;
     min-height: 0;
@@ -493,6 +504,81 @@
     -webkit-overflow-scrolling: touch;
     touch-action: pan-y;
     scrollbar-gutter: stable;
+}
+
+/* ================================================================
+   MOBILE SCROLL FIX  (max-width: 1024px)
+   Strategy:
+   - #app-content.is-detail-view becomes display:block + overflow-y:auto
+     (set in dashboard.css @media max-width:900px)
+   - All flex children must NOT have height:100% or overflow:hidden
+   - pane-scroll-area must be overflow:visible so it expands to content
+   ================================================================ */
+@media (max-width: 1024px) {
+    /* #app-content is now block-level; detail-split-container flows normally */
+    #app-content.is-detail-view {
+        display: block !important;
+        height: 100% !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+    }
+
+    #app-content.is-detail-view .detail-split-container {
+        display: flex !important;
+        flex-direction: column !important;
+        height: auto !important;
+        min-height: 0 !important;
+        overflow: visible !important;
+    }
+
+    #app-content.is-detail-view .detail-split-body {
+        display: flex !important;
+        flex-direction: column !important;
+        height: auto !important;
+        min-height: 0 !important;
+        overflow: visible !important;
+    }
+
+    /* Pane: expand to natural content height, NO internal scroll */
+    #app-content.is-detail-view .detail-split-body .pane {
+        display: flex !important;
+        flex-direction: column !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+        flex: none !important;
+    }
+
+    /* pane-scroll-area: expand to content, no internal scrollbar */
+    #app-content.is-detail-view .detail-split-body .pane-scroll-area {
+        display: flex !important;
+        flex-direction: column !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+        flex: none !important;
+    }
+
+    /* Remove any height restriction on diff/document containers */
+    .diff-container,
+    .diff-pane,
+    .diff-left,
+    .diff-right,
+    .document-viewer,
+    .document-paper-container,
+    .document-paper,
+    .is-structured,
+    .contract-structured-container,
+    .document-content,
+    .document-content-full,
+    .clause-cards-container,
+    .structured-diff-stack,
+    .structured-diff-shell {
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+        flex: none !important;
+    }
 }
 
 #app-content.is-detail-view .is-structured {
@@ -636,3 +722,5 @@
     max-width: 1400px;
     margin: 0 auto 24px;
 }
+
+/* (旧モバイルスクロールfix: 上部の @media (max-width:1024px) ブロックに統合済み) */

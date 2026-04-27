@@ -1730,7 +1730,7 @@ const Views = {
                     <div style="display:flex; align-items:center; gap:10px; color:#c53030; font-size:12px;">
                         <i class="fa-solid fa-circle-exclamation"></i>
                         <span>AI解析に失敗しました。</span>
-                        <a onclick="window.app.confirmReanalyze('${contract.id}')" style="margin-left:auto; font-weight:700; cursor:pointer;">再試行</a>
+                        <a onclick="window.app.confirmReanalyze('${id}')" style="margin-left:auto; font-weight:700; cursor:pointer;">再試行</a>
                     </div>
                 </section>
                 ` : '')))}
@@ -1739,7 +1739,7 @@ const Views = {
                     <div class="pane">
                         <div class="pane-header" style="min-height:56px; box-sizing:border-box;">
                             <span><i class="fa-solid fa-magnifying-glass-chart" style="margin-right:8px;"></i> AI解析・差分判定</span>
-                            <button id="btn-reanalyze" class="btn-upload-version" onclick="window.app.confirmReanalyze('${contract.id}')" style="margin-left:auto">
+                            <button id="btn-reanalyze" class="btn-upload-version" onclick="window.app.confirmReanalyze('${id}')" style="margin-left:auto">
                                 <i class="fa-solid fa-wand-magic-sparkles"></i>リスク解析＋期限取得
                             </button>
                         </div>
@@ -1774,7 +1774,7 @@ const Views = {
                                         </span>
                                         <span style="font-size:12px; color:#666;">${diffData.riskReason || ''}</span>
                                     </div>
-                                    <div style="font-size:13px; color:#333; line-height:1.7; white-space:pre-wrap;">${diffData.summary || 'AI解析結果がありません'}</div>
+                                    <div style="font-size:13px; color:#333; line-height:1.7; white-space:pre-wrap;">${escapeHtmlText(diffData.summary || 'AI解析結果がありません')}</div>
                                 </div>
                                 ${(effectiveSelectedDiffData && displayChanges.length > 0) ? (() => {
                                     return '<div class="analysis-section-title" style="margin-top:16px;"><span><i class="fa-solid fa-list-check text-primary"></i> 検出された重要な変更点</span></div>'
@@ -1810,7 +1810,7 @@ const Views = {
                                         書類の内容が複雑すぎるか、AIの一時的なエラーにより解析を完了できませんでした。<br>
                                         <span style="font-weight:700;">解析回数は消費されていません。</span>
                                     </div>
-                                    <button class="btn-dashboard btn-primary-action" onclick="window.app.confirmReanalyze('${contract.id}')" style="margin:0 auto;">
+                                    <button class="btn-dashboard btn-primary-action" onclick="window.app.confirmReanalyze('${id}')" style="margin:0 auto;">
                                         <i class="fa-solid fa-rotate-right"></i> もう一度解析を試す
                                     </button>
                                 </div>
@@ -1936,7 +1936,7 @@ const Views = {
                                 ${contract.original_filename ? `<span class="doc-source-name" title="${contract.original_filename}"><i class="fa-solid fa-file-lines"></i> ${contract.original_filename}</span>` : ''}
                             </div>
                             ${app?.can('operate_contract') ? `
-                            <button class="btn-upload-version btn-upload-doc" onclick="window.app.uploadNewVersion(${id})">
+                            <button class="btn-upload-version btn-upload-doc" onclick="window.app.uploadNewVersion('${id}')">
                                 <i class="fa-solid fa-cloud-arrow-up"></i><span class="upload-btn-text"> 新しいバージョンをアップロード</span><span class="upload-btn-short"> アップロード</span>
                             </button>` : ''}
                         </div>
@@ -5782,8 +5782,12 @@ class DashboardApp {
         // Toggle Fluid Layout Mode for Detail View
         if (viewId === 'diff') {
             this.mainContent.classList.add('is-detail-view');
+            // [scroll-fix] モバイル詳細画面: #app-mainのoverflow:hiddenを解除してスクロール可能にする
+            document.getElementById('app-main')?.classList.add('has-detail-view');
         } else {
             this.mainContent.classList.remove('is-detail-view');
+            // [scroll-fix] 詳細画面を離れたらクラスを除去して通常状態に戻す
+            document.getElementById('app-main')?.classList.remove('has-detail-view');
         }
 
         if (viewId !== 'contracts') {
@@ -6371,37 +6375,39 @@ class DashboardApp {
         const isMobileDetailLayout = typeof window.matchMedia === 'function'
             && window.matchMedia('(max-width: 900px)').matches;
         if (isMobileDetailLayout) {
-            // #app-content をスクロールコンテナとして保持（flex:1で高さ拘束 → overflow-y:auto でスクロール）
+            // #app-content をスクロールコンテナとして保持（fixed の親 #app-main に対する 100% 高さを維持）
             this.mainContent.style.display = 'flex';
             this.mainContent.style.flexDirection = 'column';
             this.mainContent.style.minHeight = '0';
-            this.mainContent.style.height = '';
+            this.mainContent.style.height = '100%';
             this.mainContent.style.overflowY = 'auto';
             this.mainContent.style.overflowX = 'hidden';
 
             const detailContainer = this.mainContent.querySelector('.detail-split-container');
             if (detailContainer) {
-                detailContainer.style.display = 'block';
-                detailContainer.style.flexDirection = '';
-                detailContainer.style.flex = 'none';  // CSS flex:1 を上書き → #app-content がコンテンツ高さを認識してスクロール
-                detailContainer.style.minHeight = '';
-                detailContainer.style.height = 'auto';
+                detailContainer.style.display = 'flex';
+                detailContainer.style.flexDirection = 'column';
+                detailContainer.style.flex = '1 1 auto';
+                detailContainer.style.minHeight = '0';
+                detailContainer.style.height = '100%';
             }
 
             const detailBody = this.mainContent.querySelector('.detail-split-body');
             if (detailBody) {
-                detailBody.style.display = 'block';
-                detailBody.style.flex = '';
-                detailBody.style.minHeight = '';
+                detailBody.style.display = 'flex';
+                detailBody.style.flexDirection = 'column';
+                detailBody.style.flex = '1 1 auto';
+                detailBody.style.minHeight = '0';
                 detailBody.style.height = 'auto';
-                detailBody.style.overflow = 'visible';
+                detailBody.style.overflowY = 'auto';
+                detailBody.style.overflowX = 'hidden';
             }
 
             this.mainContent.querySelectorAll('.detail-split-body .pane').forEach((pane) => {
-                pane.style.display = 'flex';
-                pane.style.flexDirection = 'column';
+                pane.style.display = 'block';
                 pane.style.flex = 'none';
                 pane.style.minHeight = '';
+                pane.style.height = 'auto';
                 pane.style.overflow = 'visible';
             });
 

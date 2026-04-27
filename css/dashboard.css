@@ -2193,32 +2193,39 @@ select:focus {
 /* Detail Split View Responsive */
 @media (max-width: 900px) {
     .detail-split-container {
-        flex: none;
-        height: auto;
+        /* Use flex column to preserve order:-1 */
+        display: flex !important;
+        flex-direction: column !important;
+        height: auto !important;
+        overflow: visible !important;
     }
 
     .detail-split-body {
-        flex: 1 1 auto;
-        /* [scroll-fix] structured-fix.cssと同じflex:1 1 autoにしてheightを継承させスクロールを可能にする */
-        height: auto;
-        flex-direction: column;
-        overflow-y: auto;
-        overflow-x: hidden;
+        /* Use flex column so order:-1 works for swapping panes */
+        display: flex !important;
+        flex-direction: column !important;
+        height: auto !important;
+        overflow: visible !important;
         min-height: 0;
-        -webkit-overflow-scrolling: touch;
     }
 
     #app-content.is-detail-view {
-        /* [scroll-fix-v2] モバイルでは #app-content をスクロールコンテナにする */
+        /* scroll container: fills #app-main (position:fixed top:52px bottom:72px) */
+        display: block !important;
         height: 100% !important;
         overflow-y: auto !important;
+        overflow-x: hidden !important;
         -webkit-overflow-scrolling: touch;
     }
 
     .pane {
-        flex: none;
-        height: auto;
-        margin-bottom: 20px;
+        /* Flex column to preserve inner layout, but expand to content */
+        display: flex !important;
+        flex-direction: column !important;
+        flex: none !important;
+        height: auto !important;
+        overflow: visible !important;
+        margin-bottom: 0;
         width: 100% !important;
     }
 
@@ -2238,14 +2245,13 @@ select:focus {
         padding: 30px 15px;
     }
 
-    /* モバイルではdocument-viewerの独自スクロールを解除 → #app-contentで一本化 */
+    /* Remove independent scroll on document-viewer and diff-pane */
     .document-viewer {
         max-height: none !important;
         overflow-y: visible !important;
         overflow-x: hidden !important;
     }
 
-    /* diff-paneの独自スクロールも解除 */
     .diff-pane {
         overflow-y: visible !important;
         height: auto !important;
@@ -2254,9 +2260,9 @@ select:focus {
 
 /* Detail Screen Mobile UX */
 @media (max-width: 900px) {
-    /* Document pane shows first, analysis pane below */
+    /* Analysis pane shows first (default DOM order), document pane below */
     .detail-split-body .pane:last-of-type {
-        order: -1;
+        order: 1; /* Analysis is on top now */
     }
 
     /* Hide cramped header action buttons 窶・primary action is in mobile-decision-bar */
@@ -2284,13 +2290,14 @@ select:focus {
         flex-shrink: 0;
     }
 
-    /* More breathing room for scroll area on mobile */
+    /* pane-scroll-area: flex column to preserve content layout */
     .detail-split-body .pane .pane-scroll-area {
-        flex: none;
-        height: auto;
-        max-height: none;
-        /* [scroll-fix] スクロールは.detail-split-bodyが担当するためvisibleのまま */
-        overflow-y: visible;
+        display: flex !important;
+        flex-direction: column !important;
+        flex: none !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
         min-height: 0;
     }
 
@@ -3745,20 +3752,26 @@ select:focus {
         border: none !important;
     }
 
-    /* Document Detail View (Mobile) */
-    /* [scroll-fix final] #app-contentがJSのoverflowY:autoでスクロールコンテナになる。
-       #app-mainはoverflow:hiddenを保ちfixed境界内にコンテンツを収める（visibleにするとタッチ届かない）。
-       height:autoを削除（2202行修正済み）によりheight:100%が正しく効くため#app-contentがスクロール可能になる。 */
+    /* =====================================================================
+       Mobile Detail View Scroll Fix
+       Strategy: #app-main stays position:fixed (top:52px, bottom:72px).
+       #app-content fills #app-main with height:100% and scrolls internally.
+       All child flex containers must NOT restrict height with overflow:hidden.
+       ===================================================================== */
     #app-main.has-detail-view {
-        overflow: hidden;
+        overflow: hidden; /* Keep fixed boundary */
     }
     #app-content.is-detail-view {
         padding: 0 !important;
         background: #fff !important;
+        /* Fill parent exactly so overflow-y has a defined height to scroll within */
         height: 100% !important;
+        max-height: 100% !important;
         overflow-y: auto !important;
         overflow-x: hidden !important;
         -webkit-overflow-scrolling: touch;
+        /* Content must NOT be restricted by flex children */
+        display: block !important;
     }
 
     .detail-split-container {
@@ -3784,15 +3797,18 @@ select:focus {
         font-size: 16px !important;
     }
 
+    /* detail-split-body: normal flow, no height restriction, no internal scroll */
     .detail-split-body {
         flex-direction: column !important;
         gap: 0 !important;
-        /* [scroll-fix] visible→autoに変更: structured-fix.cssの設計通り.detail-split-bodyをスクロールコンテナとして機能させる */
-        overflow-y: auto !important;
-        overflow-x: hidden !important;
-        -webkit-overflow-scrolling: touch;
+        /* Do NOT set overflow-y here — scrolling handled by #app-content */
+        overflow: visible !important;
+        /* Let content height grow naturally */
+        height: auto !important;
+        min-height: 0 !important;
     }
 
+    /* Panes: no height restriction, expand to content */
     .detail-split-body .pane {
         width: 100% !important;
         border: none !important;
@@ -3800,6 +3816,9 @@ select:focus {
         box-shadow: none !important;
         min-height: 0 !important;
         height: auto !important;
+        /* Critical: pane must NOT have overflow:hidden */
+        overflow: visible !important;
+        flex: none !important;
     }
 
     .pane-header {

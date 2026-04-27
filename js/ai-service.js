@@ -53,7 +53,7 @@ export const aiService = {
                 ? previousVersion
                 : this.normalizePreviousVersion(previousVersion);
             const body = {
-                contractId,
+                contractId: Number(contractId),
                 method,
                 source,
                 previousVersion: normalizedPreviousVersion
