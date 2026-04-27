@@ -3263,6 +3263,12 @@ select:focus {
         min-width: unset !important;
         width: 100%;
     }
+    /* 並び順セレクト: 全幅・タップしやすい高さ */
+    .sign-container .filter-bar select {
+        width: 100% !important;
+        padding: 10px 12px !important;
+        font-size: 14px !important;
+    }
 
     /* テーブル → カードリスト変換 */
     .sign-list-card {
