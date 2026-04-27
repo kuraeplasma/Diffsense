@@ -4722,4 +4722,60 @@ select:focus {
     .sidebar-floating-toggle:active i {
         color: var(--color-primary) !important;
     }
+
+    /* Deadline Modal Responsive Layout */
+    .deadline-modal-container {
+        width: 100% !important;
+        max-width: 1100px !important;
+        height: 88vh !important;
+        display: flex !important;
+        flex-direction: column !important;
+        background: #fff !important;
+        border-radius: 12px !important;
+        box-shadow: 0 8px 40px rgba(0,0,0,0.22) !important;
+        overflow: hidden !important;
+    }
+    .deadline-modal-body {
+        display: flex !important;
+        flex: 1 !important;
+        overflow: hidden !important;
+        min-height: 0 !important;
+    }
+    .deadline-doc-viewer {
+        flex: 1 !important;
+        overflow: hidden !important;
+        min-width: 0 !important;
+        border-right: 1px solid #eee !important;
+    }
+    .deadline-form-sidebar {
+        width: 280px !important;
+        flex-shrink: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        padding: 24px 20px !important;
+        gap: 16px !important;
+        overflow-y: auto !important;
+    }
+
+    @media (max-width: 900px) {
+        .deadline-modal-container {
+            height: 100vh !important;
+            border-radius: 0 !important;
+        }
+        .deadline-modal-body {
+            flex-direction: column !important;
+        }
+        .deadline-doc-viewer {
+            border-right: none !important;
+            border-bottom: 1px solid #eee !important;
+            height: 50% !important; /* Document on top, half height */
+            flex: none !important;
+        }
+        .deadline-form-sidebar {
+            width: 100% !important;
+            height: auto !important;
+            flex: 1 !important;
+            padding: 16px 20px !important;
+        }
+    }
 }

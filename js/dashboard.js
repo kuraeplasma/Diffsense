@@ -3591,7 +3591,7 @@ class DashboardApp {
         overlay.id = 'deadline-input-overlay';
         overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;';
         overlay.innerHTML = `
-            <div style="background:#fff;border-radius:12px;width:100%;max-width:1100px;height:88vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,0.22);overflow:hidden;">
+            <div class="deadline-modal-container">
 
                 <!-- Header -->
                 <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid #eee;flex-shrink:0;">
@@ -3602,18 +3602,18 @@ class DashboardApp {
                     <button onclick="document.getElementById('deadline-input-overlay').remove()" style="background:none;border:none;font-size:22px;color:#aaa;cursor:pointer;line-height:1;padding:4px 8px;">✕</button>
                 </div>
 
-                <!-- Body: left=doc, right=form -->
-                <div style="display:flex;flex:1;overflow:hidden;min-height:0;">
+                <!-- Body -->
+                <div class="deadline-modal-body">
 
-                    <!-- Document viewer (scrollable) -->
-                    <div style="flex:1;overflow:hidden;min-width:0;border-right:1px solid #eee;">
+                    <!-- Document viewer -->
+                    <div class="deadline-doc-viewer">
                         <div style="height:100%;overflow-y:auto;padding:20px 24px;box-sizing:border-box;">
                             ${contentHtml}
                         </div>
                     </div>
 
                     <!-- Deadline input form -->
-                    <div style="width:280px;flex-shrink:0;display:flex;flex-direction:column;padding:24px 20px;gap:16px;overflow-y:auto;">
+                    <div class="deadline-form-sidebar">
                         <div style="font-size:13px;font-weight:700;color:#2b2623;margin-bottom:4px;"><i class="fa-solid fa-calendar-days" style="color:#c5a059;margin-right:6px;"></i>期限を入力</div>
                         <div>
                             <label style="font-size:11px;font-weight:600;color:#5e544d;display:block;margin-bottom:5px;">契約終了日</label>
