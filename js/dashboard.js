@@ -2183,15 +2183,10 @@ const Views = {
         const activeTab = window.app.mcpActiveTab || 'cloud';
 
         return `
-            <style>
-                .mcp-container { width: 960px; margin: 0 auto; position: relative; display: block; min-width: 960px; }
-                .mcp-grid { display: grid; grid-template-columns: 596px 340px; gap: 24px; align-items: start; }
-                .mcp-tab-item.active { border-bottom-color: #c19b4a !important; color: #0f172a !important; background: #fff !important; font-weight: 700 !important; }
-                pre { max-width: 100%; overflow-x: auto; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; font-size: 11px; line-height: 1.4; white-space: pre-wrap; word-break: break-all; }
-            </style>
-            <div class="page-title" style="display:flex; align-items:center; gap:12px;">
-                <span>MCP連携 (AIエージェント)</span>
-            </div>
+            <div class="plan-view-container">
+                <div class="page-title" style="display:flex; align-items:center; gap:12px;">
+                    <span>MCP連携 (AIエージェント)</span>
+                </div>
             
             <div class="mcp-container">
                 <div class="mcp-grid">
@@ -2265,8 +2260,8 @@ const Views = {
                         </p>
                     </div>
                 </div>
-                </div>
             </div>
+        </div>
         `;
     },
     mcpSetupCard: (activeTab) => {
@@ -4231,7 +4226,10 @@ class DashboardApp {
 
         const lockOverlay = deadlineLocked ? `<div style="position:fixed;top:0;right:0;bottom:0;left:240px;display:flex;align-items:center;justify-content:center;background:rgba(245,247,250,0.85);backdrop-filter:blur(3px);z-index:1000;"><div style="background:#fff;border-radius:12px;padding:32px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,0.13);max-width:300px;width:90%;"><i class="fa-solid fa-crown" style="color:#c19b4a;font-size:2rem;margin-bottom:12px;display:block;"></i><div style="display:inline-block;background:#f3f0ea;color:#c5a059;border:1px solid #e8d9b8;border-radius:10px;padding:3px 12px;font-size:11px;font-weight:700;margin-bottom:12px;">Business / Proプラン限定</div><div style="font-weight:700;font-size:15px;margin-bottom:8px;color:#2b2623;">期限・アラート管理</div><p style="font-size:12px;color:#888;line-height:1.6;margin-bottom:20px;">契約期限の自動抽出・アラート通知はBusinessプラン以上でご利用いただけます。</p><button onclick="window.app.navigate('plan')" style="width:100%;padding:10px;border:none;border-radius:8px;background:#c5a059;color:#fff;font-size:13px;font-weight:700;cursor:pointer;">アップグレードする</button></div></div>` : '';
 
-        return `<div style="position:relative;">${pageHtml}${lockOverlay}</div>`;
+        return `
+            <div class="plan-view-container">
+                <div style="position:relative;">${pageHtml}${lockOverlay}</div>
+            </div>`;
     }
 
     ensureDiffLibrary() {
@@ -5250,7 +5248,9 @@ class DashboardApp {
             : '';
 
         return `
-            <div class="plan-section">
+            <div class="plan-view-container">
+                <div class="page-title">通知設定</div>
+                <div class="plan-section">
                 <div style="position:relative">
                 <div style="margin-bottom:28px">
                     <h2 class="section-title" style="margin-bottom:6px">クローラー通知設定</h2>
@@ -5366,6 +5366,7 @@ class DashboardApp {
                 ${deadlineLocked ? lockOverlayDeadline : ''}
                 </div>
             </div>
+        </div>
         `;
     }
 

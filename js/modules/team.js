@@ -18,23 +18,25 @@ export function render({ app, dbService } = {}) {
     `).join('');
 
     return `
-    <div class="flex justify-between items-center mb-md">
-        <h2 class="page-title" style="margin-bottom:0;">チーム管理 <small style="font-size:14px; font-weight:normal; color:#666; margin-left:12px;">(${users.length} / ${limit} 名)</small></h2>
-                ${app.can('manage_team') ? `<button class="btn-dashboard btn-primary-action" onclick="window.app.showInviteModal()"><i class="fa-solid fa-user-plus"></i> メンバー招待</button>` : ''}
-            </div>
-    <div class="table-container">
-        <table class="data-table team-table">
-            <thead>
-                <tr>
-                    <th>名前</th>
-                    <th>メールアドレス</th>
-                    <th>権限</th>
-                    <th>最終アクティブ</th>
-                    <th>操作</th>
-                </tr>
-            </thead>
-            <tbody>${rows}</tbody>
-        </table>
+    <div class="plan-view-container">
+        <div class="flex justify-between items-center mb-md">
+            <h2 class="page-title" style="margin-bottom:0;">チーム管理 <small style="font-size:14px; font-weight:normal; color:#666; margin-left:12px;">(${users.length} / ${limit} 名)</small></h2>
+                    ${app.can('manage_team') ? `<button class="btn-dashboard btn-primary-action" onclick="window.app.showInviteModal()"><i class="fa-solid fa-user-plus"></i> メンバー招待</button>` : ''}
+                </div>
+        <div class="table-container">
+            <table class="data-table team-table">
+                <thead>
+                    <tr>
+                        <th>名前</th>
+                        <th>メールアドレス</th>
+                        <th>権限</th>
+                        <th>最終アクティブ</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>
     </div>
 `;
 }

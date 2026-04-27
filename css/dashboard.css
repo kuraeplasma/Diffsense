@@ -1054,6 +1054,32 @@ ul {
     border-color: #d73a49;
 }
 
+/* MCP View Styles */
+.mcp-container {
+    max-width: 960px;
+    margin: 0 auto;
+    position: relative;
+}
+
+.mcp-grid {
+    display: grid;
+    grid-template-columns: 596px 340px;
+    gap: 24px;
+    align-items: start;
+}
+
+@media (max-width: 1024px) {
+    .mcp-container {
+        width: 100%;
+        min-width: 0;
+        padding: 0 16px;
+    }
+    .mcp-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+}
+
 @media (max-width: 1024px) {
     .plan-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
