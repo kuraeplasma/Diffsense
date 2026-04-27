@@ -3223,12 +3223,39 @@ select:focus {
     100% { opacity: 1; }
 }
 
+/* 並び順ラベル: 全端末で改行しない */
+.sign-container .filter-bar .flex.gap-sm.items-center {
+    flex-wrap: nowrap;
+    align-items: center;
+    white-space: nowrap;
+}
+
 /* ===================================================
    署名管理 モバイル対応 (max-width: 900px)
    sign-ui.js のHTML構造・クラス名は変更せず CSS のみで対応
    テーブル → カードリスト変換
    =================================================== */
 @media (max-width: 900px) {
+    /* 署名エディター: スプリットレイアウト → モバイル縦積み
+       インラインstyleを!importantで上書き */
+    .sign-editor-container {
+        flex-direction: column !important;
+        height: auto !important;
+        min-height: 100% !important;
+        overflow: visible !important;
+    }
+    .sign-editor-sidebar {
+        width: 100% !important;
+        max-width: 100% !important;
+        border-right: none !important;
+        border-bottom: 1px solid #ddd !important;
+        box-shadow: none !important;
+    }
+    /* PDFプレビューエリア: モバイルでは非表示（フィールド配置はPC操作） */
+    .sign-editor-viewport {
+        display: none !important;
+    }
+
     /* 署名管理ヘッダー(タイトル+説明文)を非表示
        sign-container:not([style]) = 管理画面のみ対象
        sign-container[style=...] = ビューア(戻るボタンあり)は除外 */
