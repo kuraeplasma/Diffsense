@@ -250,9 +250,12 @@ function normalizeIsoDate(value) {
     if (!raw) return null;
     if (/^(null|undefined|なし|不明|-|N\/A)$/i.test(raw)) return null;
 
-    const ymd = raw.match(/^(\d{4})[\/\-.年]\s*(\d{1,2})[\/\-.月]\s*(\d{1,2})日?$/);
+    // 3桁または4桁の年度に対応 (例: 026年 -> 2026年 と補完)
+    const ymd = raw.match(/^(\d{3,4})[\/\-.年]\s*(\d{1,2})[\/\-.月]\s*(\d{1,2})日?$/);
     if (ymd) {
-        const y = Number(ymd[1]);
+        let y = Number(ymd[1]);
+        // 026年 などの欠損を 2026年 と補完
+        if (y < 1000 && y > 20) y += 2000; 
         const m = Number(ymd[2]);
         const d = Number(ymd[3]);
         if (y >= 1900 && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
@@ -1436,10 +1439,12 @@ ${buildSemanticDiffCandidate(change?.old || '', change?.new || '')}
 重要:
 - 日本語で回答してください。
 - JSON以外のテキストは一切出力しないでください。
-- 日付が不明な場合はnullにしてください。
+- 契約期間（開始日、終了日）は「契約期間」「有効期間」「Term」「Period」などの条項を注意深く探し、正確に抽出してください。
+- テキスト抽出の誤り（例: "2026"が"026"となっている等）がある場合でも、文脈から正しい日付を推測して返してください。
 - 差分解析の場合は、新旧の対比を明確にしてください。
+- changesは、条項番号やタイトルを含めて具体的に抽出してください。
 
-${input}`;
+${input} `;
     }
 
     buildPrompt(contractText, previousVersion) {

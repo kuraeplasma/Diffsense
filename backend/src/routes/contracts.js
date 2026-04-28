@@ -1051,24 +1051,23 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
         };
 
         if (!skipAI) {
-            const structuredPairAnalysis = previousArticles.length
-                ? await buildStructuredPairAnalysis(previousArticles, currentArticles)
-                : null;
             const currentText = normalizeContentToText(currentArticles);
             const previousText = normalizeContentToText(previousArticles);
-
             if (currentText.trim().length > 0) {
                 const geminiResultRaw = await geminiService.analyzeContract(currentText, previousText);
-                const geminiResult = geminiResultRaw.data;
-                aiResult = structuredPairAnalysis
-                    ? mergeStructuredAndGeneralAnalysis(structuredPairAnalysis, geminiResult)
-                    : {
-                        changes: diffChanges.length ? aiResult.changes : (geminiResult.changes || []),
-                        riskLevel: geminiResult.riskLevel,
-                        riskReason: geminiResult.riskReason,
-                        summary: geminiResult.summary,
-                        isFallback: geminiResult.isFallback === true
-                    };
+                aiResult = geminiResultRaw.data;
+                
+                // aiResult.changes が空の場合のみ、ローカルの diffChanges で補完
+                if (!Array.isArray(aiResult.changes) || aiResult.changes.length === 0) {
+                    aiResult.changes = diffChanges.map((c) => ({
+                        section: c.section,
+                        type: c.type,
+                        old: c.old,
+                        new: c.new,
+                        impact: '',
+                        concern: ''
+                    }));
+                }
 
                 const aiSucceeded = aiResult && aiResult.summary && !isAiFailureSummary(aiResult.summary) && aiResult.isFallback !== true;
                 if (aiSucceeded && !localUnlimited) {
@@ -1326,11 +1325,9 @@ router.post('/:id/reanalyze', rateLimit, async (req, res, next) => {
 
         let aiResult = null;
         const configuredReanalyzeAttempts = Number(process.env.REANALYZE_MAX_ATTEMPTS || 2);
-        const maxReanalyzeAttempts = Math.min(Math.max(Math.floor(configuredReanalyzeAttempts), 1), 5);
-        const configuredRetryBaseMs = Number(process.env.REANALYZE_RETRY_BASE_MS || 2500);
-        const reanalyzeRetryBaseMs = Math.max(Math.floor(configuredRetryBaseMs), 0);
-        const configuredRateLimitedRetryBaseMs = Number(process.env.REANALYZE_RATE_LIMIT_RETRY_BASE_MS || 8000);
-        const reanalyzeRateLimitedRetryBaseMs = Math.max(Math.floor(configuredRateLimitedRetryBaseMs), 0);
+        const maxReanalyzeAttempts = 1; // サービス側でリトライするため、エンドポイント側は1回で十分
+        const reanalyzeRetryBaseMs = 0;
+        const reanalyzeRateLimitedRetryBaseMs = 0;
 
         for (let attempt = 1; attempt <= maxReanalyzeAttempts; attempt++) {
             try {
