@@ -8,7 +8,8 @@ const PLAN_LIMITS = {
     'trial': 1,
     'starter': 1,
     'business': 3,
-    'pro': 10
+    'pro': 10,
+    'owner': 999999
 };
 
 const AI_USAGE_LIMITS = {
@@ -16,7 +17,8 @@ const AI_USAGE_LIMITS = {
     'trial': 5,
     'starter': 50,
     'business': 120,
-    'pro': 400
+    'pro': 400,
+    'owner': 999999
 };
 
 const SIGN_USAGE_LIMITS = {
@@ -24,7 +26,8 @@ const SIGN_USAGE_LIMITS = {
     'trial': 3,
     'starter': 25,
     'business': 100,
-    'pro': 999999    // Unlimited
+    'pro': 999999,   // Unlimited
+    'owner': 999999  // Unlimited
 };
 
 const CONTRACT_LIMITS = {
@@ -32,7 +35,8 @@ const CONTRACT_LIMITS = {
     'trial': 999999,
     'starter': 999999,
     'business': 999999,
-    'pro': 999999
+    'pro': 999999,
+    'owner': 999999
 };
 
 const VALID_BILLING_CYCLES = ['monthly', 'annual'];
@@ -81,7 +85,7 @@ class DBService {
                                 userProfile.stripeStatus === 'ACTIVE' || 
                                 userProfile.paypalStatus === 'ACTIVE' || 
                                 userProfile.hasPaymentMethod;
-        if (!hasActivePayment) {
+        if (!hasActivePayment && plan === 'free') {
             return SIGN_USAGE_LIMITS['free'];
         }
 
@@ -383,12 +387,12 @@ class DBService {
         if (plan === 'trial') {
             return AI_USAGE_LIMITS.trial;
         }
-        // お支払いがない場合はFree上限を適用
+        // お支払いがない場合、かつプランがfreeの場合はFree上限を適用
         const hasActivePayment = userProfile.subscriptionState === 'active' || 
                                 userProfile.stripeStatus === 'ACTIVE' || 
                                 userProfile.paypalStatus === 'ACTIVE' || 
                                 userProfile.hasPaymentMethod;
-        if (!hasActivePayment) {
+        if (!hasActivePayment && plan === 'free') {
             return AI_USAGE_LIMITS['free'];
         }
 

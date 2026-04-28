@@ -5606,6 +5606,8 @@ class DashboardApp {
                 upgradeAdvice = '<div class="upgrade-advice">月間上限に達しました。翌月まで待つか、Proプランにアップグレードすると回数が増えます。</div>';
             } else if (sub.plan === 'pro') {
                 upgradeAdvice = '<div class="upgrade-advice">月間上限に達しました。翌月までお待ちいただくか、追加枠についてお問い合わせください。</div>';
+            } else if (sub.plan === 'owner') {
+                upgradeAdvice = ''; // Owner has no limit message
             }
         }
 
@@ -5613,7 +5615,7 @@ class DashboardApp {
         <div class="plan-status-card">
             <div class="plan-badge plan-badge-${sub.plan}">${planName}（${billingCycleLabel}）</div>
             <div class="plan-info-text">
-                AI解析: <strong style="${sub.usageLimit >= 999999 ? '' : ((({'free':3,'starter':50,'business':120,'pro':400}[sub.plan] || sub.usageLimit) - sub.usageCount) <= 1 ? 'color:#f59e0b;' : '')}">${sub.usageCount}</strong> / ${sub.usageLimit >= 999999 ? '無制限' : ({'free':3,'starter':50,'business':120,'pro':400}[sub.plan] || sub.usageLimit) + '回'}
+                AI解析: <strong style="${(sub.usageLimit >= 999999 || sub.plan === 'owner') ? '' : ((({'free':3,'starter':50,'business':120,'pro':400}[sub.plan] || sub.usageLimit) - sub.usageCount) <= 1 ? 'color:#f59e0b;' : '')}">${sub.usageCount}</strong> / ${(sub.usageLimit >= 999999 || sub.plan === 'owner') ? '無制限' : ({'free':3,'starter':50,'business':120,'pro':400}[sub.plan] || sub.usageLimit) + '回'}
                 <br>電子署名: <strong>${sub.signUsageCount || 0}</strong> / ${(sub.signUsageLimit >= 999999 || sub.plan === 'pro' || sub.plan === 'owner') ? '無制限' : `${{'free':10,'starter':25,'business':100}[sub.plan] || sub.signUsageLimit || 0}回`}
                 ${sub.renewalDate ? `<br><span style="font-size:0.75rem; opacity:0.8;">次回更新: <strong>${new Date(sub.renewalDate).toLocaleDateString('ja-JP')}</strong></span>` : ''}
             </div>
