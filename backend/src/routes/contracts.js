@@ -761,34 +761,55 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                 const previousVersionText = previousVersionArticles ? normalizeContentToText(previousVersionArticles) : null;
 
                 if (textToAnalyze.trim().length > 0) {
-                    const structuredPairAnalysis = previousVersionArticles
-                        ? await buildStructuredPairAnalysis(
-                            normalizeContentToLegacyArticles(previousVersionArticles),
-                            normalizeContentToLegacyArticles(extractedText)
-                        )
-                        : null;
+                    const maxReanalyzeAttempts = 2;
+                    let lastError = null;
+                    
+                    for (let attempt = 0; attempt < maxReanalyzeAttempts; attempt++) {
+                        try {
+                            const structuredPairAnalysis = previousVersionArticles
+                                ? await buildStructuredPairAnalysis(
+                                    normalizeContentToLegacyArticles(previousVersionArticles),
+                                    normalizeContentToLegacyArticles(extractedText)
+                                )
+                                : null;
 
-                    const shouldRunGenericAnalysis = !structuredPairAnalysis || !hasStructuredChanges(structuredPairAnalysis);
-                    const genericAnalysisResult = shouldRunGenericAnalysis
-                        ? await geminiService.analyzeContract(
-                            textToAnalyze,
-                            previousVersionText
-                        )
-                        : null;
-                    const genericAnalysis = genericAnalysisResult ? genericAnalysisResult.data : null;
+                            const shouldRunGenericAnalysis = !structuredPairAnalysis || !hasStructuredChanges(structuredPairAnalysis);
+                            const genericAnalysisResult = shouldRunGenericAnalysis
+                                ? await geminiService.analyzeContract(
+                                    textToAnalyze,
+                                    previousVersionText
+                                )
+                                : null;
+                            const genericAnalysis = genericAnalysisResult ? genericAnalysisResult.data : null;
 
-                    if (hasStructuredChanges(structuredPairAnalysis)) {
-                        aiResult = mergeStructuredAndGeneralAnalysis(structuredPairAnalysis, genericAnalysis);
-                    } else if (genericAnalysis) {
-                        aiResult = genericAnalysis;
-                    } else if (structuredPairAnalysis) {
-                        aiResult = structuredPairAnalysis;
-                    } else {
-                        const directAnalysisResult = await geminiService.analyzeContract(
-                            textToAnalyze,
-                            previousVersionText
-                        );
-                        aiResult = directAnalysisResult.data;
+                            if (hasStructuredChanges(structuredPairAnalysis)) {
+                                aiResult = mergeStructuredAndGeneralAnalysis(structuredPairAnalysis, genericAnalysis);
+                            } else if (genericAnalysis) {
+                                aiResult = genericAnalysis;
+                            } else if (structuredPairAnalysis) {
+                                aiResult = structuredPairAnalysis;
+                            } else {
+                                const directAnalysisResult = await geminiService.analyzeContract(
+                                    textToAnalyze,
+                                    previousVersionText
+                                );
+                                aiResult = directAnalysisResult.data;
+                            }
+                            lastError = null;
+                            break;
+                        } catch (err) {
+                            lastError = err;
+                            logger.warn(`AI Analysis attempt ${attempt + 1} failed: ${err.message}`);
+                            if (geminiService.getGeminiErrorStatus(err) === 429) break;
+                            await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+                        }
+                    }
+
+                    if (lastError) {
+                        aiResult = geminiService.buildHeuristicFallbackAnalysis(textToAnalyze, previousVersionText, lastError);
+                        if (aiResult.errorCode === 'AI_RATE_LIMITED') {
+                            throw new Error('AI_RATE_LIMITED');
+                        }
                     }
 
                     // 3.1 Increment Usage Count ONLY on successful AI analysis
@@ -816,6 +837,12 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                 }
             }
         } catch (error) {
+            if (error.message === 'AI_RATE_LIMITED') {
+                return res.status(429).json({
+                    success: false,
+                    error: '現在AIへのアクセスが集中しています。しばらく時間を置いてから再度お試しください。'
+                });
+            }
             logger.error('Non-fatal analysis error:', error);
             aiResult.summary = '解析中にエラーが発生しました: ' + error.message;
             aiResult.isFallback = true;
@@ -1325,9 +1352,9 @@ router.post('/:id/reanalyze', rateLimit, async (req, res, next) => {
 
         let aiResult = null;
         const configuredReanalyzeAttempts = Number(process.env.REANALYZE_MAX_ATTEMPTS || 2);
-        const maxReanalyzeAttempts = 1; // サービス側でリトライするため、エンドポイント側は1回で十分
-        const reanalyzeRetryBaseMs = 0;
-        const reanalyzeRateLimitedRetryBaseMs = 0;
+        const maxReanalyzeAttempts = 2; // AI_RATE_LIMITED 対策で2回まで試行
+        const reanalyzeRetryBaseMs = 3000;
+        const reanalyzeRateLimitedRetryBaseMs = 8000;
 
         for (let attempt = 1; attempt <= maxReanalyzeAttempts; attempt++) {
             try {

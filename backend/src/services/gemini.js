@@ -472,18 +472,25 @@ function buildLocalDiffAnalysis(currentText, previousText) {
     });
 }
 
-function buildHeuristicFallbackAnalysis(currentText, previousText = null) {
+function buildHeuristicFallbackAnalysis(currentText, previousText = null, error = null) {
     const base = previousText
         ? buildLocalDiffAnalysis(currentText, previousText)
         : buildLocalSingleAnalysis(currentText);
     
+    const status = error?.response?.status || 0;
+    const isRateLimited = status === 429;
+    const reason = isRateLimited
+        ? 'AIアクセスが集中しています。時間をおいて再試行してください。'
+        : 'AI評価を一部補完表示しています';
+
     return normalizeAnalyzeResult({
         ...base,
-        riskReason: 'AI評価を一部補完表示しています',
+        riskReason: reason,
         summary: String(base.summary || '補完解析を返しました')
             .replace(/^ローカル差分要約:/, '補完差分要約:')
             .replace(/^ローカル要約:/, '補完要約:'),
-        isFallback: true
+        isFallback: true,
+        errorCode: isRateLimited ? 'AI_RATE_LIMITED' : null
     });
 }
 
@@ -1757,3 +1764,5 @@ ${truncatedText}
 
 module.exports = new GeminiService();
 module.exports.normalizeAnalyzeResult = normalizeAnalyzeResult;
+module.exports.buildHeuristicFallbackAnalysis = buildHeuristicFallbackAnalysis;
+module.exports.getGeminiErrorStatus = (err) => Number(err?.response?.status || 0);
