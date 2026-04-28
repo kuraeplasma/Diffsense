@@ -30,7 +30,9 @@ if (!admin.apps.length) {
                     credential: admin.credential.cert({
                         projectId,
                         clientEmail,
-                        privateKey: privateKey.replace(/\\n/g, '\n'),
+                        privateKey: privateKey.includes('---') 
+                            ? privateKey.replace(/\\n/g, '\n') 
+                            : `-----BEGIN PRIVATE KEY-----\n${privateKey}\n-----END PRIVATE KEY-----`.replace(/\\n/g, '\n'),
                     }),
                     storageBucket: bucketName
                 });

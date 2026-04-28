@@ -384,7 +384,11 @@ function mergeStructuredAndGeneralAnalysis(structuredPairAnalysis, genericAnalys
         riskLevel: Number(genericAnalysis.riskLevel || structuredPairAnalysis.riskLevel || 1),
         riskReason: String(genericAnalysis.riskReason || structuredPairAnalysis.riskReason || '').trim(),
         summary: String(genericAnalysis.summary || structuredPairAnalysis.summary || '').trim(),
-        isFallback: genericAnalysis.isFallback === true && structuredPairAnalysis.isFallback === true
+        isFallback: genericAnalysis.isFallback === true && structuredPairAnalysis.isFallback === true,
+        contract_meta: geminiService.mergeContractMeta(
+            structuredPairAnalysis.contract_meta,
+            genericAnalysis.contract_meta
+        )
     });
 }
 
@@ -773,7 +777,7 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                                 )
                                 : null;
 
-                            const shouldRunGenericAnalysis = !structuredPairAnalysis || !hasStructuredChanges(structuredPairAnalysis);
+                            const shouldRunGenericAnalysis = true; // Always run generic analysis to ensure metadata (deadline, etc.) is extracted
                             const genericAnalysisResult = shouldRunGenericAnalysis
                                 ? await geminiService.analyzeContract(
                                     textToAnalyze,
@@ -799,24 +803,30 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                             break;
                         } catch (err) {
                             lastError = err;
-                            logger.warn(`AI Analysis attempt ${attempt + 1} failed: ${err.message}`);
-                            if (geminiService.getGeminiErrorStatus(err) === 429) break;
-                            await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+                            const isRateLimit = geminiService.getGeminiErrorStatus(err) === 429;
+                            logger.warn(`AI Analysis attempt ${attempt + 1} failed (RateLimit=${isRateLimit}): ${err.message}`);
+                            
+                            // 429のときは少し長めに待ってからリトライを継続
+                            const waitMs = isRateLimit ? 5000 * (attempt + 1) : 1000 * (attempt + 1);
+                            await new Promise(resolve => setTimeout(resolve, waitMs));
                         }
                     }
 
                     if (lastError) {
                         aiResult = geminiService.buildHeuristicFallbackAnalysis(textToAnalyze, previousVersionText, lastError);
-                        if (aiResult.errorCode === 'AI_RATE_LIMITED') {
-                            throw new Error('AI_RATE_LIMITED');
-                        }
                     }
 
-                    // 3.1 Increment Usage Count ONLY on successful AI analysis
-                    const aiSucceeded = aiResult && aiResult.summary && !isAiFailureSummary(aiResult.summary) && aiResult.isFallback !== true;
-                    if (aiSucceeded && !localUnlimited) {
-                        await dbService.incrementUsage(ownerUid);
-                        // 3.2 Save contract_meta (deadline info) if extracted
+                    // 3.1 Increment Usage Count ONLY on successful AI analysis (or meaningful fallback)
+                    const aiSucceeded = aiResult && aiResult.summary && !isAiFailureSummary(aiResult.summary);
+                    const hasMeta = hasMeaningfulContractMeta(aiResult?.contract_meta);
+                    
+                    if (aiSucceeded || hasMeta) {
+                        // Increment usage count only if not in local unlimited mode and it's a real analysis
+                        if (!localUnlimited && aiSucceeded && aiResult.isFallback !== true) {
+                            await dbService.incrementUsage(ownerUid);
+                        }
+
+                        // 3.2 Save contract_meta (deadline info) if extracted - ALWAYS save if we have metadata
                         const meta = aiResult.contract_meta;
                         if (meta && contractId) {
                             const metaUpdate = {
@@ -824,7 +834,7 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                                 renewal_deadline: meta.renewal_deadline || null,
                                 contract_start: meta.contract_start || null,
                                 auto_renewal: meta.auto_renewal === true,
-                                notice_period_days: Number(meta.notice_period_days) || null,
+                                notice_period_days: meta.notice_period_days !== null ? Number(meta.notice_period_days) : null,
                                 contract_category: meta.contract_category || null,
                                 date_confidence: meta.date_confidence || 'unknown',
                                 alert_sent_30d: false,
@@ -832,6 +842,7 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                                 alert_sent_0d: false
                             };
                             await dbService.updateContract(contractId, metaUpdate, ownerUid);
+                            logger.info(`contract_meta saved for contract ${contractId}: expiry=${meta.expiry_date}`);
                         }
                     }
                 }
@@ -1096,9 +1107,13 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
                     }));
                 }
 
-                const aiSucceeded = aiResult && aiResult.summary && !isAiFailureSummary(aiResult.summary) && aiResult.isFallback !== true;
-                if (aiSucceeded && !localUnlimited) {
-                    await dbService.incrementUsage(ownerUid);
+                const aiSucceeded = aiResult && aiResult.summary && !isAiFailureSummary(aiResult.summary);
+                const hasMeta = hasMeaningfulContractMeta(aiResult?.contract_meta);
+
+                if ((aiSucceeded || hasMeta) && !localUnlimited) {
+                    if (aiSucceeded && aiResult.isFallback !== true) {
+                        await dbService.incrementUsage(ownerUid);
+                    }
                     // Save contract_meta (deadline info) if extracted
                     const meta = aiResult.contract_meta;
                     if (meta && contractId) {

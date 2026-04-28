@@ -1,13 +1,13 @@
 [
   {
     "uid": "QIExRrJJFxT17j3oMwD93O6Bw933",
-    "lastResetDate": "2026-04-01T18:05:01.780Z",
+    "lastResetDate": "2026-04-28T05:05:00.000Z",
     "billingCycle": "monthly",
     "hasPaymentMethod": false,
-    "plan": "free",
+    "plan": "owner",
     "email": "kuraeplasma@gmail.com",
-    "lastUsedAt": "2026-04-01T18:59:21.642Z",
-    "usageCount": 3
+    "lastUsedAt": null,
+    "usageCount": 0
   },
   {
     "uid": "dev-uid",

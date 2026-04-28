@@ -216,13 +216,21 @@ function normalizeAnalyzeResult(parsed) {
         else if (val.includes('MEDIUM') || val === '2') riskLevel = "2";
     }
 
-    // 3. Normalize riskReason
-    const riskReason = String(parsed?.riskReason || parsed?.risk_reason || parsed?.latestRegulatoryAlignment || parsed?.latest_regulatory_alignment || '').trim() || '主要な注意点を確認してください。';
+    // 3. Normalize riskReason (ユーザーの要求する impact と suggestion も含める)
+    let riskReason = String(parsed?.riskReason || parsed?.risk_reason || '').trim();
+    const impact = String(parsed?.impact || '').trim();
+    const suggestion = String(parsed?.suggestion || '').trim();
+    
+    if (impact || suggestion) {
+        riskReason = `${riskReason}\n\n【影響】\n${impact}\n\n【推奨対応】\n${suggestion}`.trim();
+    }
+    if (!riskReason) {
+        riskReason = '主要な注意点を確認してください。';
+    }
 
     // 4. Normalize changes
-    const changes = Array.isArray(parsed?.changes || parsed?.materialChanges || parsed?.material_changes || parsed?.risks || parsed?.items) 
-        ? (parsed?.changes || parsed?.materialChanges || parsed?.material_changes || parsed?.risks || parsed?.items) 
-        : [];
+    let rawChanges = parsed?.changes || parsed?.materialChanges || parsed?.material_changes || parsed?.risks || parsed?.items;
+    const changes = Array.isArray(rawChanges) ? rawChanges : [];
 
     // 状態判定フラグ
     const isFallback = parsed?.isFallback === true;
@@ -242,6 +250,7 @@ function normalizeAnalyzeResult(parsed) {
         riskReason,
         changes,
         isFallback,
+        contract_meta: normalizeContractMeta(parsed?.contract_meta)
     };
 }
 
@@ -480,18 +489,21 @@ function buildHeuristicFallbackAnalysis(currentText, previousText = null, error 
     const status = error?.response?.status || 0;
     const isRateLimited = status === 429;
     const reason = isRateLimited
-        ? 'AIアクセスが集中しています。時間をおいて再試行してください。'
+        ? '【サーバー混雑】Google APIの制限に達しました。10秒ほど待って再度お試しください (Error 429)'
         : 'AI評価を一部補完表示しています';
 
-    return normalizeAnalyzeResult({
+    const result = normalizeAnalyzeResult({
         ...base,
         riskReason: reason,
         summary: String(base.summary || '補完解析を返しました')
             .replace(/^ローカル差分要約:/, '補完差分要約:')
             .replace(/^ローカル要約:/, '補完要約:'),
         isFallback: true,
-        errorCode: isRateLimited ? 'AI_RATE_LIMITED' : null
+        errorCode: isRateLimited ? 'AI_RATE_LIMITED' : null,
+        contract_meta: base.contract_meta // 抽出済みの期限情報があれば保持
     });
+
+    return result;
 }
 
 function normalizeRiskLevelValue(value) {
@@ -1188,10 +1200,15 @@ class GeminiService {
                 return parseGeminiJsonResponse(aiText);
             } catch (error) {
                 lastError = error;
+                const status = getGeminiErrorStatus(error);
+                const errorData = error.response?.data;
+                if (errorData) {
+                    logger.error(`Gemini API Error Details: ${JSON.stringify(errorData)}`);
+                }
+
                 if (attempt >= budget.maxAttempts - 1 || !shouldRetryGeminiRequest(error)) {
                     break;
                 }
-                const status = getGeminiErrorStatus(error);
                 const retryAfterMs = status === 429 ? parseRetryAfterMs(error) : null;
                 const linearWaitMs = budget.retryBaseMs * (attempt + 1);
                 const waitMs = status === 429
@@ -1398,60 +1415,70 @@ ${buildSemanticDiffCandidate(change?.old || '', change?.new || '')}
 - "change": false の場合は summary や risk を含めないでください。`;
     }
 
-    buildUnifiedAnalysisPrompt(contractText, previousVersion) {
-        const maxLength = 30000;
-        const truncatedText = contractText.length > maxLength
-            ? contractText.substring(0, maxLength) + '\n\n[...テキストが長すぎるため省略されました]'
-            : contractText;
+    buildUnifiedAnalysisPrompt(currentText, previousText = '') {
+        const isDiff = previousText && previousText.trim().length > 0;
+        
+        let prompt = `あなたは企業法務専門のAIです。
+以下の契約書の内容（${isDiff ? '変更内容' : '内容'}）を分析し、実務レベルでリスク評価を行ってください。
 
-        const input = previousVersion
-            ? `【旧版】\n${previousVersion.substring(0, maxLength)}\n\n【新版】\n${truncatedText}`
-            : `【契約書】\n${truncatedText}`;
+# 【目的】
+契約${isDiff ? '変更' : ''}におけるリスクを「即判断できる形」で出力する
 
-        return `あなたは高度な法務専門AIエージェントです。提供された契約書（比較時は新旧の差分）を解析し、以下のJSON形式で結果を返してください。
+# 【入力】
+${isDiff ? `変更前：
+${truncateStructuredClauseText(previousText)}
 
-指示:
-1. 概要(summary): 契約の全体像、主要な変更の意義、および実務上の注意点を200〜300文字程度で丁寧に解説してください。単なる要約ではなく、文脈を汲み取ったアドバイスを含めてください。
-2. リスクレベル(riskLevel): 1(低), 2(中), 3(高)の3段階で判定してください。
-3. リスク理由(riskReason): 判定の根拠を100文字以内で簡潔に述べてください。
-4. 変更点(changes): 特に重要な変更やリスクのある条項を最大5件抽出してください。
-5. メタデータ(contract_meta): 契約開始日、終了日、更新期限、自動更新の有無、通知期間などを正確に抽出してください。
+変更後：
+${truncateStructuredClauseText(currentText)}` : `対象テキスト：
+${truncateStructuredClauseText(currentText)}`}
 
-出力形式(JSONのみ):
+# 【出力要件】
+以下のJSON形式で厳密に出力してください。JSON以外のテキストを出力しないでください：
+
 {
-  "summary": "...",
-  "riskLevel": 2,
-  "riskReason": "...",
+  "summary": "変更点の要約（1〜2文）",
   "changes": [
     {
-      "section": "条項名",
-      "type": "modification | risk",
-      "old": "前の文言（または注意条文）",
-      "new": "後の文言（または修正案・解説）",
-      "impact": "法的影響",
-      "concern": "注意点"
+      "type": "追加 / 削除 / 変更",
+      "content": "何がどう変わったか（具体）"
     }
   ],
+  "risk_level": "High / Medium / Low",
+  "risk_reason": "なぜそのリスクなのか（契約実務ベースで具体的に）",
+  "impact": "企業側にどんな不利益があるか",
+  "suggestion": "実務的な対応案（修正・交渉案）",
   "contract_meta": {
-    "expiry_date": "YYYY-MM-DD",
-    "renewal_deadline": "YYYY-MM-DD",
-    "contract_start": "YYYY-MM-DD",
-    "auto_renewal": true,
-    "notice_period_days": 30,
-    "contract_category": "...",
-    "date_confidence": "high | medium | low"
+    "contract_category": "業務委託 / 秘密保持 / 売買 / 賃貸借 / 等（最も適切なカテゴリ）",
+    "expiry_date": "契約満了日 (YYYY-MM-DD形式、不明な場合は null)",
+    "renewal_deadline": "更新拒絶の通知期限 (YYYY-MM-DD形式、不明な場合は null)",
+    "notice_period_days": "解約通知期間（日数、不明な場合は null）",
+    "contract_start": "契約開始日 (YYYY-MM-DD形式、不明な場合は null)"
   }
 }
 
-重要:
-- 日本語で回答してください。
-- JSON以外のテキストは一切出力しないでください。
-- 契約期間（開始日、終了日）は「契約期間」「有効期間」「Term」「Period」などの条項を注意深く探し、正確に抽出してください。
-- テキスト抽出の誤り（例: "2026"が"026"となっている等）がある場合でも、文脈から正しい日付を推測して返してください。
-- 差分解析の場合は、新旧の対比を明確にしてください。
-- changesは、条項番号やタイトルを含めて具体的に抽出してください。
+# 【評価基準】
+以下を特に重視して判断すること：
+* 責任範囲の拡大（例：一切責任を負わない → 全責任を負う）
+* 損害賠償条件の変更
+* 契約解除条件の変更
+* 支払条件・期限の変更
+* 一方に不利な条項追加
 
-${input} `;
+# 【重要ルール】
+* 抽象表現は禁止（例：「注意が必要」など）
+* 必ず「なぜ危険か」を具体的に説明
+* 変更が軽微な場合のみ Low
+* 判断に迷う場合は Medium
+* 明確な不利益があれば High
+* 日付（YYYY-MM-DD）や期限情報は、契約文面から「正確に」抽出すること。
+
+# 【出力制約】
+* JSON以外のテキストを出力しない
+* 日本語で出力
+* 改行・整形を正しく行う
+`;
+
+        return prompt;
     }
 
     buildPrompt(contractText, previousVersion) {

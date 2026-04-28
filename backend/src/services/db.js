@@ -371,7 +371,8 @@ class DBService {
     async delete(collection, id) {
         let data = await this.readData(collection);
         const initialLength = data.length;
-        data = data.filter(d => d.id !== parseInt(id));
+        const targetId = String(id);
+        data = data.filter(d => String(d.id) !== targetId);
 
         if (data.length !== initialLength) {
             await this.writeData(collection, data);
@@ -764,7 +765,7 @@ class DBService {
         }
         // Always sync to file as fallback/cache
         const contracts = await this.readData('contracts');
-        const index = contracts.findIndex(c => c.id === contract.id);
+        const index = contracts.findIndex(c => String(c.id) === String(contract.id));
         if (index > -1) {
             contracts[index] = { ...contracts[index], ...contract };
         } else {
@@ -806,7 +807,7 @@ class DBService {
      */
     async updateContract(id, updates, ownerUid = null) {
         const contracts = await this.getContracts(ownerUid);
-        const index = contracts.findIndex(c => c.id === id);
+        const index = contracts.findIndex(c => String(c.id) === String(id));
 
         if (index > -1) {
             // 所有権の検証 (IDOR対策)
