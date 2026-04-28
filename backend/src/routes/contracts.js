@@ -223,9 +223,17 @@ function deriveStructuredRiskLevel(changes, fallbackLevel = 1) {
 }
 
 function structuredRiskConcern(evaluated, change) {
+    // 1. AIが具体的な懸念点（concern）を提供している場合はそれを最優先
+    if (typeof evaluated?.concern === 'string' && evaluated.concern.trim().length > 0) {
+        return evaluated.concern.trim();
+    }
+
+    // 2. リスクレベルに応じた簡易メッセージ
     const level = Number(evaluated?.riskLevel || 0);
     if (level >= 3) return '高リスクの変更として確認してください';
     if (level === 2) return '契約条件への影響を確認してください';
+    
+    // 3. 最終的なデフォルト
     return defaultStructuredConcern(change);
 }
 
@@ -439,7 +447,7 @@ async function buildStructuredPairAnalysis(oldArticles, newArticles) {
             old: change.old,
             new: change.new,
             impact: aiConfirmed
-                ? (evaluated.summary || defaultStructuredImpact(change))
+                ? (evaluated.impact || evaluated.summary || defaultStructuredImpact(change))
                 : defaultStructuredImpact(change),
             concern: aiConfirmed
                 ? structuredRiskConcern(evaluated, change)

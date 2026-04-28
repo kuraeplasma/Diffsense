@@ -556,6 +556,8 @@ function normalizeStructuredClauseResult(parsed, index) {
         summary: typeof parsed?.summary === 'string' && parsed.summary.trim()
             ? parsed.summary.trim()
             : '変更内容を確認してください。',
+        impact: typeof parsed?.impact === 'string' ? parsed.impact.trim() : null,
+        concern: typeof parsed?.concern === 'string' ? parsed.concern.trim() : null,
         riskLevel,
         risk: riskLevelToLabel(riskLevel)
     };
@@ -1368,7 +1370,9 @@ ${buildSemanticDiffCandidate(change?.old || '', change?.new || '')}
 
 {
  "change": true,
- "summary": "変更内容",
+ "summary": "変更の要約",
+ "impact": "法的影響（どのような権利義務の変化があるか、具体的かつ簡潔に）",
+ "concern": "実務上の注意点（ユーザーが確認すべきこと、具体的かつ簡潔に）",
  "risk": "HIGH | MEDIUM | LOW"
 }
 
