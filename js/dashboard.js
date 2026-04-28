@@ -1,5 +1,5 @@
 import { Notify } from './notify.js';
-import { dbService } from './db-service.js?v=20260426_final';
+import { dbService } from './db-service.js?v=20260428_sync_preserve_analysis';
 import { aiService } from './ai-service.js?v=20260426_final';
 import { getApiBaseUrl, shouldUseLocalDevAuthBypass } from './api-base.js';
 import { auth } from './firebase-config.js?v=20260422_auth_timeout';

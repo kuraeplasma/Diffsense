@@ -252,6 +252,64 @@ export const dbService = {
         return JSON.parse(localStorage.getItem(this.KEYS.CONTRACTS) || '[]');
     },
 
+    hasAnalysisOrDeadlineData(contract) {
+        return Boolean(
+            String(contract?.ai_summary || contract?.summary || '').trim()
+            || String(contract?.ai_risk_reason || contract?.risk_reason || '').trim()
+            || (Array.isArray(contract?.ai_changes) && contract.ai_changes.length > 0)
+            || contract?.ai_succeeded === true
+            || contract?.expiry_date
+            || contract?.renewal_deadline
+            || contract?.contract_start
+            || contract?.auto_renewal === true
+            || contract?.auto_renewal === false
+        );
+    },
+
+    mergeContractSyncResult(remote, cached) {
+        if (!cached) return remote;
+
+        const merged = { ...remote };
+        if (!merged.original_content && cached.original_content) {
+            merged.original_content = cached.original_content;
+        }
+
+        const cachedTime = this.toSortableTime(cached.last_updated_at || cached.last_analyzed_at || cached.created_at);
+        const remoteTime = this.toSortableTime(remote.last_updated_at || remote.last_analyzed_at || remote.created_at);
+        const cachedHasResult = this.hasAnalysisOrDeadlineData(cached);
+        const remoteHasResult = this.hasAnalysisOrDeadlineData(remote);
+        const shouldPreserveLocalResult = cachedHasResult && (!remoteHasResult || cachedTime > remoteTime);
+
+        if (shouldPreserveLocalResult) {
+            // 解析直後のローカル結果を、保存完了前の古いAPI同期で消さない。
+            [
+                'summary',
+                'ai_summary',
+                'risk_level',
+                'risk_reason',
+                'ai_risk_reason',
+                'ai_changes',
+                'ai_is_fallback',
+                'ai_succeeded',
+                'ai_limited',
+                'expiry_date',
+                'renewal_deadline',
+                'contract_start',
+                'auto_renewal',
+                'notice_period_days',
+                'contract_category',
+                'date_confidence',
+                'last_analyzed_at',
+                'last_updated_at',
+                'status'
+            ].forEach((field) => {
+                if (cached[field] !== undefined) merged[field] = cached[field];
+            });
+        }
+
+        return merged;
+    },
+
     async syncContractsFromApi() {
         const apiData = await this._callApi('/api/contracts');
         if (Array.isArray(apiData)) {
@@ -259,10 +317,7 @@ export const dbService = {
             const local = this.getContracts();
             const merged = apiData.map(remote => {
                 const cached = local.find(c => String(c.id) === String(remote.id));
-                if (cached && !remote.original_content && cached.original_content) {
-                    return { ...remote, original_content: cached.original_content };
-                }
-                return remote;
+                return this.mergeContractSyncResult(remote, cached);
             });
             localStorage.setItem(this.KEYS.CONTRACTS, JSON.stringify(merged));
             return merged;
