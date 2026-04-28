@@ -263,8 +263,13 @@ const AI_ANALYSIS_RETRY_GUIDANCE = 'AI解析に失敗しました。消費はし
 const isAiAnalysisResultReady = (payload) => {
     if (!payload || typeof payload !== 'object') return false;
     if (payload.aiFailed === true || payload.ai_failed === true) return false;
-    if (payload.isFallback === true || payload.ai_is_fallback === true) return false;
-    return hasAnalysisRecord(payload);
+    
+    // サマリーがあれば「解析結果あり」と見なす
+    const summary = String(payload.summary || payload.ai_summary || '').trim();
+    if (!summary || summary.length < 5) return false;
+    if (/AI解析に失敗|エラーが発生|取得できません/.test(summary)) return false;
+
+    return true;
 };
 
 const sanitizeAnalysisPayload = (payload) => {
@@ -1803,7 +1808,7 @@ const Views = {
                                         <i class="fa-solid fa-circle-exclamation" style="margin-right:8px;"></i>AI解析に失敗しました
                                     </div>
                                     <div style="font-size:12px; color:#742a2a; margin-bottom:16px; line-height:1.6;">
-                                        書類の内容が複雑すぎるか、AIの一時的なエラーにより解析を完了できませんでした。<br>
+                                        ${contract.errorMessage || '書類の内容が複雑すぎるか、AIの一時的なエラーにより解析を完了できませんでした。'}<br>
                                         <span style="font-weight:700;">解析回数は消費されていません。</span>
                                     </div>
                                     <button class="btn-dashboard btn-primary-action" onclick="window.app.confirmReanalyze('${id}')" style="margin:0 auto;">
@@ -5230,7 +5235,7 @@ class DashboardApp {
         const teamName = slack.teamName || '';
         const deadlineEmailEnabled = settings?.email?.deadlineAlert !== false;
         const deadlineSlackEnabled = settings?.slack?.deadlineAlert !== false && slackConnected;
-        const crawlerLocked = plan !== 'pro';
+        const crawlerLocked = plan !== 'pro' && plan !== 'owner';
         const deadlineLocked = plan === 'free';
         const lockOverlayCrawler = '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(245,247,250,0.82);backdrop-filter:blur(2px);border-radius:8px;z-index:1"><div style="background:#fff;border-radius:10px;padding:24px 32px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.1);max-width:280px"><i class=\'fa-solid fa-crown\' style=\'color:#c19b4a;font-size:1.8rem;margin-bottom:10px;display:block\'></i><div style=\'font-weight:700;font-size:15px;margin-bottom:8px\'>Proプラン限定</div><p style=\'font-size:12px;color:#888;line-height:1.6;margin-bottom:16px\'>クローラー通知はProプランの機能です</p><button class=\'btn-dashboard btn-primary-action\' style=\'width:100%;padding:10px;font-size:13px\' onclick=\'window.app.navigate("plan")\'>アップグレードする</button></div></div>';
         const lockOverlayDeadline = '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(245,247,250,0.82);backdrop-filter:blur(2px);border-radius:8px;z-index:1"><div style="background:#fff;border-radius:10px;padding:24px 32px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.1);max-width:280px"><i class=\'fa-solid fa-crown\' style=\'color:#c19b4a;font-size:1.8rem;margin-bottom:10px;display:block\'></i><div style=\'font-weight:700;font-size:15px;margin-bottom:8px\'>Starterプラン以上限定</div><p style=\'font-size:12px;color:#888;line-height:1.6;margin-bottom:16px\'>期限アラート通知はStarterプラン以上の機能です</p><button class=\'btn-dashboard btn-primary-action\' style=\'width:100%;padding:10px;font-size:13px\' onclick=\'window.app.navigate("plan")\'>アップグレードする</button></div></div>';
@@ -7477,7 +7482,7 @@ class DashboardApp {
             Notify.warning('閲覧のみの権限では監視設定を変更できません');
             return;
         }
-        if (enabled && this.subscription?.plan !== 'pro') {
+        if (enabled && this.subscription?.plan !== 'pro' && this.subscription?.plan !== 'owner') {
             this.showAlertModal('プラン制限', '定期URL監視（自動チェック）はProプラン限定の機能です。', 'warning');
             return;
         }
@@ -8011,7 +8016,7 @@ class DashboardApp {
 
 
     exportCSV() {
-        if (this.subscription?.plan !== 'pro') return;
+        if (this.subscription?.plan !== 'pro' && this.subscription?.plan !== 'owner') return;
 
         // Get filters from current state
         const filters = this.filters || {};

@@ -931,13 +931,13 @@ function parseRetryAfterMs(error) {
 
 function getGeminiRequestBudget() {
     // ローカル/本番で同一実装。必要時は環境変数で同じキーを調整する。
-    const timeoutMsRaw = Number(process.env.GEMINI_TIMEOUT_MS || 15000);
-    const maxAttemptsRaw = Number(process.env.GEMINI_MAX_ATTEMPTS || 2);
-    const retryBaseMsRaw = Number(process.env.GEMINI_RETRY_BASE_MS || 1000);
+    const timeoutMsRaw = Number(process.env.GEMINI_TIMEOUT_MS || 30000);
+    const maxAttemptsRaw = Number(process.env.GEMINI_MAX_ATTEMPTS || 3);
+    const retryBaseMsRaw = Number(process.env.GEMINI_RETRY_BASE_MS || 2000);
     return {
-        timeoutMs: Number.isFinite(timeoutMsRaw) && timeoutMsRaw >= 5000 ? Math.floor(timeoutMsRaw) : 15000,
-        maxAttempts: Number.isFinite(maxAttemptsRaw) && maxAttemptsRaw >= 1 ? Math.min(Math.floor(maxAttemptsRaw), 5) : 2,
-        retryBaseMs: Number.isFinite(retryBaseMsRaw) && retryBaseMsRaw >= 0 ? Math.floor(retryBaseMsRaw) : 1000
+        timeoutMs: Number.isFinite(timeoutMsRaw) && timeoutMsRaw >= 5000 ? Math.floor(timeoutMsRaw) : 30000,
+        maxAttempts: Number.isFinite(maxAttemptsRaw) && maxAttemptsRaw >= 1 ? Math.min(Math.floor(maxAttemptsRaw), 5) : 3,
+        retryBaseMs: Number.isFinite(retryBaseMsRaw) && retryBaseMsRaw >= 0 ? Math.floor(retryBaseMsRaw) : 2000
     };
 }
 class GeminiService {
@@ -945,6 +945,13 @@ class GeminiService {
         if (!GEMINI_API_KEY) {
             logger.warn('GEMINI_API_KEY is not set. AI analysis will fail.');
         }
+    }
+
+    /**
+     * 解析結果を正規化する（外部からも呼び出し可能）
+     */
+    normalizeAnalyzeResult(parsed) {
+        return normalizeAnalyzeResult(parsed);
     }
 
     async analyzeContract(contractText, previousVersion = null) {
@@ -1176,7 +1183,7 @@ class GeminiService {
                 const retryAfterMs = status === 429 ? parseRetryAfterMs(error) : null;
                 const linearWaitMs = budget.retryBaseMs * (attempt + 1);
                 const waitMs = status === 429
-                    ? Math.max(retryAfterMs ?? 0, Math.max(2000, linearWaitMs * 3))
+                    ? Math.max(retryAfterMs ?? 0, Math.max(5000, linearWaitMs * 4)) // 429のときは最低5秒待機
                     : linearWaitMs;
                 logger.warn(`Gemini request retry ${attempt + 1}/${Math.max(0, budget.maxAttempts - 1)} after ${waitMs}ms (status=${status || 'n/a'}): ${error.message}`);
                 await new Promise((resolve) => setTimeout(resolve, waitMs));

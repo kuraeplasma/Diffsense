@@ -130,8 +130,12 @@ function isAiFailureSummary(summary) {
 function isAiResultReady(result, allowFallback = false) {
     const summary = String(result?.summary || '').trim();
     if (!summary) return false;
-    if (!allowFallback && result?.isFallback === true) return false;
     if (isAiFailureSummary(summary)) return false;
+    
+    // allowFallbackがtrueの場合は、isFallbackやaiSucceededフラグが不問（最低限のサマリーがあれば良しとする）
+    if (allowFallback) return true;
+
+    if (result?.isFallback === true) return false;
     if (result?.aiSucceeded === false) return false;
     return true;
 }
@@ -1315,9 +1319,9 @@ router.post('/:id/reanalyze', rateLimit, async (req, res, next) => {
         let aiResult = null;
         const configuredReanalyzeAttempts = Number(process.env.REANALYZE_MAX_ATTEMPTS || 2);
         const maxReanalyzeAttempts = Math.min(Math.max(Math.floor(configuredReanalyzeAttempts), 1), 5);
-        const configuredRetryBaseMs = Number(process.env.REANALYZE_RETRY_BASE_MS || 1500);
+        const configuredRetryBaseMs = Number(process.env.REANALYZE_RETRY_BASE_MS || 2500);
         const reanalyzeRetryBaseMs = Math.max(Math.floor(configuredRetryBaseMs), 0);
-        const configuredRateLimitedRetryBaseMs = Number(process.env.REANALYZE_RATE_LIMIT_RETRY_BASE_MS || 6000);
+        const configuredRateLimitedRetryBaseMs = Number(process.env.REANALYZE_RATE_LIMIT_RETRY_BASE_MS || 8000);
         const reanalyzeRateLimitedRetryBaseMs = Math.max(Math.floor(configuredRateLimitedRetryBaseMs), 0);
 
         for (let attempt = 1; attempt <= maxReanalyzeAttempts; attempt++) {
