@@ -1351,6 +1351,14 @@ router.post('/:id/reanalyze', rateLimit, async (req, res, next) => {
                     savedContract.currentContent,
                     savedContract.text
                 ];
+                
+                // Also check history for content
+                if (Array.isArray(savedContract.history) && savedContract.history.length > 0) {
+                    const latest = savedContract.history[savedContract.history.length - 1];
+                    if (latest && latest.content) {
+                        textCandidates.push(latest.content);
+                    }
+                }
                 for (const candidate of textCandidates) {
                     const normalized = normalizeContentToText(candidate).trim();
                     if (normalized.length >= 10) {

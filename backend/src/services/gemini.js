@@ -255,15 +255,34 @@ function normalizeAnalyzeResult(parsed) {
 }
 
 function normalizeIsoDate(value) {
-    const raw = String(value || '').trim();
+    let raw = String(value || '').trim();
     if (!raw) return null;
     if (/^(null|undefined|なし|不明|-|N\/A)$/i.test(raw)) return null;
 
-    // 3桁または4桁の年度に対応 (例: 026年 -> 2026年 と補完)
+    // Remove surrounding brackets or common prefixes
+    raw = raw.replace(/^[（(【「]|[）)】」]$/g, '').trim();
+
+    // 1. Handle Japanese Eras (令和, 平成, 昭和)
+    const eraMatch = raw.match(/(?:令和|平成|昭和)?\s*(\d+|元)年\s*(\d+)月\s*(\d+)日?/);
+    if (eraMatch) {
+        let yearNum = eraMatch[1] === '元' ? 1 : Number(eraMatch[1]);
+        const month = Number(eraMatch[2]);
+        const day = Number(eraMatch[3]);
+        
+        if (raw.includes('令和')) yearNum += 2018;
+        else if (raw.includes('平成')) yearNum += 1988;
+        else if (raw.includes('昭和')) yearNum += 1925;
+        else if (yearNum < 100) yearNum += 2000; // Fallback for 2-digit years
+
+        if (yearNum >= 1900 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+            return `${yearNum}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        }
+    }
+
+    // 2. Handle 3-digit or 4-digit years (e.g., 2026/04/01, 026/04/01)
     const ymd = raw.match(/^(\d{3,4})[\/\-.年]\s*(\d{1,2})[\/\-.月]\s*(\d{1,2})日?$/);
     if (ymd) {
         let y = Number(ymd[1]);
-        // 026年 などの欠損を 2026年 と補完
         if (y < 1000 && y > 20) y += 2000; 
         const m = Number(ymd[2]);
         const d = Number(ymd[3]);
@@ -272,12 +291,18 @@ function normalizeIsoDate(value) {
         }
     }
 
-    const dt = new Date(raw);
-    if (Number.isNaN(dt.getTime())) return null;
-    const y = dt.getFullYear();
-    const m = dt.getMonth() + 1;
-    const d = dt.getDate();
-    return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    // 3. Native Date parsing fallback
+    const dt = new Date(raw.replace(/[年月日]/g, '/'));
+    if (!Number.isNaN(dt.getTime())) {
+        const y = dt.getFullYear();
+        const m = dt.getMonth() + 1;
+        const d = dt.getDate();
+        if (y >= 1900) {
+            return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        }
+    }
+
+    return null;
 }
 
 function normalizeNoticePeriodDays(value) {
@@ -445,12 +470,23 @@ function buildLocalSingleAnalysis(contractText) {
         concern: 'AIサービスへの接続が制限されている、または解析エラーのため簡易表示となっています。'
     }));
 
+    // Heuristic metadata extraction
+    const expiry_date = normalizeIsoDate(text.match(/(?:満了日|終了日|期限)[：:\s]*(令和\d+年\d+月\d+日|\d{4}[-/年]\d{1,2}[-/月]\d{1,2}日?)/i)?.[1]);
+    const contract_start = normalizeIsoDate(text.match(/(?:開始日|着手日|締結日)[：:\s]*(令和\d+年\d+月\d+日|\d{4}[-/年]\d{1,2}[-/月]\d{1,2}日?)/i)?.[1]);
+    const notice_period_days = normalizeNoticePeriodDays(text.match(/(\d+)\s*(?:日|か月|ヶ月|ヶ月|月)前までに?通知/)?.[0]);
+
     return normalizeAnalyzeResult({
         changes,
         riskLevel: 1,
         riskReason: 'AI評価を取得できなかったため補完要約を表示しています',
         summary: preview ? `補完要約: ${preview}` : '補完要約を表示しています',
-        isFallback: true
+        isFallback: true,
+        contract_meta: {
+            expiry_date,
+            contract_start,
+            notice_period_days,
+            date_confidence: 'low'
+        }
     });
 }
 
