@@ -7868,6 +7868,7 @@ class DashboardApp {
             changes: []
         };
         let requestedRemoteAnalysis = false;
+        let loadingNotify = null;
 
         try {
             // Check Usage Limit (Only for manual, non-cached analysis)
@@ -7880,7 +7881,11 @@ class DashboardApp {
                 }
             }
             if (!silent) {
-                Notify.info('AI差分解析を実行中...');
+                loadingNotify = Notify.info('比較元と比較先の差分リスクを解析中...', {
+                    title: '差分リスク解析中',
+                    position: 'center',
+                    duration: 0
+                });
             }
 
             const sourceType = String(contract?.source_type || '').toUpperCase();
@@ -7965,6 +7970,8 @@ class DashboardApp {
             } else if (!silent) {
                 Notify.error(`AI解析中にエラーが発生しました: ${error.message}`);
             }
+        } finally {
+            if (loadingNotify?.close) loadingNotify.close();
         }
     }
 
