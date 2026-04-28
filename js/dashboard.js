@@ -6834,6 +6834,47 @@ class DashboardApp {
         })();
     }
 
+    showVersionUploadNotice(onConfirm) {
+        const existing = document.getElementById('version-upload-notice-overlay');
+        if (existing) existing.remove();
+
+        const overlay = document.createElement('div');
+        overlay.id = 'version-upload-notice-overlay';
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9500;display:flex;align-items:center;justify-content:center;padding:16px;';
+        overlay.innerHTML = `
+            <div style="background:#fff;border-radius:12px;padding:26px 30px;width:430px;max-width:94vw;box-shadow:0 8px 32px rgba(0,0,0,0.18);">
+                <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:18px;">
+                    <div style="width:40px;height:40px;border-radius:10px;background:#fff4df;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                        <i class="fa-solid fa-cloud-arrow-up" style="color:#c5a059;font-size:18px;"></i>
+                    </div>
+                    <div>
+                        <div style="font-size:15px;font-weight:700;color:#2b2623;margin-bottom:6px;">新しいバージョンを取り込みますか？</div>
+                        <div style="font-size:13px;color:#5e544d;line-height:1.7;">
+                            資料を選択して取り込むと、差分判定・AIリスク解析・期限取得が開始されます。<br>
+                            <strong style="color:#c5a059;">解析回数を1回消費します。</strong>
+                        </div>
+                    </div>
+                </div>
+                <div style="background:#f8f6f3;border-radius:8px;padding:12px 14px;margin-bottom:20px;font-size:12px;color:#7a6a5a;line-height:1.6;">
+                    <i class="fa-solid fa-circle-info" style="color:#c5a059;margin-right:6px;"></i>
+                    ファイルを選ぶ前に中止する場合は「キャンセル」を押してください。
+                </div>
+                <div style="display:flex;gap:10px;justify-content:flex-end;">
+                    <button type="button" class="version-upload-cancel" style="padding:9px 18px;border:1px solid #ddd;border-radius:6px;background:#fff;color:#5e544d;font-size:14px;cursor:pointer;">キャンセル</button>
+                    <button type="button" class="version-upload-ok" style="padding:9px 22px;border:none;border-radius:6px;background:#c5a059;color:#fff;font-size:14px;font-weight:600;cursor:pointer;">はい</button>
+                </div>
+            </div>`;
+
+        const close = () => overlay.remove();
+        overlay.querySelector('.version-upload-cancel').addEventListener('click', close);
+        overlay.querySelector('.version-upload-ok').addEventListener('click', () => {
+            close();
+            if (typeof onConfirm === 'function') onConfirm();
+        });
+        overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+        document.body.appendChild(overlay);
+    }
+
     uploadNewVersion(id) {
         if (!this.ensurePaymentAccess('新しいバージョン解析')) {
             return;
@@ -6858,13 +6899,14 @@ class DashboardApp {
             return;
         }
 
-        // それ以外（PDF/Word）はファイル選択ダイアログを表示
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.pdf,.docx';
+        const openFilePicker = () => {
+            // それ以外（PDF/Word）はファイル選択ダイアログを表示
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.pdf,.docx';
 
-        // input.click() をトリガーする前にイベントハンドラを設定
-        input.onchange = async (e) => {
+            // input.click() をトリガーする前にイベントハンドラを設定
+            input.onchange = async (e) => {
             const file = e.target.files[0];
             if (!file) return;
 
@@ -7027,8 +7069,11 @@ class DashboardApp {
             await performAnalysis();
         };
 
-        // ファイル選択ダイアログを表示
-        input.click();
+            // ファイル選択ダイアログを表示
+            input.click();
+        };
+
+        this.showVersionUploadNotice(openFilePicker);
     }
 
     /**
