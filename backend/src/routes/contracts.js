@@ -816,8 +816,9 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                         aiResult = geminiService.buildHeuristicFallbackAnalysis(textToAnalyze, previousVersionText, lastError);
                     }
 
-                    // 3.1 Increment Usage Count ONLY on successful AI analysis (or meaningful fallback)
-                    const aiSucceeded = aiResult && aiResult.summary && !isAiFailureSummary(aiResult.summary);
+                    // 3.1 Increment Usage Count ONLY on successful AI analysis.
+                    // Fallback metadata may still be saved below, but fallback risk text must not be treated as a completed AI review.
+                    const aiSucceeded = aiResult && aiResult.isFallback !== true && aiResult.summary && !isAiFailureSummary(aiResult.summary);
                     const hasMeta = hasMeaningfulContractMeta(aiResult?.contract_meta);
                     
                     if (aiSucceeded || hasMeta) {
@@ -874,6 +875,16 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
             structuredContract,
             rawExtractedText
         };
+        if (aiResult.isFallback === true) {
+            Object.assign(resultData, {
+                summary: '',
+                riskReason: '',
+                changes: [],
+                isFallback: false,
+                aiFailed: true,
+                aiSucceeded: false
+            });
+        }
 
         return res.json({
             success: true,
@@ -1107,7 +1118,7 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
                     }));
                 }
 
-                const aiSucceeded = aiResult && aiResult.summary && !isAiFailureSummary(aiResult.summary);
+                const aiSucceeded = aiResult && aiResult.isFallback !== true && aiResult.summary && !isAiFailureSummary(aiResult.summary);
                 const hasMeta = hasMeaningfulContractMeta(aiResult?.contract_meta);
 
                 if ((aiSucceeded || hasMeta) && !localUnlimited) {
@@ -1148,6 +1159,14 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
             success: true,
             data: {
                 ...aiResult,
+                ...(aiResult.isFallback === true ? {
+                    summary: '',
+                    riskReason: '',
+                    changes: [],
+                    isFallback: false,
+                    aiFailed: true,
+                    aiSucceeded: false
+                } : {}),
                 sourceType: 'DOCX',
                 type: 'docx',
                 content: extractedRawText,
@@ -1402,8 +1421,7 @@ router.post('/:id/reanalyze', rateLimit, async (req, res, next) => {
             }
         }
 
-        // 保存判定ではフォールバック（補完解析）も許容する
-        const aiReady = isAiResultReady(aiResult, true);
+        const aiReady = isAiResultReady(aiResult);
         if (!aiReady) {
             const failedMetaUpdate = {
                 ai_succeeded: false,

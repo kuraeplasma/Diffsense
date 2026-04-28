@@ -1500,6 +1500,55 @@ ul {
     margin-bottom: 8px;
 }
 
+.analysis-risk-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.analysis-risk-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #5f6b7a;
+}
+
+.analysis-text-blocks {
+    display: grid;
+    gap: 6px;
+    color: #2f3a45;
+    font-size: 13px;
+    line-height: 1.75;
+    overflow-wrap: anywhere;
+}
+
+.analysis-text-heading {
+    margin-top: 4px;
+    color: #1f5fbf;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.analysis-text-paragraph {
+    margin: 0;
+}
+
+.analysis-summary-block {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #e7ecf3;
+}
+
+.analysis-change-note {
+    display: grid;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.analysis-change-note:last-child {
+    margin-bottom: 0;
+}
+
 /* Button (Quiet) */
 .btn-dashboard {
     padding: 10px 16px; /* Increased for mobile height */

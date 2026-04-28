@@ -240,6 +240,44 @@ const renderClauseParagraphs = (text) => {
     return lines.map((line) => `<p class="clause-p">${escapeHtmlText(line)}</p>`).join('');
 };
 
+const normalizeAnalysisDisplayText = (value) => String(value || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\s*[【\[［]\s*影響\s*[】\]］]\s*/g, '\n【影響】\n')
+    .replace(/\s*[【\[［]\s*推奨(?:対応|対象)\s*[】\]］]\s*/g, '\n【推奨対応】\n')
+    .replace(/\s*[【\[［]\s*(?:対応案|実務対応)\s*[】\]］]\s*/g, '\n【推奨対応】\n')
+    .replace(/\s*(影響)\s*[:：]\s*/g, '\n【$1】\n')
+    .replace(/\s*(推奨(?:対応|対象)|対応案|実務対応)\s*[:：]\s*/g, '\n【推奨対応】\n')
+    .replace(/。\s*(?=\S)/g, '。\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+const splitAnalysisDisplayLines = (value) => normalizeAnalysisDisplayText(value)
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+const getFirstAnalysisLine = (value, fallback = '') => {
+    const first = splitAnalysisDisplayLines(value)
+        .find((line) => !/^【[^】]+】$/.test(line));
+    return first || fallback;
+};
+
+const renderAnalysisTextBlocks = (value, fallback = '') => {
+    const lines = splitAnalysisDisplayLines(value || fallback);
+    if (lines.length === 0) return '';
+
+    return `<div class="analysis-text-blocks">${
+        lines.map((line) => {
+            const heading = line.match(/^【([^】]+)】$/);
+            if (heading) {
+                return `<div class="analysis-text-heading">${escapeHtmlText(heading[1])}</div>`;
+            }
+            return `<p class="analysis-text-paragraph">${escapeHtmlText(line)}</p>`;
+        }).join('')
+    }</div>`;
+};
+
 const hasAnalysisRecord = (payload) => {
     if (!payload || typeof payload !== 'object') return false;
     const summary = String(payload.summary || payload.ai_summary || '').trim();
@@ -1626,8 +1664,8 @@ const Views = {
                 </div>
                 ${(c.impact || c.concern) ? `
                 <div class="mobile-change-impact">
-                    ${c.impact ? `<div><strong><i class="fa-solid fa-scale-balanced"></i> 法的影響:</strong> ${escapeHtmlText(c.impact)}</div>` : ''}
-                    ${c.concern ? `<div><strong><i class="fa-solid fa-triangle-exclamation"></i> 懸念点:</strong> ${escapeHtmlText(c.concern)}</div>` : ''}
+                    ${c.impact ? `<div><strong><i class="fa-solid fa-scale-balanced"></i> 法的影響</strong>${renderAnalysisTextBlocks(c.impact)}</div>` : ''}
+                    ${c.concern ? `<div><strong><i class="fa-solid fa-triangle-exclamation"></i> 懸念点</strong>${renderAnalysisTextBlocks(c.concern)}</div>` : ''}
                 </div>
                 ` : ''}
             </article>
@@ -1721,10 +1759,10 @@ const Views = {
                 <section class="mobile-risk-sticky mobile-risk-${mobileRiskTone} mobile-only" aria-label="リスク判定">
                     <div class="mobile-risk-row">
                         <span class="mobile-risk-pill">${mobileRiskLabel}</span>
-                        <span class="mobile-risk-reason">${escapeHtmlText(diffData.riskReason || 'リスク判定を確認してください')}</span>
+                        <span class="mobile-risk-reason">${escapeHtmlText(getFirstAnalysisLine(diffData.riskReason, 'リスク判定を確認してください'))}</span>
                     </div>
                     <div class="mobile-risk-summary-label">AI要約</div>
-                    <div class="mobile-risk-summary">${escapeHtmlText(diffData.summary || 'AI要約はまだありません。')}</div>
+                    <div class="mobile-risk-summary">${escapeHtmlText(getFirstAnalysisLine(diffData.summary, 'AI要約はまだありません。'))}</div>
                 </section>
                 ` : (contract.ai_succeeded === false ? `
                 <section class="mobile-risk-sticky mobile-only" style="background:#fff5f5; border-top:1px solid #feb2b2; padding:12px;" aria-label="解析失敗">
@@ -1769,13 +1807,14 @@ const Views = {
                                     <span><i class="fa-solid fa-robot text-primary"></i> AIリスク要約</span>
                                 </div>
                                 <div class="analysis-card">
-                                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+                                    <div class="analysis-risk-header">
                                         <span class="badge ${diffData.riskLevel >= 3 ? 'badge-danger' : diffData.riskLevel >= 2 ? 'badge-warning' : 'badge-success'}">
                                             ${diffData.riskLevel >= 3 ? 'High' : diffData.riskLevel >= 2 ? 'Medium' : 'Low'}
                                         </span>
-                                        <span style="font-size:12px; color:#666;">${diffData.riskReason || ''}</span>
+                                        <span class="analysis-risk-label">AI評価</span>
                                     </div>
-                                    <div style="font-size:13px; color:#333; line-height:1.7; white-space:pre-wrap;">${escapeHtmlText(diffData.summary || 'AI解析結果がありません')}</div>
+                                    ${renderAnalysisTextBlocks(diffData.riskReason, '')}
+                                    <div class="analysis-summary-block">${renderAnalysisTextBlocks(diffData.summary, 'AI解析結果がありません')}</div>
                                 </div>
                                 ${(effectiveSelectedDiffData && displayChanges.length > 0) ? (() => {
                                     return '<div class="analysis-section-title" style="margin-top:16px;"><span><i class="fa-solid fa-list-check text-primary"></i> 検出された重要な変更点</span></div>'
@@ -1795,8 +1834,8 @@ const Views = {
                                                 + '</div>'
                                                 + ((c.impact || c.concern)
                                                     ? '<div style="font-size:12px; color:#5e544d; line-height:1.6; border-top:1px solid #f0ede8; padding-top:8px;">'
-                                                        + (c.impact ? '<div style="margin-bottom:4px;"><strong><i class="fa-solid fa-scale-balanced" style="color:#1976d2; margin-right:4px;"></i>法的影響:</strong> ' + escapeHtmlText(c.impact) + '</div>' : '')
-                                                        + (c.concern ? '<div><strong><i class="fa-solid fa-triangle-exclamation" style="color:#f57c00; margin-right:4px;"></i>懸念点:</strong> ' + escapeHtmlText(c.concern) + '</div>' : '')
+                                                        + (c.impact ? '<div class="analysis-change-note"><strong><i class="fa-solid fa-scale-balanced" style="color:#1976d2; margin-right:4px;"></i>法的影響</strong>' + renderAnalysisTextBlocks(c.impact) + '</div>' : '')
+                                                        + (c.concern ? '<div class="analysis-change-note"><strong><i class="fa-solid fa-triangle-exclamation" style="color:#f57c00; margin-right:4px;"></i>懸念点</strong>' + renderAnalysisTextBlocks(c.concern) + '</div>' : '')
                                                         + '</div>'
                                                     : '')
                                                 + '</div>';

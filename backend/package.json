@@ -4,7 +4,7 @@
   "description": "DIFFsense AI Contract Analysis Backend API",
   "main": "index.js",
   "engines": {
-    "node": "20"
+    "node": "22"
   },
   "scripts": {
     "check:env:prod": "node scripts/check-production-env.js",

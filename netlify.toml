@@ -4,6 +4,21 @@
   [build.environment]
     SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"
 
+[[headers]]
+  for = "/dashboard.html"
+  [headers.values]
+    Cache-Control = "no-store, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/js/dashboard.js"
+  [headers.values]
+    Cache-Control = "no-cache, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/css/dashboard.css"
+  [headers.values]
+    Cache-Control = "no-cache, max-age=0, must-revalidate"
+
 [[redirects]]
   from = "/api/paypal-checkout"
   to = "/.netlify/functions/paypal-checkout"

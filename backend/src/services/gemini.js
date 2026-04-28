@@ -5,12 +5,24 @@ const Diff = require('diff');
 // Gemini API Configuration
 // NOTE: We use gemini-2.0-flash on the v1beta endpoint as it is faster and more reliable.
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
+const DEFAULT_GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash'];
 
 if (GEMINI_API_KEY) {
     logger.info(`GEMINI_API_KEY is configured (starts with ${GEMINI_API_KEY.slice(0, 4)}...)`);
 } else {
     logger.warn('GEMINI_API_KEY is NOT configured in environment.');
+}
+
+function getGeminiModelCandidates() {
+    const raw = process.env.GEMINI_MODEL_CANDIDATES || process.env.GEMINI_MODEL || '';
+    const configured = raw.split(',').map((item) => item.trim()).filter(Boolean);
+    const candidates = configured.length > 0 ? configured : DEFAULT_GEMINI_MODELS;
+    return [...new Set(candidates.map((item) => item.replace(/^models\//, '')))];
+}
+
+function buildGeminiEndpoint(model) {
+    return `${GEMINI_API_BASE}/${model}:generateContent`;
 }
 
 function extractCandidateText(payload) {
@@ -194,9 +206,9 @@ function normalizeChanges(rawChanges) {
         section: String(c?.section || c?.clause || '本文').trim() || '本文',
         type: String(c?.type || c?.changeType || 'modification').toLowerCase(),
         old: String(c?.old || c?.before || '').trim(),
-        new: String(c?.new || c?.after || '').trim(),
+        new: String(c?.new || c?.after || c?.content || '').trim(),
         impact: String(c?.impact || '').trim(),
-        concern: String(c?.concern || c?.risk || '').trim()
+        concern: String(c?.concern || c?.risk || c?.content || '').trim()
     }));
 }
 
@@ -230,7 +242,7 @@ function normalizeAnalyzeResult(parsed) {
 
     // 4. Normalize changes
     let rawChanges = parsed?.changes || parsed?.materialChanges || parsed?.material_changes || parsed?.risks || parsed?.items;
-    const changes = Array.isArray(rawChanges) ? rawChanges : [];
+    const changes = normalizeChanges(rawChanges);
 
     // 状態判定フラグ
     const isFallback = parsed?.isFallback === true;
@@ -343,6 +355,63 @@ function normalizeDateConfidence(value) {
     if (raw === 'medium' || raw === 'partial') return 'medium';
     if (raw === 'low') return 'low';
     return 'unknown';
+}
+
+const JAPANESE_DATE_SOURCE = '(?:令和|平成|昭和)?\\s*(?:\\d+|元)年\\s*\\d{1,2}月\\s*\\d{1,2}日?|\\d{4}[\\/\\-.年]\\s*\\d{1,2}[\\/\\-.月]\\s*\\d{1,2}日?';
+
+function hasDeadlineContext(text) {
+    return /(契約期間|委託期間|有効期間|期間|満了|終了日|満了日|期限|自動更新|更新|通知|解約|解除)/.test(String(text || ''));
+}
+
+function extractHeuristicContractMeta(contractText) {
+    const text = String(contractText || '').replace(/\u3000/g, ' ').trim();
+    if (!text) return normalizeContractMeta({});
+
+    const compactText = text.replace(/[ \t]+/g, ' ');
+    const rangePattern = new RegExp(`(${JAPANESE_DATE_SOURCE})\\s*(?:から|より|～|〜|~|－|-)\\s*(${JAPANESE_DATE_SOURCE})`, 'g');
+
+    let bestRange = null;
+    for (const match of compactText.matchAll(rangePattern)) {
+        const start = match.index || 0;
+        const context = compactText.slice(Math.max(0, start - 80), Math.min(compactText.length, start + match[0].length + 80));
+        const score = hasDeadlineContext(context) ? 2 : 1;
+        if (!bestRange || score > bestRange.score) {
+            bestRange = { startDate: match[1], endDate: match[2], score };
+        }
+    }
+
+    let contract_start = normalizeIsoDate(bestRange?.startDate);
+    let expiry_date = normalizeIsoDate(bestRange?.endDate);
+
+    if (!expiry_date) {
+        const explicitExpiryPattern = new RegExp(`(?:満了日|終了日|契約終了日|有効期限|期限|至)\\s*[：:]?\\s*(${JAPANESE_DATE_SOURCE})`, 'i');
+        expiry_date = normalizeIsoDate(compactText.match(explicitExpiryPattern)?.[1]);
+    }
+
+    if (!contract_start) {
+        const explicitStartPattern = new RegExp(`(?:開始日|契約開始日|着手日|締結日|自)\\s*[：:]?\\s*(${JAPANESE_DATE_SOURCE})`, 'i');
+        contract_start = normalizeIsoDate(compactText.match(explicitStartPattern)?.[1]);
+    }
+
+    const noticeRaw = compactText.match(/(?:満了日|終了日|期限|更新|解約|解除).{0,30}?(\d{1,4})\s*(営業日|日|週間|週|か月|ヶ月|ヵ月|月|年)\s*前/)?.[0]
+        || compactText.match(/(\d{1,4})\s*(営業日|日|週間|週|か月|ヶ月|ヵ月|月|年)\s*前.{0,30}?(?:通知|申し出|申出|書面通知)/)?.[0];
+    const notice_period_days = normalizeNoticePeriodDays(noticeRaw);
+
+    const renewalMatch = new RegExp(`(?:更新拒絶|更新停止|解約申入|解除通知|通知期限)\\s*[：:]?\\s*(${JAPANESE_DATE_SOURCE})`, 'i').exec(compactText);
+    const renewal_deadline = normalizeIsoDate(renewalMatch?.[1]);
+
+    const auto_renewal = /自動更新|更新する|同一条件で更新|さらに.*更新/.test(compactText)
+        ? !/(自動更新なし|更新しない|更新されない)/.test(compactText)
+        : null;
+
+    return normalizeContractMeta({
+        expiry_date,
+        renewal_deadline,
+        contract_start,
+        auto_renewal,
+        notice_period_days,
+        date_confidence: expiry_date || renewal_deadline || contract_start ? 'low' : 'unknown'
+    });
 }
 
 function toUtcDate(isoDate) {
@@ -470,16 +539,7 @@ function buildLocalSingleAnalysis(contractText) {
         concern: 'AIサービスへの接続が制限されている、または解析エラーのため簡易表示となっています。'
     }));
 
-    // Heuristic metadata extraction (Improved for Japanese contracts)
-    // Try to find the END date in a range like "令和8年4月1日 〜 令和8年5月31日"
-    const expiryMatch = text.match(/(?:満了日|終了日|期限|期間|有効期間|至)[：:\s]*(?:令和\d+年\d+月\d+日|\d{4}[-/年]\d{1,2}[-/月]\d{1,2}日?)\s*[〜~～-]\s*(令和\d+年\d+月\d+日|\d{4}[-/年]\d{1,2}[-/月]\d{1,2}日?)/i) 
-                      || text.match(/(?:満了日|終了日|期限|期間|有効期間|至)[：:\s]*(令和\d+年\d+月\d+日|\d{4}[-/年]\d{1,2}[-/月]\d{1,2}日?)/i);
-    const expiry_date = normalizeIsoDate(expiryMatch?.[1] || expiryMatch?.[0]);
-
-    const startMatch = text.match(/(?:開始日|着手日|締結日|自)[：:\s]*(令和\d+年\d+月\d+日|\d{4}[-/年]\d{1,2}[-/月]\d{1,2}日?)/i);
-    const contract_start = normalizeIsoDate(startMatch?.[1]);
-    
-    const notice_period_days = normalizeNoticePeriodDays(text.match(/(\d+)\s*(?:日|か月|ヶ月|ヶ月|月)前までに?通知/)?.[0]);
+    const heuristicMeta = extractHeuristicContractMeta(text);
 
     return normalizeAnalyzeResult({
         changes,
@@ -487,12 +547,7 @@ function buildLocalSingleAnalysis(contractText) {
         riskReason: 'AI評価を取得できなかったため補完要約を表示しています',
         summary: preview ? `補完要約: ${preview}` : '補完要約を表示しています',
         isFallback: true,
-        contract_meta: {
-            expiry_date,
-            contract_start,
-            notice_period_days,
-            date_confidence: 'low'
-        }
+        contract_meta: heuristicMeta
     });
 }
 
@@ -519,7 +574,8 @@ function buildLocalDiffAnalysis(currentText, previousText) {
         riskLevel: 1,
         riskReason: 'AI評価を取得できなかったため補完差分を表示しています',
         summary,
-        isFallback: true
+        isFallback: true,
+        contract_meta: extractHeuristicContractMeta(rhs || lhs)
     });
 }
 
@@ -570,6 +626,12 @@ function truncateStructuredClauseText(text, maxLength = 2200) {
     const normalized = String(text || '').trim();
     if (normalized.length <= maxLength) return normalized;
     return `${normalized.slice(0, maxLength)}\n...[省略]`;
+}
+
+function getUnifiedAnalysisTextLimit() {
+    const configured = Number(process.env.GEMINI_ANALYSIS_MAX_CHARS || 16000);
+    if (!Number.isFinite(configured)) return 16000;
+    return Math.max(4000, Math.min(Math.floor(configured), 30000));
 }
 
 function riskLevelToLabel(value) {
@@ -1093,10 +1155,15 @@ class GeminiService {
             console.log('Geminiレスポンス取得');
 
             logger.info("Gemini raw response:", JSON.stringify(res));
+            const contractMeta = await this.ensureContractMeta(
+                currentText,
+                previousText,
+                res?.contract_meta || res
+            );
             const result = {
                 ...normalizeAnalyzeResult(res),
                 changes: normalizeChanges(res?.changes),
-                contract_meta: normalizeContractMeta(res?.contract_meta || res),
+                contract_meta: contractMeta,
                 isLimited: false,
                 isFallback: false
             };
@@ -1222,42 +1289,50 @@ class GeminiService {
         }
 
         const budget = getGeminiRequestBudget();
+        const models = getGeminiModelCandidates();
         let lastError = null;
-        for (let attempt = 0; attempt < budget.maxAttempts; attempt += 1) {
-            try {
-                console.log('Geminiリクエスト開始');
-                const response = await axios.post(
-                    `${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`,
-                    body,
-                    {
-                        timeout: budget.timeoutMs,
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Referer': 'https://diffsense.spacegleam.co.jp'
+        for (let modelIndex = 0; modelIndex < models.length; modelIndex += 1) {
+            const model = models[modelIndex];
+            for (let attempt = 0; attempt < budget.maxAttempts; attempt += 1) {
+                try {
+                    console.log(`Geminiリクエスト開始 (${model})`);
+                    const response = await axios.post(
+                        `${buildGeminiEndpoint(model)}?key=${GEMINI_API_KEY}`,
+                        body,
+                        {
+                            timeout: budget.timeoutMs,
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Referer': 'https://diffsense.spacegleam.co.jp'
+                            }
                         }
+                    );
+                    console.log(`Geminiレスポンス取得 (${model})`);
+                    const aiText = extractCandidateText(response?.data);
+                    return parseGeminiJsonResponse(aiText);
+                } catch (error) {
+                    lastError = error;
+                    const status = getGeminiErrorStatus(error);
+                    const errorData = error.response?.data;
+                    if (errorData) {
+                        logger.error(`Gemini API Error Details (${model}): ${JSON.stringify(errorData)}`);
                     }
-                );
-                console.log('Geminiレスポンス取得');
-                const aiText = extractCandidateText(response?.data);
-                return parseGeminiJsonResponse(aiText);
-            } catch (error) {
-                lastError = error;
-                const status = getGeminiErrorStatus(error);
-                const errorData = error.response?.data;
-                if (errorData) {
-                    logger.error(`Gemini API Error Details: ${JSON.stringify(errorData)}`);
-                }
 
-                if (attempt >= budget.maxAttempts - 1 || !shouldRetryGeminiRequest(error)) {
-                    break;
+                    if (attempt >= budget.maxAttempts - 1 || !shouldRetryGeminiRequest(error)) {
+                        break;
+                    }
+                    const retryAfterMs = status === 429 ? parseRetryAfterMs(error) : null;
+                    const linearWaitMs = budget.retryBaseMs * (attempt + 1);
+                    const waitMs = status === 429
+                        ? Math.max(retryAfterMs ?? 0, Math.max(5000, linearWaitMs * 4)) // 429のときは最低5秒待機
+                        : linearWaitMs;
+                    logger.warn(`Gemini request retry ${attempt + 1}/${Math.max(0, budget.maxAttempts - 1)} for ${model} after ${waitMs}ms (status=${status || 'n/a'}): ${error.message}`);
+                    await new Promise((resolve) => setTimeout(resolve, waitMs));
                 }
-                const retryAfterMs = status === 429 ? parseRetryAfterMs(error) : null;
-                const linearWaitMs = budget.retryBaseMs * (attempt + 1);
-                const waitMs = status === 429
-                    ? Math.max(retryAfterMs ?? 0, Math.max(5000, linearWaitMs * 4)) // 429のときは最低5秒待機
-                    : linearWaitMs;
-                logger.warn(`Gemini request retry ${attempt + 1}/${Math.max(0, budget.maxAttempts - 1)} after ${waitMs}ms (status=${status || 'n/a'}): ${error.message}`);
-                await new Promise((resolve) => setTimeout(resolve, waitMs));
+            }
+            if (modelIndex < models.length - 1) {
+                const status = getGeminiErrorStatus(lastError);
+                logger.warn(`Gemini model ${model} failed (status=${status || 'n/a'}). Trying ${models[modelIndex + 1]}.`);
             }
         }
 
@@ -1459,6 +1534,7 @@ ${buildSemanticDiffCandidate(change?.old || '', change?.new || '')}
 
     buildUnifiedAnalysisPrompt(currentText, previousText = '') {
         const isDiff = previousText && previousText.trim().length > 0;
+        const analysisTextLimit = getUnifiedAnalysisTextLimit();
         
         let prompt = `あなたは企業法務専門のAIです。
 以下の契約書の内容（${isDiff ? '変更内容' : '内容'}）を分析し、実務レベルでリスク評価を行ってください。
@@ -1468,27 +1544,27 @@ ${buildSemanticDiffCandidate(change?.old || '', change?.new || '')}
 
 # 【入力】
 ${isDiff ? `変更前：
-${truncateStructuredClauseText(previousText)}
+        ${truncateStructuredClauseText(previousText, analysisTextLimit)}
 
 変更後：
-${truncateStructuredClauseText(currentText)}` : `対象テキスト：
-${truncateStructuredClauseText(currentText)}`}
+        ${truncateStructuredClauseText(currentText, analysisTextLimit)}` : `対象テキスト：
+        ${truncateStructuredClauseText(currentText, analysisTextLimit)}`}
 
 # 【出力要件】
 以下のJSON形式で厳密に出力してください。JSON以外のテキストを出力しないでください：
 
 {
-  "summary": "変更点の要約（1〜2文）",
+  "summary": "変更点の要約（1〜2文、180文字以内）",
   "changes": [
     {
       "type": "追加 / 削除 / 変更",
-      "content": "何がどう変わったか（具体）"
+      "content": "何がどう変わったか（120文字以内で具体）"
     }
   ],
   "risk_level": "High / Medium / Low",
-  "risk_reason": "なぜそのリスクなのか（契約実務ベースで具体的に）",
-  "impact": "企業側にどんな不利益があるか",
-  "suggestion": "実務的な対応案（修正・交渉案）",
+  "risk_reason": "なぜそのリスクなのか（契約実務ベースで具体的に、160文字以内）",
+  "impact": "企業側の不利益を最大3項目。各項目は改行で区切り、各80文字以内",
+  "suggestion": "実務的な対応案を最大3項目。各項目は改行で区切り、各80文字以内",
   "contract_meta": {
     "contract_category": "業務委託 / 秘密保持 / 売買 / 賃貸借 / 等（最も適切なカテゴリ）",
     "expiry_date": "契約満了日 (YYYY-MM-DD形式、不明な場合は null)",
@@ -1513,6 +1589,9 @@ ${truncateStructuredClauseText(currentText)}`}
 * 判断に迷う場合は Medium
 * 明確な不利益があれば High
 * 日付（YYYY-MM-DD）や期限情報は、契約文面から「正確に」抽出すること。
+* summary / risk_reason / impact / suggestion は長文一段落にしない
+* impact と suggestion は同じ内容を繰り返さず、箇条書き相当の短文を改行で区切る
+* changes は重要なものを最大5件に絞る
 
 # 【出力制約】
 * JSON以外のテキストを出力しない
@@ -1819,7 +1898,7 @@ ${truncatedText}
             generationConfig: { temperature: 0.2, maxOutputTokens: 512 }
         };
         const response = await axios.post(
-            `${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`,
+            `${buildGeminiEndpoint(getGeminiModelCandidates()[0])}?key=${GEMINI_API_KEY}`,
             body,
             { timeout: 30000, headers: { 'Content-Type': 'application/json' } }
         );
