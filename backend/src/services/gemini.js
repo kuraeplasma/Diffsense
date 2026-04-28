@@ -470,9 +470,15 @@ function buildLocalSingleAnalysis(contractText) {
         concern: 'AIサービスへの接続が制限されている、または解析エラーのため簡易表示となっています。'
     }));
 
-    // Heuristic metadata extraction
-    const expiry_date = normalizeIsoDate(text.match(/(?:満了日|終了日|期限)[：:\s]*(令和\d+年\d+月\d+日|\d{4}[-/年]\d{1,2}[-/月]\d{1,2}日?)/i)?.[1]);
-    const contract_start = normalizeIsoDate(text.match(/(?:開始日|着手日|締結日)[：:\s]*(令和\d+年\d+月\d+日|\d{4}[-/年]\d{1,2}[-/月]\d{1,2}日?)/i)?.[1]);
+    // Heuristic metadata extraction (Improved for Japanese contracts)
+    // Try to find the END date in a range like "令和8年4月1日 〜 令和8年5月31日"
+    const expiryMatch = text.match(/(?:満了日|終了日|期限|期間|有効期間|至)[：:\s]*(?:令和\d+年\d+月\d+日|\d{4}[-/年]\d{1,2}[-/月]\d{1,2}日?)\s*[〜~～-]\s*(令和\d+年\d+月\d+日|\d{4}[-/年]\d{1,2}[-/月]\d{1,2}日?)/i) 
+                      || text.match(/(?:満了日|終了日|期限|期間|有効期間|至)[：:\s]*(令和\d+年\d+月\d+日|\d{4}[-/年]\d{1,2}[-/月]\d{1,2}日?)/i);
+    const expiry_date = normalizeIsoDate(expiryMatch?.[1] || expiryMatch?.[0]);
+
+    const startMatch = text.match(/(?:開始日|着手日|締結日|自)[：:\s]*(令和\d+年\d+月\d+日|\d{4}[-/年]\d{1,2}[-/月]\d{1,2}日?)/i);
+    const contract_start = normalizeIsoDate(startMatch?.[1]);
+    
     const notice_period_days = normalizeNoticePeriodDays(text.match(/(\d+)\s*(?:日|か月|ヶ月|ヶ月|月)前までに?通知/)?.[0]);
 
     return normalizeAnalyzeResult({

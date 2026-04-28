@@ -806,8 +806,8 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                             const isRateLimit = geminiService.getGeminiErrorStatus(err) === 429;
                             logger.warn(`AI Analysis attempt ${attempt + 1} failed (RateLimit=${isRateLimit}): ${err.message}`);
                             
-                            // 429のときは少し長めに待ってからリトライを継続
-                            const waitMs = isRateLimit ? 5000 * (attempt + 1) : 1000 * (attempt + 1);
+                            // 429のときはリトライするが、ユーザーを待たせすぎないよう短めに調整
+                            const waitMs = isRateLimit ? 2000 * (attempt + 1) : 1000 * (attempt + 1);
                             await new Promise(resolve => setTimeout(resolve, waitMs));
                         }
                     }
@@ -1376,8 +1376,8 @@ router.post('/:id/reanalyze', rateLimit, async (req, res, next) => {
         let aiResult = null;
         const configuredReanalyzeAttempts = Number(process.env.REANALYZE_MAX_ATTEMPTS || 2);
         const maxReanalyzeAttempts = 2; // AI_RATE_LIMITED 対策で2回まで試行
-        const reanalyzeRetryBaseMs = 3000;
-        const reanalyzeRateLimitedRetryBaseMs = 8000;
+        const reanalyzeRetryBaseMs = 1500;
+        const reanalyzeRateLimitedRetryBaseMs = 3000;
 
         for (let attempt = 1; attempt <= maxReanalyzeAttempts; attempt++) {
             try {
