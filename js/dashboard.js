@@ -1750,7 +1750,7 @@ const Views = {
                                 <div class="skeleton-analysis-wrap">
                                     <div class="analysis-section-title">
                                         <i class="fa-solid fa-spinner fa-spin text-primary"></i>
-                                        <span id="analysis-status-text">AIがリスクを解析中です</span>
+                                        <span id="analysis-status-text">AIが資料を解析しています。しばらくお待ちください。</span>
                                     </div>
                                     <div class="analysis-card">
                                         <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
