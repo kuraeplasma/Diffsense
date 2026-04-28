@@ -442,13 +442,13 @@ ul {
 
 /* Wider desktop composition for static LP screenshot */
 .hero-container.lp-static-layout {
-    width: min(2360px, 100%);
-    max-width: 2360px;
+    width: min(1800px, 100%); /* Reduced from 2360px for better focus */
+    max-width: 1800px;
     margin-left: auto;
     margin-right: auto;
-    padding-left: clamp(12px, 1.4vw, 30px);
-    padding-right: clamp(12px, 1.4vw, 30px);
-    gap: clamp(0.5rem, 1vw, 1rem);
+    padding-left: clamp(40px, 5vw, 120px); /* Increased left padding to push text right */
+    padding-right: clamp(20px, 3vw, 60px);
+    gap: clamp(2rem, 5vw, 8rem); /* Increased gap to bring text closer to center */
     justify-content: center;
     align-items: center;
 }
@@ -571,11 +571,14 @@ ul {
 }
 
 .hero-title {
-    font-size: clamp(2.26rem, 5.6vw, 4.08rem);
-    line-height: 1.2;
-    margin-bottom: 1.8rem;
-    font-weight: 700;
-    color: #0f0c0a;
+    font-size: clamp(2rem, 4.3vw, 3.25rem);
+    line-height: 1.1;
+    margin-bottom: 2rem;
+    font-weight: 800;
+    color: #1a1512;
+    letter-spacing: -0.02em;
+    width: 100%;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.05); /* Subtle depth */
 }
 
 .hero-service-brand {
@@ -641,9 +644,291 @@ ul {
     }
 
     .dashboard-frame:hover {
-        transform: scale(1.02);
+        transform: scale(1.01);
         box-shadow: 0 30px 80px rgba(0, 0, 0, 0.3);
     }
+}
+.hero {
+    position: relative;
+    padding: 140px 0 100px;
+    background: linear-gradient(135deg, #fdfcfb 0%, #f4f0ec 100%);
+    overflow: hidden;
+}
+
+.hero-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle at 70% 30%, rgba(197, 160, 89, 0.05) 0%, transparent 70%);
+    z-index: 0;
+}
+
+.hero-container {
+    display: flex;
+    align-items: center;
+    gap: 0; /* Tightened for density */
+    max-width: 1400px !important;
+    position: relative;
+    z-index: 1;
+}
+
+@media (max-width: 991px) {
+    .hero-container {
+        flex-direction: column;
+        padding-top: 80px;
+        padding-bottom: 60px;
+        text-align: center;
+    }
+}
+
+/* LegalOn-style Layered Visual - 4.png Topmost */
+.hero-layered-visual {
+    position: relative;
+    width: 100%;
+    min-height: 480px; /* Reduced height for better balance */
+    margin-top: 2rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.layer-base {
+    width: 100%; 
+    max-width: 720px; /* Slightly reduced to give text more space */
+    z-index: 50; /* Topmost layer */
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 40px 120px rgba(0, 0, 0, 0.35);
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    position: relative;
+}
+
+.layer-float {
+    position: absolute;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+    background: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    z-index: 10;
+    pointer-events: none;
+}
+
+.layer-float-analysis {
+    width: 48%;
+    top: -15%;
+    left: -15%; /* Prominent signature area on the left */
+}
+
+.layer-float-sign {
+    width: 42%;
+    bottom: -18%;
+    right: -8%;
+}
+
+.layer-base img,
+.layer-float img {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+/* Mobile Layered Visual - Compact */
+.hero-layered-visual-mobile {
+    position: relative;
+    width: 100%;
+    height: 320px;
+    margin: 30px 0 20px;
+}
+
+.hero-layered-visual-mobile .layer-base {
+    width: 100%;
+    z-index: 50;
+}
+
+.hero-layered-visual-mobile .layer-float-analysis {
+    width: 60%;
+    top: -15%;
+    left: 0;
+    z-index: 10;
+}
+
+.hero-layered-visual-mobile .layer-float-sign {
+    width: 55%;
+    bottom: -10%;
+    right: 0;
+    z-index: 10;
+}
+
+/* New Premium Layered Visual System */
+.hero-visual {
+    flex: 1.4;
+    position: relative;
+    height: 700px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%; /* Force width for absolute children */
+    min-width: 500px;
+}
+
+.hero-layered-visual {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+/* Base Dashboard - Center Focused */
+.layer-base {
+    position: absolute;
+    top: 50%;
+    right: 50%;
+    transform: translate(50%, -50%);
+    width: 96%;
+    z-index: 1;
+    filter: drop-shadow(0 20px 60px rgba(0, 0, 0, 0.2));
+    border-radius: 12px;
+    overflow: hidden;
+    background: #fff;
+    border: 1px solid rgba(0,0,0,0.08);
+}
+
+.layer-base img {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+/* Signature Panel - Overlapping Top Left */
+.layer-float-analysis {
+    position: absolute;
+    top: 5%;
+    left: -10%; /* More overlap */
+    width: 60%;
+    z-index: 3;
+    filter: drop-shadow(0 40px 80px rgba(0, 0, 0, 0.25));
+    animation: none;
+}
+
+/* Notification Panel - Overlapping Bottom Right */
+.layer-float-sign {
+    position: absolute;
+    bottom: 5%;
+    right: -5%;
+    width: 62%;
+    z-index: 2;
+    filter: drop-shadow(0 30px 60px rgba(0, 0, 0, 0.2));
+    animation: none;
+}
+
+.layer-float-analysis img,
+.layer-float-sign img {
+    width: 100%;
+    height: auto;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    display: block;
+}
+
+/* Trust Badges - Integrated */
+.hero-visual-trust {
+    position: absolute;
+    top: -40px;
+    right: 10%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.8rem;
+    z-index: 5;
+    max-width: 400px;
+    justify-content: flex-end;
+}
+
+.hero-visual-trust-item {
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(8px);
+    padding: 0.5rem 1rem;
+    border-radius: 100px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--color-secondary);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    border: 1px solid var(--color-glass-border);
+    white-space: nowrap;
+}
+
+@keyframes heroFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-15px); }
+}
+
+.hero-support-copy {
+    flex: 1; /* Balanced with visual */
+    padding-right: 5%;
+    z-index: 30; /* High priority */
+}
+
+.hero-title-nowrap {
+    white-space: nowrap !important;
+    word-break: keep-all;
+    display: block;
+    width: 100%;
+}
+
+@media (max-width: 991px) {
+    .hero-support-copy {
+        align-items: center;
+        padding: 0;
+        max-width: 100%;
+        text-align: center;
+    }
+    .hero-title-nowrap {
+        white-space: normal; /* Allow wrap on small mobile screens if absolutely necessary */
+    }
+}
+@keyframes heroSlideFade {
+    0% {
+        opacity: 0;
+        visibility: hidden;
+        transform: scale(1.02) translateY(5px);
+    }
+    2% {
+        opacity: 0;
+        visibility: visible;
+    }
+    6% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+    25% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+    29% {
+        opacity: 0;
+        transform: scale(0.99) translateY(-5px);
+        visibility: hidden;
+    }
+    100% {
+        opacity: 0;
+        visibility: hidden;
+    }
+}
+
+/* Mobile Slideshow - Balanced */
+.hero-slideshow-visual-mobile {
+    position: relative;
+    width: 100%;
+    height: 400px;
+    margin: 40px 0 20px;
+}
+
+.hero-slideshow-visual-mobile .hero-slide-item {
+    width: 95%;
+    animation-name: heroSlideFadeMobile;
+    animation-duration: 24s;
 }
 
 .hero-subtitle {
@@ -760,7 +1045,7 @@ ul {
     flex-direction: column;
     justify-content: center;
     align-items: flex-start;
-    padding: 72px 32px 56px 32px;
+    padding: 60px 32px 40px 32px; /* Rebalanced for new visual height */
 }
 
 .hero-support-btns {
@@ -3305,7 +3590,7 @@ body.footer-in-view .back-to-top-btn {
     }
 
     .nav {
-        display: flex;
+        display: none; /* Force hidden by default */
         position: fixed;
         top: 70px;
         left: 0;
@@ -3319,7 +3604,7 @@ body.footer-in-view .back-to-top-btn {
         border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
 
-        /* Fast animation */
+        /* Animation */
         transform: translateY(-20px);
         transition: all 0.25s ease-out;
         opacity: 0;
@@ -3328,6 +3613,7 @@ body.footer-in-view .back-to-top-btn {
     }
 
     .nav.active {
+        display: flex; /* Show only when active */
         transform: translateY(0);
         opacity: 1;
         visibility: visible;
