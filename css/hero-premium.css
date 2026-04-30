@@ -237,12 +237,12 @@
         gap: 0;
         justify-content: center;
         width: 100%;
-        max-width: 960px !important; /* Reduced to 960px to provide safe margins on 1200px screens */
+        max-width: 1000px !important; /* Aggressively reduced to ensure visibility on all laptops */
         margin: 0 auto !important;
     }
 
     .hero-premium-content {
-        transform: translateX(-60px) translateY(10px) scale(0.7) !important; /* Shifted further left to avoid right-side clipping */
+        transform: translateX(-15px) translateY(10px) scale(0.7) !important; /* Shifted left instead of right */
         flex: 0 0 450px;
         padding-right: 0;
         z-index: 20;
@@ -254,11 +254,11 @@
     }
 
     .hero-support-btns {
-        transform: translateX(-60px) scale(1.15) !important;
+        transform: translateX(-15px) scale(1.15) !important;
     }
 
     .hero-cta-note {
-        transform: translateX(-60px) scale(0.95) !important;
+        transform: translateX(-15px) scale(0.95) !important;
     }
 
     .hero-premium-visual {
