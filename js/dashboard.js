@@ -11,7 +11,7 @@ import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/fi
 // module extraction. See /js/modules/.
 // =========================================================================
 const routes = {
-    dashboard: () => import('./modules/dashboard.js'),
+    dashboard: () => import('./modules/dashboard.js?v=20260430_dashboard_v2'),
     contracts: () => import('./modules/contracts.js'),
     history: () => import('./modules/history.js'),
     team: () => import('./modules/team.js'),
@@ -1038,75 +1038,153 @@ const renderStructuredView = (content, idPrefix = 'clause') => {
     }
 };
 
-const renderDashboardOverview = (app) => {
+const renderDashboardOverview = () => {
     const stats = dbService.getStats();
-    const currentFilter = app ? app.dashboardFilter : 'pending';
-    const filteredItems = dbService.getFilteredContracts(currentFilter);
+    const contracts = typeof dbService.getContracts === 'function' ? dbService.getContracts() : dbService.getFilteredContracts('total');
+    const now = new Date();
+    const esc = escapeHtmlText;
+    const nav = (view, id = '') => `window.app.navigate('${view}'${id === '' ? '' : `, ${JSON.stringify(id)}`})`;
+    const toDate = (value) => {
+        if (!value) return null;
+        const date = new Date(value);
+        return Number.isFinite(date.getTime()) ? date : null;
+    };
+    const toTime = (value) => {
+        const date = toDate(value);
+        return date ? date.getTime() : 0;
+    };
+    const fmtDate = (value) => value ? formatDisplayTimestamp(value).replace(/\s+\d{1,2}:\d{2}.*/, '') : '-';
+    const confirmed = (status) => isConfirmedStatus(status);
+    const deadlineInfo = (contract) => {
+        const date = toDate(contract.expiry_date || contract.renewal_deadline || contract.deadline_at);
+        if (!date) return null;
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const due = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        return { date, days: Math.ceil((due - today) / 86400000) };
+    };
 
-    let sectionTitle = "要確認アイテム (優先度順)";
-    if (currentFilter === 'pending') sectionTitle = "未処理のアイテム (新着・変更検知)";
-    if (currentFilter === 'risk') sectionTitle = "リスク要判定アイテム";
-    if (currentFilter === 'total') sectionTitle = "全監視対象（最新順）";
+    const highRisk = contracts.filter((c) => c.risk_level === 'High');
+    const pending = contracts.filter((c) => !confirmed(c.status));
+    const analyzed = contracts.filter((c) => c.last_analyzed_at || c.ai_summary || c.ai_changes?.length || c.ai_rewrite_clauses?.length);
+    const analyzedThisMonth = analyzed.filter((c) => {
+        const date = toDate(c.last_analyzed_at || c.last_updated_at || c.created_at);
+        return date && date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
+    });
+    const deadlines = contracts
+        .map((contract) => ({ contract, info: deadlineInfo(contract) }))
+        .filter((item) => item.info && item.info.days >= 0 && item.info.days <= 30)
+        .sort((a, b) => a.info.days - b.info.days);
+    const actionMap = new Map();
+    [...highRisk, ...deadlines.map((item) => item.contract), ...pending].forEach((contract) => {
+        if (contract?.id != null && !actionMap.has(String(contract.id))) actionMap.set(String(contract.id), contract);
+    });
+    const actions = [...actionMap.values()].slice(0, 3);
+    const recent = [...contracts]
+        .sort((a, b) => toTime(b.last_analyzed_at || b.last_updated_at || b.created_at) - toTime(a.last_analyzed_at || a.last_updated_at || a.created_at))
+        .slice(0, 3);
 
-    const canOperateContract = typeof app?.can === 'function' && app.can('operate_contract');
-    const tableRows = filteredItems.length > 0 ? filteredItems.slice(0, 10).map(c => {
-        let riskBadgeClass = 'badge-neutral';
-        if (c.risk_level === 'High') riskBadgeClass = 'badge-danger';
-        else if (c.risk_level === 'Medium') riskBadgeClass = 'badge-warning';
-        else if (c.risk_level === 'Low') riskBadgeClass = 'badge-success';
-
-        const statusBadge = renderContractStatusBadge(c.status);
-
-        const actionBtn = canOperateContract
-            ? `<button class="btn-dashboard">${isConfirmedStatus(c.status) ? '履歴を見る' : '確認する'}</button>`
-            : `<button class="btn-dashboard">詳細を見る</button>`;
-
-        return `
-                <tr onclick="window.app.navigate('diff', ${c.id})">
-                    <td><span class="badge ${riskBadgeClass}">${c.risk_level === 'High' ? 'High' : (c.risk_level === 'Medium' ? 'Medium' : (c.risk_level === 'Low' ? 'Low' : c.risk_level))}</span></td>
-                    <td class="col-name" title="${escapeHtmlText(c.name)}">${escapeHtmlText(c.name)}</td>
-                    <td>${formatDisplayTimestamp(c.last_updated_at || c.last_analyzed_at || c.created_at)}</td>
-                    <td>${statusBadge}</td>
-                    <td>${actionBtn}</td>
-                </tr>
-            `;
-    }).join('') : '<tr><td colspan="5" class="text-center text-muted" style="padding:40px;">該当するアイテムはありません</td></tr>';
-
-    return `
-            <div class="page-title">ダッシュボード</div>
-            <div class="stats-grid">
-                <div class="stat-card ${currentFilter === 'pending' ? 'active' : ''}" onclick="window.app.setDashboardFilter('pending')">
-                    <div class="stat-label ${currentFilter === 'pending' ? 'text-warning' : ''}"><i class="fa-regular fa-square-check"></i> 未処理</div>
-                    <div class="stat-value">${stats.pending}件</div>
-                </div>
-                <div class="stat-card ${currentFilter === 'risk' ? 'active' : ''}" onclick="window.app.setDashboardFilter('risk')">
-                    <div class="stat-label ${currentFilter === 'risk' ? 'text-danger' : ''}"><i class="fa-solid fa-triangle-exclamation"></i> リスク要判定</div>
-                    <div class="stat-value">${stats.highRisk}件</div>
-                </div>
-                <div class="stat-card ${currentFilter === 'total' ? 'active' : ''}" onclick="window.app.setDashboardFilter('total')">
-                    <div class="stat-label"><i class="fa-solid fa-satellite-dish"></i> 監視中</div>
-                    <div class="stat-value text-muted">${stats.total}</div>
-                </div>
+    const actionCount = actions.length || pending.length;
+    const riskCount = highRisk.length || Number(stats.highRisk || 0);
+    const deadlineCount = deadlines.length;
+    const totalCount = Number(stats.total || contracts.length || 0);
+    const renderEmpty = (text) => `<div class="dashboard-v2-empty">${esc(text)}</div>`;
+    const metricCards = [
+        ['danger', 'fa-solid fa-triangle-exclamation', '要対応の契約', actionCount, `高リスク：${riskCount}件<br>期限間近：${deadlineCount}件`],
+        ['warning', 'fa-regular fa-calendar', '期限が近い契約', deadlineCount, `30日以内：${deadlineCount}件`],
+        ['success', 'fa-solid fa-shield-halved', '解析済みの契約', analyzed.length, `今月：${analyzedThisMonth.length}件`],
+        ['info', 'fa-regular fa-file-lines', '総契約書数', totalCount, 'すべての契約書']
+    ].map(([tone, icon, label, value, sub]) => `
+        <article class="dashboard-v2-metric">
+            <div class="dashboard-v2-icon is-${tone}"><i class="${icon}"></i></div>
+            <div>
+                <div class="dashboard-v2-metric-label">${label}</div>
+                <div class="dashboard-v2-metric-value">${value}<span>件</span></div>
+                <div class="dashboard-v2-metric-sub">${sub}</div>
             </div>
-
-            <h3 id="dashboard-section-title" style="font-size:16px; margin-bottom:16px; font-weight:600;">${sectionTitle}</h3>
-            <div class="table-container">
-                <table class="data-table dashboard-table">
-                    <thead>
-                        <tr>
-                            <th>リスク</th>
-                            <th>契約・規約名</th>
-                            <th>日付</th>
-                            <th>ステータス</th>
-                            <th>アクション</th>
-                        </tr>
-                    </thead>
-                    <tbody id="dashboard-table-body">
-                        ${tableRows}
-                    </tbody>
-                </table>
+        </article>
+    `).join('');
+    const actionRows = actions.length ? actions.map((contract) => {
+        const deadline = deadlines.find((item) => item.contract.id === contract.id);
+        const mainChip = contract.risk_level === 'High' ? '高リスク' : (deadline ? '期限間近' : '要確認');
+        const tone = mainChip === '高リスク' ? 'danger' : (mainChip === '期限間近' ? 'warning' : 'neutral');
+        const rewrite = contract.ai_rewrite_clauses?.[0];
+        const firstChip = rewrite?.issue ? esc(rewrite.issue) : (deadline ? `契約終了まで残り${deadline.info.days}日` : '重要な変更あり');
+        const secondChip = rewrite?.suggestion ? esc(rewrite.suggestion) : (contract.risk_level === 'High' ? 'リスク確認が必要' : (deadline ? '更新期限を確認' : ''));
+        return `
+            <div class="dashboard-v2-action-row" onclick="${nav('diff', contract.id)}">
+                <span class="dashboard-v2-status is-${tone}">${mainChip}</span>
+                <div class="dashboard-v2-contract-main">
+                    <strong>${esc(contract.name || '名称未設定')}</strong>
+                    <span>${esc(contract.counterparty || contract.company_name || contract.type || '契約書')}</span>
+                </div>
+                <div class="dashboard-v2-chips">
+                    <span>${firstChip}</span>
+                    ${secondChip ? `<span>${secondChip}</span>` : ''}
+                </div>
+                <div class="dashboard-v2-date">${fmtDate(contract.last_updated_at || contract.last_analyzed_at || contract.created_at)}</div>
+                <button class="dashboard-v2-button">確認する <i class="fa-solid fa-arrow-right"></i></button>
             </div>
         `;
+    }).join('') : renderEmpty('要対応の契約はありません');
+    const fileIcon = (contract) => {
+        const name = String(contract.name || '').toLowerCase();
+        if (name.includes('.pdf')) return '<span class="dashboard-v2-file is-pdf"><i class="fa-regular fa-file-pdf"></i></span>';
+        if (contract.source_url || name.startsWith('http')) return '<span class="dashboard-v2-file is-url"><i class="fa-solid fa-link"></i></span>';
+        return '<span class="dashboard-v2-file is-word"><i class="fa-regular fa-file-word"></i></span>';
+    };
+    const recentRows = recent.length ? recent.map((contract) => `
+        <div class="dashboard-v2-compact-row">
+            ${fileIcon(contract)}
+            <div class="dashboard-v2-compact-main">
+                <strong>${esc(contract.name || '名称未設定')}</strong>
+                <span>更新日：${formatDisplayTimestamp(contract.last_analyzed_at || contract.last_updated_at || contract.created_at)}</span>
+            </div>
+            <span class="dashboard-v2-pill is-success">${contract.last_analyzed_at ? '解析完了' : '取得・解析完了'}</span>
+            <button class="dashboard-v2-button" onclick="${nav('diff', contract.id)}">結果を見る <i class="fa-solid fa-arrow-right"></i></button>
+        </div>
+    `).join('') : renderEmpty('最近の解析はありません');
+    const deadlineRows = deadlines.slice(0, 3).map(({ contract, info }) => {
+        const weekday = ['日', '月', '火', '水', '木', '金', '土'][info.date.getDay()];
+        const tone = info.days <= 7 ? 'danger' : 'warning';
+        return `
+            <div class="dashboard-v2-calendar-row">
+                <strong>${info.date.getMonth() + 1}/${info.date.getDate()} (${weekday})</strong>
+                <span>${esc(contract.name || '名称未設定')}</span>
+                <em class="is-${tone}">残り${info.days}日</em>
+            </div>
+        `;
+    }).join('') || renderEmpty('今後30日の期限はありません');
+
+    return `
+        <div class="page-title">ダッシュボード</div>
+        <div class="dashboard-v2">
+            <div class="dashboard-v2-metrics">${metricCards}</div>
+            <section class="dashboard-v2-panel">
+                <div class="dashboard-v2-panel-head">
+                    <h2>要対応の契約</h2>
+                    <button onclick="${nav('contracts')}" class="dashboard-v2-link">すべて見る <i class="fa-solid fa-arrow-right"></i></button>
+                </div>
+                <div class="dashboard-v2-action-list">${actionRows}</div>
+            </section>
+            <div class="dashboard-v2-bottom">
+                <section class="dashboard-v2-panel">
+                    <div class="dashboard-v2-panel-head">
+                        <h2>最近の解析</h2>
+                        <button onclick="${nav('history')}" class="dashboard-v2-link">すべて見る <i class="fa-solid fa-arrow-right"></i></button>
+                    </div>
+                    <div class="dashboard-v2-compact-list">${recentRows}</div>
+                </section>
+                <section class="dashboard-v2-panel">
+                    <div class="dashboard-v2-panel-head">
+                        <h2>期限カレンダー <span>（今後30日）</span></h2>
+                        <button onclick="${nav('deadlines')}" class="dashboard-v2-link">すべて見る <i class="fa-solid fa-arrow-right"></i></button>
+                    </div>
+                    <div class="dashboard-v2-calendar-list">${deadlineRows}</div>
+                    <button onclick="${nav('deadlines')}" class="dashboard-v2-calendar-link">カレンダーで確認する <i class="fa-solid fa-arrow-right"></i></button>
+                </section>
+            </div>
+        </div>
+    `;
 };
 
 const Views = {
@@ -1145,7 +1223,7 @@ const Views = {
             return `
                 <div class="page-title">プラン管理</div>
                 <div class="plan-loading" style="text-align:center; padding:50px;">
-                    <i class="fa-solid fa-spinner fa-spin" style="font-size:2rem; color:#c19b4a; margin-bottom:16px;"></i>
+                    <i class="fa-solid fa-spinner fa-spin" style="font-size:2rem; color:#061f45; margin-bottom:16px;"></i>
                     <p>利用状況を確認しています...</p>
                 </div>
             `;
@@ -1358,6 +1436,12 @@ const Views = {
     diff: (id, appState = null) => {
         const app = appState || window.app || null;
         const contract = dbService.getContractById(id);
+
+        const stripLegacyConfidence = (text) => {
+            if (!text) return '';
+            return text.replace(/判定確度：[高中低]|判定確度:[高中低]/g, '').trim();
+        };
+
         const comparisonContext = app?.getHistoryComparisonContext(id) || null;
         const documentOptions = dbService.getDocumentsByContractId(id);
         const hasComparableVersion = documentOptions.length >= 2;
@@ -1490,9 +1574,9 @@ const Views = {
                 const cached = sanitizeAnalysisPayload(effectiveSelectedDiffData);
                 diffData = {
                     title: `${contract.name} - 文書比較`,
-                    summary: cached.summary || '選択した2文書の差分結果を表示しています。',
+                    summary: stripLegacyConfidence(cached.summary || '選択した2文書の差分結果を表示しています。'),
                     riskLevel: cached.riskLevel ?? 1,
-                    riskReason: cached.riskReason || '保存済みの差分結果を表示しています。',
+                    riskReason: stripLegacyConfidence(cached.riskReason || '保存済みの差分結果を表示しています。'),
                     changes: cached.changes || [],
                     isFallback: cached.isFallback === true,
                     aiSucceeded: cached.aiSucceeded ?? contract.ai_succeeded,
@@ -1510,9 +1594,9 @@ const Views = {
             } else if (comparisonContext?.analysis) {
                 diffData = {
                     title: `${contract.name} - 比較解析`,
-                    summary: comparisonContext.analysis.summary || '選択した履歴との差分比較を表示しています。',
+                    summary: stripLegacyConfidence(comparisonContext.analysis.summary || '選択した履歴との差分比較を表示しています。'),
                     riskLevel: comparisonContext.analysis.riskLevel ?? 1,
-                    riskReason: comparisonContext.analysis.riskReason || '選択した履歴との差分を解析しました。',
+                    riskReason: stripLegacyConfidence(comparisonContext.analysis.riskReason || '選択した履歴との差分を解析しました。'),
                     changes: comparisonContext.analysis.changes || [],
                     isFallback: comparisonContext.analysis.isFallback === true
                 };
@@ -1705,11 +1789,11 @@ const Views = {
                     </div>
                 </section>
                 ` : (contract.ai_limited ? `
-                <section class="mobile-risk-sticky mobile-only" style="background:#fffcf5; border-top:1px solid #e8d9b8;" aria-label="アップグレード案内">
+                <section class="mobile-risk-sticky mobile-only" style="background:#eef4fb; border-top:1px solid rgba(6, 31, 69, 0.18);" aria-label="アップグレード案内">
                     <div style="display:flex; align-items:center; gap:10px;">
-                        <i class="fa-solid fa-crown" style="color:#c5a059;"></i>
+                        <i class="fa-solid fa-crown" style="color:#061f45;"></i>
                         <span style="font-size:12px; color:#2b2623; font-weight:700;">AI詳細解析はアップグレードが必要です</span>
-                        <a onclick="window.app.navigate('plan')" style="margin-left:auto; font-size:11px; color:#c5a059; font-weight:700; text-decoration:underline;">詳細</a>
+                        <a onclick="window.app.navigate('plan')" style="margin-left:auto; font-size:11px; color:#061f45; font-weight:700; text-decoration:underline;">詳細</a>
                     </div>
                 </section>
                 ` : (shouldShowAnalysis ? `
@@ -1848,7 +1932,7 @@ const Views = {
                             ${['owner', 'pro'].includes(app?.subscription?.plan) ? `
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                                 <div style="display:flex; align-items:center; gap:10px;">
-                                    <i class="fa-solid fa-satellite-dish" style="color:var(--accent-gold, #c19b4a); font-size:16px;"></i>
+                                    <i class="fa-solid fa-satellite-dish" style="color:var(--accent-gold, #061f45); font-size:16px;"></i>
                                     <span style="font-weight:600; font-size:14px;">定期監視</span>
                                 </div>
                                 <label class="toggle-switch">
@@ -1877,12 +1961,12 @@ const Views = {
                             <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
                                 <i class="fa-solid fa-satellite-dish" style="color:#ccc; font-size:16px;"></i>
                                 <span style="font-weight:600; font-size:14px; color:#999;">定期監視・Slack／メール通知</span>
-                                <span style="background:#f3f0ea; color:#c5a059; border:1px solid #e8d9b8; border-radius:10px; padding:2px 10px; font-size:11px; font-weight:700;">Pro限定</span>
+                                <span style="background:#eef4fb; color:#061f45; border:1px solid rgba(6, 31, 69, 0.18); border-radius:10px; padding:2px 10px; font-size:11px; font-weight:700;">Pro限定</span>
                             </div>
                             <p style="font-size:12px; color:#aaa; margin:0 0 16px; line-height:1.5;">
                                 URLの変更を自動チェックし、差分をSlack・メールで通知します。
                             </p>
-                            <button class="btn-dashboard" style="width:100%; background:#c5a059; color:#fff; border:none; border-radius:8px; padding:10px; font-size:13px; font-weight:600; cursor:pointer;" onclick="window.app.showProFeatureModal('定期URL監視・Slack／メール通知はProプラン限定の機能です。')">
+                            <button class="btn-dashboard" style="width:100%; background:#061f45; color:#fff; border:none; border-radius:8px; padding:10px; font-size:13px; font-weight:600; cursor:pointer;" onclick="window.app.showProFeatureModal('定期URL監視・Slack／メール通知はProプラン限定の機能です。')">
                                 <i class="fa-solid fa-lock" style="margin-right:6px;"></i> Proプランで使う
                             </button>
                             `}
@@ -2151,7 +2235,7 @@ const Views = {
             <style>
                 .mcp-container { width: 960px; margin: 0 auto; position: relative; display: block; min-width: 960px; }
                 .mcp-grid { display: grid; grid-template-columns: 596px 340px; gap: 24px; align-items: start; }
-                .mcp-tab-item.active { border-bottom-color: #c19b4a !important; color: #0f172a !important; background: #fff !important; font-weight: 700 !important; }
+                .mcp-tab-item.active { border-bottom-color: #061f45 !important; color: #0f172a !important; background: #fff !important; font-weight: 700 !important; }
                 pre { max-width: 100%; overflow-x: auto; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; font-size: 11px; line-height: 1.4; white-space: pre-wrap; word-break: break-all; }
             </style>
             <div class="page-title" style="display:flex; align-items:center; gap:12px;">
@@ -2212,13 +2296,13 @@ const Views = {
                 </div>
 
                 <div class="mcp-side-col">
-                    <article class="dashboard-card" style="background:#1e293b; color:#fff; border-radius:16px; padding:24px; border:none; box-shadow:0 12px 30px rgba(15,23,42,0.15);">
-                        <h4 style="margin:0 0 16px; font-size:15px; font-weight:800; color:#fff; display:flex; align-items:center; gap:8px;">
-                            <i class="fa-solid fa-key" style="color:#c19b4a;"></i> 連携用APIキー
+                    <article class="dashboard-card" style="background:#f3f7fc; color:#0f172a; border-radius:16px; padding:24px; border:1px solid #dbe7f5; box-shadow:0 12px 30px rgba(15,23,42,0.08);">
+                        <h4 style="margin:0 0 16px; font-size:15px; font-weight:800; color:#0f172a; display:flex; align-items:center; gap:8px;">
+                            <i class="fa-solid fa-key" style="color:#061f45;"></i> 連携用APIキー
                         </h4>
                         <div id="mcp-key-card-inner">
                             <div style="text-align:center; padding:20px;">
-                                <i class="fa-solid fa-spinner fa-spin" style="color:#c19b4a;"></i>
+                                <i class="fa-solid fa-spinner fa-spin" style="color:#061f45;"></i>
                             </div>
                         </div>
                     </article>
@@ -2272,7 +2356,7 @@ const Views = {
                             <div style="font-weight:700; font-size:14px; margin-bottom:8px;">連携用URLをコピー</div>
                             <div style="position:relative;">
                                 <input type="text" value="${mcpUrl}" readonly style="width:100%; padding:10px 40px 10px 12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; font-size:12px; font-family:monospace; color:#475569;" id="mcp-claude-url">
-                                <button onclick="navigator.clipboard.writeText('${mcpUrl}'); Notify.success('URLをコピーしました')" style="position:absolute; right:8px; top:50%; transform:translateY(-50%); background:none; border:none; color:#c19b4a; cursor:pointer; padding:6px;">
+                                <button onclick="navigator.clipboard.writeText('${mcpUrl}'); Notify.success('URLをコピーしました')" style="position:absolute; right:8px; top:50%; transform:translateY(-50%); background:none; border:none; color:#061f45; cursor:pointer; padding:6px;">
                                     <i class="fa-solid fa-copy"></i>
                                 </button>
                             </div>
@@ -2319,7 +2403,7 @@ const Views = {
                 <h3 style="margin:0 0 16px; font-size:17px; font-weight:800; color:#0f172a;">Cursor / VS Code</h3>
                 <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding:24px; border-radius:12px;">
                     <div style="font-size:11px; font-weight:700; color:#64748b; margin-bottom:4px; text-transform:uppercase;">Endpoint (SSE)</div>
-                    <code style="display:block; word-break:break-all; font-size:12px; color:#c19b4a; font-family:monospace; background:#fff; border:1px solid #e2e8f0; padding:12px; border-radius:8px;">${mcpUrl}</code>
+                    <code style="display:block; word-break:break-all; font-size:12px; color:#061f45; font-family:monospace; background:#fff; border:1px solid #e2e8f0; padding:12px; border-radius:8px;">${mcpUrl}</code>
                     <button class="btn-dashboard" style="margin-top:12px; width:100%; font-size:12px; padding:10px; font-weight:700;" onclick="navigator.clipboard.writeText('${mcpUrl}'); Notify.success('URLをコピーしました')">
                         <i class="fa-solid fa-copy"></i> URLをコピーする
                     </button>
@@ -2337,10 +2421,8 @@ class RegistrationFlow {
         this.modalBody = document.getElementById('modal-body');
         this.modalTitle = document.getElementById('modal-title');
         this.fileInput = document.getElementById('reg-file-input');
-        this.compareFileInput = document.getElementById('reg-compare-file-input');
         this.currentStep = 1;
         this.tempData = {};
-        this.compareFile = null;
     }
 
     init() {
@@ -2357,11 +2439,9 @@ class RegistrationFlow {
         }
 
         if (this.fileInput) {
-            this.fileInput.onchange = (e) => this.handleFileSelect(e.target.files[0]);
-        }
-
-        if (this.compareFileInput) {
-            this.compareFileInput.onchange = (e) => this.handleCompareFileSelect(e.target.files[0]);
+            this.fileInput.onchange = (e) => {
+                if (e.target.files.length > 0) this.handleFileSelect(e.target.files[0]);
+            };
         }
     }
 
@@ -2393,33 +2473,26 @@ class RegistrationFlow {
         if (!this.modalBody) return;
 
         if (this.currentStep === 1) {
-            this.modalTitle.textContent = "新規登録 - 登録方法の選択";
+            this.modalTitle.textContent = "契約書をアップロード";
             this.modalBody.innerHTML = `
-                <div class="reg-method-grid">
-                    <div class="reg-method-card" id="reg-card-docx">
-                        <div class="reg-method-icon"><i class="fa-solid fa-file-word"></i></div>
-                        <div class="reg-method-info">
-                            <h4>Wordをアップロード</h4>
-                            <p>ファイルをここにドロップするか、クリックして選択</p>
-                        </div>
+                <div class="unified-reg-container">
+                    <div class="unified-drop-zone" id="unified-drop-zone" onclick="document.getElementById('reg-file-input').click()">
+                        <div class="unified-drop-icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+                        <div class="unified-drop-title">ここにドラッグ＆ドロップ</div>
+                        <div class="unified-drop-sub">またはクリックしてファイルを選択</div>
+                        <div class="unified-drop-formats">対応ファイル: PDF / Word (.docx) / テキスト (.txt)</div>
                     </div>
-                    <div class="reg-method-card" id="reg-card-pdf">
-                        <div class="reg-method-icon"><i class="fa-solid fa-file-pdf"></i></div>
-                        <div class="reg-method-info">
-                            <h4>PDFをアップロード</h4>
-                            <p>ファイルをここにドロップするか、クリックして選択</p>
-                        </div>
-                    </div>
-                    <div class="reg-method-card" id="reg-card-url">
-                        <div class="reg-method-icon"><i class="fa-solid fa-globe"></i></div>
-                        <div class="reg-method-info">
-                            <h4>URLを登録 (Web規約)</h4>
-                            <p>公開URLを監視対象に設定します</p>
+                    <div class="modal-separator">または</div>
+                    <div class="url-reg-section">
+                        <div class="url-reg-title">URLを貼り付けて登録</div>
+                        <div class="url-input-group">
+                            <input type="text" id="unified-url-input" class="url-input-field" placeholder="https://example.com/terms">
+                            <button class="btn-navy-submit" id="unified-url-submit">登録</button>
                         </div>
                     </div>
                 </div>
-    `;
-            this.bindCardEvents();
+            `;
+            this.bindUnifiedEvents();
         } else if (this.currentStep === 2) {
             const isPdf = this.tempData.method === 'pdf';
             const isDocx = this.tempData.method === 'docx';
@@ -2466,54 +2539,34 @@ class RegistrationFlow {
         }
     }
 
-    bindCardEvents() {
-        const cardPdf = document.getElementById('reg-card-pdf');
-        const cardDocx = document.getElementById('reg-card-docx');
-        const cardUrl = document.getElementById('reg-card-url');
+    bindUnifiedEvents() {
+        const dropZone = document.getElementById('unified-drop-zone');
+        const urlSubmit = document.getElementById('unified-url-submit');
+        const urlInput = document.getElementById('unified-url-input');
 
-        if (cardPdf) {
-            cardPdf.onclick = () => {
-                this.fileInput.accept = ".pdf";
-                this.fileInput.click();
-            };
-            cardPdf.ondragover = (e) => { e.preventDefault(); cardPdf.classList.add('drop-active'); };
-            cardPdf.ondragleave = () => { cardPdf.classList.remove('drop-active'); };
-            cardPdf.ondrop = (e) => {
+        if (dropZone) {
+            dropZone.ondragover = (e) => { e.preventDefault(); dropZone.classList.add('drop-active'); };
+            dropZone.ondragleave = () => { dropZone.classList.remove('drop-active'); };
+            dropZone.ondrop = (e) => {
                 e.preventDefault();
-                cardPdf.classList.remove('drop-active');
+                dropZone.classList.remove('drop-active');
                 if (e.dataTransfer.files.length > 0) this.handleFileSelect(e.dataTransfer.files[0]);
             };
         }
 
-        if (cardDocx) {
-            cardDocx.onclick = () => {
-                this.fileInput.accept = ".docx";
-                this.fileInput.click();
-            };
-            cardDocx.ondragover = (e) => { e.preventDefault(); cardDocx.classList.add('drop-active'); };
-            cardDocx.ondragleave = () => { cardDocx.classList.remove('drop-active'); };
-            cardDocx.ondrop = (e) => {
-                e.preventDefault();
-                cardDocx.classList.remove('drop-active');
-                if (e.dataTransfer.files.length > 0) this.handleFileSelect(e.dataTransfer.files[0]);
-            };
-        }
-
-        if (cardUrl) {
-            const isPro = ['owner', 'pro'].includes(this.app?.subscription?.plan);
-            if (!isPro) {
-                cardUrl.style.opacity = '0.55';
-                cardUrl.style.position = 'relative';
-                cardUrl.insertAdjacentHTML('beforeend',
-                    '<div style="position:absolute;top:8px;right:8px;background:#c5a059;color:#fff;border-radius:10px;padding:2px 8px;font-size:10px;font-weight:700;letter-spacing:0.03em;">Pro</div>'
-                );
-            }
-            cardUrl.onclick = () => {
+        if (urlSubmit) {
+            urlSubmit.onclick = () => {
+                const url = urlInput ? urlInput.value.trim() : '';
+                if (!url) {
+                    Notify.warning('URLを入力してください');
+                    return;
+                }
+                const isPro = ['owner', 'pro'].includes(this.app?.subscription?.plan);
                 if (!isPro) {
                     window.app.showProFeatureModal('URLを登録して定期的に変更を監視し、差分をSlack・メールで通知する機能はProプラン限定です。');
                     return;
                 }
-                this.nextStep(2, { method: 'url' });
+                this.nextStep(2, { method: 'url', source: url });
             };
         }
     }
@@ -2523,25 +2576,19 @@ class RegistrationFlow {
 
         const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
         const isDocx = file.name.toLowerCase().endsWith('.docx');
+        const isTxt = file.type === 'text/plain' || file.name.toLowerCase().endsWith('.txt');
 
-        if (!isPdf && !isDocx) {
-            Notify.warning('PDFまたはWordファイル(.docx)を選択してください');
+        if (!isPdf && !isDocx && !isTxt) {
+            Notify.warning('PDF、Word(.docx)、またはテキスト(.txt)ファイルを選択してください');
             return;
         }
 
         this.nextStep(2, {
-            method: isPdf ? 'pdf' : 'docx',
+            method: isPdf ? 'pdf' : (isDocx ? 'docx' : 'txt'),
             fileName: file.name,
             fileSize: file.size,
             fileData: file
         });
-    }
-
-    handleCompareFileSelect(file) {
-        if (!file) return;
-        this.compareFile = file;
-        const displayEl = document.getElementById('reg-compare-filename');
-        if (displayEl) displayEl.textContent = file.name;
     }
 
     nextStep(step, data = {}) {
@@ -2893,25 +2940,25 @@ class DashboardApp {
             const displayKey = (!hasVisibleKey || isKeyHidden) ? maskedKey : mcpKey;
             
             el.innerHTML = `
-                <div style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:10px; padding:16px; margin-bottom:16px;">
-                    <div style="font-size:11px; color:#94a3b8; margin-bottom:8px;">MCP専用APIキー</div>
+                <div style="background:#fff; border:1px solid #dbe7f5; border-radius:10px; padding:16px; margin-bottom:16px;">
+                    <div style="font-size:11px; color:#64748b; margin-bottom:8px;">MCP専用APIキー</div>
                     <div style="display:flex; align-items:center; gap:8px;">
-                        <code style="flex:1; font-family:monospace; font-size:13px; color:#fff; word-break:break-all;">${displayKey}</code>
+                        <code style="flex:1; font-family:monospace; font-size:13px; color:#061f45; word-break:break-all;">${displayKey}</code>
                     </div>
                     <div style="display:flex; gap:8px; margin-top:12px;">
-                        <button class="btn-dashboard" style="flex:1; background:rgba(255,255,255,0.1); border:none; color:#fff; font-size:11px; padding:6px; ${hasVisibleKey ? '' : 'opacity:0.5; cursor:not-allowed;'}" onclick="${hasVisibleKey ? 'window.app.toggleMcpKeyVisibility()' : 'Notify.info(`既存キーは安全のため再表示されません。必要なら新規発行してください`)'}">
+                        <button class="btn-dashboard" style="flex:1; background:#e5edf7; border:none; color:#0f172a; font-size:11px; padding:6px; ${hasVisibleKey ? '' : 'opacity:0.5; cursor:not-allowed;'}" onclick="${hasVisibleKey ? 'window.app.toggleMcpKeyVisibility()' : 'Notify.info(`既存キーは安全のため再表示されません。必要なら新規発行してください`)'}">
                             <i class="fa-solid ${hasVisibleKey && !isKeyHidden ? 'fa-eye-slash' : 'fa-eye'}"></i> ${hasVisibleKey ? (isKeyHidden ? '新規キーを表示' : '非表示にする') : '既存キーは再表示不可'}
                         </button>
-                        <button class="btn-dashboard" style="flex:1; background:rgba(255,255,255,0.1); border:none; color:#fff; font-size:11px; padding:6px; ${hasVisibleKey ? '' : 'opacity:0.5; cursor:not-allowed;'}" onclick="${hasVisibleKey ? `navigator.clipboard.writeText('${mcpKey}'); Notify.success('キーをコピーしました')` : `Notify.info('コピーできるのは新規発行直後のキーのみです')`}">
+                        <button class="btn-dashboard" style="flex:1; background:#e5edf7; border:none; color:#0f172a; font-size:11px; padding:6px; ${hasVisibleKey ? '' : 'opacity:0.5; cursor:not-allowed;'}" onclick="${hasVisibleKey ? `navigator.clipboard.writeText('${mcpKey}'); Notify.success('キーをコピーしました')` : `Notify.info('コピーできるのは新規発行直後のキーのみです')`}">
                             <i class="fa-solid fa-copy"></i> コピー
                         </button>
                     </div>
                 </div>
                 
-                <button class="btn-dashboard" style="width:100%; background:#c19b4a; border:none; color:#fff; font-weight:700; font-size:13px; padding:10px;" onclick="window.app.generateMcpKey()">
+                <button class="btn-dashboard" style="width:100%; background:#061f45; border:none; color:#fff; font-weight:700; font-size:13px; padding:10px;" onclick="window.app.generateMcpKey()">
                     <i class="fa-solid fa-rotate"></i> 新規キーを発行
                 </button>
-                <p style="font-size:10px; color:#94a3b8; margin-top:12px; line-height:1.4;">
+                <p style="font-size:10px; color:#64748b; margin-top:12px; line-height:1.4;">
                     ※キーは安全のため再表示しません。
                 </p>
             `;
@@ -3388,7 +3435,7 @@ class DashboardApp {
             if (clauses && clauses.length > 0) {
                 contentHtml = clauses.map(clause => {
                     const titleHtml = clause.title
-                        ? `<div style="font-size:13px;font-weight:700;color:#c5a059;margin-bottom:4px;">${clause.title}${clause.header ? `　${clause.header}` : ''}</div>`
+                        ? `<div style="font-size:13px;font-weight:700;color:#061f45;margin-bottom:4px;">${clause.title}${clause.header ? `　${clause.header}` : ''}</div>`
                         : '';
                     const bodyHtml = (clause.paragraphs || []).map(p =>
                         `<p style="margin:0 0 8px;line-height:1.8;font-size:13px;color:#2b2623;">${String(p).replace(/\n/g, '<br>')}</p>`
@@ -3440,7 +3487,7 @@ class DashboardApp {
 
                     <!-- Deadline input form -->
                     <div style="width:280px;flex-shrink:0;display:flex;flex-direction:column;padding:24px 20px;gap:16px;overflow-y:auto;">
-                        <div style="font-size:13px;font-weight:700;color:#2b2623;margin-bottom:4px;"><i class="fa-solid fa-calendar-days" style="color:#c5a059;margin-right:6px;"></i>期限を入力</div>
+                        <div style="font-size:13px;font-weight:700;color:#2b2623;margin-bottom:4px;"><i class="fa-solid fa-calendar-days" style="color:#061f45;margin-right:6px;"></i>期限を入力</div>
                         <div>
                             <label style="font-size:11px;font-weight:600;color:#5e544d;display:block;margin-bottom:5px;">契約終了日</label>
                             <input type="date" id="dl-expiry" value="${c.expiry_date || ''}"
@@ -3449,7 +3496,7 @@ class DashboardApp {
                         <div style="flex:1;"></div>
                         <div style="display:flex;flex-direction:column;gap:8px;">
                             <button onclick="window.app.saveDeadlineInput('${contractId}')"
-                                style="padding:10px;border:none;border-radius:6px;background:#c5a059;color:#fff;font-size:13px;font-weight:600;cursor:pointer;width:100%;">
+                                style="padding:10px;border:none;border-radius:6px;background:#061f45;color:#fff;font-size:13px;font-weight:600;cursor:pointer;width:100%;">
                                 <i class="fa-solid fa-check" style="margin-right:6px;"></i>保存
                             </button>
                             <button onclick="document.getElementById('deadline-input-overlay').remove()"
@@ -3473,25 +3520,25 @@ class DashboardApp {
             <div style="background:#fff;border-radius:12px;padding:28px 32px;width:400px;max-width:92vw;box-shadow:0 8px 32px rgba(0,0,0,0.18);">
                 <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:20px;">
                     <div style="width:40px;height:40px;border-radius:10px;background:#fef3e2;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                        <i class="fa-solid fa-wand-magic-sparkles" style="color:#c5a059;font-size:18px;"></i>
+                        <i class="fa-solid fa-wand-magic-sparkles" style="color:#061f45;font-size:18px;"></i>
                     </div>
                     <div>
                         <div style="font-size:15px;font-weight:700;color:#2b2623;margin-bottom:6px;">AIリスク解析＋期限取得を実行しますか？</div>
                         <div style="font-size:13px;color:#5e544d;line-height:1.6;">
                             リスク解析と期限解析を同時に行います。<br>
-                            <strong style="color:#c5a059;">解析1回を消費します。</strong>
+                            <strong style="color:#061f45;">解析1回を消費します。</strong>
                         </div>
                     </div>
                 </div>
                 <div style="background:#f8f6f3;border-radius:8px;padding:12px 14px;margin-bottom:20px;font-size:12px;color:#7a6a5a;line-height:1.6;">
-                    <i class="fa-solid fa-circle-info" style="color:#c5a059;margin-right:6px;"></i>
+                    <i class="fa-solid fa-circle-info" style="color:#061f45;margin-right:6px;"></i>
                     差分チェックなしでも、AIが書類全体のリスクと契約期限を抽出します。
                 </div>
                 <div style="display:flex;gap:10px;justify-content:flex-end;">
                     <button onclick="document.getElementById('reanalyze-confirm-overlay').remove()"
                         style="padding:9px 20px;border:1px solid #ddd;border-radius:6px;background:#fff;color:#5e544d;font-size:14px;cursor:pointer;">キャンセル</button>
                     <button onclick="document.getElementById('reanalyze-confirm-overlay').remove();window.app.runReanalyze('${contractId}', { userTriggered: true })"
-                        style="padding:9px 22px;border:none;border-radius:6px;background:#c5a059;color:#fff;font-size:14px;font-weight:600;cursor:pointer;">
+                        style="padding:9px 22px;border:none;border-radius:6px;background:#061f45;color:#fff;font-size:14px;font-weight:600;cursor:pointer;">
                         <i class="fa-solid fa-play" style="margin-right:6px;"></i>解析する
                     </button>
                 </div>
@@ -3915,7 +3962,7 @@ class DashboardApp {
             const active = sortKey === key;
             const nextDir = active && sortDir === 'asc' ? 'desc' : 'asc';
             const arrow = active ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '';
-            return `<th style="padding:10px 12px;text-align:left;font-size:12px;color:${active ? '#c5a059' : '#8a7a6a'};font-weight:600;cursor:pointer;white-space:nowrap;${extraStyle}"
+            return `<th style="padding:10px 12px;text-align:left;font-size:12px;color:${active ? '#061f45' : '#8a7a6a'};font-weight:600;cursor:pointer;white-space:nowrap;${extraStyle}"
                 onclick="window.app.navigate('deadlines', {query:'${query}',filterRange:'${filterRange}',sortKey:'${key}',sortDir:'${nextDir}'})">${label}${arrow}</th>`;
         };
 
@@ -3936,7 +3983,7 @@ class DashboardApp {
             const daysBadge = noDate
                 ? `<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">
                     <button onclick="event.stopPropagation();window.app.showDeadlineInputModal('${c.id}')"
-                        style="background:#fff;border:1.5px dashed #c5a059;color:#c5a059;border-radius:20px;padding:3px 0;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;width:90px;text-align:center;">
+                        style="background:#fff;border:1.5px dashed #061f45;color:#061f45;border-radius:20px;padding:3px 0;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;width:90px;text-align:center;">
                         <i class="fa-solid fa-plus" style="margin-right:4px;font-size:10px;"></i>期限を入力
                     </button>
                     <button id="btn-deadline-reanalyze-${c.id}" onclick="event.stopPropagation();window.app.runDeadlineReanalyze('${c.id}', { userTriggered: true })"
@@ -3958,7 +4005,7 @@ class DashboardApp {
             const active = filterRange === range;
             const count = counts[range];
             return `<button onclick="window.app.navigate('deadlines', {query:'${query}',filterRange:'${range}',sortKey:'${sortKey}',sortDir:'${sortDir}'})"
-                style="padding:7px 14px;border:1px solid ${active ? '#c5a059' : '#ddd'};border-radius:6px;background:${active ? '#c5a059' : '#fff'};color:${active ? '#fff' : '#5e544d'};font-size:13px;font-weight:${active ? '700' : '400'};cursor:pointer;display:flex;align-items:center;gap:6px;">
+                style="padding:7px 14px;border:1px solid ${active ? '#061f45' : '#ddd'};border-radius:6px;background:${active ? '#061f45' : '#fff'};color:${active ? '#fff' : '#5e544d'};font-size:13px;font-weight:${active ? '700' : '400'};cursor:pointer;display:flex;align-items:center;gap:6px;">
                 ${icon} ${label}${count > 0 ? ` <span style="background:${active ? 'rgba(255,255,255,0.3)' : '#f0ede8'};color:${active ? '#fff' : '#7a6a5a'};border-radius:10px;padding:1px 7px;font-size:11px;">${count}</span>` : ''}
             </button>`;
         };
@@ -4003,10 +4050,10 @@ class DashboardApp {
             </table>
         </div>
         <div class="text-muted" style="font-size:13px;margin-top:12px;">全 ${counts.all} 件中 ${sorted.length} 件を表示
-            ${counts.nodate > 0 ? `<span style="margin-left:16px;"><i class="fa-solid fa-circle-info" style="color:#c5a059;margin-right:4px;"></i>期限未設定 ${counts.nodate} 件：契約書を解析するとAIが自動で期限を抽出します。失敗した解析回数は消耗しません。</span>` : ''}
+            ${counts.nodate > 0 ? `<span style="margin-left:16px;"><i class="fa-solid fa-circle-info" style="color:#061f45;margin-right:4px;"></i>期限未設定 ${counts.nodate} 件：契約書を解析するとAIが自動で期限を抽出します。失敗した解析回数は消耗しません。</span>` : ''}
         </div>`;
 
-        const lockOverlay = deadlineLocked ? `<div style="position:fixed;top:0;right:0;bottom:0;left:240px;display:flex;align-items:center;justify-content:center;background:rgba(245,247,250,0.85);backdrop-filter:blur(3px);z-index:1000;"><div style="background:#fff;border-radius:12px;padding:32px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,0.13);max-width:300px;width:90%;"><i class="fa-solid fa-crown" style="color:#c19b4a;font-size:2rem;margin-bottom:12px;display:block;"></i><div style="display:inline-block;background:#f3f0ea;color:#c5a059;border:1px solid #e8d9b8;border-radius:10px;padding:3px 12px;font-size:11px;font-weight:700;margin-bottom:12px;">Business / Proプラン限定</div><div style="font-weight:700;font-size:15px;margin-bottom:8px;color:#2b2623;">期限・アラート管理</div><p style="font-size:12px;color:#888;line-height:1.6;margin-bottom:20px;">契約期限の自動抽出・アラート通知はBusinessプラン以上でご利用いただけます。</p><button onclick="window.app.navigate('plan')" style="width:100%;padding:10px;border:none;border-radius:8px;background:#c5a059;color:#fff;font-size:13px;font-weight:700;cursor:pointer;">アップグレードする</button></div></div>` : '';
+        const lockOverlay = deadlineLocked ? `<div style="position:fixed;top:0;right:0;bottom:0;left:240px;display:flex;align-items:center;justify-content:center;background:rgba(245,247,250,0.85);backdrop-filter:blur(3px);z-index:1000;"><div style="background:#fff;border-radius:12px;padding:32px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,0.13);max-width:300px;width:90%;"><i class="fa-solid fa-crown" style="color:#061f45;font-size:2rem;margin-bottom:12px;display:block;"></i><div style="display:inline-block;background:#eef4fb;color:#061f45;border:1px solid rgba(6, 31, 69, 0.18);border-radius:10px;padding:3px 12px;font-size:11px;font-weight:700;margin-bottom:12px;">Business / Proプラン限定</div><div style="font-weight:700;font-size:15px;margin-bottom:8px;color:#2b2623;">期限・アラート管理</div><p style="font-size:12px;color:#888;line-height:1.6;margin-bottom:20px;">契約期限の自動抽出・アラート通知はBusinessプラン以上でご利用いただけます。</p><button onclick="window.app.navigate('plan')" style="width:100%;padding:10px;border:none;border-radius:8px;background:#061f45;color:#fff;font-size:13px;font-weight:700;cursor:pointer;">アップグレードする</button></div></div>` : '';
 
         return `<div style="position:relative;">${pageHtml}${lockOverlay}</div>`;
     }
@@ -4609,7 +4656,7 @@ class DashboardApp {
         <div class="modal-content" style="max-width:480px;">
             <div class="modal-header">
                 <h3 style="margin:0; font-size:1.1rem;">
-                    <i class="fa-solid fa-credit-card" style="margin-right:8px; color:#B8860B;"></i>お支払い方法を登録
+                    <i class="fa-solid fa-credit-card" style="margin-right:8px; color:#061f45;"></i>お支払い方法を登録
                 </h3>
                 ${forcePayment ? '' : '<button class="btn-close" onclick="document.getElementById(\'stripe-modal-overlay\').remove()">&times;</button>'}
             </div>
@@ -4618,9 +4665,9 @@ class DashboardApp {
                     <div style="font-size:0.8rem; color:#888; margin-bottom:4px;">選択プラン</div>
                     <div style="font-size:1.1rem; font-weight:700; color:#24292E;">${planNames[targetPlan] || targetPlan}</div>
                     <div style="font-size:0.8rem; color:#8a6f40; margin-top:4px;">請求サイクル: ${billingLabel}</div>
-                    <div style="font-size:1.3rem; font-weight:700; color:#B8860B; margin-top:4px;">${planPrices[cycle]?.[targetPlan] || ''}</div>
+                    <div style="font-size:1.3rem; font-weight:700; color:#061f45; margin-top:4px;">${planPrices[cycle]?.[targetPlan] || ''}</div>
                 </div>
-                <button class="btn-dashboard full-width" style="background:#B8860B; color:#fff; border:none; font-weight:700;" onclick="window.app.startStripeCheckout('${targetPlan}', '${cycle}', ${forcePayment ? 'true' : 'false'})">
+                <button class="btn-dashboard full-width" style="background:#061f45; color:#fff; border:none; font-weight:700;" onclick="window.app.startStripeCheckout('${targetPlan}', '${cycle}', ${forcePayment ? 'true' : 'false'})">
                     お支払いを登録する
                 </button>
             </div>
@@ -4775,7 +4822,7 @@ class DashboardApp {
             paypal.Buttons({
                 style: {
                     shape: 'rect',
-                    color: 'gold',
+                    color: 'blue',
                     layout: 'vertical',
                     label: 'pay'
                 },
@@ -4846,7 +4893,7 @@ class DashboardApp {
         <div class="modal-content" style="max-width:480px;">
             <div class="modal-header">
                 <h3 style="margin:0; font-size:1.1rem;">
-                    <i class="fa-solid fa-credit-card" style="margin-right:8px; color:#c19b4a;"></i>お支払い方法を登録
+                    <i class="fa-solid fa-credit-card" style="margin-right:8px; color:#061f45;"></i>お支払い方法を登録
                 </h3>
                 ${forcePayment ? '' : '<button class="btn-close" onclick="document.getElementById(\'paypal-modal-overlay\').remove()">&times;</button>'}
             </div>
@@ -4855,7 +4902,7 @@ class DashboardApp {
                     <div style="font-size:0.8rem; color:#888; margin-bottom:4px;">選択プラン</div>
                     <div style="font-size:1.1rem; font-weight:700; color:#24292E;">${planNames[plan] || plan}</div>
                     <div style="font-size:0.8rem; color:#8a6f40; margin-top:4px;">請求サイクル: ${billingLabel}</div>
-                    <div style="font-size:1.3rem; font-weight:700; color:#c19b4a; margin-top:4px;">${planPrices[cycle]?.[plan] || ''}</div>
+                    <div style="font-size:1.3rem; font-weight:700; color:#061f45; margin-top:4px;">${planPrices[cycle]?.[plan] || ''}</div>
                 </div>
                 <p style="font-size:0.82rem; color:#666; margin-bottom:16px; text-align:center;">
                     クレジットカード/デビットカードで決済できます。
@@ -4982,8 +5029,8 @@ class DashboardApp {
         const deadlineSlackEnabled = settings?.slack?.deadlineAlert !== false && slackConnected;
         const crawlerLocked = plan !== 'pro';
         const deadlineLocked = plan === 'free';
-        const lockOverlayCrawler = '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(245,247,250,0.82);backdrop-filter:blur(2px);border-radius:8px;z-index:1"><div style="background:#fff;border-radius:10px;padding:24px 32px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.1);max-width:280px"><i class=\'fa-solid fa-crown\' style=\'color:#c19b4a;font-size:1.8rem;margin-bottom:10px;display:block\'></i><div style=\'font-weight:700;font-size:15px;margin-bottom:8px\'>Proプラン限定</div><p style=\'font-size:12px;color:#888;line-height:1.6;margin-bottom:16px\'>クローラー通知はProプランの機能です</p><button class=\'btn-dashboard btn-primary-action\' style=\'width:100%;padding:10px;font-size:13px\' onclick=\'window.app.navigate("plan")\'>アップグレードする</button></div></div>';
-        const lockOverlayDeadline = '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(245,247,250,0.82);backdrop-filter:blur(2px);border-radius:8px;z-index:1"><div style="background:#fff;border-radius:10px;padding:24px 32px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.1);max-width:280px"><i class=\'fa-solid fa-crown\' style=\'color:#c19b4a;font-size:1.8rem;margin-bottom:10px;display:block\'></i><div style=\'font-weight:700;font-size:15px;margin-bottom:8px\'>Starterプラン以上限定</div><p style=\'font-size:12px;color:#888;line-height:1.6;margin-bottom:16px\'>期限アラート通知はStarterプラン以上の機能です</p><button class=\'btn-dashboard btn-primary-action\' style=\'width:100%;padding:10px;font-size:13px\' onclick=\'window.app.navigate("plan")\'>アップグレードする</button></div></div>';
+        const lockOverlayCrawler = '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(245,247,250,0.82);backdrop-filter:blur(2px);border-radius:8px;z-index:1"><div style="background:#fff;border-radius:10px;padding:24px 32px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.1);max-width:280px"><i class=\'fa-solid fa-crown\' style=\'color:#061f45;font-size:1.8rem;margin-bottom:10px;display:block\'></i><div style=\'font-weight:700;font-size:15px;margin-bottom:8px\'>Proプラン限定</div><p style=\'font-size:12px;color:#888;line-height:1.6;margin-bottom:16px\'>クローラー通知はProプランの機能です</p><button class=\'btn-dashboard btn-primary-action\' style=\'width:100%;padding:10px;font-size:13px\' onclick=\'window.app.navigate("plan")\'>アップグレードする</button></div></div>';
+        const lockOverlayDeadline = '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(245,247,250,0.82);backdrop-filter:blur(2px);border-radius:8px;z-index:1"><div style="background:#fff;border-radius:10px;padding:24px 32px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.1);max-width:280px"><i class=\'fa-solid fa-crown\' style=\'color:#061f45;font-size:1.8rem;margin-bottom:10px;display:block\'></i><div style=\'font-weight:700;font-size:15px;margin-bottom:8px\'>Starterプラン以上限定</div><p style=\'font-size:12px;color:#888;line-height:1.6;margin-bottom:16px\'>期限アラート通知はStarterプラン以上の機能です</p><button class=\'btn-dashboard btn-primary-action\' style=\'width:100%;padding:10px;font-size:13px\' onclick=\'window.app.navigate("plan")\'>アップグレードする</button></div></div>';
 
         const slackStatus = slackConnected
             ? `<div style="display:flex;align-items:center;gap:8px;margin-top:12px;padding:10px 14px;background:#f0faf4;border:1px solid #b7dfc7;border-radius:6px">
@@ -5334,37 +5381,19 @@ class DashboardApp {
             'owner': 'Owner'
         };
 
-        const usagePercent = Math.min(100, (sub.usageCount / sub.usageLimit) * 100);
         const planName = planNames[sub.plan] || sub.plan;
         const billingCycleLabel = sub.billingCycle === 'annual' ? '年額' : '月額';
 
-        let upgradeAdvice = '';
-        if (sub.usageCount >= sub.usageLimit) {
-            if (sub.plan === 'free') {
-                upgradeAdvice = '<div class="upgrade-advice">月間上限に達しました。Starter以上のプランにすると解析回数が増えます。</div>';
-            } else if (sub.plan === 'starter') {
-                upgradeAdvice = '<div class="upgrade-advice">月間上限に達しました。翌月まで待つか、Business以上のプランにすると回数が増えます。</div>';
-            } else if (sub.plan === 'business') {
-                upgradeAdvice = '<div class="upgrade-advice">月間上限に達しました。翌月まで待つか、Proプランにアップグレードすると回数が増えます。</div>';
-            } else if (sub.plan === 'pro') {
-                upgradeAdvice = '<div class="upgrade-advice">月間上限に達しました。翌月までお待ちいただくか、追加枠についてお問い合わせください。</div>';
-            }
-        }
-
         let statusHtml = `
-        <div class="plan-status-card">
-            <div class="plan-badge plan-badge-${sub.plan}">${planName}（${billingCycleLabel}）</div>
-            <div class="plan-info-text">
-                AI解析: <strong style="${sub.usageLimit >= 999999 ? '' : ((({'free':3,'starter':50,'business':120,'pro':400}[sub.plan] || sub.usageLimit) - sub.usageCount) <= 1 ? 'color:#f59e0b;' : '')}">${sub.usageCount}</strong> / ${sub.usageLimit >= 999999 ? '無制限' : ({'free':3,'starter':50,'business':120,'pro':400}[sub.plan] || sub.usageLimit) + '回'}
-                <br>電子署名: <strong>${sub.signUsageCount || 0}</strong> / ${(sub.signUsageLimit >= 999999 || sub.plan === 'pro' || sub.plan === 'owner') ? '無制限' : `${{'free':10,'starter':25,'business':100}[sub.plan] || sub.signUsageLimit || 0}回`}
-                ${sub.renewalDate ? `<br><span style="font-size:0.75rem; opacity:0.8;">次回更新: <strong>${new Date(sub.renewalDate).toLocaleDateString('ja-JP')}</strong></span>` : ''}
+        <div class="plan-info-box">
+            <div class="plan-title">${planName}（${billingCycleLabel}）</div>
+            <div class="usage-item">
+                AI解析: <strong>${sub.usageCount}</strong> / ${sub.usageLimit >= 999999 ? '無制限' : ({'free':3,'starter':50,'business':120,'pro':400}[sub.plan] || sub.usageLimit) + '回'}
             </div>
-            ${upgradeAdvice}
-            ${this.isSignLimitReached() ? `
-                <div style="margin-top:10px; padding:8px 10px; background:rgba(234,67,53,0.08); border:1px solid rgba(234,67,53,0.2); border-radius:6px; font-size:0.72rem; color:#c2410c;">
-                    今月の電子署名上限に達しました。翌月までお待ちいただくか、上位プランへのアップグレードをご検討ください。
-                </div>
-            ` : ''}
+            <div class="usage-item">
+                電子署名: <strong>${sub.signUsageCount || 0}</strong> / ${(sub.signUsageLimit >= 999999 || sub.plan === 'pro' || sub.plan === 'owner') ? '無制限' : `${{'free':10,'starter':25,'business':100}[sub.plan] || sub.signUsageLimit || 0}回`}
+            </div>
+            ${sub.renewalDate ? `<div class="usage-item" style="opacity:0.6; margin-top:8px; font-size:11px;">次回更新: ${new Date(sub.renewalDate).toLocaleDateString('ja-JP')}</div>` : ''}
         </div>
         `;
 
@@ -5406,6 +5435,7 @@ class DashboardApp {
         const toggle = document.getElementById('sidebar-toggle');
         const sidebar = document.getElementById('app-sidebar');
         const overlay = document.getElementById('sidebar-overlay');
+        const collapseToggle = document.getElementById('sidebar-collapse-toggle');
 
         const closeSidebar = () => {
             sidebar?.classList.remove('active');
@@ -5422,6 +5452,25 @@ class DashboardApp {
 
         if (overlay) {
             overlay.addEventListener('click', closeSidebar);
+        }
+
+        if (sidebar && collapseToggle) {
+            const applyCollapsedState = (collapsed) => {
+                sidebar.classList.toggle('is-collapsed', collapsed);
+                collapseToggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+                collapseToggle.setAttribute('aria-label', collapsed ? 'メニューを展開する' : 'メニューを折りたたむ');
+                collapseToggle.innerHTML = collapsed
+                    ? '<i class="fa-solid fa-angles-right"></i>'
+                    : '<i class="fa-solid fa-angles-left"></i>';
+            };
+            const savedCollapsed = localStorage.getItem('diffsense_sidebar_collapsed') === '1';
+            applyCollapsedState(savedCollapsed);
+            collapseToggle.addEventListener('click', (event) => {
+                event.stopPropagation();
+                const nextCollapsed = !sidebar.classList.contains('is-collapsed');
+                applyCollapsedState(nextCollapsed);
+                localStorage.setItem('diffsense_sidebar_collapsed', nextCollapsed ? '1' : '0');
+            });
         }
 
         if (!this.mobileBottomNavBound) {
@@ -6784,7 +6833,7 @@ class DashboardApp {
 
         modal.innerHTML = `
                     <div style="background:white; width:90%; max-width:450px; border-radius:12px; padding:32px; text-align:center; box-shadow:0 10px 40px rgba(0,0,0,0.1); animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);">
-                        <div style="width:60px; height:60px; background:#f9f9f9; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 20px; color:#c5a059; font-size:30px;">
+                        <div style="width:60px; height:60px; background:#f9f9f9; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 20px; color:#061f45; font-size:30px;">
                             <i class="fa-solid fa-check"></i>
                         </div>
                         <h3 style="margin:0 0 12px; color:#24292E; font-size:20px; font-weight:700;">${title}</h3>
@@ -6967,15 +7016,15 @@ class DashboardApp {
         modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:11000;animation:fadeIn 0.3s;';
         modal.innerHTML = `
             <div style="background:white;width:90%;max-width:420px;border-radius:12px;padding:32px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,0.2);animation:slideUp 0.3s cubic-bezier(0.16,1,0.3,1);">
-                <div style="width:60px;height:60px;background:#f3f0ea;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;color:#c5a059;font-size:28px;">
+                <div style="width:60px;height:60px;background:#eef4fb;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;color:#061f45;font-size:28px;">
                     <i class="fa-solid fa-crown"></i>
                 </div>
-                <div style="display:inline-block;background:#f3f0ea;color:#c5a059;border:1px solid #e8d9b8;border-radius:10px;padding:3px 12px;font-size:11px;font-weight:700;margin-bottom:12px;">Business / Proプラン限定</div>
+                <div style="display:inline-block;background:#eef4fb;color:#061f45;border:1px solid rgba(6, 31, 69, 0.18);border-radius:10px;padding:3px 12px;font-size:11px;font-weight:700;margin-bottom:12px;">Business / Proプラン限定</div>
                 <h3 style="margin:0 0 12px;color:#24292E;font-size:18px;font-weight:700;">期限・アラート管理</h3>
                 <p style="margin:0 0 24px;color:#586069;font-size:13px;line-height:1.7;">契約期限の自動抽出・アラート通知はBusinessプラン以上でご利用いただけます。</p>
                 <div style="display:flex;gap:10px;">
                     <button style="flex:1;padding:10px;border:1px solid #ddd;border-radius:8px;background:#fff;color:#666;font-size:13px;cursor:pointer;" onclick="document.getElementById('business-upgrade-modal').remove()">閉じる</button>
-                    <button style="flex:1;padding:10px;border:none;border-radius:8px;background:#c5a059;color:#fff;font-size:13px;font-weight:700;cursor:pointer;" onclick="document.getElementById('business-upgrade-modal').remove();window.app.navigate('plan')">プランを見る</button>
+                    <button style="flex:1;padding:10px;border:none;border-radius:8px;background:#061f45;color:#fff;font-size:13px;font-weight:700;cursor:pointer;" onclick="document.getElementById('business-upgrade-modal').remove();window.app.navigate('plan')">プランを見る</button>
                 </div>
             </div>`;
         document.body.appendChild(modal);
@@ -6990,15 +7039,15 @@ class DashboardApp {
         modal.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:11000; animation: fadeIn 0.3s;';
         modal.innerHTML = `
             <div style="background:white; width:90%; max-width:420px; border-radius:12px; padding:32px; text-align:center; box-shadow:0 10px 40px rgba(0,0,0,0.2); animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);">
-                <div style="width:60px; height:60px; background:#f3f0ea; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 20px; color:#c5a059; font-size:28px;">
+                <div style="width:60px; height:60px; background:#eef4fb; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 20px; color:#061f45; font-size:28px;">
                     <i class="fa-solid fa-satellite-dish"></i>
                 </div>
-                <div style="display:inline-block; background:#f3f0ea; color:#c5a059; border:1px solid #e8d9b8; border-radius:10px; padding:3px 12px; font-size:11px; font-weight:700; margin-bottom:12px;">Proプラン限定</div>
+                <div style="display:inline-block; background:#eef4fb; color:#061f45; border:1px solid rgba(6, 31, 69, 0.18); border-radius:10px; padding:3px 12px; font-size:11px; font-weight:700; margin-bottom:12px;">Proプラン限定</div>
                 <h3 style="margin:0 0 12px; color:#24292E; font-size:18px; font-weight:700;">定期URL監視・Slack／メール通知</h3>
                 <p style="margin:0 0 24px; color:#586069; font-size:13px; line-height:1.7;">${message}</p>
                 <div style="display:flex; gap:10px;">
                     <button style="flex:1; padding:10px; border:1px solid #ddd; border-radius:8px; background:#fff; color:#666; font-size:13px; cursor:pointer;" onclick="document.getElementById('pro-upgrade-modal').remove()">閉じる</button>
-                    <button style="flex:1; padding:10px; border:none; border-radius:8px; background:#c5a059; color:#fff; font-size:13px; font-weight:700; cursor:pointer;" onclick="document.getElementById('pro-upgrade-modal').remove(); window.app.registration?.close(); window.app.navigate('plan')">Proプランを見る</button>
+                    <button style="flex:1; padding:10px; border:none; border-radius:8px; background:#061f45; color:#fff; font-size:13px; font-weight:700; cursor:pointer;" onclick="document.getElementById('pro-upgrade-modal').remove(); window.app.registration?.close(); window.app.navigate('plan')">Proプランを見る</button>
                 </div>
             </div>`;
         document.body.appendChild(modal);
@@ -7805,8 +7854,8 @@ class DashboardApp {
             container.innerHTML = `
                             <div style="padding: 40px; line-height: 1.6;">
                                 <!-- Section: Header -->
-                                <div style="border-bottom: 2px solid #c19b4a; padding-bottom: 10px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end;">
-                                    <h1 style="margin: 0; color: #c19b4a; font-size: 24px;">DIFFsense AI解析レポート</h1>
+                                <div style="border-bottom: 2px solid #061f45; padding-bottom: 10px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end;">
+                                    <h1 style="margin: 0; color: #061f45; font-size: 24px;">DIFFsense AI解析レポート</h1>
                                     <span style="font-size: 12px; color: #888;">出力日: ${analysisDate}</span>
                                 </div>
 
@@ -7822,19 +7871,19 @@ class DashboardApp {
 
                                 <!-- Section: AI Summary -->
                                 <div style="margin-bottom: 20px;">
-                                    <h2 style="font-size: 18px; border-left: 4px solid #c19b4a; padding-left: 10px; margin: 0 0 15px;">【解析要約】</h2>
+                                    <h2 style="font-size: 18px; border-left: 4px solid #061f45; padding-left: 10px; margin: 0 0 15px;">【解析要約】</h2>
                                     <div style="white-space: pre-wrap;">${contract.ai_summary || '解析データなし'}</div>
                                 </div>
 
                                 <!-- Section: Risk Reason -->
                                 <div style="margin-bottom: 20px;">
-                                    <h2 style="font-size: 18px; border-left: 4px solid #c19b4a; padding-left: 10px; margin: 0 0 15px;">【AIリスク判定結果・理由】</h2>
+                                    <h2 style="font-size: 18px; border-left: 4px solid #061f45; padding-left: 10px; margin: 0 0 15px;">【AIリスク判定結果・理由】</h2>
                                     <div style="white-space: pre-wrap;">${contract.ai_risk_reason || '判定データなし'}</div>
                                 </div>
 
                                 <!-- Section: Each change as separate section -->
                                 <div style="margin-bottom: 10px;">
-                                    <h2 style="font-size: 18px; border-left: 4px solid #c19b4a; padding-left: 10px; margin: 0 0 15px;">【主要な差分箇所】</h2>
+                                    <h2 style="font-size: 18px; border-left: 4px solid #061f45; padding-left: 10px; margin: 0 0 15px;">【主要な差分箇所】</h2>
                                 </div>
                                 ${(contract.ai_changes || []).map(c => `
                     <div style="margin-bottom: 15px; border: 1px solid #eee; border-radius: 4px;">
@@ -7852,7 +7901,7 @@ class DashboardApp {
 
                                 <!-- Section: Original Content -->
                                 <div style="margin-bottom: 20px;">
-                                    <h2 style="font-size: 18px; border-left: 4px solid #c19b4a; padding-left: 10px; margin: 0 0 15px;">【原本（全文）】</h2>
+                                    <h2 style="font-size: 18px; border-left: 4px solid #061f45; padding-left: 10px; margin: 0 0 15px;">【原本（全文）】</h2>
                                     <div style="white-space: pre-wrap; background: #fafafa; padding: 20px; font-size: 12px; border: 1px solid #eee;">${contract.original_content || '原本データはありません'}</div>
                                 </div>
 

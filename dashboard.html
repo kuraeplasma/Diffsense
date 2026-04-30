@@ -68,9 +68,9 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;700&family=Noto+Serif+JP:wght@400;700&display=swap"
         rel="stylesheet">
-    <style>body{margin:0;background:#fafafa;color:#222;font-family:Inter,"Noto Sans JP",sans-serif}#app-sidebar{width:250px;position:fixed;left:0;top:0;bottom:0;background:#111827;color:#fff;z-index:20}#app-main{margin-left:250px;min-height:100vh}#app-content{padding:24px;min-height:100vh}.shell-skeleton{display:grid;gap:14px}.skeleton-block{height:18px;background:linear-gradient(90deg,#eceff3,#f5f7fa,#eceff3);background-size:200% 100%;border-radius:6px;animation:skel 1.2s ease-in-out infinite}.skeleton-card{height:110px;border-radius:12px;background:#fff;border:1px solid #eceff3}.skeleton-row{height:46px;border-radius:8px;background:#fff;border:1px solid #eceff3}@keyframes skel{0%{background-position:200% 0}100%{background-position:-200% 0}}@media (max-width:900px){#app-main{margin-left:0}#app-content{padding:16px}}.toggle-switch{position:relative;display:inline-block;width:48px;height:26px}.toggle-switch input{opacity:0;width:0;height:0}.toggle-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#444;border-radius:26px;transition:.3s}.toggle-slider:before{position:absolute;content:"";height:20px;width:20px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s}input:checked+.toggle-slider{background:#4CAF50}input:checked+.toggle-slider:before{transform:translateX(22px)}</style>
-    <link rel="preload" as="style" href="css/dashboard.css?v=5" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="css/dashboard.css?v=5"></noscript>
+    <style>body{margin:0;background:#fbfdff;color:#222;font-family:Helvetica,"Helvetica Neue",Arial,"Noto Sans JP",sans-serif}#app-sidebar{width:250px;position:fixed;left:0;top:0;bottom:0;background:#111827;color:#fff;z-index:20}#app-main{margin-left:250px;min-height:100vh;background:#fbfdff}#app-content{padding:24px;min-height:100vh;background:#fbfdff}.shell-skeleton{display:grid;gap:14px}.skeleton-block{height:18px;background:linear-gradient(90deg,#eceff3,#f5f7fa,#eceff3);background-size:200% 100%;border-radius:6px;animation:skel 1.2s ease-in-out infinite}.skeleton-card{height:110px;border-radius:12px;background:#fff;border:1px solid #eceff3}.skeleton-row{height:46px;border-radius:8px;background:#fff;border:1px solid #eceff3}@keyframes skel{0%{background-position:200% 0}100%{background-position:-200% 0}}@media (max-width:900px){#app-main{margin-left:0}#app-content{padding:16px}}.toggle-switch{position:relative;display:inline-block;width:48px;height:26px}.toggle-switch input{opacity:0;width:0;height:0}.toggle-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#444;border-radius:26px;transition:.3s}.toggle-slider:before{position:absolute;content:"";height:20px;width:20px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s}input:checked+.toggle-slider{background:#4CAF50}input:checked+.toggle-slider:before{transform:translateX(22px)}</style>
+    <link rel="preload" as="style" href="css/dashboard.css?v=20260501_collapsed_sidebar_align" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="css/dashboard.css?v=20260501_collapsed_sidebar_align"></noscript>
     <link rel="stylesheet" href="css/sign.css?v=premiumv53">
     <link rel="stylesheet" href="css/dashboard-structured-fix.css?v=20260310local1">
     <!-- FontAwesome for Icons (CDN) -->
@@ -87,55 +87,62 @@
     <!-- Sidebar -->
     <nav id="app-sidebar">
         <div class="sidebar-logo">
-            <i class="fa-solid fa-scale-balanced"></i>
-            DIFFsense
+            <span class="sidebar-logo-mark">
+                <i class="fa-solid fa-scale-balanced"></i>
+                <span>DIFFsense</span>
+            </span>
+            <button type="button" id="sidebar-collapse-toggle" class="sidebar-collapse-btn" aria-label="メニューを折りたたむ" aria-expanded="true">
+                <i class="fa-solid fa-angles-left"></i>
+            </button>
         </div>
         <div class="nav-menu">
-            <div class="nav-item active" onclick="window.app.navigate('dashboard')">
-                <div class="nav-icon"><i class="fa-solid fa-house"></i></div>
+            <div class="nav-item" onclick="window.app.navigate('dashboard')">
+                <i class="fa-solid fa-house"></i>
                 <span>ダッシュボード</span>
             </div>
             <div class="nav-item" onclick="window.app.navigate('contracts')">
-                <div class="nav-icon"><i class="fa-solid fa-file-contract"></i></div>
-                <span>契約・規約管理</span>
+                <i class="fa-regular fa-file-lines"></i>
+                <span>契約書一覧</span>
             </div>
             <div class="nav-item" id="nav-deadlines" onclick="window.app.navigate('deadlines')">
-                <div class="nav-icon"><i class="fa-solid fa-calendar-days"></i></div>
+                <i class="fa-solid fa-calendar-days"></i>
                 <span>期限・アラート管理</span>
             </div>
             <div class="nav-item" onclick="window.app.navigate('history')">
-                <div class="nav-icon"><i class="fa-solid fa-clock-rotate-left"></i></div>
+                <i class="fa-solid fa-clock-rotate-left"></i>
                 <span>解析履歴</span>
             </div>
             <div class="nav-item" id="nav-sign" onclick="window.app.navigate('sign')">
-                <div class="nav-icon"><i class="fa-solid fa-file-signature"></i></div>
+                <i class="fa-solid fa-file-signature"></i>
                 <span class="nav-label">署名管理</span>
                 <span class="nav-badge" id="nav-sign-badge" style="display:none">0</span>
             </div>
 
             <div class="nav-item" id="nav-team" onclick="window.app.navigate('team')" style="display:none;">
-                <div class="nav-icon"><i class="fa-solid fa-users"></i></div>
+                <i class="fa-solid fa-users"></i>
                 <span>チーム設定</span>
             </div>
             <div class="nav-item" id="nav-plan" onclick="window.app.navigate('plan')">
-                <div class="nav-icon"><i class="fa-solid fa-credit-card"></i></div>
+                <i class="fa-solid fa-credit-card"></i>
                 <span>プラン管理</span>
             </div>
             <div class="nav-item" id="nav-notifications" onclick="window.app.navigate('notifications')">
-                <div class="nav-icon"><i class="fa-solid fa-bell"></i></div>
+                <i class="fa-solid fa-bell"></i>
                 <span>通知設定</span>
             </div>
             <div class="nav-item" id="nav-mcp" onclick="window.app.navigate('mcp')">
-                <div class="nav-icon"><i class="fa-solid fa-plug"></i></div>
+                <i class="fa-solid fa-plug"></i>
                 <span>MCP連携</span>
             </div>
         </div>
-        <div class="user-profile">
+        <div class="sidebar-footer">
             <div id="plan-status-container"></div>
-            <div style="font-weight:600; color:#fff;" id="user-name-display">ユーザー</div>
-            <div id="user-email-display" style="font-size:11px; margin-bottom:10px;">...</div>
-            <div style="cursor:pointer; color:#ccc;" id="logout-btn">
-                <i class="fa-solid fa-arrow-right-from-bracket"></i> ログアウト
+            <div class="user-profile">
+                <div class="user-name" id="user-name-display">ユーザー</div>
+                <div class="user-email" id="user-email-display">...</div>
+                <button class="btn-logout" id="logout-btn">
+                    <i class="fa-solid fa-arrow-right-from-bracket"></i> ログアウト
+                </button>
             </div>
         </div>
     </nav>
@@ -143,9 +150,9 @@
     <button id="sidebar-toggle" class="btn-icon mobile-only sidebar-floating-toggle" aria-label="メニューを開く">
         <i class="fa-solid fa-bars"></i>
     </button>
-    <button class="btn-dashboard btn-primary-action global-registration-btn" id="open-registration-btn"
+    <button class="btn-outline-brand global-registration-btn" id="open-registration-btn"
         style="display:none;">
-        <i class="fa-solid fa-plus"></i> 新規登録
+        <i class="fa-solid fa-plus"></i> 契約書をアップロード
     </button>
 
     <!-- Mobile Header (スマホ専用) -->
@@ -153,9 +160,9 @@
         <button class="mobile-menu-button" id="bnav-menu" onclick="window.app?.toggleMobileMenu()" aria-expanded="false" aria-label="メニュー">
             <i class="fa-solid fa-bars"></i>
         </button>
-        <span class="mobile-header-logo"><i class="fa-solid fa-scale-balanced"></i> DIFFsense</span>
-        <button class="mobile-register-btn" onclick="if(window.app?.can('operate_contract')){window.app.registration?.open()}else{window.Notify?.warning('閲覧のみの権限では新規登録できません')}" aria-label="新規登録">
-            <i class="fa-solid fa-plus"></i> 新規登録
+        <span class="mobile-header-logo">DIFFsense</span>
+        <button class="mobile-register-btn" onclick="if(window.app?.can('operate_contract')){window.app.registration?.open()}else{window.Notify?.warning('閲覧のみの権限では新規登録できません')}" aria-label="契約書をアップロード">
+            <i class="fa-solid fa-plus"></i> 契約書をアップロード
         </button>
     </header>
 
@@ -249,8 +256,7 @@
     </div>
 
     <!-- Hidden File Input for PDF Upload -->
-    <input type="file" id="reg-file-input" style="display: none;" accept="application/pdf">
-    <input type="file" id="reg-compare-file-input" style="display: none;" accept=".docx">
+    <input type="file" id="reg-file-input" style="display: none;" accept="application/pdf,.docx,.txt">
 
     <!-- Invite Member Modal -->
     <div id="invite-member-modal" class="modal-overlay">
@@ -290,7 +296,7 @@
     <div id="upgrade-modal" class="modal-overlay">
         <div class="modal-content" style="max-width: 450px; text-align: center;">
             <div class="modal-body" style="padding: 40px 32px;">
-                <div style="font-size: 3rem; color: #c19b4a; margin-bottom: 20px;">
+                <div style="font-size: 3rem; color: #061f45; margin-bottom: 20px;">
                     <i class="fa-solid fa-crown"></i>
                 </div>
                 <h3 style="margin-bottom: 16px; font-size: 1.4rem;">Businessプラン限定機能</h3>
@@ -375,7 +381,7 @@
     </div>
 
     <!-- App Logic -->
-    <script type="module" src="/js/dashboard.js?v=20260424_ui_centering_fix_v7"></script>
+    <script type="module" src="/js/dashboard.js?v=20260501_collapsed_sidebar_align"></script>
     <script type="module">
         import { requireAuth, handleLogout } from '/js/auth.js?v=20260423_docx_async_fix';
 
