@@ -1697,6 +1697,101 @@ ${truncatedText}
     sleep(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
+
+    /**
+     * 修正提案付き拡張解析 (Enhanced Analysis with Modification Suggestions)
+     * @param {string} contractText - 契約書テキスト
+     * @returns {Promise<Object>} { contractType, contractTypeConfidence, overall, clauses, finalDocument, negotiationText }
+     */
+    async analyzeContractEnhanced(contractText) {
+        if (!GEMINI_API_KEY) {
+            throw new Error('Gemini API key is not configured');
+        }
+
+        const maxLength = 28000;
+        const truncated = String(contractText || '').substring(0, maxLength);
+
+        const prompt = `あなたは高度な法務専門AIエージェントです。
+以下の契約書を詳細に解析し、各条項に対する修正提案を含む拡張レポートをJSON形式で返してください。
+
+# 契約書
+${truncated}
+
+# 出力形式（JSONのみ。説明文やコードブロック不要）
+{
+  "contractType": "契約種別（例: 業務委託契約、売買契約、秘密保持契約）",
+  "contractTypeConfidence": "高 | 中 | 低",
+  "overall": {
+    "riskLevel": 2,
+    "riskLabel": "🟡 中リスク",
+    "summary": "契約全体のリスク概要と推奨対応（200文字以内）"
+  },
+  "clauses": [
+    {
+      "clauseName": "第X条（条項名）",
+      "severity": "HIGH | MEDIUM | LOW",
+      "issue": "この条項の問題点（100文字以内）",
+      "suggestion": "修正提案の要旨（100文字以内）",
+      "originalText": "元の条文（原文をそのまま引用。200文字以内）",
+      "modifiedText": "修正後の条文案（200文字以内）"
+    }
+  ],
+  "finalDocument": "全条項を修正提案反映済みの完全な契約書テキスト（改行\\nで表現）",
+  "negotiationText": "相手方への交渉・申し入れ文書のサンプル（300文字以内）"
+}
+
+# ルール
+- 日本語で回答してください
+- clausesは重要度の高い順に最大8件
+- severity は必ず HIGH / MEDIUM / LOW のいずれか
+- riskLevel は 1, 2, 3 のいずれか
+- riskLabel は「🔴 高リスク」「🟡 中リスク」「🟢 低リスク」のいずれか
+- finalDocument は元の契約書をベースに修正提案を反映した完成形テキスト
+- JSON以外のテキストは一切出力しないでください`;
+
+        logger.info('Starting analyzeContractEnhanced request');
+        try {
+            const result = await this.requestGeminiJson(prompt, true);
+            return this._normalizeEnhancedResult(result);
+        } catch (error) {
+            logger.warn('analyzeContractEnhanced primary failed, retrying without JSON mime:', error.message);
+            try {
+                const result = await this.requestGeminiJson(prompt, false);
+                return this._normalizeEnhancedResult(result);
+            } catch (retryError) {
+                logger.error('analyzeContractEnhanced failed:', retryError);
+                throw retryError;
+            }
+        }
+    }
+
+    _normalizeEnhancedResult(parsed) {
+        const riskLevel = Number(parsed?.overall?.riskLevel || 2);
+        const riskLabel = parsed?.overall?.riskLabel ||
+            (riskLevel >= 3 ? '🔴 高リスク' : riskLevel === 2 ? '🟡 中リスク' : '🟢 低リスク');
+
+        const clauses = Array.isArray(parsed?.clauses) ? parsed.clauses.map(c => ({
+            clauseName: String(c?.clauseName || c?.clause || '').trim() || '条項',
+            severity: /^(HIGH|MEDIUM|LOW)$/i.test(String(c?.severity || '')) ? String(c.severity).toUpperCase() : 'MEDIUM',
+            issue: String(c?.issue || c?.reason || '').trim(),
+            suggestion: String(c?.suggestion || c?.action || '').trim(),
+            originalText: String(c?.originalText || c?.original || c?.old || '').trim(),
+            modifiedText: String(c?.modifiedText || c?.modified || c?.new || '').trim()
+        })).filter(c => c.clauseName || c.issue) : [];
+
+        return {
+            contractType: String(parsed?.contractType || '').trim() || '契約書',
+            contractTypeConfidence: String(parsed?.contractTypeConfidence || '').trim() || '中',
+            overall: {
+                riskLevel,
+                riskLabel,
+                summary: String(parsed?.overall?.summary || '').trim() || '解析が完了しました。'
+            },
+            clauses,
+            finalDocument: String(parsed?.finalDocument || '').trim(),
+            negotiationText: String(parsed?.negotiationText || '').trim()
+        };
+    }
 }
 
 module.exports = new GeminiService();

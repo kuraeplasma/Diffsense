@@ -1439,4 +1439,30 @@ router.post('/:id/reanalyze', rateLimit, async (req, res, next) => {
     }
 });
 
+router.post('/analyze-enhanced', rateLimit, async (req, res, next) => {
+    try {
+        const { contractId, extractedText } = req.body || {};
+        if (!extractedText) {
+            return res.status(400).json({ success: false, error: 'extractedText is required' });
+        }
+
+        const text = typeof extractedText === 'string'
+            ? extractedText
+            : Array.isArray(extractedText)
+                ? extractedText.map(s => `${s?.article || ''} ${s?.title || ''}\n${(s?.paragraphs || []).join('\n')}`).join('\n\n')
+                : String(extractedText || '');
+
+        if (!text.trim()) {
+            return res.status(400).json({ success: false, error: '契約書テキストが空です' });
+        }
+
+        logger.info(`analyze-enhanced: contractId=${contractId}, textLen=${text.length}`);
+        const result = await geminiService.analyzeContractEnhanced(text);
+        res.json({ success: true, data: result });
+    } catch (error) {
+        logger.error('analyze-enhanced error:', error);
+        next(error);
+    }
+});
+
 module.exports = router;
