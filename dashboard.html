@@ -68,9 +68,14 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;700&family=Noto+Serif+JP:wght@400;700&display=swap"
         rel="stylesheet">
-    <style>body{margin:0;background:#fbfdff;color:#222;font-family:Helvetica,"Helvetica Neue",Arial,"Noto Sans JP",sans-serif}#app-sidebar{width:250px;position:fixed;left:0;top:0;bottom:0;background:#111827;color:#fff;z-index:20}#app-main{margin-left:250px;min-height:100vh;background:#fbfdff}#app-content{padding:24px;min-height:100vh;background:#fbfdff}.shell-skeleton{display:grid;gap:14px}.skeleton-block{height:18px;background:linear-gradient(90deg,#eceff3,#f5f7fa,#eceff3);background-size:200% 100%;border-radius:6px;animation:skel 1.2s ease-in-out infinite}.skeleton-card{height:110px;border-radius:12px;background:#fff;border:1px solid #eceff3}.skeleton-row{height:46px;border-radius:8px;background:#fff;border:1px solid #eceff3}@keyframes skel{0%{background-position:200% 0}100%{background-position:-200% 0}}@media (max-width:900px){#app-main{margin-left:0}#app-content{padding:16px}}.toggle-switch{position:relative;display:inline-block;width:48px;height:26px}.toggle-switch input{opacity:0;width:0;height:0}.toggle-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#444;border-radius:26px;transition:.3s}.toggle-slider:before{position:absolute;content:"";height:20px;width:20px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s}input:checked+.toggle-slider{background:#4CAF50}input:checked+.toggle-slider:before{transform:translateX(22px)}</style>
-    <link rel="preload" as="style" href="css/dashboard.css?v=20260501_collapsed_sidebar_align" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="css/dashboard.css?v=20260501_collapsed_sidebar_align"></noscript>
+    <style>body{margin:0;background:#fbfdff;color:#222;font-family:Helvetica,"Helvetica Neue",Arial,"Noto Sans JP",sans-serif}#app-sidebar{width:250px;position:fixed;left:0;top:0;bottom:0;background:#010816;color:#fff;z-index:20}#app-main{margin-left:250px;min-height:100vh;background:#fbfdff}#app-content{padding:24px;min-height:100vh;background:#fbfdff}.shell-skeleton{display:grid;gap:14px}.skeleton-block{height:18px;background:linear-gradient(90deg,#eceff3,#f5f7fa,#eceff3);background-size:200% 100%;border-radius:6px;animation:skel 1.2s ease-in-out infinite}.skeleton-card{height:110px;border-radius:12px;background:#fff;border:1px solid #eceff3}.skeleton-row{height:46px;border-radius:8px;background:#fff;border:1px solid #eceff3}@keyframes skel{0%{background-position:200% 0}100%{background-position:-200% 0}}@media (max-width:900px){#app-main{margin-left:0}#app-content{padding:16px}}.toggle-switch{position:relative;display:inline-block;width:48px;height:26px}.toggle-switch input{opacity:0;width:0;height:0}.toggle-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#444;border-radius:26px;transition:.3s}.toggle-slider:before{position:absolute;content:"";height:20px;width:20px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s}input:checked+.toggle-slider{background:#4CAF50}input:checked+.toggle-slider:before{transform:translateX(22px)}</style>
+    <link rel="preload" as="style" href="css/dashboard.css?v=20260501_midnight_navy" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="css/dashboard.css?v=20260501_midnight_navy"></noscript>
+    <link rel="stylesheet" href="css/sign.css?v=premiumv53">
+    <link rel="stylesheet" href="css/dashboard-structured-fix.css?v=20260310local1">
+    <!-- FontAwesome for Icons (CDN) -->
+    <!-- FontAwesome for Icons (CDN) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/sign.css?v=premiumv53">
     <link rel="stylesheet" href="css/dashboard-structured-fix.css?v=20260310local1">
     <!-- FontAwesome for Icons (CDN) -->
@@ -117,7 +122,6 @@
                 <span class="nav-label">署名管理</span>
                 <span class="nav-badge" id="nav-sign-badge" style="display:none">0</span>
             </div>
-
             <div class="nav-item" id="nav-team" onclick="window.app.navigate('team')" style="display:none;">
                 <i class="fa-solid fa-users"></i>
                 <span>チーム設定</span>
@@ -126,24 +130,17 @@
                 <i class="fa-solid fa-credit-card"></i>
                 <span>プラン管理</span>
             </div>
-            <div class="nav-item" id="nav-notifications" onclick="window.app.navigate('notifications')">
-                <i class="fa-solid fa-bell"></i>
-                <span>通知設定</span>
-            </div>
             <div class="nav-item" id="nav-mcp" onclick="window.app.navigate('mcp')">
                 <i class="fa-solid fa-plug"></i>
                 <span>MCP連携</span>
             </div>
-        </div>
-        <div class="sidebar-footer">
-            <div id="plan-status-container"></div>
-            <div class="user-profile">
-                <div class="user-name" id="user-name-display">ユーザー</div>
-                <div class="user-email" id="user-email-display">...</div>
-                <button class="btn-logout" id="logout-btn">
-                    <i class="fa-solid fa-arrow-right-from-bracket"></i> ログアウト
-                </button>
+            <div class="nav-item" id="nav-settings" onclick="window.app.navigate('notifications')">
+                <i class="fa-solid fa-gear"></i>
+                <span>設定・ログアウト</span>
             </div>
+        </div>
+        <div class="sidebar-footer" style="padding: 16px; border-top: 1px solid rgba(255, 255, 255, 0.08);">
+            <div id="plan-status-container"></div>
         </div>
     </nav>
 
@@ -161,25 +158,7 @@
             <i class="fa-solid fa-bars"></i>
         </button>
         <span class="mobile-header-logo">DIFFsense</span>
-        <button class="mobile-register-btn" onclick="if(window.app?.can('operate_contract')){window.app.registration?.open()}else{window.Notify?.warning('閲覧のみの権限では新規登録できません')}" aria-label="契約書をアップロード">
-            <i class="fa-solid fa-plus"></i> 契約書をアップロード
-        </button>
     </header>
-
-    <!-- Mobile Menu Panel (スマホ専用) -->
-    <div id="mobile-menu-panel" class="mobile-menu-panel mobile-only" aria-hidden="true">
-        <div class="mobile-menu-inner">
-            <div class="mobile-menu-item" onclick="window.app?.navigate('history');window.app?.closeMobileMenu()"><i class="fa-solid fa-clock-rotate-left"></i> 解析履歴</div>
-            <div class="mobile-menu-item" onclick="window.app?.navigate('deadlines');window.app?.closeMobileMenu()"><i class="fa-solid fa-calendar-days"></i> 期限・アラート管理</div>
-            <div class="mobile-menu-item" onclick="window.app?.navigate('plan');window.app?.closeMobileMenu()"><i class="fa-solid fa-credit-card"></i> プラン管理</div>
-            <div class="mobile-menu-item" onclick="window.app?.navigate('notifications');window.app?.closeMobileMenu()"><i class="fa-solid fa-bell"></i> 通知設定</div>
-            <div class="mobile-menu-item" onclick="window.app?.navigate('mcp');window.app?.closeMobileMenu()"><i class="fa-solid fa-plug"></i> MCP連携</div>
-            <div class="mobile-menu-divider"></div>
-            <div class="mobile-menu-item" id="mobile-logout-btn"><i class="fa-solid fa-arrow-right-from-bracket"></i> ログアウト</div>
-        </div>
-    </div>
-
-    <!-- Main Content -->
     <main id="app-main">
         <!-- Dynamic Content Area -->
         <div id="app-content">
@@ -296,7 +275,7 @@
     <div id="upgrade-modal" class="modal-overlay">
         <div class="modal-content" style="max-width: 450px; text-align: center;">
             <div class="modal-body" style="padding: 40px 32px;">
-                <div style="font-size: 3rem; color: #061f45; margin-bottom: 20px;">
+                <div style="font-size: 3rem; color: #0b2d62; margin-bottom: 20px;">
                     <i class="fa-solid fa-crown"></i>
                 </div>
                 <h3 style="margin-bottom: 16px; font-size: 1.4rem;">Businessプラン限定機能</h3>
@@ -381,7 +360,7 @@
     </div>
 
     <!-- App Logic -->
-    <script type="module" src="/js/dashboard.js?v=20260501_collapsed_sidebar_align"></script>
+    <script type="module" src="/js/dashboard.js?v=20260501_team_icon_grid_fix"></script>
     <script type="module">
         import { requireAuth, handleLogout } from '/js/auth.js?v=20260423_docx_async_fix';
 
@@ -389,7 +368,7 @@
         requireAuth();
 
         // Logout Binding
-        document.getElementById('logout-btn').addEventListener('click', handleLogout);
+        document.getElementById('logout-btn')?.addEventListener('click', handleLogout);
         document.getElementById('mobile-logout-btn')?.addEventListener('click', handleLogout);
     </script>
     <!-- Signature Upload Modal -->

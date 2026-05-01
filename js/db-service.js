@@ -107,10 +107,11 @@ export const dbService = {
                 }
             };
 
-            const token = await getIdToken();
+            const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            const token = isLocalDev ? null : await getIdToken();
             if (token) {
                 fetchOptions.headers.Authorization = `Bearer ${token}`;
-            } else if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            } else if (isLocalDev) {
                 // Local development uses backend AUTH_BYPASS, so allow API access without Firebase login.
                 console.warn(`API Call proceeding without authenticated user in local dev: ${endpoint}`);
             } else {

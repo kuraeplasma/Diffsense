@@ -88,9 +88,8 @@ export function getApiBaseUrl() {
         }
     }
 
-    // Default to production API even on localhost.
-    // If local backend is needed, pass ?apiBase=http://localhost:3001
-    // or set localStorage['diffsense_api_base'] accordingly.
+    // On localhost, default to local backend. On production, use Cloud Run.
+    if (isLocalHostEnvironment()) return LOCAL_API_BASE_URL;
     return PROD_API_BASE_URL;
 }
 
