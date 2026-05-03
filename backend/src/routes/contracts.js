@@ -772,8 +772,8 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                     const aiSucceeded = aiResult && aiResult.summary && !isAiFailureSummary(aiResult.summary) && aiResult.isFallback !== true;
                     if (aiSucceeded && !localUnlimited) {
                         await dbService.incrementUsage(ownerUid);
-                        // 3.2 Save contract_meta (deadline info) if extracted
-                        const meta = aiResult.contract_meta;
+                        // 3.2 Save contract_meta (deadline info) - with ensureContractMeta fallback
+                        const meta = await geminiService.ensureContractMeta(textToAnalyze, previousVersionText, aiResult.contract_meta);
                         if (meta && contractId) {
                             const metaUpdate = {
                                 expiry_date: meta.expiry_date || null,
@@ -1054,8 +1054,8 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
                 const aiSucceeded = aiResult && aiResult.summary && !isAiFailureSummary(aiResult.summary) && aiResult.isFallback !== true;
                 if (aiSucceeded && !localUnlimited) {
                     await dbService.incrementUsage(ownerUid);
-                    // Save contract_meta (deadline info) if extracted
-                    const meta = aiResult.contract_meta;
+                    // Save contract_meta (deadline info) - with ensureContractMeta fallback
+                    const meta = await geminiService.ensureContractMeta(currentText, previousText, aiResult.contract_meta);
                     if (meta && contractId) {
                         const metaUpdate = {
                             expiry_date: meta.expiry_date || null,
