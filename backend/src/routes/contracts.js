@@ -782,6 +782,8 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                                 auto_renewal: meta.auto_renewal === true,
                                 notice_period_days: Number(meta.notice_period_days) || null,
                                 contract_category: meta.contract_category || null,
+                                contract_amount: meta.contract_amount || null,
+                                parties: meta.parties || null,
                                 date_confidence: meta.date_confidence || 'unknown',
                                 alert_sent_30d: false,
                                 alert_sent_7d: false,
@@ -1045,7 +1047,8 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
                         riskLevel: geminiResult.riskLevel,
                         riskReason: geminiResult.riskReason,
                         summary: geminiResult.summary,
-                        isFallback: geminiResult.isFallback === true
+                        isFallback: geminiResult.isFallback === true,
+                        contract_meta: geminiResult.contract_meta
                     };
 
                 const aiSucceeded = aiResult && aiResult.summary && !isAiFailureSummary(aiResult.summary) && aiResult.isFallback !== true;
