@@ -352,7 +352,9 @@ function normalizeContractMeta(rawMeta) {
         auto_renewal: normalizeAutoRenewal(rawMeta.auto_renewal),
         notice_period_days: normalizeNoticePeriodDays(rawMeta.notice_period_days || rawMeta.noticePeriodDays),
         contract_category: String(rawMeta.contract_category || rawMeta.contractCategory || '').trim() || null,
-        date_confidence: normalizeDateConfidence(rawMeta.date_confidence || rawMeta.dateConfidence)
+        date_confidence: normalizeDateConfidence(rawMeta.date_confidence || rawMeta.dateConfidence),
+        contract_amount: String(rawMeta.contract_amount || rawMeta.contractAmount || '').trim() || null,
+        parties: String(rawMeta.parties || '').trim() || null
     };
 
     if (!normalized.renewal_deadline && normalized.expiry_date && normalized.notice_period_days !== null) {
@@ -1354,7 +1356,7 @@ ${buildSemanticDiffCandidate(change?.old || '', change?.new || '')}
 2. リスクレベル(riskLevel): 1(低), 2(中), 3(高)の3段階で判定してください。
 3. リスク理由(riskReason): 判定の根拠を100文字以内で簡潔に述べてください。
 4. 変更点(changes): 特に重要な変更やリスクのある条項を最大5件抽出してください。
-5. メタデータ(contract_meta): 契約開始日、終了日、更新期限、自動更新の有無、通知期間などを正確に抽出してください。
+5. メタデータ(contract_meta): 契約開始日、終了日、更新期限、自動更新の有無、通知期間、契約金額（月額や総額）、契約当事者（甲・乙の名称）を正確に抽出してください。
 
 出力形式(JSONのみ):
 {
@@ -1365,7 +1367,7 @@ ${buildSemanticDiffCandidate(change?.old || '', change?.new || '')}
     {
       "section": "条項名",
       "type": "modification | risk",
-      "old": "前の文言（または注意条文）",
+      "old": "書類内の該当箇所の文章をそのまま一字一句引用（要約・言い換え禁止）",
       "new": "後の文言（または修正案・解説）",
       "impact": "法的影響",
       "concern": "注意点"
@@ -1378,7 +1380,9 @@ ${buildSemanticDiffCandidate(change?.old || '', change?.new || '')}
     "auto_renewal": true,
     "notice_period_days": 30,
     "contract_category": "...",
-    "date_confidence": "high | medium | low"
+    "date_confidence": "high | medium | low",
+    "contract_amount": "例: 月額 ¥500,000 (税抜)",
+    "parties": "例: 株式会社A（甲）、株式会社B（乙）"
   }
 }
 
@@ -1419,7 +1423,7 @@ ${truncatedText}
     {
       "section": "条項名",
       "type": "modification",
-      "old": "変更前の文言",
+      "old": "旧バージョンの該当箇所の文章をそのまま一字一句引用（要約・言い換え禁止）",
       "new": "変更後の文言",
       "impact": "この変更による法的な影響や拘束力の変化（50文字以内）",
       "concern": "この変更におけるリスクや注意点（ない場合は'特になし'）"
@@ -1446,7 +1450,7 @@ ${truncatedText}
     {
       "section": "該当する条項名",
       "type": "risk",
-      "old": "注意すべき条文（原文を引用）",
+      "old": "書類内の該当条文をそのまま一字一句引用（要約・言い換え禁止。条文が長い場合は問題箇所を中心に引用）",
       "new": "リスクの内容や推奨される修正案",
       "impact": "この条項による法的な影響（50文字以内）",
       "concern": "この条項におけるリスクや注意点"
