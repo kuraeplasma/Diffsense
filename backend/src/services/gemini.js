@@ -191,11 +191,11 @@ function parseGeminiJsonResponse(aiText) {
 function normalizeChanges(rawChanges) {
     const changes = Array.isArray(rawChanges) ? rawChanges : [];
     return changes.map(c => ({
-        section: String(c?.section || c?.clause || '本文').trim() || '本文',
+        section: String(c?.section || c?.clause || c?.issue || '本文').trim() || '本文',
         type: String(c?.type || c?.changeType || 'modification').toLowerCase(),
-        old: String(c?.old || c?.before || '').trim(),
-        new: String(c?.new || c?.after || '').trim(),
-        impact: String(c?.impact || '').trim(),
+        old: String(c?.old || c?.before || c?.originalText || '').trim(),
+        new: String(c?.new || c?.after || c?.proposal || c?.modifiedText || '').trim(),
+        impact: String(c?.impact || c?.benefit || '').trim(),
         concern: String(c?.concern || c?.risk || '').trim()
     }));
 }
@@ -219,10 +219,12 @@ function normalizeAnalyzeResult(parsed) {
     // 3. Normalize riskReason
     const riskReason = String(parsed?.riskReason || parsed?.risk_reason || parsed?.latestRegulatoryAlignment || parsed?.latest_regulatory_alignment || '').trim() || '主要な注意点を確認してください。';
 
-    // 4. Normalize changes
-    const changes = Array.isArray(parsed?.changes || parsed?.materialChanges || parsed?.material_changes || parsed?.risks || parsed?.items) 
-        ? (parsed?.changes || parsed?.materialChanges || parsed?.material_changes || parsed?.risks || parsed?.items) 
-        : [];
+    // 4. Normalize changes (新形式: suggestions / 旧形式: changes)
+    const rawChanges = parsed?.suggestions || parsed?.changes || parsed?.materialChanges || parsed?.material_changes || parsed?.risks || parsed?.items;
+    const changes = Array.isArray(rawChanges) ? rawChanges : [];
+
+    // needs_revision=false の場合はriskLevelを1に下げる
+    if (parsed?.needs_revision === false && riskLevel !== "1") riskLevel = "1";
 
     // 状態判定フラグ
     const isFallback = parsed?.isFallback === true;
@@ -1422,11 +1424,12 @@ ${truncatedText}
   "changes": [
     {
       "section": "条項名",
+      "issue": "変更内容の概要",
       "type": "modification",
       "old": "旧バージョンの該当箇所の文章をそのまま一字一句引用（要約・言い換え禁止）",
-      "new": "変更後の文言",
-      "impact": "この変更による法的な影響や拘束力の変化（50文字以内）",
-      "concern": "この変更におけるリスクや注意点（ない場合は'特になし'）"
+      "proposal": "修正後の推奨文言（変更後の文言をベースに改善を加えたもの）",
+      "risk": "この変更による法的リスクや注意点",
+      "benefit": "修正することで得られるメリット（50文字以内）"
     }
   ]
 }
@@ -1436,42 +1439,86 @@ ${truncatedText}
 - changesには、特に重要と思われる変更を優先的に抽出してください。
 - riskLevelは1（低リスク）、2（中リスク）、3（高リスク）のいずれかに設定してください。`;
         } else {
-            return `あなたは契約書の解析の専門家です。以下の契約書を解析し、重要なリスク要因や注意すべき条項を抽出してください。
+            return `あなたは契約書レビュー専門の法務AIです。以下の契約書を分析し、「修正提案を行うかどうか」と「その理由」を明確に説明してください。
 
 【契約書】
 ${truncatedText}
 
-以下のJSON形式で回答してください（JSONのみを出力し、説明文は不要です）:
+# ■最重要ルール
+
+修正提案は必ず以下のいずれかに該当する場合のみ行う：
+
+① リスク低減：損害賠償が無制限／一方的に不利な義務／解除条件が不利／責任範囲が過大
+② 不利条件の是正：一般的な契約より明らかに不利／支払い条件が悪い／権利が一方的に相手に偏っている
+③ 曖昧性の排除：解釈が分かれる表現／具体性がない条文／トラブルになりやすい記述
+④ 条項の欠落：支払い条件がない／損害賠償条項がない／解除条件がない／秘密保持がない
+⑤ 有利化（任意）：より有利な条件にできる場合のみ
+
+# ■修正してはいけないケース
+
+以下の場合は修正提案を出さない：
+・一般的な契約内容である
+・リスクが低い
+・バランスが取れている
+・実務上問題がない
+
+# ■出力ルール（厳守）
+
+必ず以下のJSON形式のみで出力すること（説明文・コードブロック記号は不要）:
+
+修正不要の場合:
 {
-  "summary": "日本語で回答してください。契約書の要約とリスク概要を詳しく解説してください。",
+  "needs_revision": false,
+  "summary": "大きな修正は不要と判断されました（契約全体の評価を200文字以内で）",
+  "riskLevel": 1,
+  "riskReason": "リスク判定の根拠（100文字以内）",
+  "reason": ["主要な条項が網羅されているため", "一般的な契約構成であるため"],
+  "suggestions": [],
+  "contract_meta": {
+    "expiry_date": "YYYY-MM-DDまたはnull",
+    "renewal_deadline": "YYYY-MM-DDまたはnull",
+    "contract_start": "YYYY-MM-DDまたはnull",
+    "auto_renewal": null,
+    "notice_period_days": null,
+    "contract_category": "契約種別",
+    "date_confidence": "high/medium/low"
+  }
+}
+
+修正必要の場合:
+{
+  "needs_revision": true,
+  "summary": "一部調整を推奨します（契約全体の評価を200文字以内で）",
   "riskLevel": 2,
-  "riskReason": "リスク判定の理由を簡潔に（100文字以内）",
-  "changes": [
+  "riskReason": "リスク判定の根拠（100文字以内）",
+  "reason": ["判断理由1（必ず2つ以上）", "判断理由2"],
+  "suggestions": [
     {
       "section": "該当する条項名",
-      "type": "risk",
+      "issue": "問題点の概要",
       "old": "書類内の該当条文をそのまま一字一句引用（要約・言い換え禁止。条文が長い場合は問題箇所を中心に引用）",
-      "new": "リスクの内容や推奨される修正案",
-      "impact": "この条項による法的な影響（50文字以内）",
-      "concern": "この条項におけるリスクや注意点"
+      "proposal": "具体的な修正案（修正後の文案）",
+      "risk": "このままにした場合の具体的なリスク",
+      "benefit": "修正することで得られるメリット"
     }
   ],
   "contract_meta": {
-    "expiry_date": "契約終了日（YYYY-MM-DD形式。不明な場合はnull）",
-    "renewal_deadline": "更新拒絶通知の期限（YYYY-MM-DD形式。不明な場合はnull）",
-    "contract_start": "契約開始日（YYYY-MM-DD形式。不明な場合はnull）",
-    "auto_renewal": true,
-    "notice_period_days": 30,
-    "contract_category": "契約種別（例: 業務委託、売買、賃貸借、秘密保持など）",
-    "date_confidence": "high/medium/low（日付抽出の確信度）"
+    "expiry_date": "YYYY-MM-DDまたはnull",
+    "renewal_deadline": "YYYY-MM-DDまたはnull",
+    "contract_start": "YYYY-MM-DDまたはnull",
+    "auto_renewal": null,
+    "notice_period_days": null,
+    "contract_category": "契約種別",
+    "date_confidence": "high/medium/low"
   }
 }
 
 重要:
-- summaryフィールドを先頭に含め、契約内容の丁寧な解説を行ってください。
-- changesには、リスクが高い条項や注意すべき条項を最大5つまで抽出してください。
-- riskLevelは1（低リスク）、2（中リスク）、3（高リスク）のいずれかに設定してください。
-- contract_metaの日付は契約書本文から正確に読み取ってください。記載がない場合はnullにしてください。`;
+- 必ずJSONのみ出力。説明文・マークダウン不要。
+- riskLevelは1（低）、2（中）、3（高）のいずれか。
+- suggestionsのoldは書類内の原文を一字一句引用すること（要約・解釈・言い換え禁止）。
+- 修正不要の場合はsuggestionsを空配列にすること。
+- contract_metaの日付は契約書本文から正確に読み取ること。記載がない場合はnull。`;
         }
     }
 
