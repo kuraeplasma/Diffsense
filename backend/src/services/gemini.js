@@ -191,12 +191,13 @@ function parseGeminiJsonResponse(aiText) {
 function normalizeChanges(rawChanges) {
     const changes = Array.isArray(rawChanges) ? rawChanges : [];
     return changes.map(c => ({
-        section: String(c?.section || c?.clause || c?.issue || '本文').trim() || '本文',
+        section: String(c?.section || c?.clause || '本文').trim() || '本文',
         type: String(c?.type || c?.changeType || 'modification').toLowerCase(),
         old: String(c?.old || c?.before || c?.originalText || '').trim(),
         new: String(c?.new || c?.after || c?.proposal || c?.modifiedText || '').trim(),
         impact: String(c?.impact || c?.benefit || '').trim(),
-        concern: String(c?.concern || c?.risk || '').trim()
+        concern: String(c?.concern || c?.risk || '').trim(),
+        reason: String(c?.issue || c?.reason || c?.description || '').trim()
     }));
 }
 
