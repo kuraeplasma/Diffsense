@@ -32,6 +32,8 @@ router.get('/', async (req, res, next) => {
     }
 });
 
+
+
 router.post('/', async (req, res, next) => {
     try {
         const uid = req.user.uid;
@@ -277,13 +279,13 @@ function isLikelyMaterialStructuredChange(change) {
     // Use super-normalization for the material change check
     const oldNorm = superNormalize(oldText);
     const newNorm = superNormalize(newText);
-    
+
     // If identical after super-normalization, it's definitely not material
     if (oldNorm === newNorm) return false;
 
     // Check similarity on normalized text
     const similarity = stringSimilarity.compareTwoStrings(oldNorm, newNorm);
-    
+
     // Safety check: if they are extremely similar, it's likely noise (e.g. phantom page numbers)
     // unless it's a very short text where every character matters.
     if (similarity > 0.997 && oldNorm.length > 200) {
@@ -566,7 +568,7 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
         if (!skipAI && !localUnlimited) {
             if (userProfile.usageCount >= limit) {
                 logger.warn(`Usage limit reached for user ${uid}`, { plan: userProfile.plan, current: userProfile.usageCount });
-                
+
                 const plan = userProfile.plan || 'free';
                 const nextPlanMap = {
                     'free': { name: 'Starter', limit: 50, price: '¥1,480' },
@@ -848,6 +850,124 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
 });
 
 /**
+ * POST /api/contracts/convert-docx
+ * Manually trigger DOCX to PDF conversion for an existing contract
+ */
+router.post('/convert-docx', async (req, res, next) => {
+    try {
+        const { contractId } = req.body;
+        const uid = req.user.uid;
+        const email = req.user.email;
+        const teamInfo = await dbService.getTeamRole(email, uid);
+        const ownerUid = teamInfo.ownerUid;
+
+        logger.info(`Starting manual DOCX conversion for contract ${contractId}`);
+
+        const contract = await dbService.getContractById(contractId, ownerUid);
+        if (!contract) {
+            return res.status(404).json({ success: false, error: '契約が見つかりません' });
+        }
+
+        let originalPath = contract.original_file_path || contract.originalFilePath;
+        const fs = require('fs');
+        const pathMod = require('path');
+        const uploadsDir = pathMod.join(__dirname, '../../uploads');
+        let localPath = null;
+
+        if (originalPath) {
+            localPath = pathMod.isAbsolute(originalPath) ? originalPath : pathMod.resolve(pathMod.join(__dirname, '../..', originalPath));
+            if (!fs.existsSync(localPath)) {
+                // Fallback: search by basename in uploadsDir
+                const filename = pathMod.basename(originalPath);
+                const candidate = pathMod.join(uploadsDir, filename);
+                if (fs.existsSync(candidate)) localPath = candidate;
+            }
+        }
+
+        // Final Fallback: search by contractId if still not found or no path provided
+        if ((!localPath || !fs.existsSync(localPath)) && fs.existsSync(uploadsDir)) {
+            const prefix = `original-${contractId}-`;
+            const files = fs.readdirSync(uploadsDir)
+                .filter(f => f.startsWith(prefix) && f.toLowerCase().endsWith('.docx'))
+                .map(f => ({ f, mtime: fs.statSync(pathMod.join(uploadsDir, f)).mtimeMs }))
+                .sort((a, b) => b.mtime - a.mtime);
+            if (files.length > 0) {
+                localPath = pathMod.join(uploadsDir, files[0].f);
+                logger.info(`Found DOCX via ID search: ${localPath}`);
+            }
+        }
+
+        if (!localPath || !fs.existsSync(localPath)) {
+             return res.status(400).json({ success: false, error: '変換可能なDOCX原本ファイルがサーバー上に見つかりません' });
+        }
+
+        // 変換実行
+        const pdfPath = await docxService.convertToPdf(localPath);
+        if (!fs.existsSync(pdfPath)) {
+            throw new Error('LibreOffice conversion failed to produce a file');
+        }
+        const pdfBuffer = fs.readFileSync(pdfPath);
+
+        // Upload to Storage
+        let pdfUrl = null;
+        let pdfStoragePath = null;
+
+        if (bucket) {
+            pdfStoragePath = `contracts/${contractId}/${Date.now()}.pdf`;
+            const pdfFile = bucket.file(pdfStoragePath);
+            const downloadToken = crypto.randomUUID();
+            await pdfFile.save(pdfBuffer, {
+                metadata: {
+                    contentType: 'application/pdf',
+                    metadata: { firebaseStorageDownloadTokens: downloadToken }
+                }
+            });
+
+            try {
+                const [signedUrl] = await pdfFile.getSignedUrl({
+                    action: 'read',
+                    expires: Date.now() + 31536000000 // 1 year
+                });
+                pdfUrl = signedUrl;
+            } catch (e) {
+                const bucketName = bucket.name || process.env.FIREBASE_STORAGE_BUCKET;
+                pdfUrl = buildFirebaseDownloadUrl(bucketName, pdfStoragePath, downloadToken);
+            }
+
+            // Update contract in DB
+            await dbService.updateContract(contractId, {
+                pdf_storage_path: pdfStoragePath,
+                pdf_url: pdfUrl
+            }, ownerUid);
+            logger.info(`Contract ${contractId} updated with manual PDF conversion: ${pdfUrl}`);
+        } else {
+            // Local dev fallback (if no bucket)
+            const filename = `manual-${contractId}-${Date.now()}.pdf`;
+            const localPdfPath = pathMod.join(uploadsDir, filename);
+            fs.writeFileSync(localPdfPath, pdfBuffer);
+            const protocol = req.protocol;
+            const baseUrl = `${protocol}://${req.get('host')}`;
+            pdfUrl = `${baseUrl}/uploads/${filename}`;
+
+            await dbService.updateContract(contractId, {
+                pdf_storage_path: localPdfPath,
+                pdf_url: pdfUrl
+            }, ownerUid);
+            logger.info(`Contract ${contractId} updated with local manual PDF conversion: ${pdfUrl}`);
+        }
+
+        // Cleanup
+        if (fs.existsSync(pdfPath)) fs.unlinkSync(pdfPath);
+
+        res.json({ success: true, url: pdfUrl });
+
+    } catch (error) {
+        logger.error('Manual DOCX conversion error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
  * POST /api/contracts/upload-docx
  * Parse DOCX and compare by article blocks
  */
@@ -910,16 +1030,16 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
         let extractedRawText = '';
         let conversionMethod = 'mammoth';
         const filename = req.body.filename || 'unknown';
+        let pdfBuffer = null;
 
         try {
             // 1. まずはLibreOfficeでのPDF変換を試みる（原本性が高いため）
             const tmpDir = path.join(__dirname, '../../tmp/docx-convert');
             if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
-            
+
             const docxTmpPath = path.join(tmpDir, `upload-${Date.now()}.docx`);
             fs.writeFileSync(docxTmpPath, currentBuffer);
-            
-            let pdfBuffer = null;
+
             try {
                 const pdfPath = await docxService.convertToPdf(docxTmpPath);
                 if (fs.existsSync(pdfPath)) {
@@ -928,7 +1048,7 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
                     extractedRawText = pdfData.rawText || pdfData.text || '';
                     conversionMethod = 'libreoffice_pdf';
                     logger.info(`DOCX conversion success via LibreOffice: ${filename}`);
-                    
+
                     // Cleanup
                     fs.unlinkSync(pdfPath);
                 }
@@ -943,8 +1063,8 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
             }
         } catch (extractError) {
             logger.error('DOCX_CONVERT_ERROR', extractError);
-            return res.status(500).json({ 
-                success: false, 
+            return res.status(500).json({
+                success: false,
                 error: 'DOCX_CONVERT_FAILED',
                 detail: extractError.message
             });
@@ -974,7 +1094,7 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
                 logger.info(`Original DOCX uploaded: ${docxStoragePath}`);
 
                 // 2. Upload Converted PDF (if available)
-                if (conversionMethod === 'libreoffice_pdf' && typeof pdfBuffer !== 'undefined') {
+                if (conversionMethod === 'libreoffice_pdf' && pdfBuffer) {
                     pdfStoragePath = `contracts/${contractId}/${Date.now()}.pdf`;
                     const pdfFile = bucket.file(pdfStoragePath);
                     const downloadToken = crypto.randomUUID();
@@ -984,7 +1104,7 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
                             metadata: { firebaseStorageDownloadTokens: downloadToken }
                         }
                     });
-                    
+
                     try {
                         const [signedUrl] = await pdfFile.getSignedUrl({
                             action: 'read',
@@ -999,6 +1119,39 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
                 }
             } catch (storageErr) {
                 logger.warn('DOCX Storage upload failed:', storageErr.message);
+            }
+        } else {
+            // Local dev fallback (if no bucket)
+            const isCloudFunction = !!process.env.FUNCTION_TARGET || !!process.env.K_SERVICE;
+            if (!isCloudFunction) {
+                try {
+                    const uploadsDir = path.join(__dirname, '../../uploads');
+                    if (!fs.existsSync(uploadsDir)) {
+                        fs.mkdirSync(uploadsDir, { recursive: true });
+                    }
+
+                    // 1. Save Original DOCX locally
+                    const docxFilename = `original-${contractId}-${Date.now()}.docx`;
+                    const docxLocalPath = path.join(uploadsDir, docxFilename);
+                    fs.writeFileSync(docxLocalPath, currentBuffer);
+                    original_file_path = `uploads/${docxFilename}`;
+                    logger.info(`Original DOCX saved locally: ${docxLocalPath}`);
+
+                    // 2. Save Converted PDF locally (if available)
+                    if (conversionMethod === 'libreoffice_pdf' && pdfBuffer) {
+                        const pdfFilename = `contract-${contractId}-${Date.now()}.pdf`;
+                        const pdfLocalPath = path.join(uploadsDir, pdfFilename);
+                        fs.writeFileSync(pdfLocalPath, pdfBuffer);
+                        pdfStoragePath = pdfLocalPath;
+
+                        const protocol = req.protocol;
+                        const baseUrl = `${protocol}://${req.get('host')}`;
+                        pdfUrl = `${baseUrl}/uploads/${pdfFilename}`;
+                        logger.info(`Converted PDF saved locally: ${pdfLocalPath}`);
+                    }
+                } catch (localError) {
+                    logger.warn('Local DOCX/PDF save failed:', localError.message);
+                }
             }
         }
 
@@ -1179,6 +1332,69 @@ router.get('/:id/original-file', async (req, res, next) => {
         logger.info(`Served original file for contract ${contractId}: ${resolved}`);
     } catch (error) {
         logger.error('Original file serve error:', error);
+        next(error);
+    }
+});
+
+/**
+ * GET /api/contracts/:id/preview-html
+ * Word原本をHTMLに変換して返却（原本プレビューのフォールバック用）
+ */
+router.get('/:id/preview-html', async (req, res, next) => {
+    try {
+        const uid = req.user.uid;
+        const email = req.user.email;
+        const teamInfo = await dbService.getTeamRole(email, uid);
+        const ownerUid = teamInfo.ownerUid;
+
+        const contractId = parseInt(req.params.id, 10);
+        const contracts = await dbService.getContracts(ownerUid);
+        const contract = (Array.isArray(contracts) ? contracts : [])
+            .find(c => String(c.id) === String(contractId));
+
+        if (!contract) {
+            return res.status(404).json({ success: false, error: '契約が見つかりません' });
+        }
+
+        let html = '';
+        const originalPath = contract.original_file_path || contract.originalFilePath;
+        const fs = require('fs');
+        const pathMod = require('path');
+        const uploadsDir = pathMod.join(__dirname, '../../uploads');
+
+        let localPath = null;
+        if (originalPath) {
+            localPath = pathMod.isAbsolute(originalPath) ? originalPath : pathMod.resolve(pathMod.join(__dirname, '../..', originalPath));
+            if (!fs.existsSync(localPath)) {
+                const filename = pathMod.basename(originalPath);
+                const candidate = pathMod.join(uploadsDir, filename);
+                if (fs.existsSync(candidate)) localPath = candidate;
+            }
+        }
+
+        if ((!localPath || !fs.existsSync(localPath)) && fs.existsSync(uploadsDir)) {
+            const prefix = `original-${contractId}-`;
+            const files = fs.readdirSync(uploadsDir)
+                .filter(f => f.startsWith(prefix) && f.toLowerCase().endsWith('.docx'))
+                .map(f => ({ f, mtime: fs.statSync(pathMod.join(uploadsDir, f)).mtimeMs }))
+                .sort((a, b) => b.mtime - a.mtime);
+            if (files.length > 0) localPath = pathMod.join(uploadsDir, files[0].f);
+        }
+
+        if (localPath && fs.existsSync(localPath)) {
+            const mammoth = require('mammoth');
+            const result = await mammoth.convertToHtml({ path: localPath });
+            html = result.value;
+        } else {
+            // DOCXがない場合は、保存されているテキスト（あれば）を表示
+            html = contract.original_content
+                ? contract.original_content.replace(/\n/g, '<br>')
+                : 'プレビューを表示できるDOCXファイルまたはテキストデータが見つかりません。';
+        }
+
+        res.json({ success: true, html });
+    } catch (error) {
+        logger.error('Preview HTML error:', error);
         next(error);
     }
 });
@@ -1464,6 +1680,29 @@ router.post('/analyze-enhanced', rateLimit, async (req, res, next) => {
         res.json({ success: true, data: result });
     } catch (error) {
         logger.error('analyze-enhanced error:', error);
+        next(error);
+    }
+});
+
+/**
+ * GET /api/contracts/:id
+ * 単一の契約情報を取得（他の方針を優先するため最後に配置）
+ */
+router.get('/:id', async (req, res, next) => {
+    try {
+        const uid = req.user.uid;
+        const email = req.user.email;
+        const teamInfo = await dbService.getTeamRole(email, uid);
+        const ownerUid = teamInfo.ownerUid;
+
+        const { id } = req.params;
+        const contract = await dbService.getContractById(id, ownerUid);
+        if (!contract) {
+            return res.status(404).json({ success: false, error: '契約が見つかりません' });
+        }
+        res.json({ success: true, data: contract });
+    } catch (error) {
+        logger.error('GET /contracts/:id error:', error);
         next(error);
     }
 });
