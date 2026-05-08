@@ -400,6 +400,135 @@ class DocxService {
         return this._regroupByArticle(blocks);
     }
 
+    _escapeXmlText(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
+
+    _stripXmlTags(xml) {
+        return String(xml || '')
+            .replace(/<w:tab\/?>/g, ' ')
+            .replace(/<w:br\/?>/g, '\n')
+            .replace(/<[^>]+>/g, '')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&amp;/g, '&')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    _normalizeDocxSearchText(value) {
+        return String(value || '')
+            .replace(/[\s　]+/g, '')
+            .replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
+    }
+
+    _buildInsertedParagraphXml(text, referenceParagraphXml = '') {
+        const pPrMatch = String(referenceParagraphXml || '').match(/<w:pPr[\s\S]*?<\/w:pPr>/);
+        let pPr = pPrMatch ? pPrMatch[0] : '<w:pPr></w:pPr>';
+        if (!/<w:ind\b/.test(pPr)) {
+            pPr = pPr.replace('</w:pPr>', '<w:ind w:left="420"/></w:pPr>');
+        }
+        if (!/<w:spacing\b/.test(pPr)) {
+            pPr = pPr.replace('</w:pPr>', '<w:spacing w:after="0" w:line="360" w:lineRule="auto"/></w:pPr>');
+        }
+        return String(text || '')
+            .split(/\r?\n/)
+            .map(line => line.trim())
+            .filter(Boolean)
+            .map(line => '<w:p>' + pPr + '<w:r><w:t xml:space="preserve">' + this._escapeXmlText(line) + '</w:t></w:r></w:p>')
+            .join('');
+    }
+
+    applyRevisionsToDocx(buffer, revisions = []) {
+        const zip = new AdmZip(buffer);
+        const entry = zip.getEntry('word/document.xml');
+        if (!entry) throw new Error('Invalid docx: word/document.xml not found');
+
+        let xml = entry.getData().toString('utf8');
+        const normalize = value => this._normalizeDocxSearchText(value);
+        const articlePattern = /第\s*[0-9０-９一二三四五六七八九十百千〇零]+\s*条/;
+        const normalizedRevisions = (Array.isArray(revisions) ? revisions : [])
+            .map(revision => {
+                const rawAnchor = String(revision.anchor || revision.section || revision.article || '').trim();
+                const rawText = String(revision.text || revision.newText || '').trim();
+                const articleMatch = rawAnchor.match(articlePattern) || rawText.match(articlePattern);
+                return {
+                    anchor: normalize(rawAnchor),
+                    articleAnchor: normalize(articleMatch ? articleMatch[0] : ''),
+                    text: rawText
+                };
+            })
+            .filter(revision => revision.text);
+
+        const isInsertionBoundary = text => {
+            const value = String(text || '').trim();
+            if (!value) return false;
+            if (articlePattern.test(value)) return true;
+            if (/^（[^）]{1,30}）$/.test(value)) return true;
+            if (/^(以上|貸主|借主|甲|乙|連帯保証人|立会人|印)$/.test(value)) return true;
+            return false;
+        };
+
+        const findStartIndex = (paragraphs, revision) => {
+            if (revision.articleAnchor) {
+                const byArticle = paragraphs.findIndex(p => p.normalized.includes(revision.articleAnchor));
+                if (byArticle >= 0) return byArticle;
+            }
+            if (revision.anchor) {
+                const exact = paragraphs.findIndex(p => p.normalized.includes(revision.anchor));
+                if (exact >= 0) return exact;
+                const partial = paragraphs.findIndex(p => p.normalized && revision.anchor.includes(p.normalized) && p.normalized.length >= 3);
+                if (partial >= 0) return partial;
+            }
+            return -1;
+        };
+
+        let insertedCount = 0;
+        const skipped = [];
+
+        for (const revision of normalizedRevisions) {
+            const paragraphs = [...xml.matchAll(/<w:p[\s\S]*?<\/w:p>/g)].map(match => ({
+                xml: match[0],
+                index: match.index,
+                end: match.index + match[0].length,
+                text: this._stripXmlTags(match[0]),
+                normalized: normalize(this._stripXmlTags(match[0]))
+            }));
+            if (!paragraphs.length) {
+                skipped.push({ anchor: revision.anchor, reason: 'no_paragraphs' });
+                continue;
+            }
+
+            const startIndex = findStartIndex(paragraphs, revision);
+            if (startIndex < 0) {
+                skipped.push({ anchor: revision.anchor, articleAnchor: revision.articleAnchor, reason: 'anchor_not_found' });
+                continue;
+            }
+
+            let insertAfter = startIndex;
+            for (let i = startIndex + 1; i < paragraphs.length; i += 1) {
+                if (isInsertionBoundary(paragraphs[i].text)) break;
+                insertAfter = i;
+            }
+
+            const target = paragraphs[insertAfter];
+            const alreadyInserted = normalize(xml).includes(normalize(revision.text));
+            if (!target || alreadyInserted) {
+                skipped.push({ anchor: revision.anchor, articleAnchor: revision.articleAnchor, reason: alreadyInserted ? 'already_inserted' : 'target_not_found' });
+                continue;
+            }
+
+            const insertionXml = this._buildInsertedParagraphXml(revision.text, target.xml);
+            xml = xml.slice(0, target.end) + insertionXml + xml.slice(target.end);
+            insertedCount += 1;
+        }
+
+        zip.updateFile('word/document.xml', Buffer.from(xml, 'utf8'));
+        return { buffer: zip.toBuffer(), insertedCount, requestedCount: normalizedRevisions.length, skipped };
+    }
     /**
      * Convert DOCX file to PDF using LibreOffice/soffice
      */
@@ -429,7 +558,7 @@ class DocxService {
             try {
                 await execFileAsync(
                     command,
-                    ['--headless', '--convert-to', 'pdf:writer_pdf_Export', '--outdir', outputDir, absoluteDocxPath],
+                    ['--headless', '--convert-to', 'pdf', '--outdir', outputDir, absoluteDocxPath],
                     { windowsHide: true, timeout: 180000 }
                 );
                 if (fs.existsSync(outputPdfPath)) {
