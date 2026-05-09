@@ -442,6 +442,17 @@ class DocxService {
             .join('');
     }
 
+    _buildReplacementParagraphXml(text, referenceParagraphXml = '') {
+        const pPrMatch = String(referenceParagraphXml || '').match(/<w:pPr[\s\S]*?<\/w:pPr>/);
+        const pPr = pPrMatch ? pPrMatch[0] : '<w:pPr></w:pPr>';
+        return String(text || '')
+            .split(/\r?\n/)
+            .map(line => line.trim())
+            .filter(Boolean)
+            .map(line => '<w:p>' + pPr + '<w:r><w:t xml:space="preserve">' + this._escapeXmlText(line) + '</w:t></w:r></w:p>')
+            .join('');
+    }
+
     applyRevisionsToDocx(buffer, revisions = []) {
         const zip = new AdmZip(buffer);
         const entry = zip.getEntry('word/document.xml');
@@ -458,7 +469,10 @@ class DocxService {
                 return {
                     anchor: normalize(rawAnchor),
                     articleAnchor: normalize(articleMatch ? articleMatch[0] : ''),
-                    text: rawText
+                    text: rawText,
+                    oldText: String(revision.oldText || revision.old || '').trim(),
+                    normalizedOldText: normalize(revision.oldText || revision.old || ''),
+                    type: String(revision.type || '').toLowerCase()
                 };
             })
             .filter(revision => revision.text);
@@ -506,6 +520,28 @@ class DocxService {
             if (startIndex < 0) {
                 skipped.push({ anchor: revision.anchor, articleAnchor: revision.articleAnchor, reason: 'anchor_not_found' });
                 continue;
+            }
+
+            if (revision.normalizedOldText) {
+                const replaceIndex = paragraphs.findIndex((p, index) =>
+                    index >= startIndex
+                    && (
+                        p.normalized.includes(revision.normalizedOldText)
+                        || revision.normalizedOldText.includes(p.normalized)
+                    )
+                );
+                if (replaceIndex >= 0) {
+                    const target = paragraphs[replaceIndex];
+                    const alreadyReplaced = normalize(xml).includes(normalize(revision.text));
+                    if (alreadyReplaced) {
+                        skipped.push({ anchor: revision.anchor, articleAnchor: revision.articleAnchor, reason: 'already_replaced' });
+                        continue;
+                    }
+                    const replacementXml = this._buildReplacementParagraphXml(revision.text, target.xml);
+                    xml = xml.slice(0, target.index) + replacementXml + xml.slice(target.end);
+                    insertedCount += 1;
+                    continue;
+                }
             }
 
             let insertAfter = startIndex;

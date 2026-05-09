@@ -192,7 +192,7 @@ function normalizeChanges(rawChanges) {
     const changes = Array.isArray(rawChanges) ? rawChanges : [];
     return changes.map(c => ({
         section: String(c?.section || c?.clause || '本文').trim() || '本文',
-        type: String(c?.type || c?.changeType || 'modification').toLowerCase(),
+        type: String(c?.type || c?.changeType || (c?.old || c?.before || c?.originalText ? 'replace' : 'add')).toLowerCase(),
         old: String(c?.old || c?.before || c?.originalText || '').trim(),
         new: String(c?.new || c?.after || c?.proposal || c?.modifiedText || '').trim(),
         impact: String(c?.impact || c?.benefit || '').trim(),
@@ -1371,7 +1371,7 @@ ${buildSemanticDiffCandidate(change?.old || '', change?.new || '')}
       "section": "条項名",
       "type": "modification | risk",
       "old": "書類内の該当箇所の文章をそのまま一字一句引用（要約・言い換え禁止）",
-      "new": "後の文言（または修正案・解説）",
+      "new": "修正後の契約条項文言（解説や要約、箇条書き、冒頭の見出しなどは一切含めず、契約書としてそのまま利用可能な正式な条文テキストのみを出力してください）",
       "impact": "法的影響",
       "concern": "注意点"
     }
@@ -1428,7 +1428,7 @@ ${truncatedText}
       "issue": "変更内容の概要",
       "type": "modification",
       "old": "旧バージョンの該当箇所の文章をそのまま一字一句引用（要約・言い換え禁止）",
-      "proposal": "修正後の推奨文言（変更後の文言をベースに改善を加えたもの）",
+      "proposal": "修正後の推奨文言（要約や解説は含めず、契約書にそのまま使える正式な改善文言のみを出力してください）",
       "risk": "この変更による法的リスクや注意点",
       "benefit": "修正することで得られるメリット（50文字以内）"
     }
@@ -1438,7 +1438,8 @@ ${truncatedText}
 重要: 
 - summaryフィールドを必ず含め、新バージョンがどのような状態になり、どのようなリスクがあるかの「解説」を含めてください。
 - changesには、特に重要と思われる変更を優先的に抽出してください。
-- riskLevelは1（低リスク）、2（中リスク）、3（高リスク）のいずれかに設定してください。`;
+- riskLevelは1（低リスク）、2（中リスク）、3（高リスク）のいずれかに設定してください。
+- new（修正後条文）の条番号・項番号は原文と同じ表記形式を厳守してください。全角数字（第１条、第２条）、和数字括弧書き（（一）（二）（三））、アラビア数字括弧書き（（1）（2））など、原文に合わせてください。半角数字を単独で使用しないでください（例：「6」ではなく「６」または「第６条」）。`;
         } else {
             return `あなたは契約書レビュー専門の法務AIです。以下の契約書を分析し、「修正提案を行うかどうか」と「その理由」を明確に説明してください。
 
@@ -1497,6 +1498,7 @@ ${truncatedText}
     {
       "section": "該当する条項名",
       "issue": "問題点の概要",
+      "type": "replace または add（既存条文を直せる場合は必ず replace。条項が完全に欠落している場合のみ add）",
       "old": "書類内の該当条文をそのまま一字一句引用（要約・言い換え禁止。条文が長い場合は問題箇所を中心に引用）",
       "proposal": "具体的な修正案（修正後の文案）",
       "risk": "このままにした場合の具体的なリスク",
@@ -1517,6 +1519,9 @@ ${truncatedText}
 重要:
 - 必ずJSONのみ出力。説明文・マークダウン不要。
 - riskLevelは1（低）、2（中）、3（高）のいずれか。
+- riskLevelが3（高）の場合は、必ずその高リスクを実務上低減または排除する条文修正案をsuggestionsへ入れること。
+- 追記ばかりにしないこと。既存条文の一部を直せる場合はtypeをreplaceにし、oldへ原文、proposalへ修正後の完成条文を入れること。
+- proposalには「不足しています」「設定されています」「提案します」などの指摘文を入れないこと。契約書へそのまま貼れる条文本文だけを書くこと。
 - suggestionsのoldは書類内の原文を一字一句引用すること（要約・解釈・言い換え禁止）。
 - 修正不要の場合はsuggestionsを空配列にすること。
 - contract_metaの日付は契約書本文から正確に読み取ること。記載がない場合はnull。`;
@@ -1545,7 +1550,7 @@ ${truncatedText}
       "section": "条項名",
       "type": "modification/risk",
       "old": "前の文言",
-      "new": "後の文言/アドバイス",
+      "new": "修正後の契約条項文言（解説や要約、箇条書き、見出しなどは一切含めず、契約書としてそのまま利用可能な正式な条文テキストのみを出力してください）",
       "impact": "影響",
       "concern": "注意点"
     }
@@ -1563,7 +1568,8 @@ ${truncatedText}
 [ルール]
 - changesは最重要の5件以内
 - 日付不明はnull
-- JSON以外のテキストは出力禁止`;
+- JSON以外のテキストは出力禁止
+- new（修正後条文）の条番号・項番号は原文と同じ表記形式を厳守。全角数字（第１条）・和数字括弧（（一）（二））・アラビア数字括弧（（1）（2））など原文に合わせること。半角数字の単独使用禁止（「6」ではなく「６」または「第６条」）`;
     }
 
     buildSummaryPrompt(contractText, previousVersion) {
