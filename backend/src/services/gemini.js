@@ -201,6 +201,16 @@ function normalizeChanges(rawChanges) {
     }));
 }
 
+function getRawAnalysisChanges(parsed) {
+    return parsed?.suggestions
+        || parsed?.changes
+        || parsed?.materialChanges
+        || parsed?.material_changes
+        || parsed?.risks
+        || parsed?.items
+        || [];
+}
+
 function normalizeAnalyzeResult(parsed) {
     // 1. Normalize summary (優先順位: summary > changeSummary > fallback)
     const summary = String(parsed?.summary || parsed?.changeSummary || parsed?.change_summary || '').trim() || '解析完了';
@@ -221,7 +231,7 @@ function normalizeAnalyzeResult(parsed) {
     const riskReason = String(parsed?.riskReason || parsed?.risk_reason || parsed?.latestRegulatoryAlignment || parsed?.latest_regulatory_alignment || '').trim() || '主要な注意点を確認してください。';
 
     // 4. Normalize changes (新形式: suggestions / 旧形式: changes)
-    const rawChanges = parsed?.suggestions || parsed?.changes || parsed?.materialChanges || parsed?.material_changes || parsed?.risks || parsed?.items;
+    const rawChanges = getRawAnalysisChanges(parsed);
     const changes = Array.isArray(rawChanges) ? rawChanges : [];
 
     // needs_revision=false の場合はriskLevelを1に下げる
@@ -1017,7 +1027,7 @@ class GeminiService {
 
             const result = {
                 ...normalizeAnalyzeResult(res),
-                changes: normalizeChanges(res?.changes),
+                changes: normalizeChanges(getRawAnalysisChanges(res)),
                 contract_meta: normalizeContractMeta(res?.contract_meta || res),
                 isLimited: false,
                 isFallback: false
@@ -1496,7 +1506,7 @@ ${truncatedText}
   "reason": ["判断理由1（必ず2つ以上）", "判断理由2"],
   "suggestions": [
     {
-      "section": "該当する条項名",
+      "section": "該当する既存条項名（例: 第12条（解除）。完全に欠落している場合のみ 新設条項（秘密保持） のように具体名）",
       "issue": "問題点の概要",
       "type": "replace または add（既存条文を直せる場合は必ず replace。条項が完全に欠落している場合のみ add）",
       "old": "書類内の該当条文をそのまま一字一句引用（要約・言い換え禁止。条文が長い場合は問題箇所を中心に引用）",
@@ -1520,7 +1530,10 @@ ${truncatedText}
 - 必ずJSONのみ出力。説明文・マークダウン不要。
 - riskLevelは1（低）、2（中）、3（高）のいずれか。
 - riskLevelが3（高）の場合は、必ずその高リスクを実務上低減または排除する条文修正案をsuggestionsへ入れること。
-- 追記ばかりにしないこと。既存条文の一部を直せる場合はtypeをreplaceにし、oldへ原文、proposalへ修正後の完成条文を入れること。
+- 原則は既存条文の修正（type="replace"）を優先すること。解除、損害賠償、秘密保持、検収、支払、期間、責任制限など既存条文が少しでも存在する場合は、その条文をoldへ一字一句引用し、proposalへ修正後の完成条文を入れること。
+- type="add" は、契約書内に対応する条文・項・文が完全に存在せず、既存条文の修正では自然に解消できない場合だけ使用すること。
+- sectionに「追加条項1」「追加条項2」「本文」「その他」などの汎用名を入れないこと。必ず「第○条（題名）」または「新設条項（目的が分かる題名）」にすること。
+- proposalはリスクを実際に減らす具体的な権利義務・手続・期限・例外・責任範囲を含むこと。単なる注意喚起、説明、抽象的な努力義務だけは禁止。
 - proposalには「不足しています」「設定されています」「提案します」などの指摘文を入れないこと。契約書へそのまま貼れる条文本文だけを書くこと。
 - suggestionsのoldは書類内の原文を一字一句引用すること（要約・解釈・言い換え禁止）。
 - 修正不要の場合はsuggestionsを空配列にすること。
@@ -1567,6 +1580,9 @@ ${truncatedText}
 
 [ルール]
 - changesは最重要の5件以内
+- 高リスクの提案は、単なる末尾追記ではなく、原則として既存条文を修正すること。既存条文で解消できる場合は old に原文を一字一句引用し、new に完成した修正後条文を入れること。
+- 既存条文が完全に欠落している場合だけ新設条項を提案し、sectionは「新設条項（秘密保持）」のように目的が分かる具体名にすること。「追加条項1」「本文」「その他」は禁止。
+- new は契約書にそのまま反映できる条文本文だけにすること。「不足」「リスク」「提案」などの解説文は禁止。
 - 日付不明はnull
 - JSON以外のテキストは出力禁止
 - new（修正後条文）の条番号・項番号は原文と同じ表記形式を厳守。全角数字（第１条）・和数字括弧（（一）（二））・アラビア数字括弧（（1）（2））など原文に合わせること。半角数字の単独使用禁止（「6」ではなく「６」または「第６条」）`;
