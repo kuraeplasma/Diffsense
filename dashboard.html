@@ -3,55 +3,19 @@
 
 <head>
     <meta charset="UTF-8">
-    <script src="/js/env.js?v=20260423_api_base_hotfix1"></script>
-    <!--
-      Content-Security-Policy (Phase 1: Report-Only)
-      ------------------------------------------------
-      Enforces no blocking yet; browser only REPORTS violations (DevTools console).
-      After a sprint of monitoring with no legitimate violations, flip the header
-      name from `Content-Security-Policy-Report-Only` to `Content-Security-Policy`
-      to enforce. 'unsafe-inline' is kept because dashboard.js renders UI via
-      template strings with onclick= and inline <style> blocks; removing those
-      is a separate refactor task.
-    -->
-    <meta http-equiv="Content-Security-Policy-Report-Only" content="
-        default-src 'self' https:;
-        script-src 'self' 'unsafe-inline' 'unsafe-eval'
-            https://www.googletagmanager.com
-            https://www.google-analytics.com
-            https://www.gstatic.com
-            https://apis.google.com
-            https://js.stripe.com
-            https://cdnjs.cloudflare.com;
-        style-src 'self' 'unsafe-inline'
-            https://fonts.googleapis.com
-            https://cdnjs.cloudflare.com;
-        font-src 'self' data:
-            https://fonts.gstatic.com
-            https://cdnjs.cloudflare.com;
-        img-src 'self' data: blob: https:;
-        connect-src 'self'
-            http://localhost:3001
-            https://api-qf37m5ba2q-an.a.run.app
-            https://diffsense-api-707048573054.asia-northeast1.run.app
-            https://diffsense.spacegleam.co.jp
-            https://*.googleapis.com
-            https://*.firebaseio.com
-            https://*.google-analytics.com
-            https://identitytoolkit.googleapis.com
-            https://securetoken.googleapis.com;
-        frame-src 'self' https://js.stripe.com https://*.firebaseapp.com;
-        object-src 'none';
-        base-uri 'self';
-    ">
+    <script src="/js/env.js?v=20260507_prod_api_localhost"></script>
+    <!-- CSP is handled by the backend server via HTTP headers for security and consistency -->
     <script>
         // Cloud Runウォームアップ
         (function() {
+            var host = window.location.hostname;
+            if (host === 'localhost' || host === '127.0.0.1' || host === '[::1]') return;
             fetch('https://diffsense-api-707048573054.asia-northeast1.run.app/health', {
                 method: 'GET',
                 cache: 'no-store'
             }).catch(function() {});
         })();
+
     </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DIFFsense Dashboard</title>
@@ -68,20 +32,95 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;700&family=Noto+Serif+JP:wght@400;700&display=swap"
         rel="stylesheet">
-    <style>body{margin:0;background:#fbfdff;color:#222;font-family:Helvetica,"Helvetica Neue",Arial,"Noto Sans JP",sans-serif}#app-sidebar{width:250px;position:fixed;left:0;top:0;bottom:0;background:#010816;color:#fff;z-index:20}#app-main{margin-left:250px;min-height:100vh;background:#fbfdff}#app-content{padding:24px;min-height:100vh;background:#fbfdff}.shell-skeleton{display:grid;gap:14px}.skeleton-block{height:18px;background:linear-gradient(90deg,#eceff3,#f5f7fa,#eceff3);background-size:200% 100%;border-radius:6px;animation:skel 1.2s ease-in-out infinite}.skeleton-card{height:110px;border-radius:12px;background:#fff;border:1px solid #eceff3}.skeleton-row{height:46px;border-radius:8px;background:#fff;border:1px solid #eceff3}@keyframes skel{0%{background-position:200% 0}100%{background-position:-200% 0}}@media (max-width:900px){#app-main{margin-left:0}#app-content{padding:16px}}.toggle-switch{position:relative;display:inline-block;width:48px;height:26px}.toggle-switch input{opacity:0;width:0;height:0}.toggle-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#444;border-radius:26px;transition:.3s}.toggle-slider:before{position:absolute;content:"";height:20px;width:20px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s}input:checked+.toggle-slider{background:#4CAF50}input:checked+.toggle-slider:before{transform:translateX(22px)}</style>
-    <link rel="preload" as="style" href="css/dashboard.css?v=20260501_midnight_navy" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="css/dashboard.css?v=20260501_midnight_navy"></noscript>
-    <link rel="stylesheet" href="css/sign.css?v=premiumv53">
-    <link rel="stylesheet" href="css/dashboard-structured-fix.css?v=20260310local1">
-    <!-- FontAwesome for Icons (CDN) -->
-    <!-- FontAwesome for Icons (CDN) -->
+    <style>body{margin:0;background:#f8fafc;color:#222;font-family:Helvetica,"Helvetica Neue",Arial,"Noto Sans JP",sans-serif}#app-sidebar{width:250px;position:fixed;left:0;top:0;bottom:0;background:#010816;color:#fff;z-index:20}#app-main{margin-left:250px;min-height:100vh;background:#f8fafc}#app-content{padding:24px;min-height:100vh;background:#f8fafc}
+.shell-skeleton{display:grid;gap:14px}.skeleton-block{height:18px;background:linear-gradient(90deg,#eceff3,#f5f7fa,#eceff3);background-size:200% 100%;border-radius:6px;animation:skel 1.2s ease-in-out infinite}.skeleton-card{height:110px;border-radius:12px;background:#fff;border:none !important}.skeleton-row{height:46px;border-radius:8px;background:#fff;border:none !important}@keyframes skel{0%{background-position:200% 0}100%{background-position:-200% 0}}@media (max-width:900px){#app-main{margin-left:0}#app-content{padding:16px}}.toggle-switch{position:relative;display:inline-block;width:48px;height:26px}.toggle-switch input{opacity:0;width:0;height:0}.toggle-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#444;border-radius:26px;transition:.3s}.toggle-slider:before{position:absolute;content:"";height:20px;width:20px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s}input:checked+.toggle-slider{background:#4CAF50}input:checked+.toggle-slider:before{transform:translateX(22px)}</style>
+    <link rel="preload" as="style" href="css/dashboard.css?v=20260511_pdf_fix_v1" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="css/dashboard.css?v=20260511_pdf_fix_v1"></noscript>
+    <link rel="stylesheet" href="css/sign.css?v=20260511_pdf_fix_v1">
+    <link rel="stylesheet" href="css/dashboard-structured-fix.css?v=20260511_pdf_fix_v1">
+    <link rel="stylesheet" href="css/analysis-details-v3.css?v=20260511_pdf_fix_v1">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="css/sign.css?v=premiumv53">
-    <link rel="stylesheet" href="css/dashboard-structured-fix.css?v=20260310local1">
-    <!-- FontAwesome for Icons (CDN) -->
-    <!-- FontAwesome for Icons (CDN) -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-<link rel="icon" type="image/png" href="favicon2.png?v=2">
+    <style id="desktop-sidebar-guard">
+        @media (min-width: 901px) {
+            html body #app-sidebar,
+            html body #app-sidebar.active {
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                bottom: 0 !important;
+                width: var(--sidebar-width, 240px) !important;
+                height: 100vh !important;
+                min-height: 100vh !important;
+                max-height: 100vh !important;
+                display: flex !important;
+                flex-direction: column !important;
+                background: #010816 !important;
+                overflow: hidden !important;
+                z-index: 1000 !important;
+            }
+
+            html body #app-sidebar.is-collapsed,
+            html body #app-sidebar.is-collapsed.active {
+                width: 72px !important;
+            }
+
+            html body #app-sidebar .nav-menu {
+                flex: 1 1 auto !important;
+                min-height: 0 !important;
+                overflow-y: auto !important;
+            }
+
+            html body #app-sidebar .nav-divider {
+                margin: 12px 16px !important;
+            }
+
+            html body #app-sidebar .nav-category {
+                min-height: 34px !important;
+                padding: 0 12px !important;
+                display: flex !important;
+                align-items: center !important;
+                line-height: 1 !important;
+            }
+
+            html body #app-sidebar .sidebar-footer {
+                margin-top: auto !important;
+                flex-shrink: 0 !important;
+            }
+
+            html body #app-main {
+                margin-left: var(--sidebar-width, 240px) !important;
+                width: calc(100% - var(--sidebar-width, 240px)) !important;
+                min-width: 0 !important;
+                min-height: 100vh !important;
+                height: 100vh !important;
+            }
+
+            html body:has(#app-sidebar.is-collapsed) #app-main {
+                margin-left: 72px !important;
+                width: calc(100% - 72px) !important;
+            }
+
+            html body #app-content.is-detail-view {
+                left: var(--sidebar-width, 240px) !important;
+            }
+
+            html body:has(#app-sidebar.is-collapsed) #app-content.is-detail-view {
+                left: 72px !important;
+            }
+
+            @media (min-width: 1400px) {
+                html body .analysis-v3-split-layout:not(.is-fullscreen) {
+                    grid-template-columns: minmax(640px, 50%) minmax(0, 1fr) !important;
+                }
+
+                html body:has(#app-sidebar.is-collapsed) .analysis-v3-split-layout:not(.is-fullscreen) {
+                    grid-template-columns: minmax(720px, 52%) minmax(0, 1fr) !important;
+                }
+            }
+        }
+    </style>
+    <link rel="icon" type="image/png" href="images/scaled_favicon.png?v=2">
+    <script>window.__DOCX_PDF_SERVICE_URL__ = 'http://127.0.0.1:3001';</script>
 </head>
 
 <body>
@@ -93,53 +132,60 @@
     <nav id="app-sidebar">
         <div class="sidebar-logo">
             <span class="sidebar-logo-mark">
-                <i class="fa-solid fa-scale-balanced"></i>
+                <img src="images/logo_official.png" class="sidebar-logo-img" alt="DIFFsense">
                 <span>DIFFsense</span>
             </span>
-            <button type="button" id="sidebar-collapse-toggle" class="sidebar-collapse-btn" aria-label="メニューを折りたたむ" aria-expanded="true">
+            <button type="button" id="sidebar-collapse-toggle" class="sidebar-collapse-btn" aria-label="メニューを折りたたむ" aria-expanded="true" onclick="window.app.handleSidebarCollapse(event)">
                 <i class="fa-solid fa-angles-left"></i>
             </button>
         </div>
         <div class="nav-menu">
-            <div class="nav-item" onclick="window.app.navigate('dashboard')">
+            <!-- ダッシュボード -->
+            <div class="nav-item active" onclick="window.app.navigate('dashboard')">
                 <i class="fa-solid fa-house"></i>
                 <span>ダッシュボード</span>
             </div>
+
+            <!-- 契約管理 -->
+            <div class="nav-divider"></div>
+            <div class="nav-category">契約管理</div>
             <div class="nav-item" onclick="window.app.navigate('contracts')">
-                <i class="fa-regular fa-file-lines"></i>
+                <i class="fa-regular fa-file"></i>
                 <span>契約書一覧</span>
+            </div>
+            <div class="nav-item" onclick="window.app.navigate('diff-check')">
+                <i class="fa-solid fa-arrows-rotate"></i>
+                <span>差分チェック</span>
             </div>
             <div class="nav-item" id="nav-deadlines" onclick="window.app.navigate('deadlines')">
                 <i class="fa-solid fa-calendar-days"></i>
-                <span>期限・アラート管理</span>
+                <span>期限・アラート</span>
             </div>
+
+            <!-- 解析・履歴 -->
+            <div class="nav-divider"></div>
+            <div class="nav-category">解析・履歴</div>
             <div class="nav-item" onclick="window.app.navigate('history')">
-                <i class="fa-solid fa-clock-rotate-left"></i>
+                <i class="fa-regular fa-clock"></i>
                 <span>解析履歴</span>
             </div>
+
+            <!-- 署名 -->
+            <div class="nav-divider"></div>
+            <div class="nav-category">署名</div>
             <div class="nav-item" id="nav-sign" onclick="window.app.navigate('sign')">
                 <i class="fa-solid fa-file-signature"></i>
-                <span class="nav-label">署名管理</span>
-                <span class="nav-badge" id="nav-sign-badge" style="display:none">0</span>
+                <span>署名管理</span>
             </div>
-            <div class="nav-item" id="nav-team" onclick="window.app.navigate('team')" style="display:none;">
-                <i class="fa-solid fa-users"></i>
-                <span>チーム設定</span>
-            </div>
-            <div class="nav-item" id="nav-plan" onclick="window.app.navigate('plan')">
-                <i class="fa-solid fa-credit-card"></i>
-                <span>プラン管理</span>
-            </div>
-            <div class="nav-item" id="nav-mcp" onclick="window.app.navigate('mcp')">
-                <i class="fa-solid fa-plug"></i>
-                <span>MCP連携</span>
-            </div>
+            <div class="nav-divider"></div>
+
+            <!-- 設定 -->
             <div class="nav-item" id="nav-settings" onclick="window.app.navigate('notifications')">
                 <i class="fa-solid fa-gear"></i>
-                <span>設定・ログアウト</span>
+                <span>設定</span>
             </div>
         </div>
-        <div class="sidebar-footer" style="padding: 16px; border-top: 1px solid rgba(255, 255, 255, 0.08);">
+        <div class="sidebar-footer">
             <div id="plan-status-container"></div>
         </div>
     </nav>
@@ -159,40 +205,74 @@
         </button>
         <span class="mobile-header-logo">DIFFsense</span>
     </header>
+
     <main id="app-main">
-        <!-- Dynamic Content Area -->
         <div id="app-content">
+            <!-- Initial Dashboard v2 Skeleton -->
             <div class="page-title">ダッシュボード</div>
-            <div class="stats-grid">
-                <div class="stat-card active">
-                    <div class="stat-label text-warning"><i class="fa-regular fa-square-check"></i> 未処理</div>
-                    <div class="stat-value">0件</div>
+            <div class="dashboard-v2">
+                <div class="dashboard-v2-metrics">
+                    <article class="dashboard-v2-metric skeleton-pulse">
+                        <div class="dashboard-v2-icon" style="background:#f1f5f9"></div>
+                        <div style="flex:1">
+                            <div class="skeleton-block" style="width:60%; height:12px; margin-bottom:8px;"></div>
+                            <div class="skeleton-block" style="width:40%; height:24px;"></div>
+                        </div>
+                    </article>
+                    <article class="dashboard-v2-metric skeleton-pulse">
+                        <div class="dashboard-v2-icon" style="background:#f1f5f9"></div>
+                        <div style="flex:1">
+                            <div class="skeleton-block" style="width:60%; height:12px; margin-bottom:8px;"></div>
+                            <div class="skeleton-block" style="width:40%; height:24px;"></div>
+                        </div>
+                    </article>
+                    <article class="dashboard-v2-metric skeleton-pulse">
+                        <div class="dashboard-v2-icon" style="background:#f1f5f9"></div>
+                        <div style="flex:1">
+                            <div class="skeleton-block" style="width:60%; height:12px; margin-bottom:8px;"></div>
+                            <div class="skeleton-block" style="width:40%; height:24px;"></div>
+                        </div>
+                    </article>
+                    <article class="dashboard-v2-metric skeleton-pulse">
+                        <div class="dashboard-v2-icon" style="background:#f1f5f9"></div>
+                        <div style="flex:1">
+                            <div class="skeleton-block" style="width:60%; height:12px; margin-bottom:8px;"></div>
+                            <div class="skeleton-block" style="width:40%; height:24px;"></div>
+                        </div>
+                    </article>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-label text-danger"><i class="fa-solid fa-triangle-exclamation"></i> リスク要判定</div>
-                    <div class="stat-value">0件</div>
+                
+                <section class="dashboard-v2-panel">
+                    <div class="dashboard-v2-panel-head">
+                        <h2>要対応の契約</h2>
+                    </div>
+                    <div class="dashboard-v2-action-list">
+                        <div class="skeleton-row" style="margin-bottom:12px;"></div>
+                        <div class="skeleton-row" style="margin-bottom:12px;"></div>
+                        <div class="skeleton-row"></div>
+                    </div>
+                </section>
+
+                <div class="dashboard-v2-bottom">
+                    <section class="dashboard-v2-panel">
+                        <div class="dashboard-v2-panel-head">
+                            <h2>最近の解析</h2>
+                        </div>
+                        <div class="dashboard-v2-compact-list">
+                            <div class="skeleton-row" style="margin-bottom:8px; height:60px;"></div>
+                            <div class="skeleton-row" style="margin-bottom:8px; height:60px;"></div>
+                        </div>
+                    </section>
+                    <section class="dashboard-v2-panel">
+                        <div class="dashboard-v2-panel-head">
+                            <h2>期限カレンダー</h2>
+                        </div>
+                        <div class="dashboard-v2-calendar-list">
+                            <div class="skeleton-row" style="margin-bottom:8px; height:40px;"></div>
+                            <div class="skeleton-row" style="margin-bottom:8px; height:40px;"></div>
+                        </div>
+                    </section>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-label"><i class="fa-solid fa-satellite-dish"></i> 監視中</div>
-                    <div class="stat-value text-muted">0</div>
-                </div>
-            </div>
-            <h3 id="dashboard-section-title" style="font-size:16px; margin-bottom:16px; font-weight:600;">未処理のアイテム (新着・変更検知)</h3>
-            <div class="table-container">
-                <table class="data-table dashboard-table">
-                    <thead>
-                        <tr>
-                            <th>リスク</th>
-                            <th>契約・規約名</th>
-                            <th>日付</th>
-                            <th>ステータス</th>
-                            <th>アクション</th>
-                        </tr>
-                    </thead>
-                    <tbody id="dashboard-table-body">
-                        <tr><td colspan="5" class="text-center text-muted" style="padding:40px;">該当するアイテムはありません</td></tr>
-                    </tbody>
-                </table>
             </div>
         </div>
     </main>
@@ -359,10 +439,33 @@
         </div>
     </div>
 
+    <!-- Error capture for debugging (remove after fix) -->
+    <div id="ds-error-debug" style="display:none;position:fixed;top:0;left:0;right:0;z-index:99999;background:#fee2e2;color:#991b1b;padding:12px 16px;font-family:monospace;font-size:12px;border-bottom:3px solid #ef4444;max-height:40vh;overflow:auto;"></div>
+    <script>
+    window.__pendingDashboardNavigation = null;
+    window.__queueDashboardNavigation = function(view, params) {
+        window.__pendingDashboardNavigation = { view: view, params: params };
+    };
+    window.app = window.app || {
+        navigate: function(view, params) {
+            window.__queueDashboardNavigation(view, params);
+        }
+    };
+    window.onerror = function(msg, src, line, col, err) {
+        var d = document.getElementById('ds-error-debug');
+        if (d) { d.style.display='block'; d.innerHTML += '<div><b>' + (src||'?').split('/').pop() + ':' + line + '</b> &mdash; ' + msg + '</div>'; }
+    };
+    window.addEventListener('unhandledrejection', function(e) {
+        var d = document.getElementById('ds-error-debug');
+        if (d) { d.style.display='block'; d.innerHTML += '<div><b>UnhandledRejection:</b> ' + ((e.reason&&e.reason.message)||String(e.reason)||'unknown') + '</div>'; }
+    });
+    </script>
     <!-- App Logic -->
-    <script type="module" src="/js/dashboard.js?v=20260501_team_icon_grid_fix"></script>
+    <script type="module" src="/js/dashboard.js?v=20260511_docx_dom_fix_v9"></script>
+
     <script type="module">
-        import { requireAuth, handleLogout } from '/js/auth.js?v=20260423_docx_async_fix';
+        import { requireAuth, handleLogout } from '/js/auth.js?v=20260511_docx_dom_fix_v9';
+        import { aiService } from '/js/ai-service.js?v=20260511_docx_dom_fix_v9';
 
         // Protect Route
         requireAuth();
@@ -425,16 +528,16 @@
             <i class="fa-solid fa-file-lines"></i>
             <span>書類</span>
         </button>
-        <button class="bottom-nav-item bottom-nav-fab" data-mobile-action="register">
-            <span class="bottom-nav-fab-inner"><i class="fa-solid fa-plus"></i></span>
+        <button class="bottom-nav-item" data-mobile-action="register">
+            <i class="fa-solid fa-plus"></i>
             <span>登録</span>
         </button>
         <button class="bottom-nav-item" data-mobile-view="sign">
             <i class="fa-solid fa-file-signature"></i>
-            <span>著名</span>
+            <span>署名</span>
         </button>
         <button class="bottom-nav-item" id="bnav-menu-bottom" data-mobile-action="menu">
-            <i class="fa-solid fa-ellipsis"></i>
+            <i class="fa-solid fa-bars"></i>
             <span>メニュー</span>
         </button>
     </nav>

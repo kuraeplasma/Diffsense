@@ -2,21 +2,39 @@ import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const rootDir = process.cwd();
-const targetDirs = ['js/modules'];
+const targetDirs = ['js', 'backend/src', 'scripts'];
 const forbiddenPatterns = [
+  // Browser Security
   { name: 'innerHTML', pattern: /\binnerHTML\b/ },
   { name: 'eval', pattern: /\beval\s*\(/ },
   { name: 'new Function', pattern: /\bnew\s+Function\b/ },
   { name: 'document.write', pattern: /\bdocument\.write\s*\(/ },
+  // Secret Leaks
+  { name: 'Google API Key', pattern: /AIzaSy[0-9A-Za-z-_]{33}/ },
+  { name: 'Stripe Secret Key', pattern: /sk_(?:live|test)_[0-9a-zA-Z]{24}/ },
+  { name: 'Private Key', pattern: /-----BEGIN (?:RSA|OPENSSH|PRIVATE) KEY-----/ },
+  { name: 'Firebase AppId', pattern: /1:\d+:web:[a-f0-9]{22}/ },
+];
+
+const excludeFiles = [
+  'js/firebase-config.js', // Public Firebase web configuration
 ];
 
 async function collectFiles(dir) {
   const absDir = path.join(rootDir, dir);
-  const entries = await readdir(absDir, { withFileTypes: true });
+  let entries;
+  try {
+    entries = await readdir(absDir, { withFileTypes: true });
+  } catch (error) {
+    // If directory doesn't exist (e.g. backend/src in some environments), skip it.
+    return [];
+  }
   const files = [];
 
   for (const entry of entries) {
-    const relPath = path.join(dir, entry.name);
+    const relPath = path.join(dir, entry.name).replace(/\\/g, '/');
+    if (excludeFiles.includes(relPath)) continue;
+
     if (entry.isDirectory()) {
       files.push(...await collectFiles(relPath));
     } else if (entry.isFile() && /\.(m?js|html)$/i.test(entry.name)) {

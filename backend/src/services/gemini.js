@@ -946,11 +946,11 @@ function parseRetryAfterMs(error) {
 
 function getGeminiRequestBudget() {
     // ローカル/本番で同一実装。必要時は環境変数で同じキーを調整する。
-    const timeoutMsRaw = Number(process.env.GEMINI_TIMEOUT_MS || 45000);
+    const timeoutMsRaw = Number(process.env.GEMINI_TIMEOUT_MS || 120000);
     const maxAttemptsRaw = Number(process.env.GEMINI_MAX_ATTEMPTS || 2);
     const retryBaseMsRaw = Number(process.env.GEMINI_RETRY_BASE_MS || 1000);
     return {
-        timeoutMs: Number.isFinite(timeoutMsRaw) && timeoutMsRaw >= 5000 ? Math.floor(timeoutMsRaw) : 45000,
+        timeoutMs: Number.isFinite(timeoutMsRaw) && timeoutMsRaw >= 5000 ? Math.floor(timeoutMsRaw) : 120000,
         maxAttempts: Number.isFinite(maxAttemptsRaw) && maxAttemptsRaw >= 1 ? Math.min(Math.floor(maxAttemptsRaw), 5) : 2,
         retryBaseMs: Number.isFinite(retryBaseMsRaw) && retryBaseMsRaw >= 0 ? Math.floor(retryBaseMsRaw) : 1000
     };
@@ -1763,7 +1763,7 @@ ${truncatedText}
         const response = await axios.post(
             `${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`,
             body,
-            { timeout: 30000, headers: { 'Content-Type': 'application/json' } }
+            { timeout: 90000, headers: { 'Content-Type': 'application/json' } }
         );
         return extractCandidateText(response?.data);
     }

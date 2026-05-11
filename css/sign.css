@@ -301,12 +301,13 @@
     background: var(--color-primary);
     border-color: var(--color-primary);
     color: #fff;
-    box-shadow: none;
+    box-shadow: 0 4px 12px rgba(11, 45, 98, 0.15);
 }
 
 .btn-sign-primary:hover {
-    background: #9e8047;
-    border-color: #9e8047;
+    background: var(--color-navy-hover);
+    border-color: var(--color-navy-hover);
+    transform: translateY(-1px);
 }
 
 .sign-page-switcher {
@@ -521,6 +522,8 @@
 .sign-editor-sidebar {
     --sign-bg-light: #f8f9fa;
     --sign-border: #e0e0e0;
+    --sign-primary: var(--color-primary, #0b2d62);
+    --sign-text-muted: #64748b;
 }
 
 .sign-editor-sidebar-body {
@@ -840,3 +843,23 @@
 .sign-editor-viewport .docx-virtual-page-layer * {
     color: #1a1a1a !important;
 }
+ 
+/* PDF Viewer Layout Fixes */
+#sign-viewer-content {
+  width: 100% !important;
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
+}
+ 
+#pdf-viewer-wrapper,
+.pdf-viewer-wrapper {
+  width: 100% !important;
+  min-width: 0 !important;
+}
+ 
+#pdf-pages-container,
+.pdf-pages-container {
+  width: 100% !important;
+  min-width: 0 !important;
+}
+

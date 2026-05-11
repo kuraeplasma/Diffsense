@@ -24,7 +24,7 @@ export function render({ app, dbService, escapeHtmlText, formatDisplayTimestamp,
             : '<span class="badge badge-warning">未確認</span>';
 
         return `
-                <tr onclick="window.app.navigate('diff', ${c.id})">
+                <tr onclick='window.app.navigate("diff", ${JSON.stringify({ id: c.id, source: 'contracts' })})'>
                     <td class="col-name" title="${escapeHtmlText(c.name)}">${escapeHtmlText(c.name)}</td>
                     <td>${escapeHtmlText(c.type)}</td>
                     <td>${formatDisplayTimestamp(c.last_updated_at || c.last_analyzed_at || c.created_at)}</td>

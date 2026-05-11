@@ -5,7 +5,7 @@
 
 import { dbService } from './db-service.js';
 import { Notify } from './notify.js';
-import { getIdToken } from './auth.js';
+import { getIdToken } from './auth.js?v=20260510_auth_ready_fix';
 import { toApiUrl } from './api-base-safe.js?v=20260329_api_base_safe1';
 
 export const SignUI = {
@@ -1011,18 +1011,18 @@ export const SignUI = {
                         <button class="btn-dashboard" onclick="window.app.navigate('sign')" style="margin-bottom:16px; font-size:12px; background:none; border:none; padding:0; color:#666;">
                             <i class="fa-solid fa-chevron-left"></i> 戻る
                         </button>
-                        <h2 style="font-size:18px; margin:0; color:var(--sign-primary); font-weight:700;">この契約に署名を依頼する</h2>
+                        <h2 style="font-size:18px; margin:0; color:#0b2d62 !important; font-weight:700;">この契約に署名を依頼する</h2>
                     </div>
 
                     <div class="sign-editor-sidebar-body">
                         <!-- Section 1: Recipients -->
                         <div class="editor-sidebar-section sign-editor-sidebar-section is-recipient">
-                            <label style="display:block; font-size:11px; font-weight:700; color:#999; margin-bottom:16px; text-transform:uppercase; letter-spacing:1px;">宛先設定</label>
+                            <label style="display:block; font-size:11px; font-weight:800; color:#0b2d62 !important; margin-bottom:16px; text-transform:uppercase; letter-spacing:1px; opacity:0.8;">宛先設定</label>
                             <div id="editor-recipients-list" class="sign-editor-recipient-list">
                                 <!-- Recipient rows injected here by SignEditor -->
                             </div>
-                            <button class="btn-dashboard" onclick="window.SignEditor.addRecipientRow()" style="width:100%; border:1px dashed #ccc; background:#fafafa; font-size:11px; margin-top:12px; border-radius:8px; height:36px;">
-                                <i class="fa-solid fa-plus"></i> 署名者を追加
+                            <button class="btn-dashboard" onclick="window.SignEditor.addRecipientRow()" style="width:100%; border:1px solid #0b2d62 !important; background:#fff !important; color:#0b2d62 !important; font-size:13px; margin-top:12px; border-radius:12px; height:44px; font-weight:700 !important; display:flex; align-items:center; justify-content:center; gap:8px; transition:all 0.2s;">
+                                <i class="fa-solid fa-plus" style="color:#0b2d62 !important;"></i> 署名者を追加
                             </button>
                         </div>
 
@@ -1030,18 +1030,18 @@ export const SignUI = {
 
                         <!-- Section 2: Fields -->
                         <div class="editor-sidebar-section sign-editor-sidebar-section">
-                            <label style="display:block; font-size:11px; font-weight:700; color:#999; margin-bottom:16px; text-transform:uppercase; letter-spacing:1px;">フィールド配置</label>
+                            <label style="display:block; font-size:11px; font-weight:800; color:#0b2d62 !important; margin-bottom:16px; text-transform:uppercase; letter-spacing:1px; opacity:0.8;">フィールド配置</label>
                             <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-                                <button class="btn-dashboard field-tool" id="tool-signature" onclick="window.SignEditor.setTool('signature')" style="height:auto; padding:16px; flex-direction:column; gap:8px; border-radius:12px; cursor:grab;">
-                                    <i class="fa-solid fa-signature" style="font-size:20px; color:var(--sign-primary);"></i>
-                                    <span style="font-size:12px; font-weight:600;">署名枠</span>
+                                <button class="btn-dashboard field-tool" id="tool-signature" onclick="window.SignEditor.setTool('signature')" style="height:auto; padding:18px 12px; flex-direction:column; gap:10px; border-radius:14px; cursor:grab; border:1px solid #ddd !important; background:#fff !important; box-shadow:0 4px 12px rgba(0,0,0,0.05);">
+                                    <i class="fa-solid fa-signature" style="font-size:22px; color:#0b2d62 !important; display:block; margin-bottom:4px;"></i>
+                                    <span style="font-size:12px; font-weight:700; color:#0b2d62 !important; display:block;">署名枠</span>
                                 </button>
-                                <button class="btn-dashboard field-tool" id="tool-date" onclick="window.SignEditor.setTool('date')" style="height:auto; padding:16px; flex-direction:column; gap:8px; border-radius:12px; cursor:grab;">
-                                    <i class="fa-regular fa-calendar" style="font-size:20px; color:var(--sign-primary);"></i>
-                                    <span style="font-size:12px; font-weight:600;">日付枠</span>
+                                <button class="btn-dashboard field-tool" id="tool-date" onclick="window.SignEditor.setTool('date')" style="height:auto; padding:18px 12px; flex-direction:column; gap:10px; border-radius:14px; cursor:grab; border:1px solid #ddd !important; background:#fff !important; box-shadow:0 4px 12px rgba(0,0,0,0.05);">
+                                    <i class="fa-regular fa-calendar" style="font-size:22px; color:#0b2d62 !important; display:block; margin-bottom:4px;"></i>
+                                    <span style="font-size:12px; font-weight:700; color:#0b2d62 !important; display:block;">日付枠</span>
                                 </button>
                             </div>
-                            <p style="font-size:11px; color:#888; margin-top:16px; line-height:1.6; background:#f8f9fa; padding:12px; border-radius:8px; border:1px solid #eee;">
+                            <p style="font-size:11px; color:#0b2d62 !important; margin-top:16px; line-height:1.6; background:rgba(11, 45, 98, 0.05) !important; padding:12px; border-radius:8px; border:1px solid rgba(11, 45, 98, 0.1) !important; font-weight:700;">
                                 ドラッグアンドドロップで配置してください。
                             </p>
                         </div>
@@ -1057,10 +1057,7 @@ export const SignUI = {
 
                     <!-- Bottom Action -->
                     <div style="padding:24px; border-top:1px solid #eee; background:#fff;">
-                        <button id="sign-editor-preview-toggle" class="btn-dashboard" onclick="window.SignEditor.openRecipientPreview()" style="width:100%; height:46px; font-size:14px; font-weight:600; border-radius:12px; margin-bottom:12px; justify-content:center;">
-                            受信者プレビュー
-                        </button>
-                        <button id="sign-editor-send-btn" class="btn-sign btn-sign-primary" onclick="window.SignEditor.saveAndSend()" style="width:100%; min-height:46px; font-size:15px;">
+                        <button id="sign-editor-send-btn" class="btn-sign btn-sign-primary" onclick="window.SignEditor.saveAndSend()" style="width:100%; min-height:48px; font-size:15px; border-radius:14px; font-weight:700;">
                             この内容で署名依頼を送信 <i class="fa-solid fa-paper-plane" style="margin-left:8px;"></i>
                         </button>
                     </div>

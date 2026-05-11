@@ -106,6 +106,12 @@ async function bootstrap() {
 
         // --- Middleware & Config ---
         
+        // Set global request timeout to 3 minutes
+        app.use((req, res, next) => {
+            res.setTimeout(180000);
+            next();
+        });
+
         // Enable trust proxy for Cloud Run/Functions
         app.set('trust proxy', 1);
 

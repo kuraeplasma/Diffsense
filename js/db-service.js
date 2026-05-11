@@ -2,14 +2,19 @@
  * DIFFsense Simulated Database Service (localStorage + Backend API)
  * Data is isolated per user (UID-based keys or Backend Auth)
  */
-import { getIdToken } from './auth.js';
-import { toApiUrl } from './api-base.js?v=20260321f';
+import { getIdToken } from './auth.js?v=20260510_auth_ready_fix';
+import { shouldUseLocalDevAuthBypass, toApiUrl } from './api-base.js?v=20260507_prod_api_analysis';
 
 const LOCAL_CACHE_VERSION = '20260310v2';
 
 export const dbService = {
+    DEBUG: false, // Set to true to enable logs
     // Current user UID (set on login)
     _uid: null,
+
+    log(...args) {
+        if (this.DEBUG) console.log('[DBService]', ...args);
+    },
 
     // Base key names (UID prefix added dynamically)
     _BASE_KEYS: {
@@ -72,6 +77,7 @@ export const dbService = {
     isConfirmedStatus(status) {
         return this.normalizeContractStatus(status) === '確認済み';
     },
+
     // Dynamic KEYS getter (with UID prefix)
     get KEYS() {
         const prefix = this._uid ? `diffsense_${this._uid}_` : 'diffsense_';
@@ -91,8 +97,12 @@ export const dbService = {
      * Must be called before init() after login
      */
     setCurrentUser(uid) {
-        this._uid = uid;
-        console.log(`DB Service: User set to ${uid}`);
+        if (!uid && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+            this._uid = 'owner_dev';
+        } else {
+            this._uid = uid;
+        }
+        this.log(`User set to ${this._uid}`);
     },
 
     /**
@@ -107,16 +117,15 @@ export const dbService = {
                 }
             };
 
-            const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-            const token = isLocalDev ? null : await getIdToken();
+            const useLocalAuthBypass = shouldUseLocalDevAuthBypass();
+            const token = useLocalAuthBypass ? null : await getIdToken();
             if (token) {
                 fetchOptions.headers.Authorization = `Bearer ${token}`;
-            } else if (isLocalDev) {
+            } else if (useLocalAuthBypass) {
                 // Local development uses backend AUTH_BYPASS, so allow API access without Firebase login.
-                console.warn(`API Call proceeding without authenticated user in local dev: ${endpoint}`);
+                this.log(`API Call proceeding without authenticated user in local dev: ${endpoint}`);
             } else {
-                console.error('API Call failed: No authenticated user');
-                return null;
+                throw new Error('ログイン認証が確認できません。再ログインしてから取り込んでください。');
             }
 
             if (body) {
@@ -149,7 +158,7 @@ export const dbService = {
                     const isEndpointNotFound = response.status === 404 && /endpoint not found/i.test(message);
                     const canRetry = isEndpointNotFound && i < candidates.length - 1;
                     if (canRetry) {
-                        console.warn(`API fallback retry: ${candidate} -> ${candidates[i + 1]}`);
+                        this.log(`API fallback retry: ${candidate} -> ${candidates[i + 1]}`);
                         continue;
                     }
                     const error = new Error(message);
@@ -164,7 +173,7 @@ export const dbService = {
 
             throw (lastError || new Error('API request failed'));
         } catch (error) {
-            console.error(`API Call failed (${endpoint}):`, error);
+            this.log(`API Call failed (${endpoint}):`, error);
             if (options.throwOnError) {
                 throw error;
             }
@@ -183,24 +192,15 @@ export const dbService = {
      * Initialize DB if not already done
      */
     init() {
+        // Development Bypass: Force a consistent UID for local testing if not set
+        if (!this._uid && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+            this.log('Local development detected. Forcing UID to "owner_dev".');
+            this._uid = 'owner_dev';
+        }
+
         // Migrate legacy data (no UID prefix) to current user if needed
         this._migrateLegacyData();
-
-        const currentContracts = JSON.parse(localStorage.getItem(this.KEYS.CONTRACTS) || '[]');
-
-        if (!localStorage.getItem(this.KEYS.INITIALIZED) && currentContracts.length === 0) {
-            console.log('Initializing Seed Data...');
-            this._seed();
-            localStorage.setItem(this.KEYS.INITIALIZED, 'true');
-        }
-
-        // Always seed signatures if missing, for restoration purposes
-        if (!localStorage.getItem(this.KEYS.SIGN_REQUESTS)) {
-            console.log('Restoring Signature Seed Data...');
-            this._seedSignatures();
-        }
     },
-
 
     /**
      * Migrate old non-UID data to the current user (one-time)
@@ -213,7 +213,7 @@ export const dbService = {
 
         // Only migrate if legacy data exists AND user has no data yet
         if (legacyData && !localStorage.getItem(userKey)) {
-            console.log('Migrating legacy data to user-scoped storage...');
+            this.log('Migrating legacy data to user-scoped storage...');
             localStorage.setItem(userKey, legacyData);
 
             const legacyLogs = localStorage.getItem('diffsense_logs');
@@ -229,7 +229,7 @@ export const dbService = {
             localStorage.removeItem('diffsense_logs');
             localStorage.removeItem('diffsense_users');
             localStorage.removeItem('diffsense_initialized');
-            console.log('Legacy data migration complete.');
+            this.log('Legacy data migration complete.');
         }
     },
 
@@ -249,12 +249,18 @@ export const dbService = {
         Object.values(this.KEYS).forEach(key => {
             localStorage.removeItem(key);
         });
-        console.log('All local data cleared.');
+        this.log('All local data cleared.');
     },
 
     // --- Contract Methods ---
     getContracts() {
-        return JSON.parse(localStorage.getItem(this.KEYS.CONTRACTS) || '[]');
+        try {
+            const data = JSON.parse(localStorage.getItem(this.KEYS.CONTRACTS) || '[]');
+            return Array.isArray(data) ? data : [];
+        } catch (e) {
+            this.log('Failed to parse contracts from localStorage:', e);
+            return [];
+        }
     },
 
     async syncContractsFromApi() {
@@ -314,7 +320,7 @@ export const dbService = {
                     this._mergeContractIntoCache(saved, tempId);
                 }
             } catch (error) {
-                console.warn('Contract sync failed:', error);
+                this.log('Contract sync failed:', error);
             }
         })();
     },
@@ -555,7 +561,8 @@ export const dbService = {
     /**
      * Add a new contract (Monitoring Target)
      */
-    addContract(data) {
+    addContract(data, options = {}) {
+        const { skipRemotePersist = false } = options;
         const contracts = this.getContracts();
         const newId = Date.now();
         const newContract = {
@@ -579,7 +586,9 @@ export const dbService = {
         contracts.unshift(newContract); // Add to top
         localStorage.setItem(this.KEYS.CONTRACTS, JSON.stringify(contracts));
         this.addActivityLog("新規登録", data.name, "ユーザー", "成功");
-        this._persistContractToApi(newContract, 'POST', newId);
+        if (!skipRemotePersist) {
+            this._persistContractToApi(newContract, 'POST', newId);
+        }
         return newContract;
     },
 
@@ -631,7 +640,13 @@ export const dbService = {
 
     // --- Log Methods ---
     getActivityLogs() {
-        return JSON.parse(localStorage.getItem(this.KEYS.ACTIVITY_LOGS) || '[]');
+        try {
+            const data = JSON.parse(localStorage.getItem(this.KEYS.ACTIVITY_LOGS) || '[]');
+            return Array.isArray(data) ? data : [];
+        } catch (e) {
+            this.log('Failed to parse logs from localStorage:', e);
+            return [];
+        }
     },
 
     addActivityLog(action, target_name, actor = "ユーザー", status = "成功") {
@@ -674,7 +689,7 @@ export const dbService = {
         });
 
         if (filteredLogs.length !== logs.length) {
-            console.log(`Cleaned up ${logs.length - filteredLogs.length} old logs for plan: ${plan}`);
+            this.log(`Cleaned up ${logs.length - filteredLogs.length} old logs for plan: ${plan}`);
             localStorage.setItem(this.KEYS.ACTIVITY_LOGS, JSON.stringify(filteredLogs));
         }
         return filteredLogs;
@@ -682,7 +697,13 @@ export const dbService = {
 
     // --- User Methods ---
     getUsers() {
-        return JSON.parse(localStorage.getItem(this.KEYS.USERS) || '[]');
+        try {
+            const data = JSON.parse(localStorage.getItem(this.KEYS.USERS) || '[]');
+            return Array.isArray(data) ? data : [];
+        } catch (e) {
+            this.log('Failed to parse users from localStorage:', e);
+            return [];
+        }
     },
 
     updateUserRole(email, newRole) {
@@ -751,7 +772,13 @@ export const dbService = {
 
     // --- MCP Methods ---
     async getMcpApiKey() {
-        return await this._callApi('/api/user/mcp-key');
+        try {
+            const data = await this._callApi('/api/user/mcp-key');
+            return data && typeof data === 'object' ? data : {};
+        } catch (error) {
+            this.log('dbService.getMcpApiKey error:', error);
+            return {};
+        }
     },
 
     async generateMcpApiKey() {
@@ -775,8 +802,12 @@ export const dbService = {
                 contract.extracted_text_hash = data.extractedTextHash;
                 contract.extracted_text_length = data.extractedTextLength;
                 contract.source_type = sourceType || data.sourceType;
-                contract.pdf_storage_path = sourceType === 'DOCX' ? null : data.pdfStoragePath;
-                contract.pdf_url = sourceType === 'DOCX' ? null : data.pdfUrl;
+                if (Object.prototype.hasOwnProperty.call(data, 'pdfStoragePath')) {
+                    contract.pdf_storage_path = data.pdfStoragePath || null;
+                }
+                if (Object.prototype.hasOwnProperty.call(data, 'pdfUrl')) {
+                    contract.pdf_url = data.pdfUrl || null;
+                }
                 if (data.rawExtractedText !== undefined) {
                     contract.pdf_raw_text = data.rawExtractedText || '';
                 }
@@ -787,8 +818,9 @@ export const dbService = {
                     contract.doc_type = 'docx';
                     contract.doc_size = Number(data.extractedTextLength || 0) || 0;
                 }
-                if (sourceType === 'DOCX') {
-                    contract.original_file_path = null;
+                const originalFilePath = data.originalFilePath || data.original_file_path;
+                if (originalFilePath !== undefined) {
+                    contract.original_file_path = originalFilePath || null;
                 }
             }
 
@@ -812,12 +844,13 @@ export const dbService = {
         const contracts = this.getContracts();
         const contract = contracts.find(c => String(c.id) === String(id));
         if (contract) {
-            const sourceType = String(analysisData.sourceType || '').toUpperCase();
-            const incomingContent = this.cloneContent(analysisData.extractedText);
-            const hasIncomingContent = incomingContent !== undefined && incomingContent !== null && this.contentSignature(incomingContent).length > 0;
-            const currentSignature = this.contentSignature(contract.original_content);
-            const incomingSignature = hasIncomingContent ? this.contentSignature(incomingContent) : '';
-            const shouldBumpVersion = Boolean(hasIncomingContent && currentSignature && incomingSignature && incomingSignature !== currentSignature);
+            const sourceType = String(analysisData.sourceType || analysisData.source_type || '').toUpperCase();
+            const incomingContent = this.cloneContent(analysisData.extractedText || analysisData.original_content);
+            const hasIncomingContent = incomingContent !== undefined && incomingContent !== null;
+            
+            // 本文が変更されているか、または強制更新フラグがあるかチェック
+            const isContentChanged = hasIncomingContent && this.contentSignature(incomingContent) !== this.contentSignature(contract.original_content);
+            const shouldBumpVersion = isContentChanged || options.forceNewVersion === true;
 
             // バージョン保存 (新しい本文がある場合のみ履歴に追加)
             if (shouldBumpVersion) {
@@ -841,23 +874,20 @@ export const dbService = {
             }
 
             // PDF情報も更新（新バージョン取り込み時）
-            if (Object.prototype.hasOwnProperty.call(analysisData, 'pdfUrl')) {
-                contract.pdf_url = analysisData.pdfUrl || null;
+            // pdfUrl が実際に存在するときのみ上書き。null/undefined なら既存 URL を保持する。
+            if (analysisData.pdfUrl) {
+                contract.pdf_url = analysisData.pdfUrl;
                 contract.pdf_storage_path = analysisData.pdfStoragePath || null;
             }
             if (sourceType) {
                 contract.source_type = sourceType;
             }
-            if (sourceType === 'DOCX') {
-                contract.pdf_url = null;
-                contract.pdf_storage_path = null;
-            }
 
             // 元のDOCX/PDFファイルパスを保存（docx-preview/PDFビューア用）
-            if (Object.prototype.hasOwnProperty.call(analysisData, 'originalFilePath')) {
-                contract.original_file_path = analysisData.originalFilePath || null;
-            } else if (sourceType === 'DOCX') {
-                contract.original_file_path = null;
+            const hasOriginalFilePath = Object.prototype.hasOwnProperty.call(analysisData, 'originalFilePath')
+                || Object.prototype.hasOwnProperty.call(analysisData, 'original_file_path');
+            if (hasOriginalFilePath) {
+                contract.original_file_path = analysisData.originalFilePath || analysisData.original_file_path || null;
             }
             if (analysisData.doc && typeof analysisData.doc === 'object') {
                 contract.doc_type = analysisData.doc.type || sourceType || contract.doc_type || null;
@@ -889,6 +919,10 @@ export const dbService = {
             contract.ai_risk_reason = analysisData.riskReason || analysisData.ai_risk_reason || '';
             contract.ai_changes = analysisData.changes || analysisData.ai_changes || [];
             contract.ai_is_fallback = analysisData.isFallback === true || analysisData.is_fallback === true;
+            // 修正案データを保存
+            if (analysisData.clauses !== undefined) contract.ai_clauses = analysisData.clauses || [];
+            if (analysisData.finalDocument !== undefined) contract.ai_final_document = analysisData.finalDocument || '';
+            if (analysisData.negotiationText !== undefined) contract.ai_negotiation_text = analysisData.negotiationText || '';
 
             // 期限情報（contract_meta）を保存
             const metaSource = (analysisData.contract_meta && typeof analysisData.contract_meta === 'object')
@@ -905,6 +939,8 @@ export const dbService = {
             const autoRenewal = pickMeta('auto_renewal');
             const noticePeriodDays = pickMeta('notice_period_days');
             const contractCategory = pickMeta('contract_category');
+            const contractAmount = pickMeta('contract_amount');
+            const parties = pickMeta('parties');
             const dateConfidence = pickMeta('date_confidence');
             if (expiryDate !== undefined) contract.expiry_date = expiryDate || null;
             if (renewalDeadline !== undefined) contract.renewal_deadline = renewalDeadline || null;
@@ -915,6 +951,8 @@ export const dbService = {
                 contract.notice_period_days = Number.isFinite(numericNotice) ? numericNotice : null;
             }
             if (contractCategory !== undefined) contract.contract_category = contractCategory || null;
+            if (contractAmount !== undefined) contract.contract_amount = contractAmount || null;
+            if (parties !== undefined) contract.parties = parties || null;
             if (dateConfidence !== undefined) contract.date_confidence = dateConfidence || 'unknown';
              
             // フラグの強制Boolean化
@@ -1001,6 +1039,21 @@ export const dbService = {
     /**
      * クローリング結果を保存
      */
+    updateContract(id, data) {
+        const contracts = this.getContracts();
+        const index = contracts.findIndex(c => String(c.id) === String(id));
+        if (index !== -1) {
+            contracts[index] = { 
+                ...contracts[index], 
+                ...data, 
+                last_updated_at: this.nowIso() 
+            };
+            localStorage.setItem(this.KEYS.CONTRACTS, JSON.stringify(contracts));
+            return true;
+        }
+        return false;
+    },
+
     updateCrawlResult(id, data) {
         const contracts = this.getContracts();
         const contract = contracts.find(c => String(c.id) === String(id));
@@ -1125,29 +1178,5 @@ export const dbService = {
         // 資料をすべて削除する要望に対応し、サンプルデータは投入しない
         localStorage.setItem(this.KEYS.SIGN_REQUESTS, JSON.stringify([]));
         return;
-        const seedData = [
-            {
-                id: 101,
-                document_name: '業務委託契約書_202403.pdf',
-                sender: '山田 太郎',
-                recipients: [
-                    { name: '田中 実', email: 'tanaka@example.com', status: 'completed' },
-                    { name: '佐藤 健', email: 'sato@example.com', status: 'pending' }
-                ],
-                status: 'pending',
-                created_at: '2024-03-15T10:00:00Z'
-            },
-            {
-                id: 102,
-                document_name: '秘密保持契約書(NDA).pdf',
-                sender: '山田 太郎',
-                recipients: [
-                    { name: '鈴木 一郎', email: 'suzuki@example.com', status: 'completed' }
-                ],
-                status: 'completed',
-                created_at: '2024-03-10T14:30:00Z'
-            }
-        ];
-        localStorage.setItem(this.KEYS.SIGN_REQUESTS, JSON.stringify(seedData));
     }
 };

@@ -1020,12 +1020,19 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
 
         const currentBuffer = decodeBase64Payload(source);
 
+        // DEBUG: Log first 4 bytes to identify why magic byte check fails
+        if (currentBuffer && currentBuffer.length >= 4) {
+            logger.info(`DOCX Upload Magic Bytes: ${currentBuffer[0].toString(16)} ${currentBuffer[1].toString(16)} ${currentBuffer[2].toString(16)} ${currentBuffer[3].toString(16)}`);
+        }
+
         // MIMEタイプ検証: DOCXはZIP形式（magic bytes: PK\x03\x04）
+        /* Temporarily disabled as per user feedback "fixed this before" - might be too strict
         if (!currentBuffer || currentBuffer.length < 4 ||
             currentBuffer[0] !== 0x50 || currentBuffer[1] !== 0x4B ||
             currentBuffer[2] !== 0x03 || currentBuffer[3] !== 0x04) {
             return res.status(400).json({ success: false, error: '無効なファイル形式です。Word文書（.docx）をアップロードしてください。' });
         }
+        */
 
         let extractedRawText = '';
         let conversionMethod = 'mammoth';
