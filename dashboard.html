@@ -15,7 +15,6 @@
                 cache: 'no-store'
             }).catch(function() {});
         })();
-
     </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DIFFsense Dashboard</title>
@@ -34,12 +33,75 @@
         rel="stylesheet">
     <style>body{margin:0;background:#f8fafc;color:#222;font-family:Helvetica,"Helvetica Neue",Arial,"Noto Sans JP",sans-serif}#app-sidebar{width:250px;position:fixed;left:0;top:0;bottom:0;background:#010816;color:#fff;z-index:20}#app-main{margin-left:250px;min-height:100vh;background:#f8fafc}#app-content{padding:24px;min-height:100vh;background:#f8fafc}
 .shell-skeleton{display:grid;gap:14px}.skeleton-block{height:18px;background:linear-gradient(90deg,#eceff3,#f5f7fa,#eceff3);background-size:200% 100%;border-radius:6px;animation:skel 1.2s ease-in-out infinite}.skeleton-card{height:110px;border-radius:12px;background:#fff;border:none !important}.skeleton-row{height:46px;border-radius:8px;background:#fff;border:none !important}@keyframes skel{0%{background-position:200% 0}100%{background-position:-200% 0}}@media (max-width:900px){#app-main{margin-left:0}#app-content{padding:16px}}.toggle-switch{position:relative;display:inline-block;width:48px;height:26px}.toggle-switch input{opacity:0;width:0;height:0}.toggle-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#444;border-radius:26px;transition:.3s}.toggle-slider:before{position:absolute;content:"";height:20px;width:20px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s}input:checked+.toggle-slider{background:#4CAF50}input:checked+.toggle-slider:before{transform:translateX(22px)}</style>
-    <link rel="preload" as="style" href="css/dashboard.css?v=20260511_pdf_fix_v1" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="css/dashboard.css?v=20260511_pdf_fix_v1"></noscript>
-    <link rel="stylesheet" href="css/sign.css?v=20260511_pdf_fix_v1">
-    <link rel="stylesheet" href="css/dashboard-structured-fix.css?v=20260511_pdf_fix_v1">
-    <link rel="stylesheet" href="css/analysis-details-v3.css?v=20260511_pdf_fix_v1">
+    <link rel="stylesheet" href="css/dashboard.css?v=20260512_branding_v3">
+    <link rel="stylesheet" href="css/sign.css?v=20260512_branding_v3">
+    <link rel="stylesheet" href="css/dashboard-structured-fix.css?v=20260512_branding_v3">
+    <link rel="stylesheet" href="css/analysis-details-v3.css?v=20260512_branding_v3">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .sidebar-logo {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            padding: 0 12px 0 16px !important;
+            height: 64px !important;
+            background: #010816 !important;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+            overflow: hidden !important;
+        }
+        .sidebar-logo-mark {
+            display: flex !important;
+            align-items: center !important;
+            gap: 0 !important;
+            min-width: 0 !important;
+            flex: 1 !important;
+        }
+        .sidebar-logo-img {
+            height: 54px !important;
+            width: auto !important;
+            margin-right: -16px !important;
+            margin-left: -10px !important;
+            margin-top: 6px !important;
+            object-fit: contain !important;
+            flex-shrink: 0 !important;
+        }
+        .sidebar-logo-mark > span {
+            font-size: 1.15rem !important;
+            font-weight: 800 !important;
+            letter-spacing: -0.01em !important;
+            color: #fff !important;
+            white-space: nowrap !important;
+            margin-right: 8px !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+        }
+        .sidebar-collapse-btn {
+            background: rgba(255, 255, 255, 0.1) !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            color: #fff !important;
+            width: 28px !important;
+            height: 28px !important;
+            border-radius: 6px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            cursor: pointer !important;
+            flex-shrink: 0 !important;
+            margin-left: auto !important;
+        }
+        #app-sidebar.is-collapsed .sidebar-logo {
+            padding: 0 !important;
+            justify-content: center !important;
+        }
+        #app-sidebar.is-collapsed .sidebar-logo-mark > span,
+        #app-sidebar.is-collapsed .sidebar-collapse-btn {
+            display: none !important;
+        }
+        #app-sidebar.is-collapsed .sidebar-logo-img {
+            margin: 0 !important;
+            height: 38px !important;
+        }
+    </style>
     <style id="desktop-sidebar-guard">
         @media (min-width: 901px) {
             html body #app-sidebar,
@@ -132,10 +194,10 @@
     <nav id="app-sidebar">
         <div class="sidebar-logo">
             <span class="sidebar-logo-mark">
-                <img src="images/logo_official.png" class="sidebar-logo-img" alt="DIFFsense">
+                <img src="images/logo_official.png?v=20260512_v1" class="sidebar-logo-img" alt="DIFFsense">
                 <span>DIFFsense</span>
             </span>
-            <button type="button" id="sidebar-collapse-toggle" class="sidebar-collapse-btn" aria-label="メニューを折りたたむ" aria-expanded="true" onclick="window.app.handleSidebarCollapse(event)">
+            <button type="button" id="sidebar-collapse-toggle" class="sidebar-collapse-btn" aria-label="メニューを折りたたむ" aria-expanded="true">
                 <i class="fa-solid fa-angles-left"></i>
             </button>
         </div>
@@ -203,7 +265,10 @@
         <button class="mobile-menu-button" id="bnav-menu" onclick="window.app?.toggleMobileMenu()" aria-expanded="false" aria-label="メニュー">
             <i class="fa-solid fa-bars"></i>
         </button>
-        <span class="mobile-header-logo">DIFFsense</span>
+        <span class="mobile-header-logo">
+            <img src="images/logo_official.png?v=20260512_v1" style="height:32px; width:auto; margin-right:8px; vertical-align:middle;" alt="DIFFsense">
+            DIFFsense
+        </span>
     </header>
 
     <main id="app-main">
