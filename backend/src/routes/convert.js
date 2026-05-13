@@ -130,6 +130,59 @@ router.post('/final-docx-to-pdf', (req, res) => {
 
     req.pipe(bb);
 });
+
+/**
+ * POST /api/convert/final-docx
+ * Applies approved revision paragraphs to the original DOCX and returns the revised DOCX.
+ */
+router.post('/final-docx', (req, res) => {
+    const bb = busboy({ headers: req.headers });
+    let fileBuffer = null;
+    let fileName = 'document.docx';
+    let revisionsRaw = '[]';
+
+    bb.on('file', (name, file, info) => {
+        fileName = info.filename || fileName;
+        const chunks = [];
+        file.on('data', (data) => chunks.push(data));
+        file.on('end', () => { fileBuffer = Buffer.concat(chunks); });
+    });
+
+    bb.on('field', (name, value) => {
+        if (name === 'revisions') revisionsRaw = value || '[]';
+    });
+
+    bb.on('finish', async () => {
+        if (!fileBuffer) return res.status(400).json({ error: 'No DOCX uploaded' });
+
+        let revisions = [];
+        try { revisions = JSON.parse(revisionsRaw || '[]'); }
+        catch (_) { return res.status(400).json({ error: 'Invalid revisions payload' }); }
+
+        try {
+            const revisedResult = docxService.applyRevisionsToDocx(fileBuffer, revisions);
+            logger.info(`Final DOCX download requested=${revisedResult.requestedCount} inserted=${revisedResult.insertedCount} skipped=${JSON.stringify(revisedResult.skipped || [])}`);
+            if (revisedResult.insertedCount !== revisedResult.requestedCount) {
+                return res.status(422).json({
+                    error: 'Some revisions were not inserted into DOCX',
+                    requestedCount: revisedResult.requestedCount,
+                    insertedCount: revisedResult.insertedCount,
+                    skipped: revisedResult.skipped || []
+                });
+            }
+
+            const safeName = String(fileName || 'document.docx').replace(/[^a-zA-Z0-9_.-]/g, '_').replace(/\.docx?$/i, '');
+            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+            res.setHeader('Content-Disposition', `attachment; filename="${safeName}_final.docx"`);
+            res.send(revisedResult.buffer);
+        } catch (err) {
+            logger.error('Final DOCX download error:', err);
+            res.status(500).json({ error: err.message });
+        }
+    });
+
+    req.pipe(bb);
+});
 /**
  * POST /api/convert/html-to-pdf
  * Matches the Cloud Run service API for HTML/Text conversion
