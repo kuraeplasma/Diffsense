@@ -85,6 +85,7 @@ async function bootstrap() {
         const crawlRoutes = require('./routes/crawl');
         const webhookRoutes = require('./routes/webhook');
         const signRoutes = require('./routes/sign');
+        const convertRoutes = require('./routes/convert');
         const notificationRoutes = require('./routes/notifications');
         const cronRoutes = require('./routes/cron');
         const slackRoutes = require('./routes/slack');
@@ -359,6 +360,7 @@ async function bootstrap() {
         };
         app.use('/api/sign', signMiddleware, signRoutes);
         app.use('/sign', signMiddleware, signRoutes);
+        app.use('/api/convert', convertRoutes);
 
         const mcpRouter = createMcpRouter();
         app.use(createMcpAuthRouter());
