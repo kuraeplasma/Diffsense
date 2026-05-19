@@ -14,20 +14,13 @@ export const SignViewer = {
         if (this._pdfjsLoaded) return;
         return new Promise((resolve, reject) => {
             const script = document.createElement('script');
-            // Try to use local copy first if available, otherwise fallback to CDN
             script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js';
             script.onload = () => {
-                // Use CDN worker to match the script version, as local /js/vendor/ is missing
                 window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-                
-                console.log('[SignViewer] PDF.js loaded. Worker path set to:', window.pdfjsLib.GlobalWorkerOptions.workerSrc);
                 this._pdfjsLoaded = true;
                 resolve();
             };
-            script.onerror = () => {
-                console.error('[SignViewer] Failed to load PDF.js from CDN');
-                reject(new Error('PDF.js load failed'));
-            };
+            script.onerror = reject;
             document.head.appendChild(script);
         });
     },
@@ -325,7 +318,7 @@ export const SignViewer = {
             return false;
         }
         this._currentDownloadUrl = this._currentDownloadUrl || this._currentPdfUrl;
-        this._scale = this._scale || 1.2;
+        this._currentScale = this._currentScale || 1.2;
 
         const isDash = this._isDashboardMode;
         let scrollEl = document.getElementById('pdf-viewer-scroll');
@@ -354,9 +347,9 @@ export const SignViewer = {
                         <div id="v3-edit-layer" style="display:none; width:100%; height:100%;"></div>
                         
                         <!-- Premium Loader -->
-                        <div id="viewer-loader" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); display:none; flex-direction:column; align-items:center; justify-content:center; gap:12px; z-index:100;">
-                            <div class="v3-premium-ring" style="display:block;"></div>
-                            <span style="font-size:11px; font-weight:800; color:#3b82f6; letter-spacing:1px; margin-right:-1px; text-align:center; display:block;">LOADING</span>
+                        <div id="viewer-loader" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); display:none; flex-direction:column; align-items:center; gap:12px; z-index:100;">
+                            <div class="v3-premium-ring"></div>
+                            <span style="font-size:11px; font-weight:700; color:#3b82f6; letter-spacing:1px;">LOADING</span>
                         </div>
                     </div>
                 </div>
@@ -617,19 +610,27 @@ export const SignViewer = {
         // USER REQUEST 5: display:none 状態で render() を禁止する
         if (pagesContainer.offsetWidth <= 0) {
             console.warn('[PDF.js] Skipping render: container offsetWidth <= 0');
+            if (!pagesContainer._resizeObserverPending) {
+                pagesContainer._resizeObserverPending = true;
+                const ro = new ResizeObserver((entries) => {
+                    if (entries[0].target.offsetWidth > 0) {
+                        ro.disconnect();
+                        pagesContainer._resizeObserverPending = false;
+                        this.refreshPdfRendering(mountId);
+                    }
+                });
+                ro.observe(pagesContainer);
+            }
             return false;
         }
 
         try {
-            console.log('[PDF.js] Starting renderPdfMode', { mountId, url: this._currentPdfUrl });
             await this.loadPdfJs();
-            console.log('[PDF.js] PDF.js library ready');
             
             const renderSeq = ++this._renderSeq || (this._renderSeq = 1);
             
             // Use cached PDF document if URL matches
             if (!this._pdfDoc || this._pdfDoc._sourceUrl !== this._currentPdfUrl) {
-                console.log('[PDF.js] Fetching document...', this._currentPdfUrl);
                 const loadingTask = pdfjsLib.getDocument({
                     url: this._currentPdfUrl,
                     cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/cmaps/',
@@ -637,19 +638,11 @@ export const SignViewer = {
                     standardFontDataUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/standard_fonts/',
                     useWorkerFetch: true
                 });
-                
-                console.log('[PDF.js] Loading task created. Waiting for promise...');
                 this._pdfDoc = await loadingTask.promise;
-                console.log('[PDF.js] Document fetched successfully. numPages:', this._pdfDoc.numPages);
                 this._pdfDoc._sourceUrl = this._currentPdfUrl;
-            } else {
-                console.log('[PDF.js] Using cached document');
             }
 
-            if (renderSeq !== this._renderSeq) {
-                console.warn('[PDF.js] Render sequence mismatch, aborting old render');
-                return false;
-            }
+            if (renderSeq !== this._renderSeq) return false;
 
             const pdf = this._pdfDoc;
             this._totalPages = pdf.numPages;
@@ -776,7 +769,7 @@ export const SignViewer = {
 
                 // scale=1のnative viewport幅でfit-to-widthのscaleを計算
                 const nativeViewport = page.getViewport({ scale: 1.0 });
-                const fitScale = Math.min(effectiveContainerWidth / nativeViewport.width, 2.5) * (this._scale || 1.0);
+                const fitScale = Math.min(effectiveContainerWidth / nativeViewport.width, 2.5);
                 const viewport = page.getViewport({ scale: fitScale });
 
                 console.log(`[PDF.js Page ${pageNum}]`, {
@@ -817,9 +810,7 @@ export const SignViewer = {
                 context.scale(pixelRatio, pixelRatio);
 
                 pageShell.appendChild(canvas);
-                console.log(`[PDF.js] Rendering page ${pageNum}...`);
                 await page.render({ canvasContext: context, viewport }).promise;
-                console.log(`[PDF.js] Page ${pageNum} rendered successfully.`);
 
                 pageShell.appendChild(this.createFieldOverlay(pageNum, viewport.width, viewport.height, nativeViewport.width, nativeViewport.height));
                 renderedNodes.appendChild(pageShell);
@@ -1099,8 +1090,8 @@ export const SignViewer = {
             }
 
             const pageDims = request?.page_dimensions?.[pageNum] || request?.page_dimensions?.[String(pageNum)] || null;
-            const baseWidth = Math.max(1, Number(pageDims?.width || fallbackBaseWidth || viewportWidth / Math.max(this._scale || 1, 0.01)));
-            const baseHeight = Math.max(1, Number(pageDims?.height || fallbackBaseHeight || viewportHeight / Math.max(this._scale || 1, 0.01)));
+            const baseWidth = Math.max(1, Number(pageDims?.width || fallbackBaseWidth || viewportWidth / Math.max(this._currentScale || 1, 0.01)));
+            const baseHeight = Math.max(1, Number(pageDims?.height || fallbackBaseHeight || viewportHeight / Math.max(this._currentScale || 1, 0.01)));
             const widthPx = Math.max(24, (Number(field.width || (field.type === 'signature' ? 88 : 130)) / baseWidth) * viewportWidth);
             const heightPx = Math.max(18, (Number(field.height || (field.type === 'signature' ? 88 : 48)) / baseHeight) * viewportHeight);
 
@@ -1187,18 +1178,12 @@ export const SignViewer = {
                 }
 
                 if (targetPage) {
-                    targetPage.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    targetPage.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 } else if (this._renderMode === 'pdf') {
                     this.renderPdfMode();
                 } else if (this._renderMode === 'image') {
                     this.renderImageMode();
                 }
-            }
-
-            // Also scroll the active thumbnail into view if possible
-            const activeThumb = document.querySelector(`.v3-thumbnail.active`);
-            if (activeThumb && activeThumb.parentElement) {
-                activeThumb.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
             
             this.renderDashboardUI();
@@ -1209,21 +1194,7 @@ export const SignViewer = {
         this.renderPageSwitcher();
     },
 
-    /**
-     * Re-renders the current PDF (usually for zoom or resize)
-     */
-    refreshPdfRendering(mountId = 'pdf-pages-container') {
-        console.log('[SignViewer] refreshPdfRendering called', { mountId, mode: this._renderMode });
-        if (this._renderMode === 'pdf') {
-            return this.renderPdfMode(mountId);
-        } else if (this._renderMode === 'image') {
-            return this.renderImageMode(mountId);
-        }
-        return false;
-    },
-
     updateVisiblePages() {
-
         const ap = this._activePage;
         let style = document.getElementById('docx-page-vis-style');
         if (!style) {
@@ -1275,6 +1246,27 @@ export const SignViewer = {
         `;
     },
 
+    zoomIn() {
+        if (this._isDashboardMode) {
+            this._currentScale = Math.min(3.0, (this._currentScale || 1.0) + 0.1);
+            this._applyZoom();
+            return;
+        }
+        if (this._currentScale >= 3.0) return;
+        this._currentScale += 0.2;
+        this.refreshPdfRendering();
+    },
+
+    zoomOut() {
+        if (this._isDashboardMode) {
+            this._currentScale = Math.max(0.3, (this._currentScale || 1.0) - 0.1);
+            this._applyZoom();
+            return;
+        }
+        if (this._currentScale <= 0.5) return;
+        this._currentScale -= 0.2;
+        this.refreshPdfRendering();
+    },
 
     _applyZoom() {
         const z = this._scale || 1.0;
@@ -1363,8 +1355,11 @@ export const SignViewer = {
                 // 保存済みPDFを再表示
                 await this.renderPdf(this._finalGeneratedPdfUrl, container);
             } else {
-                // 未保存→修正案を反映したプレビューを表示
-                await this.renderFinalOriginalLayout(container);
+                // 未保存→編集モードへ（_viewModeはfinalのまま）
+                if (editLayer) {
+                    editLayer.style.display = 'block';
+                    this.renderHandEditMode(container);
+                }
             }
         } else {
             // 蜴滓悽 PDF陦ｨ遉ｺ
@@ -4304,7 +4299,7 @@ ${addition}`.trim();
                 
                 // Word雉・侭縺ｮ驟咲ｽｮ縺ｨ繧ｹ繧ｱ繝ｼ繝ｫ縺ｮ譛驕ｩ蛹・
                     // Apply CSS zoom to scale the DOCX document (zoom affects layout bounds unlike transform)
-                    const zoom = this._scale || 1.0;
+                    const zoom = this._currentScale || 1.0;
                     mount.style.zoom = zoom;
                     this.renderDashboardUI();
                 }
@@ -4614,8 +4609,7 @@ ${addition}`.trim();
             this._contract = contract;
             window.signViewer = this; 
             
-            const hasRevisions = Array.isArray(contract.ai_changes) && contract.ai_changes.filter(Boolean).length > 0;
-            this._viewMode = options.forceMode || (hasRevisions ? 'revised' : 'original');
+            this._viewMode = options.forceMode || 'revised';
             
             this.cleanupObjectUrls();
             this._activePage = 1;
@@ -4750,7 +4744,7 @@ ${addition}`.trim();
             const activeTabStyle = `background:${badgeColor};color:#fff;box-shadow:0 1px 4px rgba(59,130,246,0.3);`;
             const inactiveTabStyle = 'background:transparent;color:#94a3b8;';
             toolbar.innerHTML = `
-                <div style="display:flex; align-items:center; justify-content:space-between; background:#ffffff; border:none; border-radius:12px; padding:8px 24px; width: 900px !important; max-width: 900px !important; margin: 8px auto 12px auto !important; box-shadow: 0 4px 12px rgba(0,0,0,0.08); min-height:48px; position:relative; box-sizing:border-box !important;">
+                <div style="display:flex; align-items:center; justify-content:space-between; background:#ffffff; border:none; border-radius:12px; padding:8px 24px; width:100%; margin: 8px 0 12px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.08); min-height:48px; position:relative; box-sizing:border-box;">
                     
                     <!-- Left: Page Navigation & Zoom -->
                     <div style="display:flex; align-items:center; gap:24px; flex:1;">
@@ -4787,7 +4781,6 @@ ${addition}`.trim();
 
                     <!-- Middle: Tabs (Centered) -->
                     <div style="display:flex; align-items:center; background:#f1f5f9; border-radius:8px; padding:3px; gap:2px; flex-shrink:0;">
-                        <button onclick="window.signViewer.switchViewMode('original')" style="display:inline-flex;align-items:center;gap:5px;font-size:12px; font-weight:600; padding:4px 16px; border-radius:6px; border:none; cursor:pointer; transition:all 0.15s; ${this._viewMode === 'original' ? activeTabStyle : inactiveTabStyle}"><i class="fa-regular fa-file-lines"></i> 原文</button>
                         <button onclick="window.signViewer.switchViewMode('revised')" style="display:inline-flex;align-items:center;gap:5px;font-size:12px; font-weight:600; padding:4px 16px; border-radius:6px; border:none; cursor:pointer; transition:all 0.15s; ${this._viewMode === 'revised' ? activeTabStyle : inactiveTabStyle}"><i class="fa-regular fa-pen-to-square"></i> 修正案</button>
                         <button onclick="window.signViewer.switchViewMode('final')" style="display:inline-flex;align-items:center;gap:5px;font-size:12px; font-weight:600; padding:4px 16px; border-radius:6px; border:none; cursor:pointer; transition:all 0.15s; ${(this._viewMode === 'final' || this._viewMode === 'edit') ? activeTabStyle : inactiveTabStyle}"><i class="fa-regular fa-circle-check"></i> 最終版</button>
                     </div>

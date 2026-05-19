@@ -492,6 +492,87 @@ async function extractTextFromDocx(buffer) {
     return String(result?.value || '').replace(/\r/g, '');
 }
 
+function getArticleExtractionStats(articles = []) {
+    const list = Array.isArray(articles) ? articles : [];
+    let articleCount = 0;
+    let maxArticleNumber = 0;
+    let textLength = 0;
+
+    for (const article of list) {
+        const label = String(article?.article || '').trim();
+        if (/^第\s*[0-9０-９一二三四五六七八九十百千〇○◯零]+\s*条$/.test(label)) {
+            articleCount += 1;
+            const numeric = Number(article.article_number || 0);
+            if (Number.isFinite(numeric)) {
+                maxArticleNumber = Math.max(maxArticleNumber, numeric);
+            }
+        }
+        textLength += normalizeContentToText([article]).length;
+    }
+
+    return { articleCount, maxArticleNumber, textLength };
+}
+
+function isBetterDocxExtraction(candidate, current) {
+    if (!current) return true;
+    const a = candidate.stats || getArticleExtractionStats(candidate.articles);
+    const b = current.stats || getArticleExtractionStats(current.articles);
+    if (a.articleCount !== b.articleCount) return a.articleCount > b.articleCount;
+    if (a.maxArticleNumber !== b.maxArticleNumber) return a.maxArticleNumber > b.maxArticleNumber;
+    return a.textLength > b.textLength;
+}
+
+async function extractReliableDocxContent(buffer, primaryText = '', primaryMethod = 'mammoth') {
+    const candidates = [];
+    const pushCandidate = (method, rawText, articles) => {
+        const normalizedArticles = Array.isArray(articles) ? articles : docxService.parseTextToArticles(rawText);
+        candidates.push({
+            method,
+            rawText: String(rawText || '').replace(/\r/g, ''),
+            articles: normalizedArticles,
+            stats: getArticleExtractionStats(normalizedArticles)
+        });
+    };
+
+    if (String(primaryText || '').trim()) {
+        pushCandidate(primaryMethod, primaryText, null);
+    }
+
+    try {
+        const mammothText = await extractTextFromDocx(buffer);
+        pushCandidate('mammoth', mammothText, null);
+    } catch (error) {
+        logger.warn('Mammoth DOCX extraction failed:', error.message);
+    }
+
+    try {
+        const xmlArticles = await docxService.parseDocx(buffer);
+        pushCandidate('docx_xml', normalizeContentToText(xmlArticles), xmlArticles);
+    } catch (error) {
+        logger.warn('DOCX XML extraction failed:', error.message);
+    }
+
+    const best = candidates.reduce((selected, candidate) => (
+        isBetterDocxExtraction(candidate, selected) ? candidate : selected
+    ), null);
+
+    if (!best) {
+        throw new Error('DOCX_TEXT_EXTRACTION_FAILED');
+    }
+
+    logger.info(
+        `DOCX extraction selected ${best.method}: articles=${best.stats.articleCount}, max=${best.stats.maxArticleNumber}, length=${best.stats.textLength}`
+    );
+
+    return {
+        rawText: best.rawText || normalizeContentToText(best.articles),
+        articles: best.articles,
+        structuredContract: fromLegacyArticleArray(best.articles),
+        method: best.method,
+        stats: best.stats
+    };
+}
+
 async function resolvePreviousDocxArticles(previousVersion) {
     if (!previousVersion) return [];
     if (Array.isArray(previousVersion)) return previousVersion;
@@ -719,14 +800,22 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                     structuredContract = pdfResult.structuredContract || null;
                     extractedText = pdfResult.articles;
                     rawExtractedText = String(pdfResult.rawText || '');
+                    
+                    const pageCount = pdfResult.pageCount || 0;
+                    if (pageCount > 0 && contractId) {
+                        await dbService.updateContract(contractId, {
+                            document_meta: { pageCount }
+                        }, ownerUid).catch(e => logger.warn(`Failed to update pageCount for PDF ${contractId}: ${e.message}`));
+                    }
                 } else {
                     extractedText = pdfResult;
                 }
             } else if (method === 'docx') {
                 const docxBuffer = decodeBase64Payload(source);
-                rawExtractedText = await extractTextFromDocx(docxBuffer);
-                extractedText = docxService.parseTextToArticles(rawExtractedText);
-                structuredContract = fromLegacyArticleArray(extractedText);
+                const docxContent = await extractReliableDocxContent(docxBuffer);
+                rawExtractedText = docxContent.rawText;
+                extractedText = docxContent.articles;
+                structuredContract = docxContent.structuredContract;
             } else if (method === 'url') {
                 extractedText = await urlService.extractText(source);
             } else if (method === 'text') {
@@ -906,6 +995,10 @@ router.post('/convert-docx', async (req, res, next) => {
         if (!fs.existsSync(pdfPath)) {
             throw new Error('LibreOffice conversion failed to produce a file');
         }
+
+        // Generate high-fidelity PNG fallback images
+        const pageImages = await docxService.generatePageImages(pdfPath, contractId);
+
         const pdfBuffer = fs.readFileSync(pdfPath);
 
         // Upload to Storage
@@ -937,7 +1030,8 @@ router.post('/convert-docx', async (req, res, next) => {
             // Update contract in DB
             await dbService.updateContract(contractId, {
                 pdf_storage_path: pdfStoragePath,
-                pdf_url: pdfUrl
+                pdf_url: pdfUrl,
+                page_images: pageImages
             }, ownerUid);
             logger.info(`Contract ${contractId} updated with manual PDF conversion: ${pdfUrl}`);
         } else {
@@ -1038,6 +1132,9 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
         let conversionMethod = 'mammoth';
         const filename = req.body.filename || 'unknown';
         let pdfBuffer = null;
+        let pageImages = [];
+        let pdfData = null;
+        let selectedDocxContent = null;
 
         try {
             // 1. まずはLibreOfficeでのPDF変換を試みる（原本性が高いため）
@@ -1050,8 +1147,11 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
             try {
                 const pdfPath = await docxService.convertToPdf(docxTmpPath);
                 if (fs.existsSync(pdfPath)) {
+                    // Generate high-fidelity PNG fallback images BEFORE unlinking PDF
+                    pageImages = await docxService.generatePageImages(pdfPath, contractId);
+
                     pdfBuffer = fs.readFileSync(pdfPath);
-                    const pdfData = await pdfService.extractText(pdfBuffer.toString('base64'));
+                    pdfData = await pdfService.extractText(pdfBuffer.toString('base64'));
                     extractedRawText = pdfData.rawText || pdfData.text || '';
                     conversionMethod = 'libreoffice_pdf';
                     logger.info(`DOCX conversion success via LibreOffice: ${filename}`);
@@ -1061,13 +1161,12 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
                 }
             } catch (convError) {
                 logger.warn(`LibreOffice conversion failed for ${filename}, falling back to mammoth:`, convError.message);
-                // Fallback to mammoth
-                const mammothResult = await mammoth.extractRawText({ buffer: currentBuffer });
-                extractedRawText = mammothResult.value;
                 conversionMethod = 'mammoth';
             } finally {
                 if (fs.existsSync(docxTmpPath)) fs.unlinkSync(docxTmpPath);
             }
+
+            selectedDocxContent = await extractReliableDocxContent(currentBuffer, extractedRawText, conversionMethod);
         } catch (extractError) {
             logger.error('DOCX_CONVERT_ERROR', extractError);
             return res.status(500).json({
@@ -1077,8 +1176,10 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
             });
         }
 
-        const currentArticles = docxService.parseTextToArticles(extractedRawText);
-        const structuredContract = fromLegacyArticleArray(currentArticles);
+        extractedRawText = selectedDocxContent.rawText;
+        conversionMethod = selectedDocxContent.method;
+        const currentArticles = selectedDocxContent.articles;
+        const structuredContract = selectedDocxContent.structuredContract;
         const previousArticles = await resolvePreviousDocxArticles(previousVersion);
 
         const extractedTextHash = crypto.createHash('sha256').update(extractedRawText).digest('hex');
@@ -1162,15 +1263,24 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
             }
         }
 
-        // Update Firestore with new paths
-        await dbService.updateContract(contractId, {
+        // Update Firestore with new paths and metadata
+        const updatePayload = {
             original_file_path,
             pdf_storage_path: pdfStoragePath,
             pdf_url: pdfUrl,
+            page_images: pageImages,
             last_updated_at: new Date().toISOString(),
             status: '解析済み',
             original_filename: filename
-        }, ownerUid).catch(dbErr => logger.error('Firestore update failed for DOCX upload:', dbErr.message));
+        };
+
+        // If we have a pageCount from PDF extraction, save it
+        if (typeof pdfData === 'object' && pdfData.pageCount > 0) {
+            updatePayload.document_meta = { pageCount: pdfData.pageCount };
+        }
+
+        await dbService.updateContract(contractId, updatePayload, ownerUid)
+            .catch(dbErr => logger.error('Firestore update failed for DOCX upload:', dbErr.message));
 
         const diffChanges = previousArticles.length
             ? diffService.compare(previousArticles, currentArticles)
@@ -1688,6 +1798,304 @@ router.post('/analyze-enhanced', rateLimit, async (req, res, next) => {
     } catch (error) {
         logger.error('analyze-enhanced error:', error);
         next(error);
+    }
+});
+
+/**
+ * GET /api/contracts/:id/word-online-url
+ * Microsoft Word Online で表示するための短命署名付きURLを生成する
+ */
+router.get('/:id/word-online-url', async (req, res, next) => {
+    try {
+        const uid = req.user.uid;
+        const email = req.user.email;
+        const teamInfo = await dbService.getTeamRole(email, uid);
+        const ownerUid = teamInfo.ownerUid;
+
+        const contractId = req.params.id;
+        const contract = await dbService.getContractById(contractId, ownerUid);
+        if (!contract) {
+            return res.status(404).json({ success: false, error: '契約が見つかりません' });
+        }
+
+        const filePath = contract.original_file_path || contract.originalFilePath;
+        if (!filePath) {
+            return res.status(404).json({ success: false, error: '原本ファイルが保存されていません' });
+        }
+
+        // GCS以外（ローカル等）の場合は生成不可
+        const { bucket } = require('../firebase');
+        if (!bucket || filePath.startsWith('http') || filePath.includes('uploads/')) {
+            return res.status(400).json({ success: false, error: 'Word Online は Cloud Storage に保存されたファイルのみ対応しています' });
+        }
+
+        const file = bucket.file(filePath);
+        const [exists] = await file.exists();
+        if (!exists) {
+            return res.status(404).json({ success: false, error: 'Storage上にファイルが存在しません' });
+        }
+
+        // 5分間有効な署名付きURLを生成
+        const [signedUrl] = await file.getSignedUrl({
+            action: 'read',
+            version: 'v4',
+            expires: Date.now() + 5 * 60 * 1000 // 5 minutes
+        });
+
+        res.json({ success: true, url: signedUrl });
+    } catch (error) {
+        logger.error('Word Online URL error:', error);
+        res.status(500).json({ success: false, error: 'Word Online URLの生成に失敗しました' });
+    }
+});
+
+/**
+ * GET /api/contracts/:id/temp-word-token
+ * デスクトップWordで開くための短命トークンURLを発行する。
+ * GCSファイル → 署名付きURL、ローカルファイル → tempTokenStore経由のURL
+ */
+router.get('/:id/temp-word-token', async (req, res, next) => {
+    try {
+        const uid = req.user.uid;
+        const email = req.user.email;
+        const teamInfo = await dbService.getTeamRole(email, uid);
+        const ownerUid = teamInfo.ownerUid;
+
+        const contractId = parseInt(req.params.id, 10);
+        if (isNaN(contractId)) {
+            return res.status(400).json({ success: false, error: '契約IDが不正です' });
+        }
+
+        const contracts = await dbService.getContracts(ownerUid);
+        const contract = (Array.isArray(contracts) ? contracts : [])
+            .find(c => String(c.id) === String(contractId));
+        if (!contract) {
+            return res.status(404).json({ success: false, error: '契約が見つかりません' });
+        }
+
+        const filePath = contract.original_file_path || contract.originalFilePath;
+        const originalName = contract.original_filename || `contract_${contractId}.docx`;
+
+        // GCS ファイルの場合: 署名付きURLを直接返す
+        if (filePath && !filePath.startsWith('/') && !filePath.match(/^[A-Za-z]:[\\\/]/) && !filePath.includes('uploads/')) {
+            try {
+                const file = bucket.file(filePath);
+                const [exists] = await file.exists();
+                if (exists) {
+                    const [signedUrl] = await file.getSignedUrl({
+                        action: 'read',
+                        version: 'v4',
+                        expires: Date.now() + 5 * 60 * 1000,
+                        responseDisposition: `attachment; filename*=UTF-8''${encodeURIComponent(originalName)}`
+                    });
+                    return res.json({ success: true, type: 'gcs', url: signedUrl });
+                }
+            } catch (gcsErr) {
+                logger.warn('GCS signed URL failed, falling back to local:', gcsErr.message);
+            }
+        }
+
+        // ローカルファイルの場合: tempTokenを発行
+        const uploadsDir = path.join(__dirname, '../../uploads');
+        let resolved = null;
+
+        if (filePath) {
+            const candidate = path.resolve(filePath);
+            if (fs.existsSync(candidate)) resolved = candidate;
+        }
+
+        if (!resolved && fs.existsSync(uploadsDir)) {
+            const prefix1 = `contract-${contractId}-`;
+            const prefix2 = `docx-${contractId}-`;
+            const files = fs.readdirSync(uploadsDir)
+                .filter(f => (f.startsWith(prefix1) || f.startsWith(prefix2)) && /\.(docx?|pdf)$/i.test(f))
+                .map(f => ({ f, mtime: fs.statSync(path.join(uploadsDir, f)).mtimeMs }))
+                .sort((a, b) => b.mtime - a.mtime);
+            if (files.length > 0) resolved = path.join(uploadsDir, files[0].f);
+        }
+
+        if (!resolved) {
+            return res.status(404).json({ success: false, error: '原本ファイルが見つかりません' });
+        }
+
+        const { createToken } = require('../services/tempTokenStore');
+        const token = createToken(resolved, originalName);
+        const host = `${req.protocol}://${req.get('host')}`;
+        const url = `${host}/api/download/temp/${token}`;
+
+        return res.json({ success: true, type: 'local', url });
+    } catch (error) {
+        logger.error('temp-word-token error:', error);
+        next(error);
+    }
+});
+
+/**
+ * GET /api/contracts/:id/export
+ * 契約書のPDFまたはWord原本をエクスポート（ダウンロード）する。
+ * dashboard.js の downloadContract から呼び出される。
+ */
+router.get('/:id/export', async (req, res, next) => {
+    try {
+        const uid = req.user.uid;
+        const email = req.user.email;
+        const teamInfo = await dbService.getTeamRole(email, uid);
+        const ownerUid = teamInfo.ownerUid;
+
+        const contractId = req.params.id;
+        const contract = await dbService.getContractById(contractId, ownerUid);
+        if (!contract) {
+            return res.status(404).json({ success: false, error: '契約が見つかりません' });
+        }
+
+        const format = (req.query.format || 'pdf').toLowerCase();
+        
+        // 元の原本ファイルパスまたはPDFパスを特定
+        let filePath = null;
+        let fileName = contract.original_filename || contract.name || 'contract';
+        let contentType = 'application/octet-stream';
+
+        if (format === 'docx') {
+            filePath = contract.original_file_path || contract.originalFilePath;
+            contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+            if (!fileName.toLowerCase().endsWith('.docx')) fileName += '.docx';
+        } else {
+            // デフォルトはPDF
+            filePath = contract.pdf_storage_path || contract.pdf_url;
+            contentType = 'application/pdf';
+            if (!fileName.toLowerCase().endsWith('.pdf')) fileName += '.pdf';
+        }
+
+        if (!filePath) {
+            return res.status(404).json({ success: false, error: 'エクスポート可能なファイルが見つかりません' });
+        }
+
+        // ストレージまたはローカルパスからファイルを読み込み
+        const fs = require('fs');
+        const pathMod = require('path');
+        const { bucket } = require('../firebase');
+
+        let buffer = null;
+        if (filePath.startsWith('http')) {
+            // URLの場合はaxiosで取得
+            const axios = require('axios');
+            const response = await axios.get(filePath, { responseType: 'arraybuffer' });
+            buffer = Buffer.from(response.data);
+        } else if (bucket && !pathMod.isAbsolute(filePath) && !filePath.includes('uploads/')) {
+            // GCSパスの場合
+            const [data] = await bucket.file(filePath).download();
+            buffer = data;
+        } else {
+            // ローカルパスの場合
+            let localPath = filePath;
+            if (!pathMod.isAbsolute(localPath)) {
+                localPath = pathMod.join(__dirname, '../../', localPath);
+            }
+            if (fs.existsSync(localPath)) {
+                buffer = fs.readFileSync(localPath);
+            }
+        }
+
+        if (!buffer) {
+            return res.status(404).json({ success: false, error: 'ファイルの実体が見つかりません' });
+        }
+
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`);
+        res.send(buffer);
+
+    } catch (error) {
+        logger.error('Export error:', error);
+        res.status(500).json({ success: false, error: 'エクスポートに失敗しました' });
+    }
+});
+
+/**
+ * GET /api/contracts/:id/export-token
+ * ms-word: などのプロトコルハンドラで使用するための短命トークンを発行する。
+ */
+router.get('/:id/export-token', async (req, res, next) => {
+    try {
+        const uid = req.user.uid;
+        const email = req.user.email;
+        const contractId = req.params.id;
+
+        const jwt = require('jsonwebtoken');
+        const token = jwt.sign(
+            { uid, email, contractId, action: 'export' },
+            process.env.JWT_SECRET,
+            { expiresIn: '5m' }
+        );
+
+        res.json({ success: true, token });
+    } catch (error) {
+        logger.error('Export token error:', error);
+        res.status(500).json({ success: false, error: 'トークンの発行に失敗しました' });
+    }
+});
+
+/**
+ * GET /api/contracts/:id/direct-export
+ * トークン認証による直接ダウンロード（プロトコルハンドラ用）
+ */
+router.get('/:id/direct-export', async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { token, format } = req.query;
+
+        if (!token) return res.status(401).send('Unauthorized');
+
+        const jwt = require('jsonwebtoken');
+        const payload = jwt.verify(token, process.env.JWT_SECRET);
+        if (payload.contractId !== id) return res.status(403).send('Forbidden');
+
+        // 通常のエクスポート処理を再利用するために req.user を偽装
+        req.user = { uid: payload.uid, email: payload.email };
+        // 再帰呼び出しではなく、内部的に export ロジックを実行
+        return next(); 
+    } catch (error) {
+        return res.status(401).send('Invalid token');
+    }
+}, async (req, res) => {
+    // 認証後のエクスポート処理（GET /:id/export と同等）
+    try {
+        const uid = req.user.uid;
+        const email = req.user.email;
+        const teamInfo = await dbService.getTeamRole(email, uid);
+        const ownerUid = teamInfo.ownerUid;
+
+        const contract = await dbService.getContractById(req.params.id, ownerUid);
+        if (!contract) return res.status(404).send('Not Found');
+
+        const format = (req.query.format || 'docx').toLowerCase();
+        let filePath = (format === 'docx') ? (contract.original_file_path || contract.originalFilePath) : (contract.pdf_storage_path || contract.pdf_url);
+        let fileName = (contract.original_filename || contract.name || 'contract') + (format === 'docx' ? '.docx' : '.pdf');
+
+        const fs = require('fs');
+        const pathMod = require('path');
+        const { bucket } = require('../firebase');
+
+        let buffer = null;
+        if (filePath.startsWith('http')) {
+            const axios = require('axios');
+            const response = await axios.get(filePath, { responseType: 'arraybuffer' });
+            buffer = Buffer.from(response.data);
+        } else if (bucket && !pathMod.isAbsolute(filePath) && !filePath.includes('uploads/')) {
+            const [data] = await bucket.file(filePath).download();
+            buffer = data;
+        } else {
+            let localPath = filePath;
+            if (!pathMod.isAbsolute(localPath)) localPath = pathMod.join(__dirname, '../../', localPath);
+            if (fs.existsSync(localPath)) buffer = fs.readFileSync(localPath);
+        }
+
+        if (!buffer) return res.status(404).send('File not found');
+
+        res.setHeader('Content-Type', format === 'docx' ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`);
+        res.send(buffer);
+    } catch (err) {
+        res.status(500).send('Internal Server Error');
     }
 });
 

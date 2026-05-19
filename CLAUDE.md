@@ -22,6 +22,10 @@
 ## 3. システム整合性の維持
 - **送信・受取の同期**: `sign-editor.js` と `signing.html` の見た目・挙動を常に一致させる。
 - **描画タイミング**: ドキュメント読み込み（PDF/画像）完了後に必ず描画関数を呼び出す。
+- **高精度レンダリング (Fidelity Mode)**: DOCX変換時のフォント崩れ対策として、PDF.jsに加え、サーバー側で生成したPNG画像（`page_images`）を重ねて表示できる。新ドキュメント追加時は必ず `docxService.generatePageImages` を実行すること。
+- **レンダリング忠実度とA4比率の維持**: ページ表示時は常に A4 比率（高さ:幅 ≒ 1.414:1）を維持する。`height: 100%` や `scaleY` による強制的な引き延ばしを厳禁とし、`height: auto !important` と `aspect-ratio: auto !important` を強制する。
+- **表示診断ログの出力**: レンダリング時に `[PDF REAL SIZE]` と `[DOM DISPLAY SIZE]` を出力し、物理サイズと表示サイズの不一致を監視する。
+- **Docker環境の維持**: サーバー側変換（LibreOffice）の再現性確保のため、Dockerfile に `fonts-ipaexfont-mincho`, `fonts-noto-cjk` などの日本語フォントパッケージと `poppler-utils` が含まれていることを常に確認する。
 - **データ保護**: ローカル保存データの構造変更時は後方互換性を維持する。
 - **エラー通知**: 通信エラー時はユーザーに具体的対策を提示する UI を作る。
 

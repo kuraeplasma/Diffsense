@@ -1,4 +1,5 @@
-const ARTICLE_HEADER_REGEX = /^第\s*([0-9０-９]+)\s*条\s*(.*)$/;
+const contractRuleEngine = require('./contractRuleEngine');
+const ARTICLE_HEADER_REGEX = /^第\s*([0-9０-９一二三四五六七八九十百千〇○◯]+)\s*[条章節]\s*(.*)$/;
 const VERSION_REGEX = /(?:ver(?:sion)?\.?\s*)?v?\d+(?:\.\d+)+/i;
 
 function normalizeDigits(value) {
@@ -10,7 +11,7 @@ function parseJapaneseNumber(value) {
     if (!normalized) return 0;
     if (/^\d+$/.test(normalized)) return parseInt(normalized, 10);
 
-    const map = { '零': 0, '〇': 0, '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9 };
+    const map = { '零': 0, '〇': 0, '○': 0, '◯': 0, '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9 };
     if (map[normalized] !== undefined) return map[normalized];
 
     let total = 0;
@@ -41,8 +42,8 @@ function parseJapaneseNumber(value) {
 
 function parseArticleHeader(text) {
     let line = String(text || '').trim();
-    line = line.replace(/^第\s*第?\s*([0-9０-９一二三四五六七八九十百千〇零]+)\s*条\s*条?/, '第$1条');
-    line = line.replace(/^第\s+([0-9０-９一二三四五六七八九十百千〇零]+)\s+条/, '第$1条');
+    line = line.replace(/^第\s*第?\s*([0-9０-９一二三四五六七八九十百千〇○◯零]+)\s*[条章節]\s*[条章節]?/, '第$1条');
+    line = line.replace(/^第\s+([0-9０-９一二三四五六七八九十百千〇○◯零]+)\s+[条章節]/, '第$1条');
     const match = line.match(ARTICLE_HEADER_REGEX);
     if (!match) return null;
 
@@ -125,67 +126,21 @@ function looksLikeStandaloneHeading(line) {
 }
 
 function buildStructuredContract(paragraphs = [], meta = {}) {
-    const cleaned = [];
-    for (const p of (paragraphs || [])) {
-        const raw = String(p || '').replace(/\r/g, '');
-        const lines = raw.split(/\n+/).map((line) => line.trim()).filter(Boolean);
-        if (lines.length) {
-            cleaned.push(...lines);
-        }
-    }
+    const rawText = paragraphs.join('\n');
+    const ruleBlocks = contractRuleEngine.parse(rawText);
+    const legacyArticles = contractRuleEngine.toLegacyFormat(ruleBlocks);
 
-    const title = (meta.title || cleaned[0] || '').trim();
-    const version = (meta.version || (cleaned.find((line) => VERSION_REGEX.test(line)) || '')).trim();
-    const preambleLines = [];
-    const articles = [];
-    let currentArticle = null;
-
-    const flush = () => {
-        if (!currentArticle) return;
-        currentArticle.content = currentArticle.paragraphs.join('\n').trim();
-        articles.push(currentArticle);
-        currentArticle = null;
-    };
-
-    for (const line of cleaned) {
-        const header = parseArticleHeader(line);
-        if (header) {
-            flush();
-            currentArticle = {
-                articleNumber: header.articleNumber,
-                articleNumeric: header.articleNumeric,
-                title: header.title || '',
-                paragraphs: [],
-                content: ''
-            };
-            if (header.remainder) currentArticle.paragraphs.push(header.remainder);
-            continue;
-        }
-
-        if (!currentArticle) {
-            // Keep all preamble lines to avoid losing leading text.
-            preambleLines.push(line);
-        } else {
-            // If title is missing and the first body line looks like a standalone heading,
-            // promote it to article title to stabilize PDF extraction output.
-            if (!currentArticle.title && currentArticle.paragraphs.length === 0 && looksLikeStandaloneHeading(line)) {
-                currentArticle.title = line;
-            } else {
-                currentArticle.paragraphs.push(line);
-            }
-        }
-    }
-
-    flush();
+    const title = (meta.title || legacyArticles[0]?.title || '').trim();
+    const version = (meta.version || (paragraphs.find((line) => VERSION_REGEX.test(line)) || '')).trim();
 
     return {
         title,
         version,
-        preamble: preambleLines.join('\n').trim(),
-        articles: articles.map((a) => ({
-            articleNumber: a.articleNumber,
+        preamble: legacyArticles.find(a => a.article === '前文')?.full_text || '',
+        articles: legacyArticles.filter(a => a.article !== '前文').map((a) => ({
+            articleNumber: a.article,
             title: a.title,
-            content: a.content
+            content: a.paragraphs.join('\n')
         }))
     };
 }
@@ -206,7 +161,8 @@ function toLegacyArticleArray(structuredContract) {
     for (const art of structuredContract.articles) {
         const articleNumber = art.articleNumber || '';
         const numeric = parseJapaneseNumber((articleNumber.match(/第(.+?)条/) || [])[1] || '');
-        const paragraphs = String(art.content || '').split(/\n+/).filter((p) => p.trim().length > 0);
+        // LOSSLESS: Do NOT filter out empty strings as they represent blank lines
+        const paragraphs = String(art.content || '').split(/\n/);
         result.push({
             article: articleNumber,
             title: art.title || '',
@@ -237,8 +193,8 @@ function fromLegacyArticleArray(articles = [], meta = {}) {
         const articleLabel = String(item?.article || '').trim();
         let title = String(item?.title || '').trim();
         let paragraphs = Array.isArray(item?.paragraphs)
-            ? item.paragraphs.map((p) => String(p || '')).filter((p) => p.length > 0)
-            : (typeof item?.full_text === 'string' ? item.full_text.split(/\n+/).filter(Boolean) : []);
+            ? item.paragraphs.map((p) => String(p || ''))
+            : (typeof item?.full_text === 'string' ? item.full_text.split(/\n/) : []);
 
         if (!articleLabel || articleLabel === '前文' || Number(item?.article_number) === 0) {
             const preambleText = paragraphs.join('\n').trim();

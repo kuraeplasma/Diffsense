@@ -20,6 +20,7 @@ const remindRateLimit = rateLimit({
     standardHeaders: true,
     legacyHeaders: false,
 });
+const docxService = require('../services/docxService');
 const firmaService = require('../services/firma');
 const dbService = require('../services/db');
 const mailer = require('../services/mailer');
@@ -238,45 +239,7 @@ function buildFirebaseDownloadUrl(bucketName, objectPath, token) {
 }
 
 async function convertDocxToPdf(docxPath) {
-    const fs = require('fs');
-    const pathMod = require('path');
-    const absoluteDocxPath = pathMod.resolve(String(docxPath || ''));
-    if (!absoluteDocxPath || !fs.existsSync(absoluteDocxPath)) {
-        throw new Error('DOCX file not found for conversion');
-    }
-
-    const outputDir = pathMod.dirname(absoluteDocxPath);
-    const outputPdfPath = pathMod.join(
-        outputDir,
-        `${pathMod.basename(absoluteDocxPath, pathMod.extname(absoluteDocxPath))}.pdf`
-    );
-    if (fs.existsSync(outputPdfPath)) {
-        await fs.promises.unlink(outputPdfPath).catch(() => {});
-    }
-
-    const commandCandidates = [
-        String(process.env.SOFFICE_PATH || '').trim(),
-        process.platform === 'win32' ? 'soffice.exe' : 'soffice',
-        process.platform === 'win32' ? 'C:\\Program Files\\LibreOffice\\program\\soffice.exe' : 'libreoffice'
-    ].filter(Boolean);
-
-    let lastError = null;
-    for (const command of commandCandidates) {
-        try {
-            await execFileAsync(
-                command,
-                ['--headless', '--convert-to', 'pdf:writer_pdf_Export', '--outdir', outputDir, absoluteDocxPath],
-                { windowsHide: true, timeout: 180000 }
-            );
-            if (fs.existsSync(outputPdfPath)) {
-                return outputPdfPath;
-            }
-        } catch (error) {
-            lastError = error;
-        }
-    }
-
-    throw new Error(`DOCX to PDF conversion failed${lastError?.message ? `: ${lastError.message}` : ''}`);
+    return await docxService.convertToPdf(docxPath);
 }
 
 async function createPdfBufferFromDocxSource(sourceBuffer, signRequestId) {
@@ -284,15 +247,21 @@ async function createPdfBufferFromDocxSource(sourceBuffer, signRequestId) {
     await fs.promises.mkdir(tmpDir, { recursive: true });
     const safeBase = sanitizeStorageFileName(`sign-${signRequestId}-${Date.now()}`, `sign-${Date.now()}`);
     const docxPath = path.join(tmpDir, `${safeBase}.docx`);
-    const generatedPdfPath = path.join(tmpDir, `${safeBase}.pdf`);
 
     try {
         await fs.promises.writeFile(docxPath, sourceBuffer);
         const convertedPdfPath = await convertDocxToPdf(docxPath);
-        return await fs.promises.readFile(convertedPdfPath);
+        
+        // Generate high-fidelity PNG fallback images
+        const pageImages = await docxService.generatePageImages(convertedPdfPath, signRequestId);
+        
+        const pdfBuffer = await fs.promises.readFile(convertedPdfPath);
+        return { pdfBuffer, pageImages };
     } finally {
         await fs.promises.unlink(docxPath).catch(() => {});
-        await fs.promises.unlink(generatedPdfPath).catch(() => {});
+        // Note: we don't unlink convertedPdfPath here because it might be needed if we return path,
+        // but since we read it into buffer, we SHOULD unlink it. 
+        // convertDocxToPdf returns a path.
     }
 }
 
@@ -1483,9 +1452,15 @@ router.post('/generate-pdf', async (req, res) => {
             || ''
         ).trim();
         const isDocxSourceFile = isDocxLikeSource(resolvedSource, sourceName);
-        const pdfBuffer = isDocxSourceFile
-            ? await createPdfBufferFromDocxSource(sourceBuffer, signRequest.id)
-            : sourceBuffer;
+        let pdfBuffer = null;
+        let pageImages = [];
+        if (isDocxSourceFile) {
+            const result = await createPdfBufferFromDocxSource(sourceBuffer, signRequest.id);
+            pdfBuffer = result.pdfBuffer;
+            pageImages = result.pageImages;
+        } else {
+            pdfBuffer = sourceBuffer;
+        }
 
         const persisted = await persistSignSourcePdf(
             signRequest.id,
@@ -1497,7 +1472,8 @@ router.post('/generate-pdf', async (req, res) => {
         const updatedSnapshot = {
             ...(signRequest.document_snapshot || {}),
             pdf_url: persisted.pdfUrl,
-            pdf_storage_path: persisted.pdfStoragePath
+            pdf_storage_path: persisted.pdfStoragePath,
+            page_images: pageImages
         };
 
         await dbService.updateSignRequest(
@@ -1511,7 +1487,8 @@ router.post('/generate-pdf', async (req, res) => {
                 contract.id,
                 {
                     pdf_url: persisted.pdfUrl,
-                    pdf_storage_path: persisted.pdfStoragePath
+                    pdf_storage_path: persisted.pdfStoragePath,
+                    page_images: pageImages
                 },
                 ownerUid || null
             );

@@ -23,14 +23,37 @@ export function render({ app, dbService, escapeHtmlText, formatDisplayTimestamp,
             ? '<span class="badge badge-neutral"><i class="fa-solid fa-check"></i> 確認済み</span>'
             : '<span class="badge badge-warning">未確認</span>';
 
+        // Check if there are any diff results for this contract
+        const results = (typeof dbService.getDiffResults === 'function') ? dbService.getDiffResults() : [];
+        const diffResult = results.find(r => String(r.contract_id) === String(c.id));
+
+        let actionButton = '';
+        if (diffResult) {
+            actionButton = `
+                <button onclick="window.app.selectedOldFile = '${diffResult.docA_id}'; window.app.selectedNewFile = '${diffResult.docB_id}'; window.app.isAnalyzed = true; window.app.navigate('diff-check', { id: '${c.id}', source: 'contracts' })"
+                        style="background:#16a34a; color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:11px; font-weight:700; cursor:pointer; white-space:nowrap; display:inline-flex; align-items:center; justify-content:center; gap:6px; width:100%; transition:all 0.2s; box-shadow:0 2px 4px rgba(22,163,74,0.15);" onmouseover="this.style.background='#15803d'; this.style.transform='translateY(-1px)';" onmouseout="this.style.background='#16a34a'; this.style.transform='translateY(0)';">
+                    <i class="fa-solid fa-square-check"></i> 差分チェック済み
+                </button>
+            `;
+        } else {
+            actionButton = `
+                <button onclick="window.app.selectedOldFile = '${c.id}'; window.app.selectedNewFile = null; window.app.isAnalyzed = false; window.app.navigate('diff-check', { id: '${c.id}', source: 'contracts' })"
+                        style="background:#0b2d62; color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:11px; font-weight:700; cursor:pointer; white-space:nowrap; display:inline-flex; align-items:center; justify-content:center; gap:6px; width:100%; transition:all 0.2s; box-shadow:0 2px 4px rgba(11,45,98,0.15);" onmouseover="this.style.background='#1e40af'; this.style.transform='translateY(-1px)';" onmouseout="this.style.background='#0b2d62'; this.style.transform='translateY(0)';">
+                    <i class="fa-solid fa-code-compare"></i> 差分チェック
+                </button>
+            `;
+        }
+
         return `
-                <tr onclick='window.app.navigate("diff", ${JSON.stringify({ id: c.id, source: 'contracts' })})'>
+                <tr onclick='window.app.navigate("diff", ${JSON.stringify({ id: c.id, source: 'contracts' })})' style="cursor:pointer;">
                     <td class="col-name" title="${escapeHtmlText(c.name)}">${escapeHtmlText(c.name)}</td>
                     <td>${escapeHtmlText(c.type)}</td>
                     <td>${formatDisplayTimestamp(c.last_updated_at || c.last_analyzed_at || c.created_at)}</td>
                     <td>${riskBadge}</td>
                     <td>${statusBadge}</td>
-                    <td>${c.assignee_name}</td>
+                    <td onclick="event.stopPropagation()" style="width:120px; text-align:center; vertical-align:middle;">
+                        ${actionButton}
+                    </td>
                 </tr>
             `;
     }).join('');
@@ -98,7 +121,7 @@ export function render({ app, dbService, escapeHtmlText, formatDisplayTimestamp,
                             <th>最終更新</th>
                             <th>リスク</th>
                             <th>状態</th>
-                            <th>担当者</th>
+                            <th style="width:120px; text-align:center;">操作</th>
                         </tr>
                     </thead>
                     <tbody>${rows || '<tr><td colspan="6" class="text-center text-muted" style="padding:40px;">該当する契約が見つかりませんでした</td></tr>'}</tbody>

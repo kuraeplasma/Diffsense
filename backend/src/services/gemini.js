@@ -2,7 +2,6 @@ const axios = require('axios');
 const logger = require('../utils/logger');
 const Diff = require('diff');
 
-// Gemini API Configuration
 // NOTE: We use gemini-2.0-flash on the v1beta endpoint as it is faster and more reliable.
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
@@ -947,7 +946,7 @@ function parseRetryAfterMs(error) {
 function getGeminiRequestBudget() {
     // ローカル/本番で同一実装。必要時は環境変数で同じキーを調整する。
     const timeoutMsRaw = Number(process.env.GEMINI_TIMEOUT_MS || 120000);
-    const maxAttemptsRaw = Number(process.env.GEMINI_MAX_ATTEMPTS || 2);
+    const maxAttemptsRaw = Number(process.env.GEMINI_MAX_ATTEMPTS || 3);
     const retryBaseMsRaw = Number(process.env.GEMINI_RETRY_BASE_MS || 1000);
     return {
         timeoutMs: Number.isFinite(timeoutMsRaw) && timeoutMsRaw >= 5000 ? Math.floor(timeoutMsRaw) : 120000,

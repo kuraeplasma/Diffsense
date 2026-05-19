@@ -5,7 +5,9 @@ const { promisify } = require('util');
 const fs = require('fs');
 const path = require('path');
 const execFileAsync = promisify(execFile);
+const os = require('os');
 const logger = require('../utils/logger');
+const contractRuleEngine = require('./contractRuleEngine');
 
 class DocxService {
     constructor() {
@@ -197,21 +199,13 @@ class DocxService {
     }
 
     _normalizeExtractedLine(text) {
+        // LOSSLESS: Do NOT collapse spaces or remove doubled lines that might be intentional
         const normalized = String(text || '')
             .replace(/\u00a0/g, ' ')
-            .replace(/[ \t]+\n/g, '\n')
-            .replace(/[ \t]{2,}/g, ' ')
-            .trim();
+            .replace(/[ \t]+\n/g, '\n');
+            // .replace(/[ \t]{2,}/g, ' '); // Removed
 
-        if (!normalized) return '';
-
-        // Collapse exact doubled lines such as "利用規約利用規約".
-        const exactDouble = normalized.match(/^(.{2,120}?)\1$/u);
-        if (exactDouble) {
-            return exactDouble[1].trim();
-        }
-
-        return normalized;
+        return normalized.trim();
     }
 
     /**
@@ -313,91 +307,91 @@ class DocxService {
     }
 
     /**
-     * Group fragments into complete Article objects
+     * Group fragments into complete Article objects.
+     * Aligned with ContractRuleEngine logic for stability.
      */
     _regroupByArticle(blocks) {
         const articles = [];
         let currentArticle = null;
 
-        const startNewArticle = (headerBlock = null) => {
-            if (currentArticle) articles.push(currentArticle);
-            currentArticle = {
-                clause_number: headerBlock ? headerBlock.clause_number : '',
-                title: headerBlock ? headerBlock.title : (articles.length === 0 ? '前文/ヘッダー' : ''),
-                article_number: headerBlock ? headerBlock.article_number : (articles.length === 0 ? 0 : articles.length + 1),
-                paragraphs: headerBlock && headerBlock.content ? [headerBlock.content] : [],
-                full_text: headerBlock ? headerBlock.full_text : '',
-                blocks: headerBlock ? [headerBlock] : []
-            };
-        };
+        // CLAUSE_REGEX same as rule engine
+        const CLAUSE_REGEX = /^第\s*([0-9０-９一二三四五六七八九十百]+)\s*条(.*)/;
+        const TITLE_BRACKET_REGEX = /^\s*[（(【]([^）)】]+)[）)】]\s*$/;
 
-        for (const block of blocks) {
-            if (block.type === 'article_header') {
-                startNewArticle(block);
-            } else {
-                if (!currentArticle) startNewArticle();
+        for (let i = 0; i < blocks.length; i++) {
+            const block = blocks[i];
+            const text = (block.body || block.full_text || '').trim();
 
-                const blockText = String(block.body || block.full_text || '').trim();
-                if (currentArticle.clause_number && !currentArticle.title && currentArticle.paragraphs.length === 0) {
-                    const bracketedTitle = this._extractBracketedTitlePrefix(blockText);
-                    if (bracketedTitle) {
-                        currentArticle.title = bracketedTitle.title;
-                        if (bracketedTitle.rest) {
-                            currentArticle.paragraphs.push(bracketedTitle.rest);
-                        }
-                        currentArticle.blocks.push(block);
-                        currentArticle.full_text = (currentArticle.full_text || '') + '\n' + (block.full_text || '');
-                        continue;
+            if (block.type === 'article_header' || (block.type === 'paragraph' && text.match(CLAUSE_REGEX))) {
+                const match = text.match(CLAUSE_REGEX);
+                const clauseNumber = match ? `第${match[1]}条` : (block.clause_number || '');
+                let title = match ? match[2].trim() : (block.title || '');
+                
+                // OCR/Word robustness: Merge next line if it's a bracketed title
+                if (!title && i + 1 < blocks.length) {
+                    const nextText = (blocks[i+1].body || blocks[i+1].full_text || '').trim();
+                    const titleMatch = nextText.match(TITLE_BRACKET_REGEX);
+                    if (titleMatch) {
+                        title = titleMatch[1];
+                        i++; // Consume next block
                     }
-
-                    if (this._isShortTitleCandidate(blockText)) {
-                        currentArticle.title = blockText;
-                        currentArticle.blocks.push(block);
-                        currentArticle.full_text = (currentArticle.full_text || '') + '\n' + (block.full_text || '');
-                        continue;
-                    }
+                } else if (title) {
+                    const inlineMatch = title.match(TITLE_BRACKET_REGEX);
+                    if (inlineMatch) title = inlineMatch[1];
                 }
 
-                if (block.type === 'blank_line') {
-                    currentArticle.paragraphs.push('');
-                } else if (block.type === 'table') {
-                    currentArticle.paragraphs.push('[Table]');
+                currentArticle = {
+                    article: clauseNumber,
+                    title: title,
+                    article_number: this._parseJapaneseNumber(clauseNumber.match(/[0-9０-９一二三四五六七八九十百]+/)?.[0] || ''),
+                    paragraphs: [],
+                    full_text: text
+                };
+                articles.push(currentArticle);
+                continue;
+            }
+
+            if (!currentArticle) {
+                // Preamble
+                currentArticle = {
+                    article: '前文',
+                    title: '前文',
+                    article_number: 0,
+                    paragraphs: [],
+                    full_text: ''
+                };
+                articles.push(currentArticle);
+            }
+
+            if (block.type === 'blank_line') {
+                currentArticle.paragraphs.push('');
+            } else if (block.type === 'table') {
+                // Flatten table for text-based analysis compatibility
+                if (Array.isArray(block.data)) {
+                    block.data.forEach(row => {
+                        currentArticle.paragraphs.push(row.join(' | '));
+                    });
                 } else {
-                    currentArticle.paragraphs.push(block.body || block.full_text);
+                    currentArticle.paragraphs.push('[Table]');
                 }
-                currentArticle.blocks.push(block);
-                currentArticle.full_text = (currentArticle.full_text || '') + '\n' + (block.full_text || '');
+            } else {
+                currentArticle.paragraphs.push(text);
             }
         }
 
-        if (currentArticle) articles.push(currentArticle);
-
-        // Finalize as structured objects
-        return articles.map(a => ({
-            article: a.clause_number,
-            title: a.title,
-            article_number: a.article_number,
-            paragraphs: a.paragraphs.filter(p => p !== null), // Filter out nulls if any
-            full_text: a.full_text
-        }));
+        return articles;
     }
 
     /**
-     * Parse raw text into the same article format for comparison
-     * Use this when we only have previous version as text
+     * Parse raw text into the same article format for comparison.
+     * Uses the core RuleEngine for maximum stability.
      */
     parseTextToArticles(text) {
         if (!text) return [];
-        // If already structured (array), return as is
         if (Array.isArray(text)) return text;
 
-        const lines = text.split(/\r?\n/);
-        const blocks = lines
-            .map(line => line.trim())
-            .filter(line => line.length > 0)
-            .map(line => this._categorizeParagraph(line));
-
-        return this._regroupByArticle(blocks);
+        const blocks = contractRuleEngine.parse(text);
+        return contractRuleEngine.toLegacyFormat(blocks);
     }
 
     _escapeXmlText(value) {
@@ -592,12 +586,51 @@ class DocxService {
         let lastError = null;
         for (const command of commandCandidates) {
             try {
+                // [DIAGNOSTIC] Log font matching before conversion
+                if (process.platform !== 'win32') {
+                    try {
+                        const families = ["Yu Gothic", "Yu Mincho", "MS Gothic", "MS Mincho", "Meiryo"];
+                        const matches = await Promise.all(families.map(f => execFileAsync('fc-match', [f]).then(r => `${f} => ${r.stdout.trim()}`).catch(() => `${f} => FAILED`)));
+                        logger.info(`[FONT DIAGNOSTIC] Fontconfig Mapping:\n${matches.join('\n')}`);
+                    } catch (diagErr) {
+                        logger.warn('Font diagnostic (fc-match) failed:', diagErr.message);
+                    }
+                }
+
+                // Ensure a unique user installation to avoid lock conflicts in concurrent environments
+                const userInstallDir = path.join(os.tmpdir(), `soffice_user_${Date.now()}_${Math.floor(Math.random() * 1000)}`);
+                
                 await execFileAsync(
                     command,
-                    ['--headless', '--convert-to', 'pdf', '--outdir', outputDir, absoluteDocxPath],
+                    [
+                        '--headless',
+                        `-env:UserInstallation=file://${userInstallDir.replace(/\\/g, '/')}`,
+                        '--convert-to', 'pdf:writer_pdf_Export',
+                        '--outdir', outputDir,
+                        absoluteDocxPath
+                    ],
                     { windowsHide: true, timeout: 180000 }
                 );
+                
+                // Cleanup temp profile after conversion if it was created
+                try {
+                    if (fs.existsSync(userInstallDir)) {
+                        fs.rmSync(userInstallDir, { recursive: true, force: true });
+                    }
+                } catch (cleanupErr) {
+                    logger.warn('LibreOffice temp profile cleanup failed:', cleanupErr.message);
+                }
+
                 if (fs.existsSync(outputPdfPath)) {
+                    // [DIAGNOSTIC] Check embedded fonts in generated PDF
+                    if (process.platform !== 'win32') {
+                        try {
+                            const { stdout } = await execFileAsync('pdffonts', [outputPdfPath]);
+                            logger.info(`[PDF FONT CHECK] Generated PDF Fonts:\n${stdout}`);
+                        } catch (diagErr) {
+                            logger.warn('PDF font check (pdffonts) failed:', diagErr.message);
+                        }
+                    }
                     return outputPdfPath;
                 }
             } catch (error) {
@@ -606,6 +639,50 @@ class DocxService {
         }
 
         throw new Error(`LibreOffice conversion failed${lastError?.message ? `: ${lastError.message}` : ''}`);
+    }
+
+    /**
+     * Generate high-fidelity PNG images for each page of a PDF using pdftoppm
+     * This provides a reliable fallback/preview when PDF.js rendering has font issues
+     */
+    async generatePageImages(pdfPath, requestId = 'fallback') {
+        const absolutePdfPath = path.resolve(String(pdfPath || ''));
+        if (!absolutePdfPath || !fs.existsSync(absolutePdfPath)) {
+            throw new Error('PDF file not found for image generation');
+        }
+
+        const safeRequestId = String(requestId).replace(/[^a-zA-Z0-9_-]/g, '_');
+        const outputDir = path.join(__dirname, '../../uploads/page-images', safeRequestId);
+        
+        try {
+            if (!fs.existsSync(outputDir)) {
+                fs.mkdirSync(outputDir, { recursive: true });
+            }
+
+            const baseName = 'page';
+            const outputPrefix = path.join(outputDir, baseName);
+
+            logger.info(`Generating page images for PDF: ${path.basename(absolutePdfPath)}`);
+            
+            // pdftoppm -png -r 150: 150 DPI is a good balance for quality/speed
+            // -sep "": avoid extra dash if possible, but default is prefix-1.png
+            await execFileAsync('pdftoppm', ['-png', '-r', '150', absolutePdfPath, outputPrefix]);
+
+            const files = fs.readdirSync(outputDir)
+                .filter(f => f.startsWith(baseName) && f.endsWith('.png'))
+                .sort((a, b) => {
+                    const aMatch = a.match(/-(\d+)\.png$/);
+                    const bMatch = b.match(/-(\d+)\.png$/);
+                    return (parseInt(aMatch?.[1] || '0')) - (parseInt(bMatch?.[1] || '0'));
+                });
+
+            // Return relative URLs for frontend
+            return files.map(f => `/uploads/page-images/${safeRequestId}/${f}`);
+        } catch (error) {
+            logger.error('pdftoppm image generation failed:', error);
+            // Non-fatal: if images fail, we still have the PDF
+            return [];
+        }
     }
 }
 

@@ -1,5 +1,20 @@
+// Automatically clean up any failed or timeout states from sessionStorage on load
+try {
+    for (let i = sessionStorage.length - 1; i >= 0; i--) {
+        const key = sessionStorage.key(i);
+        if (key && key.startsWith('diff-check-ai-state:')) {
+            try {
+                const val = JSON.parse(sessionStorage.getItem(key));
+                if (val && ['failed', 'timeout'].includes(val.status)) {
+                    sessionStorage.removeItem(key);
+                }
+            } catch(e){}
+        }
+    }
+} catch(e){}
+
 import { Notify } from './notify.js';
-import { dbService } from './db-service.js?v=20260508_registration_sync_fix';
+import { dbService } from './db-service.js?v=20260519_quota_fix';
 import { aiService } from '/js/ai-service.js?v=20260511_docx_dom_fix_v9';
 import { getApiBaseUrl, toApiUrl, shouldUseLocalDevAuthBypass, isLocalHostEnvironment, resolveBackendAssetUrl } from './api-base.js';
 import { auth } from './firebase-config.js?v=20260422_auth_timeout';
@@ -12,8 +27,8 @@ import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/fi
 // =========================================================================
 const routes = {
     dashboard: () => import('./modules/dashboard.js?v=20260430_dashboard_v2'),
-    contracts: () => import('./modules/contracts.js?v=20260506_contract_list_original_tab'),
-    'diff-check': () => import('./modules/diff-check.js?v=20260506_route_split'),
+    contracts: () => import('./modules/contracts.js?v=20260519_diff_ai_state_clear_v3'),
+    'diff-check': () => import('./modules/diff-check.js?v=20260519_diff_ai_state_clear_v3'),
     history: () => import('./modules/history.js'),
     team: () => import('./modules/team.js'),
 };
@@ -1616,8 +1631,15 @@ const Views = {
 
         const aiChanges = Array.isArray(contract.ai_changes) ? contract.ai_changes : [];
         
-        const riskLevel = contract.risk_level || 'None';
-        const riskClass = riskLevel.toLowerCase() === 'high' ? 'high' : (riskLevel.toLowerCase() === 'medium' ? 'medium' : 'low');
+        const rlNorm = String(contract.risk_level || 'None').toLowerCase();
+        const riskClass = rlNorm.includes('high') || rlNorm.includes('高') ? 'high' : (rlNorm.includes('medium') || rlNorm.includes('中') ? 'medium' : 'low');
+        const riskLevelText = riskClass === 'high' ? '高' : (riskClass === 'medium' ? '中' : '低');
+        const riskPalette = {
+            high: { bg: '#fee2e2', color: '#b91c1c', border: '#fecaca' },
+            medium: { bg: '#fef3c7', color: '#b45309', border: '#fde68a' },
+            low: { bg: '#dcfce7', color: '#15803d', border: '#bbf7d0' }
+        };
+        const p = riskPalette[riskClass] || riskPalette.low;
 
         const clauseListHtml = articles.length > 0
             ? articles.map((art, idx) => {
@@ -1628,15 +1650,21 @@ const Views = {
                     if (!section || !artNum) return false;
                     return section.includes(artNum) || artNum.includes(section);
                 });
-                const rl = risk?.riskLevel || risk?.risk_level || 'None';
-                const bClass = rl.toLowerCase() === 'high' ? 'high' : (rl.toLowerCase() === 'medium' ? 'medium' : 'low');
-                const riskLabelMap = { 'High': '高', 'Medium': '中', 'Low': '低', 'None': '低' };
-                const bText = riskLabelMap[rl] || '低';
+                const rlRaw = String(risk?.riskLevel || risk?.risk_level || 'None');
+                const bClass = rlRaw.toLowerCase().includes('high') || rlRaw.includes('高') ? 'high' : (rlRaw.toLowerCase().includes('medium') || rlRaw.includes('中') ? 'medium' : 'low');
+                const riskPalette = {
+                    high: { bg: '#fee2e2', color: '#b91c1c', border: '#fecaca' },
+                    medium: { bg: '#fef3c7', color: '#b45309', border: '#fde68a' },
+                    low: { bg: '#dcfce7', color: '#15803d', border: '#bbf7d0' }
+                };
+                const p = riskPalette[bClass] || riskPalette.low;
+                const riskLabelMap = { 'high': '高', 'medium': '中', 'low': '低', 'none': '低' };
+                const bText = riskLabelMap[bClass] || '低';
                 const artNum = (art.articleNumber || art.article || `第${idx+1}条`).replace(/'/g, '');
                 return `
                     <div class="v3-list-item" style="display:flex;align-items:center;justify-content:space-between;" onclick="window.app.scrollToClauseInViewer(${idx}, '${artNum}');">
                         <div style="display:flex;align-items:center;gap:12px;min-width:0;flex:1;">
-                            <span class="v3-badge-risk ${bClass}" style="flex-shrink:0;">${bText}</span>
+                            <span class="v3-badge-risk ${bClass}" style="flex-shrink:0; background:${p.bg}; color:${p.color}; border:1px solid ${p.border};">${bText}</span>
                             <span style="font-size:13px;font-weight:800;flex-shrink:0;">${artNum}</span>
                             <span style="font-size:12px;color:var(--v3-text-sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${(art.content || '').substring(0, 40).replace(/\n/g, ' ')}...</span>
                         </div>
@@ -1646,14 +1674,21 @@ const Views = {
             }).join('')
             : aiChanges.length > 0
                 ? aiChanges.map((c, idx) => {
-                    const rl = c.riskLevel || 'Low';
-                    const riskLabelMap = { 'High': '高', 'Medium': '中', 'Low': '低', 'None': '-' };
-                    const bText = riskLabelMap[rl] || rl;
+                    const rlRaw = String(c.riskLevel || 'Low');
+                    const bClass = rlRaw.toLowerCase().includes('high') || rlRaw.includes('高') ? 'high' : (rlRaw.toLowerCase().includes('medium') || rlRaw.includes('中') ? 'medium' : 'low');
+                    const riskPalette = {
+                        high: { bg: '#fee2e2', color: '#b91c1c', border: '#fecaca' },
+                        medium: { bg: '#fef3c7', color: '#b45309', border: '#fde68a' },
+                        low: { bg: '#dcfce7', color: '#15803d', border: '#bbf7d0' }
+                    };
+                    const p = riskPalette[bClass] || riskPalette.low;
+                    const riskLabelMap = { 'high': '高', 'medium': '中', 'low': '低', 'none': '-' };
+                    const bText = riskLabelMap[bClass] || '-';
                     const secName = (c.section || `項目 ${idx+1}`).replace(/'/g, '');
                     return `
                         <div class="v3-list-item" style="display:flex;align-items:center;justify-content:space-between;" onclick="window.app.scrollToClauseInViewer(${idx}, '${secName}');">
                             <div style="display:flex;align-items:center;gap:12px;min-width:0;flex:1;">
-                                <span class="v3-badge-risk ${rl.toLowerCase()}" style="flex-shrink:0;">${bText}</span>
+                                <span class="v3-badge-risk ${bClass}" style="flex-shrink:0; background:${p.bg}; color:${p.color}; border:1px solid ${p.border};">${bText}</span>
                                 <span style="font-size:13px;font-weight:800;flex-shrink:0;">${secName}</span>
                                 <span style="font-size:12px;color:var(--v3-text-sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${(c.description || c.old || '').substring(0, 40).replace(/\n/g, ' ')}...</span>
                             </div>
@@ -1702,7 +1737,7 @@ const Views = {
                                 <section class="v3-card analysis-summary-card is-risk" style="grid-column:1 / -1; padding:20px; display:flex; align-items:center; gap:24px; min-height:100px;">
                                     <div class="analysis-risk-badge-panel" style="text-align:center; min-width:140px; border-right:1px solid #f1f5f9; padding-right:24px;">
                                         <div class="v3-card-title" style="margin-bottom:12px; justify-content:center;">リスク要約</div>
-                                        <div class="v3-badge-risk-lg ${riskClass}" style="font-size:24px; padding:10px 24px;">${riskLevel === 'High' ? '高' : (riskLevel === 'Medium' ? '中' : (riskLevel === 'Low' ? '低' : '-'))}</div>
+                                        <div class="v3-badge-risk-lg ${riskClass}" style="font-size:24px; padding:10px 24px; background:${p.bg}; color:${p.color}; border:1px solid ${p.border}; border-radius:12px; display:inline-flex; align-items:center; justify-content:center; font-weight:800;">${riskLevelText}</div>
                                     </div>
                                     <div class="analysis-risk-copy" style="flex:1;">
                                         <p style="font-size:16px; color:var(--v3-text-main); line-height:1.7; margin:0;">
@@ -5975,19 +6010,46 @@ class DashboardApp {
         }
 
         if (routes[viewId]) {
-            const html = await navigateLazy(viewId, {
-                app: this,
-                dbService,
-                DASHBOARD_CACHE_KEYS,
-                escapeHtmlText,
-                formatDisplayTimestamp,
-                normalizeChangesForDisplay,
-                params: renderParams
-            });
+            let html = '';
+            let module = null;
+            try {
+                const loader = routes[viewId];
+                module = await loader();
+                html = await navigateLazy(viewId, {
+                    app: this,
+                    dbService,
+                    DASHBOARD_CACHE_KEYS,
+                    escapeHtmlText,
+                    formatDisplayTimestamp,
+                    normalizeChangesForDisplay,
+                    params: renderParams
+                });
+            } catch (err) {
+                console.error('Lazy loader failed:', err);
+            }
             if (typeof html !== 'string') {
                 throw new Error('Dashboard module did not return HTML');
             }
             this.mainContent.innerHTML = html;
+
+            // --- Fast Render Hook: Execute heavy rendering logic asynchronously after DOM update ---
+            if (module && typeof module.afterRender === 'function') {
+                setTimeout(() => {
+                    try {
+                        module.afterRender({
+                            app: this,
+                            dbService,
+                            DASHBOARD_CACHE_KEYS,
+                            escapeHtmlText,
+                            formatDisplayTimestamp,
+                            normalizeChangesForDisplay,
+                            params: renderParams
+                        });
+                    } catch (e) {
+                        console.error('afterRender execution failed:', e);
+                    }
+                }, 10);
+            }
             return true;
         }
 
@@ -6011,7 +6073,7 @@ class DashboardApp {
                     const contractId = (typeof renderParams === 'object' ? renderParams?.id : renderParams);
                     console.log('[Dashboard] Dynamically importing SignViewer for Contract:', contractId);
 
-                    const module = await import('/js/sign-viewer.js?v=20260511_pdf_js_fix_v16');
+                    const module = await import('/js/sign-viewer.js?v=20260519_diff_ai_state_clear_v3');
                     const SignViewer = module.SignViewer || module.default || module;
                     console.log('[Dashboard] SignViewer module loaded:', !!SignViewer);
 
@@ -6322,7 +6384,7 @@ class DashboardApp {
 
         if (viewId === 'sign-viewer') {
             const { SignUI } = await import('/js/sign-ui.js?v=20260501_premium_fix');
-            const module = await import('/js/sign-viewer.js?v=20260511_pdf_js_fix_v16');
+            const module = await import('/js/sign-viewer.js?v=20260519_diff_ai_state_clear_v3');
             const SignViewer = module.SignViewer || module.default || module;
             this.mainContent.innerHTML = await SignUI.renderSignViewer(this, params);
             await SignViewer.init(this, params);
@@ -6423,7 +6485,7 @@ class DashboardApp {
                             if (this.activeDetailTab === 'original') {
                                 (async () => {
                                     try {
-                                        const module = await import('/js/sign-viewer.js?v=20260511_pdf_js_fix_v16');
+                                        const module = await import('/js/sign-viewer.js?v=20260519_diff_ai_state_clear_v3');
                                         const SignViewer = module.SignViewer || module.default || module;
                                         await SignViewer.initForContract(this, this.currentViewParams, 'v3-pdf-sheet');
                                     } catch (e) {
@@ -6583,10 +6645,16 @@ class DashboardApp {
         const tableBody = document.getElementById('dashboard-table-body');
         if (tableBody) {
             const rows = filteredItems.length > 0 ? filteredItems.slice(0, 10).map(c => {
-                let riskBadgeClass = 'badge-neutral';
-                if (c.risk_level === 'High') riskBadgeClass = 'badge-danger';
-                else if (c.risk_level === 'Medium') riskBadgeClass = 'badge-warning';
-                else if (c.risk_level === 'Low') riskBadgeClass = 'badge-success';
+                const rlRaw = String(c.risk_level || 'Low');
+                const bClass = rlRaw.toLowerCase().includes('high') || rlRaw.includes('高') ? 'high' : (rlRaw.toLowerCase().includes('medium') || rlRaw.includes('中') ? 'medium' : 'low');
+                const riskPalette = {
+                    high: { bg: '#fee2e2', color: '#b91c1c', border: '#fecaca' },
+                    medium: { bg: '#fef3c7', color: '#b45309', border: '#fde68a' },
+                    low: { bg: '#dcfce7', color: '#15803d', border: '#bbf7d0' }
+                };
+                const p = riskPalette[bClass] || riskPalette.low;
+                const riskLabelMap = { 'high': '高', 'medium': '中', 'low': '低' };
+                const bText = riskLabelMap[bClass] || '低';
 
                 const statusBadge = renderContractStatusBadge(c.status);
 
@@ -6596,7 +6664,7 @@ class DashboardApp {
 
                 return `
         <tr onclick="window.app.navigate('diff', ${c.id})">
-            <td><span class="badge ${riskBadgeClass}">${c.risk_level}</span></td>
+            <td><span class="v3-badge-risk ${bClass}" style="background:${p.bg}; color:${p.color}; border:1px solid ${p.border};">${bText}</span></td>
             <td class="col-name" title="${escapeHtmlText(c.name)}">${escapeHtmlText(c.name)}</td>
             <td>${c.last_updated_at}</td>
             <td>${statusBadge}</td>
@@ -6664,7 +6732,26 @@ class DashboardApp {
     updateDiffSelection(type, value) {
         if (type === 'old') this.selectedOldFile = parseInt(value, 10);
         if (type === 'new') this.selectedNewFile = parseInt(value, 10);
+        this.isAnalyzed = false;
+        if (this.currentContractId) {
+            this.clearAiAnalysisState(this.currentContractId);
+        }
         this.navigate('diff-check');
+    }
+
+    clearAiAnalysisState(id) {
+        if (!id) return;
+        try {
+            if (window.aiAnalysisStates) delete window.aiAnalysisStates[id];
+            sessionStorage.removeItem('diff-check-ai-state:' + id);
+            const lastSaved = sessionStorage.getItem('diff-check-ai-state:last');
+            if (lastSaved) {
+                const lastState = JSON.parse(lastSaved);
+                if (String(lastState?.contractId) === String(id)) {
+                    sessionStorage.removeItem('diff-check-ai-state:last');
+                }
+            }
+        } catch(e){}
     }
 
     async startAnalysis() {
@@ -6718,7 +6805,36 @@ class DashboardApp {
         const input = document.getElementById('memo-input');
         if (!input || !input.value.trim()) return;
         input.value = '';
-        Notify.success('メモを送信しました');
+    }
+
+    addDiffMemo() {
+        const input = document.getElementById('diff-memo-input');
+        if (!input || !input.value.trim()) return;
+        const text = input.value.trim();
+        input.value = '';
+
+        if (this.selectedOldFile && this.selectedNewFile && typeof dbService.saveDiffMemo === 'function') {
+            dbService.saveDiffMemo(this.selectedOldFile, this.selectedNewFile, this.currentContractId, text);
+        }
+
+        const memoList = document.getElementById('diff-memo-list');
+        if (memoList) {
+            if (memoList.innerHTML.includes('共有メモはありません')) {
+                memoList.innerHTML = '';
+            }
+            const memoEl = document.createElement('div');
+            memoEl.style.cssText = 'padding:10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:8px; font-size:12px; color:#334155; line-height:1.4;';
+            const escapedText = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+            memoEl.innerHTML = `
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-weight:700; color:#64748b; font-size:10px;">
+                    <span>あなた</span>
+                    <span>たった今</span>
+                </div>
+                <div style="white-space:pre-wrap; word-break:break-all;">${escapedText}</div>
+            `;
+            memoList.appendChild(memoEl);
+            memoList.scrollTop = memoList.scrollHeight;
+        }
     }
 
     async setDetailTab(tab) {
@@ -8946,30 +9062,6 @@ class DashboardApp {
         } else {
             Notify.info(message);
         }
-    }
-
-    handleSidebarCollapse(event) {
-        if (event) event.stopPropagation();
-        const sidebar = document.getElementById('app-sidebar');
-        const collapseToggle = document.getElementById('sidebar-collapse-toggle');
-        if (!sidebar || !collapseToggle) return;
-
-        const isCollapsed = sidebar.classList.contains('is-collapsed');
-        const nextCollapsed = !isCollapsed;
-
-        // Apply state
-        sidebar.classList.toggle('is-collapsed', nextCollapsed);
-        collapseToggle.setAttribute('aria-expanded', nextCollapsed ? 'false' : 'true');
-        collapseToggle.setAttribute('aria-label', nextCollapsed ? 'メニューを展開する' : 'メニューを折りたたむ');
-        collapseToggle.innerHTML = nextCollapsed
-            ? '<i class="fa-solid fa-angles-right"></i>'
-            : '<i class="fa-solid fa-angles-left"></i>';
-        
-        localStorage.setItem('diffsense_sidebar_collapsed', nextCollapsed ? '1' : '0');
-        console.log('[Dashboard] Sidebar collapsed:', nextCollapsed);
-        
-        // Trigger resize for any listeners
-        window.dispatchEvent(new Event('resize'));
     }
 }
 

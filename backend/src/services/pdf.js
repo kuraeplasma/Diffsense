@@ -1,5 +1,6 @@
 const logger = require('../utils/logger');
 const docxService = require('./docxService');
+const contractRuleEngine = require('./contractRuleEngine');
 const { buildStructuredContract, toLegacyArticleArray, fromLegacyArticleArray } = require('./contractStructure');
 
 let pdfjsModulePromise = null;
@@ -52,7 +53,10 @@ function shouldInsertSpace(prevText, nextText, gap, fontSize) {
 
 function normalizeLineText(text) {
     let line = String(text || '');
-    line = line.replace(/\s{2,}/g, ' ').trim();
+    // LOSSLESS: Do NOT collapse multiple spaces as they might be used for alignment
+    // line = line.replace(/\s{2,}/g, ' ').trim(); 
+    
+    // Minimal cleanup for punctuation that often gets weird gaps in PDF extraction
     line = line.replace(/\s+([、。。，．,.;:!?])/g, '$1');
     line = line.replace(/([（(「『【])\s+/g, '$1');
     line = line.replace(/\s+([）」』】])/g, '$1');
@@ -60,15 +64,6 @@ function normalizeLineText(text) {
     // Recover article headers corrupted by extracted spacing.
     line = line.replace(/^第\s*第?\s*([0-9０-９一二三四五六七八九十百千〇零]+)\s*条\s*条?/, '第$1条');
     line = line.replace(/^第\s+([0-9０-９一二三四五六七八九十百千〇零]+)\s+条/, '第$1条');
-
-    // Collapse exact doubled fragments caused by layered PDF text rendering.
-    // Examples:
-    // - "利用規約利用規約" -> "利用規約"
-    // - "定義定義" -> "定義"
-    const doubled = line.match(/^(.{2,64})\1$/);
-    if (doubled && /[\u3040-\u30ff\u3400-\u9fff]/.test(doubled[1])) {
-        line = doubled[1];
-    }
 
     return line.trim();
 }
@@ -172,7 +167,6 @@ function shouldKeepSoftLineBreak(prevLine, nextLine) {
     
     // If the previous line ends in a bracket or closing quote, it might be a heading or the end of a block
     if (/[）)】」』]$/.test(prev) && prev.length <= 40) return true;
-
     // Otherwise, assume it's a soft wrap if it was a continuation of text
     return false;
 }
@@ -210,10 +204,8 @@ function dedupeRowItems(items) {
 
 function collapseLineDuplicates(text) {
     let line = String(text || '');
-    // "利用規約利用規約" / "定義定義" を圧縮（同一語の連続）
-    line = line.replace(/([\u3040-\u30ff\u3400-\u9fffA-Za-z0-9]{2,24})\1+/g, '$1');
-    // "ユーザー ユーザー：" のような先頭重複を圧縮
-    line = line.replace(/^([\u3040-\u30ff\u3400-\u9fffA-Za-z0-9]{2,24})[\s　]+\1([：:])/g, '$1$2');
+    // LOSSLESS: DISABLED. This was too aggressive and removed intentional repeats.
+    // line = line.replace(/([\u3040-\u30ff\u3400-\u9fffA-Za-z0-9]{2,24})\1+/g, '$1');
     return line;
 }
 
@@ -329,7 +321,26 @@ class PDFService {
                 }
 
                 rows.sort((a, b) => b.y - a.y);
+                let prevRowY = null;
                 for (const row of rows) {
+                    // LOSSLESS: Detect vertical gaps and insert blank lines if distance is significant
+                    if (prevRowY !== null) {
+                        const gap = prevRowY - row.y;
+                        const rowHeight = row.avgHeight || 10;
+                        if (gap > rowHeight * 1.8) {
+                            allLines.push({
+                                text: '', // Blank line
+                                y: row.y + (gap / 2),
+                                xStart: 0,
+                                xEnd: 0,
+                                height: 0,
+                                centered: false,
+                                pageNum
+                            });
+                        }
+                    }
+                    prevRowY = row.y;
+
                     row.items.sort((a, b) => a.x - b.x);
                     row.items = dedupeRowItems(row.items);
                     let line = '';
@@ -359,9 +370,11 @@ class PDFService {
                         prevText = chunk;
                     }
                     line = normalizeLineText(collapseLineDuplicates(line));
-                    if (!line) continue;
-                    const minX = row.items[0].x;
-                    const maxX = row.items[row.items.length - 1].x + row.items[row.items.length - 1].width;
+                    // LOSSLESS: Keep blank lines (after normalization, if it becomes empty but wasn't before, we still might want it)
+                    // if (!line) continue;
+                    
+                    const minX = row.items[0] ? row.items[0].x : 0;
+                    const maxX = row.items[0] ? row.items[row.items.length - 1].x + row.items[row.items.length - 1].width : 0;
                     const lineCenter = (minX + maxX) / 2;
                     const centered = Math.abs(lineCenter - viewport.width / 2) < viewport.width * 0.15;
                     allLines.push({
@@ -394,6 +407,8 @@ class PDFService {
                 if (a.pageNum !== b.pageNum) return a.pageNum - b.pageNum;
                 return b.y - a.y;
             });
+            // STEP 1: Rule-based extraction using the new ContractRuleEngine
+            // This replaces the unstable coordinate-based paragraph grouping.
             const rawText = allLines.map((l) => l.text).join('\n').trim();
 
             const heights = allLines.map((l) => l.height).filter((h) => h > 0);
@@ -402,93 +417,30 @@ class PDFService {
             const titleLine = headCandidates.find((l) => l.height > medianHeight * 1.25 || (l.centered && l.text.length >= 6));
             const versionLine = headCandidates.find((l) => /(?:ver(?:sion)?\.?\s*)?v?\d+(?:\.\d+)+/i.test(l.text));
 
-            const paragraphs = [];
-            let current = '';
-            let prev = null;
-            const lineGapThreshold = Math.max(8, medianHeight * 1.5);
-            
-            // Helper to identify "noise" lines like page numbers
-            const isPageArtifact = (line) => {
-                const text = line.text.trim();
-                // Standalone page numbers like "1", "2", or "- 1 -"
-                if (/^[\d\-]{1,5}$/.test(text)) return true;
-                if (/^(page|ページ|項)\s*[\d一二三四五六七八九十]{1,5}$/i.test(text)) return true;
-                return false;
-            };
+            const ruleBlocks = contractRuleEngine.parse(rawText);
+            const legacyArticles = contractRuleEngine.toLegacyFormat(ruleBlocks);
 
-            for (const line of allLines) {
-                // Skip lines that are likely page numbers or artifacts
-                // but only if they are not part of an article header or a list
-                if (isPageArtifact(line) && !isArticleHeaderLine(line.text)) {
-                    // Check if it's likely a page number (at extreme top/bottom)
-                    // (Simplified: for now just skip standalone short numeric lines)
-                    continue;
-                }
-
-                if (!prev) {
-                    current = line.text;
-                    prev = line;
-                    continue;
-                }
-                const isNewPage = line.pageNum !== prev.pageNum;
-                const lineGap = isNewPage ? 999 : Math.abs(prev.y - line.y);
-                const isArticleHeader = isArticleHeaderLine(line.text);
-                if (isNewPage || lineGap > lineGapThreshold || isArticleHeader) {
-                    if (current.trim()) paragraphs.push(current.trim());
-                    current = line.text;
-                } else {
-                    // Within a paragraph, avoid preserving visual line wraps from PDF layout.
-                    // Keep explicit soft line breaks only for list-like lines.
-                    const keepBreak = shouldKeepSoftLineBreak(prev.text, line.text);
-                    if (keepBreak) {
-                        current += `\n${line.text}`;
-                    } else {
-                        current += line.text;
-                    }
-                }
-                prev = line;
-            }
-            if (current.trim()) paragraphs.push(current.trim());
-            const normalizedParagraphs = normalizeParagraphBreaks(paragraphs)
-                .flatMap((paragraph) => splitParagraphByInlineArticleHeaders(paragraph))
-                .map((paragraph) => normalizeArticleHeaderLead(paragraph))
-                .map((paragraph) => normalizeLineText(collapseLineDuplicates(paragraph)))
-                .filter(Boolean);
-
-            // Reuse the same article parser as DOCX flow so PDF and Word behave consistently.
-            const normalizedText = normalizedParagraphs.join('\n');
-            const docxStyleArticles = docxService.parseTextToArticles(normalizedText);
-            let structuredContract = fromLegacyArticleArray(docxStyleArticles, {
+            // Maintain title and version detection from PDF metadata/coordinates
+            const structuredContract = {
                 title: titleLine ? titleLine.text : '',
-                version: versionLine ? versionLine.text : ''
-            });
-
-            // Fallback to existing PDF-first builder when DOCX-style parsing cannot build articles.
-            if (!structuredContract || !Array.isArray(structuredContract.articles) || structuredContract.articles.length === 0) {
-                structuredContract = buildStructuredContract(normalizedParagraphs, {
-                    title: titleLine ? titleLine.text : '',
-                    version: versionLine ? versionLine.text : ''
-                });
-            }
-
-            if ((!structuredContract || !Array.isArray(structuredContract.articles) || structuredContract.articles.length === 0)
-                && normalizedParagraphs.length > 0) {
-                const syntheticArticles = buildSyntheticClauseArticles(normalizedParagraphs);
-                if (syntheticArticles.length > 0) {
-                    structuredContract = {
-                        title: structuredContract?.title || (titleLine ? titleLine.text : ''),
-                        version: structuredContract?.version || (versionLine ? versionLine.text : ''),
-                        preamble: '',
-                        articles: syntheticArticles
-                    };
-                    logger.warn('PDF clause headers not detected; synthetic clause blocks were generated.');
-                }
-            }
+                version: versionLine ? versionLine.text : '',
+                preamble: legacyArticles.find(a => a.article === '前文')?.full_text || '',
+                articles: legacyArticles.filter(a => a.article !== '前文').map(a => ({
+                    articleNumber: a.article,
+                    title: a.title,
+                    content: a.paragraphs.join('\n')
+                }))
+            };
 
             const articles = toLegacyArticleArray(structuredContract);
 
-            logger.info(`Successfully extracted ${normalizedParagraphs.length} paragraphs from ${pdfDocument.numPages} pages`);
-            return { structuredContract, articles, rawText };
+            logger.info(`Successfully extracted ${articles.length} articles from ${pdfDocument.numPages} pages`);
+            return {
+                structuredContract,
+                articles,
+                rawText,
+                pageCount: pdfDocument.numPages
+            };
 
         } catch (error) {
             logger.error('PDF extraction error:', error);

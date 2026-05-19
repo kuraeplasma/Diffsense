@@ -366,6 +366,27 @@ async function bootstrap() {
         app.use(createMcpAuthRouter());
         app.use('/mcp', mcpRouter);
         app.use('/api/mcp', mcpRouter);
+        // Unauthenticated temp download for desktop Word (ms-word: protocol)
+        app.get('/api/download/temp/:token', (req, res) => {
+            const { consumeToken } = require('./services/tempTokenStore');
+            const entry = consumeToken(req.params.token);
+            if (!entry) {
+                return res.status(404).json({ error: 'Invalid or expired token' });
+            }
+            const fsSync = require('fs');
+            if (!fsSync.existsSync(entry.filePath)) {
+                return res.status(404).json({ error: 'File not found' });
+            }
+            const ext = require('path').extname(entry.originalName).toLowerCase();
+            const contentType = ext === '.docx'
+                ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                : ext === '.doc' ? 'application/msword' : 'application/octet-stream';
+            res.setHeader('Content-Type', contentType);
+            res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(entry.originalName)}`);
+            res.setHeader('Cache-Control', 'no-store');
+            fsSync.createReadStream(entry.filePath).pipe(res);
+        });
+
         app.use('/contracts', authMiddleware, contractRoutes);
         app.use('/api/contracts', authMiddleware, contractRoutes);
         app.use('/invite', authMiddleware, inviteRoutes);

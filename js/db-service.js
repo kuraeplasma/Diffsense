@@ -24,7 +24,8 @@ export const dbService = {
         INITIALIZED: 'initialized',
         DIFF_RESULTS: 'diff_results',
         RECENT_DIFF: 'recent_diff',
-        SIGN_REQUESTS: 'sign_requests'
+        SIGN_REQUESTS: 'sign_requests',
+        DIFF_MEMOS: 'diff_memos'
     },
 
     cloneContent(value) {
@@ -88,7 +89,8 @@ export const dbService = {
             INITIALIZED: `${prefix}initialized`,
             DIFF_RESULTS: `${prefix}diff_results_${LOCAL_CACHE_VERSION}`,
             RECENT_DIFF: `${prefix}recent_diff_${LOCAL_CACHE_VERSION}`,
-            SIGN_REQUESTS: `${prefix}sign_requests`
+            SIGN_REQUESTS: `${prefix}sign_requests`,
+            DIFF_MEMOS: `${prefix}diff_memos_${LOCAL_CACHE_VERSION}`
         };
     },
 
@@ -200,6 +202,21 @@ export const dbService = {
 
         // Migrate legacy data (no UID prefix) to current user if needed
         this._migrateLegacyData();
+
+        // Prune diff results to avoid QuotaExceededError on startup
+        try {
+            const resultsKey = this.KEYS.DIFF_RESULTS;
+            const resultsData = localStorage.getItem(resultsKey);
+            if (resultsData) {
+                let results = JSON.parse(resultsData);
+                if (Array.isArray(results) && results.length > 5) {
+                    this.log(`Pruning diff results from ${results.length} to 5 on init`);
+                    localStorage.setItem(resultsKey, JSON.stringify(results.slice(0, 5)));
+                }
+            }
+        } catch (e) {
+            this.log('Failed to prune diff results on init:', e);
+        }
     },
 
     /**
@@ -445,6 +462,36 @@ export const dbService = {
         return JSON.parse(localStorage.getItem(this.KEYS.DIFF_RESULTS) || '[]');
     },
 
+    getDiffMemos(docAId, docBId) {
+        try {
+            const allMemos = JSON.parse(localStorage.getItem(this.KEYS.DIFF_MEMOS) || '[]');
+            return allMemos.filter(m => String(m.docA_id) === String(docAId) && String(m.docB_id) === String(docBId));
+        } catch (e) {
+            this.log('Failed to get diff memos:', e);
+            return [];
+        }
+    },
+
+    saveDiffMemo(docAId, docBId, contractId, memoText) {
+        try {
+            const allMemos = JSON.parse(localStorage.getItem(this.KEYS.DIFF_MEMOS) || '[]');
+            const newMemo = {
+                docA_id: docAId,
+                docB_id: docBId,
+                contract_id: contractId || null,
+                author: 'あなた',
+                text: memoText,
+                timestamp: new Date().toISOString()
+            };
+            allMemos.push(newMemo);
+            localStorage.setItem(this.KEYS.DIFF_MEMOS, JSON.stringify(allMemos));
+            return newMemo;
+        } catch (e) {
+            this.log('Failed to save diff memo:', e);
+            return null;
+        }
+    },
+
     getDiffResult(docAId, docBId, contractId = null) {
         const results = this.getDiffResults();
         return results.find((item) => {
@@ -459,7 +506,14 @@ export const dbService = {
     },
 
     saveDiffResult(payload) {
-        const results = this.getDiffResults();
+        let results = [];
+        try {
+            results = this.getDiffResults();
+        } catch (e) {
+            this.log('Failed to get diff results:', e);
+            results = [];
+        }
+
         const existingIndex = results.findIndex((item) => item.docA_id === payload.docA_id && item.docB_id === payload.docB_id);
         const nextValue = {
             contract_id: payload.contract_id || null,
@@ -469,12 +523,46 @@ export const dbService = {
             created_at: payload.created_at || new Date().toISOString(),
             updated_at: new Date().toISOString()
         };
+
         if (existingIndex >= 0) {
             results[existingIndex] = { ...results[existingIndex], ...nextValue };
         } else {
             results.unshift(nextValue);
         }
-        localStorage.setItem(this.KEYS.DIFF_RESULTS, JSON.stringify(results));
+
+        // Limit maximum cache size to prevent QuotaExceededError
+        const maxCacheSize = 5;
+        if (results.length > maxCacheSize) {
+            results = results.slice(0, maxCacheSize);
+        }
+
+        // Attempt to save to localStorage with progressive eviction if quota exceeded
+        let saveSuccess = false;
+        while (results.length > 0) {
+            try {
+                localStorage.setItem(this.KEYS.DIFF_RESULTS, JSON.stringify(results));
+                saveSuccess = true;
+                break;
+            } catch (error) {
+                if (error.name === 'QuotaExceededError' || error.code === 22) {
+                    this.log('QuotaExceededError while saving diff results. Evicting oldest entry...');
+                    results.pop(); // Remove the oldest entry and try again
+                } else {
+                    this.log('Failed to write diff results to localStorage:', error);
+                    break;
+                }
+            }
+        }
+
+        if (!saveSuccess) {
+            // Final fallback: try to save just the single latest diff result
+            try {
+                localStorage.setItem(this.KEYS.DIFF_RESULTS, JSON.stringify([nextValue]));
+            } catch (fallbackError) {
+                this.log('Critical: Failed to save even a single diff result:', fallbackError);
+            }
+        }
+
         return nextValue;
     },
 
