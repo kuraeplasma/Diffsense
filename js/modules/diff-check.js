@@ -254,7 +254,7 @@ export function afterRender(options = {}) {
         }
 
         const contract = actualContractId ? dbService.getContractById(actualContractId) : null;
-        const docs = actualContractId ? dbService.getDocumentsMetaByContractId(actualContractId) : [];
+        const docs = actualContractId ? dbService.getDocumentsByContractId(actualContractId) : [];
 
         const safeFormatDate = (date) => {
             const fmt = formatDisplayTimestamp?.(date) || String(date || '');
