@@ -2,11 +2,9 @@ const axios = require('axios');
 const logger = require('../utils/logger');
 const Diff = require('diff');
 
-// NOTE: gemini-2.5-flash で精度向上 (前 gemini-2.0-flash は速度優先で複雑指示を無視する傾向あり)。
-// ユーザー要望「資料をしっかり解析して4 typeバランスよく適切な修正案を出す」 への対応。
-// レスポンス時間若干増加するが、 prompt の解析プロセス指示 (commit 90c72fc) を AI が正しく実行するために必要。
+// NOTE: We use gemini-2.0-flash on the v1beta endpoint as it is faster and more reliable.
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 if (GEMINI_API_KEY) {
     logger.info(`GEMINI_API_KEY is configured (starts with ${GEMINI_API_KEY.slice(0, 4)}...)`);
