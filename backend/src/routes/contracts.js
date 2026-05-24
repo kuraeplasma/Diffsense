@@ -1275,7 +1275,7 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
         };
 
         // If we have a pageCount from PDF extraction, save it
-        if (typeof pdfData === 'object' && pdfData.pageCount > 0) {
+        if (pdfData && typeof pdfData === 'object' && pdfData.pageCount > 0) {
             updatePayload.document_meta = { pageCount: pdfData.pageCount };
         }
 
@@ -1565,6 +1565,74 @@ router.post('/storage/cleanup', async (req, res, next) => {
 
 /**
  * POST /api/contracts/:id/reanalyze
+ * AI を使って 修正案を contract本文の適切な位置に反映する。
+ * 入力: { change: {section, type, old, new, impact, concern} }
+ * 出力: { new_final_content: string }
+ * regex/anchorベースの挿入が失敗 or 精度不足の場合の代替手段。
+ */
+router.post('/:id/ai-apply-change', rateLimit, async (req, res, next) => {
+    try {
+        const contractId = parseInt(req.params.id, 10);
+        const change = req.body?.change || {};
+        if (!change || (!change.old && !change.new)) {
+            return res.status(400).json({ error: 'change パラメータが不正です (old/new いずれかが必要)' });
+        }
+        const dbService = require('../services/db');
+        const uid = req.user?.uid;
+        if (!uid) return res.status(401).json({ error: 'unauthorized' });
+        const contract = await dbService.getContractById(contractId, uid);
+        if (!contract) return res.status(404).json({ error: 'contract が見つかりません' });
+
+        const baseText = String(contract.final_content || contract.original_content || '').trim();
+        if (!baseText) return res.status(400).json({ error: 'contract本文が空です' });
+        if (baseText.length > 60000) return res.status(400).json({ error: 'contractが長すぎます (60K chars超)' });
+
+        const section = String(change.section || '').trim();
+        const oldText = String(change.old || '').trim();
+        const newText = String(change.new || '').trim();
+        const isDeletion = !newText && !!oldText;
+
+        const prompt = `あなたは法務文書編集の専門家です。 以下の契約書全文に対し、指定された修正案を 適切な位置 に反映してください。
+
+【契約書全文】
+\`\`\`
+${baseText}
+\`\`\`
+
+【修正案】
+- 対象条項: ${section || '不明'}
+- 修正タイプ: ${isDeletion ? '削除' : (oldText ? '置換 (oldをnewに書き換え)' : '追加')}
+- 修正前テキスト (old): ${oldText ? `"${oldText}"` : '(なし - 新規追加)'}
+- 修正後テキスト (new): ${newText ? `"${newText}"` : '(なし - 削除のみ)'}
+
+【厳守ルール】
+1. 既存契約書の フォーマット (改行/字下げ/全角空白/番号付け/前文/署名欄) を 完全に保持
+2. 対象条項の正しい位置に挿入/置換
+   - 同名条項が複数ある場合は 文脈で正しい方を選択
+   - 追加の場合は 対象条項の本文末尾に追加 (条項ヘッダーの直後ではなく本文の最後)
+3. 出力は反映後の契約書本文のみ。 説明文・コードブロック記号・前置きは一切含めない
+4. 該当箇所以外は 一文字も変更しない (= ハルシネーション厳禁)
+5. もし指定位置が見つからない場合のみ 出力末尾に \`\\n\\n[AI_APPLY_FAILED]\` と記載`;
+
+        const updatedText = await geminiService.generateText(prompt);
+        if (!updatedText || typeof updatedText !== 'string') {
+            return res.status(500).json({ error: 'AI 応答が不正です' });
+        }
+        const cleaned = updatedText.replace(/^```[a-z]*\n?|```$/g, '').trim();
+        if (cleaned.includes('[AI_APPLY_FAILED]')) {
+            return res.status(422).json({ error: '指定位置が見つかりませんでした', detail: cleaned });
+        }
+        if (cleaned.length < baseText.length * 0.5) {
+            return res.status(500).json({ error: 'AI 応答が著しく短い (元の半分未満)、 反映を中断' });
+        }
+        return res.json({ new_final_content: cleaned });
+    } catch (err) {
+        console.error('[ai-apply-change] error:', err);
+        return res.status(500).json({ error: 'AI 反映に失敗しました', detail: String(err?.message || err) });
+    }
+});
+
+/**
  * 既存の契約書テキストを使ってリスク解析＋期限解析を単体実行（差分なし）。
  * 解析1回消費。
  */
