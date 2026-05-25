@@ -1614,9 +1614,28 @@ ${baseText}
 4. 該当箇所以外は 一文字も変更しない (= ハルシネーション厳禁)
 5. もし指定位置が見つからない場合のみ 出力末尾に \`\\n\\n[AI_APPLY_FAILED]\` と記載`;
 
-        const updatedText = await geminiService.generateText(prompt);
+        // generateText は maxOutputTokens=512 で short text 用のため、 contract全文用に
+        // 直接 axios で gemini API 呼ぶ (maxOutputTokens 8192)
+        const axios = require('axios');
+        const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+        if (!GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY 未設定' });
+        const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+        let updatedText = '';
+        try {
+            const apiRes = await axios.post(GEMINI_URL, {
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: { temperature: 0.0, maxOutputTokens: 8192 }
+            }, { timeout: 120000, headers: { 'Content-Type': 'application/json' } });
+            updatedText = apiRes?.data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        } catch (apiErr) {
+            console.error('[ai-apply-change] gemini API error:', apiErr?.response?.status, apiErr?.response?.data?.error?.message || apiErr?.message);
+            return res.status(500).json({
+                error: 'AI API 呼び出し失敗',
+                detail: apiErr?.response?.data?.error?.message || apiErr?.message
+            });
+        }
         if (!updatedText || typeof updatedText !== 'string') {
-            return res.status(500).json({ error: 'AI 応答が不正です' });
+            return res.status(500).json({ error: 'AI 応答が不正です (空)' });
         }
         const cleaned = updatedText.replace(/^```[a-z]*\n?|```$/g, '').trim();
         if (cleaned.includes('[AI_APPLY_FAILED]')) {
