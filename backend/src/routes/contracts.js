@@ -1625,7 +1625,13 @@ ${baseText}
             const apiRes = await axios.post(GEMINI_URL, {
                 contents: [{ parts: [{ text: prompt }] }],
                 generationConfig: { temperature: 0.0, maxOutputTokens: 8192 }
-            }, { timeout: 120000, headers: { 'Content-Type': 'application/json' } });
+            }, {
+                timeout: 120000,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Referer': 'https://diffsense.spacegleam.co.jp'  // API key の referer制限回避 (既存 requestGeminiJson と同じ)
+                }
+            });
             updatedText = apiRes?.data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
         } catch (apiErr) {
             console.error('[ai-apply-change] gemini API error:', apiErr?.response?.status, apiErr?.response?.data?.error?.message || apiErr?.message);
