@@ -1610,9 +1610,11 @@ ${baseText}
    - 修正は「${section || '対象条項'}」 という1つの条項の内部 にのみ行うこと
    - 「${section || '対象条項'}」 以外の条項 (例: 第N条のNが異なる条項) には 一文字も変更を加えないこと
    - 仮に他条項に挿入したほうが適切に見えても、 絶対に他条項には触らない
-★★ 2. 配置:
-   - 対象条項の本文末尾 (= 次の「第N条」が始まる直前) に追加する
-   - 条項ヘッダー「第N条 (XXX)」 の直後ではなく、 対象条項の すべての項目 の あとに追加
+★★ 2. 配置 - 厳密厳守:
+   - 「${section || '対象条項'}」 のヘッダー行直後から始まり、 次の「第N+1条」 が始まる直前で終わる範囲を「対象条項の範囲」 と呼ぶ
+   - 修正案 (new) は この対象条項の範囲の 内側 (= 最後の項目の直後、 次条が始まる前) に挿入する
+   - **絶対禁止**: contract全体の末尾 (署名欄や末尾の管轄条項の後) に追加すること。 これは商用品質違反として強制的に reject される
+   - **絶対禁止**: 対象条項ヘッダー直後への挿入 (= 既存項目より上)。 既存項目の後に追加すること
 ★★ 3. フォーマット完全保持:
    - 改行、 字下げ (全角空白)、 番号付け (1, 2, 3 / １, ２, ３ / (一)(二)(三)等) を 既存条項と完全一致させる
    - 既存条項が「１ 〜」 で始まっていれば 追加条項も「N+1 〜」 で始める
@@ -1698,6 +1700,21 @@ yes なら出力、 no なら修正をやり直してから出力。`;
                     error: `対象外条項が変更されました: ${changedKeys.join(', ')}。 AI出力を破棄しました。`,
                     detail: '商用品質保証のため、 対象条項以外への影響がある反映は受け付けません。'
                 });
+            }
+            // 追加検証: 新規挿入text (newText) が 対象条項範囲内 に含まれているか確認
+            // 末尾追加や別条項挿入 を検出 (前の changedKeys 検証は条項境界 split で末尾追加は通る)
+            if (newText && newText.length >= 10 && targetKey) {
+                const targetArticleText = String(after[targetKey] || '');
+                const normNewText = normalize(newText);
+                const normTargetArticle = normalize(targetArticleText);
+                if (normTargetArticle.length === 0 || !normTargetArticle.includes(normNewText)) {
+                    // 対象条項に挿入されてない → contract末尾追加 or 別条項に紛れた
+                    console.warn(`[ai-apply-change] newText が対象条項 ${targetKey} 内にない、 reject`);
+                    return res.status(422).json({
+                        error: `修正案が対象条項 (第${targetKey}条) の範囲外に挿入されました。 AI出力を破棄しました。`,
+                        detail: 'AIが対象条項以外の位置 (contract末尾等) に挿入したため reject しました。'
+                    });
+                }
             }
         } catch (verifyErr) {
             console.warn('[ai-apply-change] verify failed:', verifyErr?.message);
