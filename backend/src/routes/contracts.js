@@ -1687,6 +1687,8 @@ yes なら出力、 no なら修正をやり直してから出力。`;
         // 商用品質検証: 対象条項以外が変更されていないかチェック
         // 各条項を「第N条」 で split し、 対象条項以外の各条項の内容が元と一致するか比較
         try {
+            // 全角→半角 正規化 (key 照合 mismatch防止: '２' vs '2')
+            const toHalfNum = (s) => String(s || '').replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
             const articleHeaderRe = /(?=^[ 　\t]*第\s*[0-9０-９零〇一二三四五六七八九十百千]+\s*条)/m;
             const splitArticles = (text) => {
                 const parts = String(text || '').split(articleHeaderRe);
@@ -1694,8 +1696,8 @@ yes なら出力、 no なら修正をやり直してから出力。`;
                 parts.forEach(p => {
                     const m = p.match(/^[ 　\t]*第\s*([0-9０-９零〇一二三四五六七八九十百千]+)\s*条/);
                     if (m) {
-                        const key = String(m[1]);
-                        map[key] = (map[key] || '') + p; // 同番号は連結
+                        const key = toHalfNum(m[1]);  // 半角化して統一
+                        map[key] = (map[key] || '') + p;
                     }
                 });
                 return map;
@@ -1703,7 +1705,7 @@ yes なら出力、 no なら修正をやり直してから出力。`;
             const before = splitArticles(baseText);
             const after = splitArticles(cleaned);
             const targetNumMatch = String(section || '').match(/第\s*([0-9０-９零〇一二三四五六七八九十百千]+)\s*条/);
-            const targetKey = targetNumMatch ? String(targetNumMatch[1]) : null;
+            const targetKey = targetNumMatch ? toHalfNum(targetNumMatch[1]) : null;  // 半角化
             const normalize = (s) => String(s || '').replace(/[\s　]+/g, '');
             const changedKeys = [];
             for (const key of Object.keys(before)) {
