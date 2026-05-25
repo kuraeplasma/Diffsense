@@ -1572,81 +1572,41 @@ router.post('/storage/cleanup', async (req, res, next) => {
  */
 router.post('/:id/ai-apply-change', rateLimit, async (req, res, next) => {
     try {
-        const contractId = parseInt(req.params.id, 10);
         const change = req.body?.change || {};
+        const sectionText = String(req.body?.section_text || '').trim();
         if (!change || (!change.old && !change.new)) {
-            return res.status(400).json({ error: 'change パラメータが不正です (old/new いずれかが必要)' });
+            return res.status(400).json({ error: 'change パラメータが不正です' });
         }
-        const dbService = require('../services/db');
-        const uid = req.user?.uid;
-        if (!uid) return res.status(401).json({ error: 'unauthorized' });
-        const contract = await dbService.getContractById(contractId, uid);
-        if (!contract) return res.status(404).json({ error: 'contract が見つかりません' });
-
-        // contract.original_content は array of {article,title,paragraphs} の構造の場合があるため
-        // text に確実 変換 (String(array) で [object Object] になる bug 防止)
-        const arrayToText = (arr) => {
-            if (!Array.isArray(arr)) return '';
-            return arr.map(item => {
-                if (typeof item === 'string') return item;
-                if (!item || typeof item !== 'object') return '';
-                const header = [item.article, item.title].filter(Boolean).join(' ');
-                const body = Array.isArray(item.paragraphs) ? item.paragraphs.join('\n') : (item.content || item.text || '');
-                return [header, body].filter(Boolean).join('\n');
-            }).filter(Boolean).join('\n\n');
-        };
-        let baseText = '';
-        if (typeof contract.final_content === 'string' && contract.final_content.trim()) {
-            baseText = contract.final_content.trim();
-        } else if (typeof contract.original_content === 'string' && contract.original_content.trim()) {
-            baseText = contract.original_content.trim();
-        } else if (Array.isArray(contract.original_content)) {
-            baseText = arrayToText(contract.original_content);
+        if (!sectionText) {
+            return res.status(400).json({ error: 'section_text 必要 (対象条項のtext)' });
         }
-        if (!baseText) return res.status(400).json({ error: 'contract本文が空です' });
-        if (baseText.length > 60000) return res.status(400).json({ error: 'contractが長すぎます (60K chars超)' });
+        if (sectionText.length > 15000) {
+            return res.status(400).json({ error: '対象条項が大きすぎます (15K chars超)' });
+        }
 
         const section = String(change.section || '').trim();
         const oldText = String(change.old || '').trim();
         const newText = String(change.new || '').trim();
         const isDeletion = !newText && !!oldText;
 
-        const prompt = `あなたは法務文書編集の専門家です。 以下の契約書に修正案を反映してください。
+        const prompt = `あなたは法務文書編集の専門家です。 以下の「単一条項」 に修正案を反映してください。
 
-【契約書全文】
+【対象条項の現状 - これのみ編集対象】
 \`\`\`
-${baseText}
+${sectionText}
 \`\`\`
 
-【修正案 - 必読】
-- 対象条項: ${section || '不明'}  ← この条項のみに反映。他の条項には絶対に手を加えない。
+【修正案】
 - 修正タイプ: ${isDeletion ? '削除' : (oldText ? '置換 (oldをnewに書き換え)' : '追加')}
 - 修正前テキスト (old): ${oldText ? `"""${oldText}"""` : '(なし - 新規追加)'}
 - 修正後テキスト (new): ${newText ? `"""${newText}"""` : '(なし - 削除のみ)'}
 
-【絶対厳守ルール - 違反は重大な不適合】
-★★ 1. 対象条項の絶対遵守:
-   - 修正は「${section || '対象条項'}」 という1つの条項の内部 にのみ行うこと
-   - 「${section || '対象条項'}」 以外の条項 (例: 第N条のNが異なる条項) には 一文字も変更を加えないこと
-   - 仮に他条項に挿入したほうが適切に見えても、 絶対に他条項には触らない
-★★ 2. 配置 - 厳密厳守:
-   - 「${section || '対象条項'}」 のヘッダー行直後から始まり、 次の「第N+1条」 が始まる直前で終わる範囲を「対象条項の範囲」 と呼ぶ
-   - 修正案 (new) は この対象条項の範囲の 内側 (= 最後の項目の直後、 次条が始まる前) に挿入する
-   - **絶対禁止**: contract全体の末尾 (署名欄や末尾の管轄条項の後) に追加すること。 これは商用品質違反として強制的に reject される
-   - **絶対禁止**: 対象条項ヘッダー直後への挿入 (= 既存項目より上)。 既存項目の後に追加すること
-★★ 3. フォーマット完全保持:
-   - 改行、 字下げ (全角空白)、 番号付け (1, 2, 3 / １, ２, ３ / (一)(二)(三)等) を 既存条項と完全一致させる
-   - 既存条項が「１ 〜」 で始まっていれば 追加条項も「N+1 〜」 で始める
-★★ 4. 他条項の変更禁止:
-   - 対象条項以外の text は 1文字も変更しない (改行・空白含む)
-★★ 5. 出力形式:
-   - 反映後の契約書本文のみを出力
-   - 説明文、 コードブロック記号、 前置き、 後置き は 一切含めない
-   - もし対象条項が契約書内で見つからない場合のみ 出力末尾に \`\\n\\n[AI_APPLY_FAILED]\` と記載
-
-【最重要】
-出力前に確認: 修正は「${section || '対象条項'}」 の内部だけに行ったか? 他条項に1文字でも変更を加えていないか?
-yes なら出力、 no なら修正をやり直してから出力。`;
+【ルール】
+1. 上記の「対象条項の現状」 を編集対象とする (他条項は存在しないので考慮不要)
+2. 条項ヘッダー (「${section}」) は そのまま維持する
+3. 追加の場合は 既存項目の **末尾** に新項目として追加する。 既存番号付け (1, 2, 3 / １, ２, ３ / (一)(二)) を踏襲して N+1 番として続ける
+4. 出力は反映後の **この単一条項のみ** を返す。 説明文、 コードブロック記号、 前置き、 後置き は 一切含めない
+5. 失敗時のみ 出力末尾に \`\\n\\n[AI_APPLY_FAILED]\` と記載`;
 
         // generateText は maxOutputTokens=512 で short text 用のため、 contract全文用に
         // 直接 axios で gemini API 呼ぶ (maxOutputTokens 8192)
@@ -1679,72 +1639,29 @@ yes なら出力、 no なら修正をやり直してから出力。`;
         }
         const cleaned = updatedText.replace(/^```[a-z]*\n?|```$/g, '').trim();
         if (cleaned.includes('[AI_APPLY_FAILED]')) {
-            return res.status(422).json({ error: '指定位置が見つかりませんでした', detail: cleaned });
+            return res.status(422).json({ error: '対象条項への反映に失敗しました', detail: cleaned });
         }
-        if (cleaned.length < baseText.length * 0.5) {
-            return res.status(500).json({ error: 'AI 応答が著しく短い (元の半分未満)、 反映を中断' });
-        }
-        // 商用品質検証: 対象条項以外が変更されていないかチェック
-        // 各条項を「第N条」 で split し、 対象条項以外の各条項の内容が元と一致するか比較
-        try {
-            // 全角→半角 正規化 (key 照合 mismatch防止: '２' vs '2')
-            const toHalfNum = (s) => String(s || '').replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
-            const articleHeaderRe = /(?=^[ 　\t]*第\s*[0-9０-９零〇一二三四五六七八九十百千]+\s*条)/m;
-            const splitArticles = (text) => {
-                const parts = String(text || '').split(articleHeaderRe);
-                const map = {};
-                parts.forEach(p => {
-                    const m = p.match(/^[ 　\t]*第\s*([0-9０-９零〇一二三四五六七八九十百千]+)\s*条/);
-                    if (m) {
-                        const key = toHalfNum(m[1]);  // 半角化して統一
-                        map[key] = (map[key] || '') + p;
-                    }
-                });
-                return map;
-            };
-            const before = splitArticles(baseText);
-            const after = splitArticles(cleaned);
-            const targetNumMatch = String(section || '').match(/第\s*([0-9０-９零〇一二三四五六七八九十百千]+)\s*条/);
-            const targetKey = targetNumMatch ? toHalfNum(targetNumMatch[1]) : null;  // 半角化
-            const normalize = (s) => String(s || '').replace(/[\s　]+/g, '');
-            const changedKeys = [];
-            for (const key of Object.keys(before)) {
-                if (key === targetKey) continue; // 対象条項は変更OK
-                if (!after[key]) { changedKeys.push(`第${key}条(消失)`); continue; }
-                if (normalize(before[key]) !== normalize(after[key])) {
-                    changedKeys.push(`第${key}条`);
-                }
-            }
-            if (changedKeys.length > 0) {
-                console.warn(`[ai-apply-change] 他条項変更検知、 reject: ${changedKeys.join(', ')}`);
+        // 検証: 新版 section_text 内に newText が含まれるか (追加/置換型)
+        if (newText && newText.length >= 10) {
+            const norm = s => String(s||'').replace(/[\s　]+/g,'');
+            const normPrefix = norm(newText).slice(0, 30);
+            if (!norm(cleaned).includes(normPrefix)) {
+                console.warn('[ai-apply-change] AI出力に修正案が含まれません');
                 return res.status(422).json({
-                    error: `対象外条項が変更されました: ${changedKeys.join(', ')}。 AI出力を破棄しました。`,
-                    detail: '商用品質保証のため、 対象条項以外への影響がある反映は受け付けません。'
+                    error: 'AI出力に修正案が反映されていません。 再試行してください。',
+                    detail: 'AI 出力には newText が含まれていません'
                 });
             }
-            // 追加検証: 新規挿入text (newText) が 対象条項範囲内 に含まれているか確認
-            // 末尾追加や別条項挿入 を検出
-            // 完全一致でなく、 newText の最初 30文字 normalize版で部分一致を check (= AIの微小整形を許容)
-            if (newText && newText.length >= 10 && targetKey) {
-                const targetArticleText = String(after[targetKey] || '');
-                const normNewTextPrefix = normalize(newText).slice(0, 30);
-                const normTargetArticle = normalize(targetArticleText);
-                console.log(`[ai-apply-change] verify: targetKey=${targetKey}, targetArticleLen=${normTargetArticle.length}, newTextPrefix="${normNewTextPrefix.slice(0,40)}", containsPrefix=${normTargetArticle.includes(normNewTextPrefix)}`);
-                if (normTargetArticle.length === 0 || !normTargetArticle.includes(normNewTextPrefix)) {
-                    console.warn(`[ai-apply-change] newText が対象条項 ${targetKey} 内にない、 reject`);
-                    console.warn(`  AI cleaned (first 500): ${cleaned.slice(0, 500)}`);
-                    console.warn(`  AI cleaned (last 500):  ${cleaned.slice(-500)}`);
-                    return res.status(422).json({
-                        error: `修正案が対象条項 (第${targetKey}条) の範囲外に挿入されました。 AI出力を破棄しました。`,
-                        detail: 'AIが対象条項以外の位置に挿入したため reject しました。'
-                    });
-                }
-            }
-        } catch (verifyErr) {
-            console.warn('[ai-apply-change] verify failed:', verifyErr?.message);
-            // 検証失敗時は通す (= 検証ロジックバグで反映を妨げない)
         }
-        return res.json({ new_final_content: cleaned });
+        // 検証: 条項ヘッダーが維持されているか (= 「第N条」 が含まれるか)
+        const sectionHeaderMatch = sectionText.match(/^[ 　\t]*第\s*[0-9０-９零〇一二三四五六七八九十百千]+\s*条/);
+        if (sectionHeaderMatch && !cleaned.includes(sectionHeaderMatch[0].trim())) {
+            return res.status(422).json({
+                error: '条項ヘッダーが失われました。 反映を中断しました。'
+            });
+        }
+        // 対象条項のみ送って 新版を受け取る形のため、 他条項変更チェックは frontend側で物理置換するため不要
+        return res.json({ new_section_text: cleaned });
     } catch (err) {
         console.error('[ai-apply-change] error:', err);
         return res.status(500).json({ error: 'AI 反映に失敗しました', detail: String(err?.message || err) });
