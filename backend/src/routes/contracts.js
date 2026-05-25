@@ -1583,7 +1583,26 @@ router.post('/:id/ai-apply-change', rateLimit, async (req, res, next) => {
         const contract = await dbService.getContractById(contractId, uid);
         if (!contract) return res.status(404).json({ error: 'contract が見つかりません' });
 
-        const baseText = String(contract.final_content || contract.original_content || '').trim();
+        // contract.original_content は array of {article,title,paragraphs} の構造の場合があるため
+        // text に確実 変換 (String(array) で [object Object] になる bug 防止)
+        const arrayToText = (arr) => {
+            if (!Array.isArray(arr)) return '';
+            return arr.map(item => {
+                if (typeof item === 'string') return item;
+                if (!item || typeof item !== 'object') return '';
+                const header = [item.article, item.title].filter(Boolean).join(' ');
+                const body = Array.isArray(item.paragraphs) ? item.paragraphs.join('\n') : (item.content || item.text || '');
+                return [header, body].filter(Boolean).join('\n');
+            }).filter(Boolean).join('\n\n');
+        };
+        let baseText = '';
+        if (typeof contract.final_content === 'string' && contract.final_content.trim()) {
+            baseText = contract.final_content.trim();
+        } else if (typeof contract.original_content === 'string' && contract.original_content.trim()) {
+            baseText = contract.original_content.trim();
+        } else if (Array.isArray(contract.original_content)) {
+            baseText = arrayToText(contract.original_content);
+        }
         if (!baseText) return res.status(400).json({ error: 'contract本文が空です' });
         if (baseText.length > 60000) return res.status(400).json({ error: 'contractが長すぎます (60K chars超)' });
 
@@ -1702,17 +1721,20 @@ yes なら出力、 no なら修正をやり直してから出力。`;
                 });
             }
             // 追加検証: 新規挿入text (newText) が 対象条項範囲内 に含まれているか確認
-            // 末尾追加や別条項挿入 を検出 (前の changedKeys 検証は条項境界 split で末尾追加は通る)
+            // 末尾追加や別条項挿入 を検出
+            // 完全一致でなく、 newText の最初 30文字 normalize版で部分一致を check (= AIの微小整形を許容)
             if (newText && newText.length >= 10 && targetKey) {
                 const targetArticleText = String(after[targetKey] || '');
-                const normNewText = normalize(newText);
+                const normNewTextPrefix = normalize(newText).slice(0, 30);
                 const normTargetArticle = normalize(targetArticleText);
-                if (normTargetArticle.length === 0 || !normTargetArticle.includes(normNewText)) {
-                    // 対象条項に挿入されてない → contract末尾追加 or 別条項に紛れた
+                console.log(`[ai-apply-change] verify: targetKey=${targetKey}, targetArticleLen=${normTargetArticle.length}, newTextPrefix="${normNewTextPrefix.slice(0,40)}", containsPrefix=${normTargetArticle.includes(normNewTextPrefix)}`);
+                if (normTargetArticle.length === 0 || !normTargetArticle.includes(normNewTextPrefix)) {
                     console.warn(`[ai-apply-change] newText が対象条項 ${targetKey} 内にない、 reject`);
+                    console.warn(`  AI cleaned (first 500): ${cleaned.slice(0, 500)}`);
+                    console.warn(`  AI cleaned (last 500):  ${cleaned.slice(-500)}`);
                     return res.status(422).json({
                         error: `修正案が対象条項 (第${targetKey}条) の範囲外に挿入されました。 AI出力を破棄しました。`,
-                        detail: 'AIが対象条項以外の位置 (contract末尾等) に挿入したため reject しました。'
+                        detail: 'AIが対象条項以外の位置に挿入したため reject しました。'
                     });
                 }
             }
