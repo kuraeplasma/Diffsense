@@ -1592,27 +1592,40 @@ router.post('/:id/ai-apply-change', rateLimit, async (req, res, next) => {
         const newText = String(change.new || '').trim();
         const isDeletion = !newText && !!oldText;
 
-        const prompt = `あなたは法務文書編集の専門家です。 以下の契約書全文に対し、指定された修正案を 適切な位置 に反映してください。
+        const prompt = `あなたは法務文書編集の専門家です。 以下の契約書に修正案を反映してください。
 
 【契約書全文】
 \`\`\`
 ${baseText}
 \`\`\`
 
-【修正案】
-- 対象条項: ${section || '不明'}
+【修正案 - 必読】
+- 対象条項: ${section || '不明'}  ← この条項のみに反映。他の条項には絶対に手を加えない。
 - 修正タイプ: ${isDeletion ? '削除' : (oldText ? '置換 (oldをnewに書き換え)' : '追加')}
-- 修正前テキスト (old): ${oldText ? `"${oldText}"` : '(なし - 新規追加)'}
-- 修正後テキスト (new): ${newText ? `"${newText}"` : '(なし - 削除のみ)'}
+- 修正前テキスト (old): ${oldText ? `"""${oldText}"""` : '(なし - 新規追加)'}
+- 修正後テキスト (new): ${newText ? `"""${newText}"""` : '(なし - 削除のみ)'}
 
-【厳守ルール】
-1. 既存契約書の フォーマット (改行/字下げ/全角空白/番号付け/前文/署名欄) を 完全に保持
-2. 対象条項の正しい位置に挿入/置換
-   - 同名条項が複数ある場合は 文脈で正しい方を選択
-   - 追加の場合は 対象条項の本文末尾に追加 (条項ヘッダーの直後ではなく本文の最後)
-3. 出力は反映後の契約書本文のみ。 説明文・コードブロック記号・前置きは一切含めない
-4. 該当箇所以外は 一文字も変更しない (= ハルシネーション厳禁)
-5. もし指定位置が見つからない場合のみ 出力末尾に \`\\n\\n[AI_APPLY_FAILED]\` と記載`;
+【絶対厳守ルール - 違反は重大な不適合】
+★★ 1. 対象条項の絶対遵守:
+   - 修正は「${section || '対象条項'}」 という1つの条項の内部 にのみ行うこと
+   - 「${section || '対象条項'}」 以外の条項 (例: 第N条のNが異なる条項) には 一文字も変更を加えないこと
+   - 仮に他条項に挿入したほうが適切に見えても、 絶対に他条項には触らない
+★★ 2. 配置:
+   - 対象条項の本文末尾 (= 次の「第N条」が始まる直前) に追加する
+   - 条項ヘッダー「第N条 (XXX)」 の直後ではなく、 対象条項の すべての項目 の あとに追加
+★★ 3. フォーマット完全保持:
+   - 改行、 字下げ (全角空白)、 番号付け (1, 2, 3 / １, ２, ３ / (一)(二)(三)等) を 既存条項と完全一致させる
+   - 既存条項が「１ 〜」 で始まっていれば 追加条項も「N+1 〜」 で始める
+★★ 4. 他条項の変更禁止:
+   - 対象条項以外の text は 1文字も変更しない (改行・空白含む)
+★★ 5. 出力形式:
+   - 反映後の契約書本文のみを出力
+   - 説明文、 コードブロック記号、 前置き、 後置き は 一切含めない
+   - もし対象条項が契約書内で見つからない場合のみ 出力末尾に \`\\n\\n[AI_APPLY_FAILED]\` と記載
+
+【最重要】
+出力前に確認: 修正は「${section || '対象条項'}」 の内部だけに行ったか? 他条項に1文字でも変更を加えていないか?
+yes なら出力、 no なら修正をやり直してから出力。`;
 
         // generateText は maxOutputTokens=512 で short text 用のため、 contract全文用に
         // 直接 axios で gemini API 呼ぶ (maxOutputTokens 8192)
@@ -1649,6 +1662,46 @@ ${baseText}
         }
         if (cleaned.length < baseText.length * 0.5) {
             return res.status(500).json({ error: 'AI 応答が著しく短い (元の半分未満)、 反映を中断' });
+        }
+        // 商用品質検証: 対象条項以外が変更されていないかチェック
+        // 各条項を「第N条」 で split し、 対象条項以外の各条項の内容が元と一致するか比較
+        try {
+            const articleHeaderRe = /(?=^[ 　\t]*第\s*[0-9０-９零〇一二三四五六七八九十百千]+\s*条)/m;
+            const splitArticles = (text) => {
+                const parts = String(text || '').split(articleHeaderRe);
+                const map = {};
+                parts.forEach(p => {
+                    const m = p.match(/^[ 　\t]*第\s*([0-9０-９零〇一二三四五六七八九十百千]+)\s*条/);
+                    if (m) {
+                        const key = String(m[1]);
+                        map[key] = (map[key] || '') + p; // 同番号は連結
+                    }
+                });
+                return map;
+            };
+            const before = splitArticles(baseText);
+            const after = splitArticles(cleaned);
+            const targetNumMatch = String(section || '').match(/第\s*([0-9０-９零〇一二三四五六七八九十百千]+)\s*条/);
+            const targetKey = targetNumMatch ? String(targetNumMatch[1]) : null;
+            const normalize = (s) => String(s || '').replace(/[\s　]+/g, '');
+            const changedKeys = [];
+            for (const key of Object.keys(before)) {
+                if (key === targetKey) continue; // 対象条項は変更OK
+                if (!after[key]) { changedKeys.push(`第${key}条(消失)`); continue; }
+                if (normalize(before[key]) !== normalize(after[key])) {
+                    changedKeys.push(`第${key}条`);
+                }
+            }
+            if (changedKeys.length > 0) {
+                console.warn(`[ai-apply-change] 他条項変更検知、 reject: ${changedKeys.join(', ')}`);
+                return res.status(422).json({
+                    error: `対象外条項が変更されました: ${changedKeys.join(', ')}。 AI出力を破棄しました。`,
+                    detail: '商用品質保証のため、 対象条項以外への影響がある反映は受け付けません。'
+                });
+            }
+        } catch (verifyErr) {
+            console.warn('[ai-apply-change] verify failed:', verifyErr?.message);
+            // 検証失敗時は通す (= 検証ロジックバグで反映を妨げない)
         }
         return res.json({ new_final_content: cleaned });
     } catch (err) {
