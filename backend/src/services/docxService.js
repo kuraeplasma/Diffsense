@@ -9,6 +9,13 @@ const os = require('os');
 const logger = require('../utils/logger');
 const contractRuleEngine = require('./contractRuleEngine');
 
+// LibreOffice runs as a single global instance per machine on Windows. Launching
+// multiple `soffice --convert-to` processes at once collides during init and fails
+// with exit!=0 / no PDF and a GUI "bootstrap.ini is corrupted" dialog (even though
+// the install is fine). Serialize all PDF conversions so only ONE soffice process
+// ever runs at a time; concurrent requests queue instead of colliding.
+let __pdfConvertQueue = Promise.resolve();
+
 class DocxService {
     constructor() {
         this.parser = new XMLParser({
@@ -205,7 +212,7 @@ class DocxService {
             .replace(/[ \t]+\n/g, '\n');
             // .replace(/[ \t]{2,}/g, ' '); // Removed
 
-        return normalized.trim();
+        return normalized.trimEnd();
     }
 
     /**
@@ -375,7 +382,10 @@ class DocxService {
                     currentArticle.paragraphs.push('[Table]');
                 }
             } else {
-                currentArticle.paragraphs.push(text);
+                // Use block.full_text to preserve the list markers and indentation,
+                // but do not trim leading spaces (only trimEnd to clean up trailing whitespace/newlines).
+                const val = (block.full_text !== undefined) ? block.full_text.trimEnd() : text;
+                currentArticle.paragraphs.push(val);
             }
         }
 
@@ -419,32 +429,43 @@ class DocxService {
             .replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
     }
 
-    _buildInsertedParagraphXml(text, referenceParagraphXml = '') {
+    // 参照段落から文字書式（フォント・サイズ等）の <w:rPr> を抽出する。
+    // 先頭ランの rPr → 段落マークの rPr の順で探し、無ければ空文字を返す。
+    _extractRunProperties(referenceParagraphXml = '') {
+        const xml = String(referenceParagraphXml || '');
+        const firstRun = xml.match(/<w:r\b[^>]*>[\s\S]*?<\/w:r>/);
+        if (firstRun) {
+            const rPr = firstRun[0].match(/<w:rPr[\s\S]*?<\/w:rPr>/);
+            if (rPr) return rPr[0];
+        }
+        const pPr = xml.match(/<w:pPr[\s\S]*?<\/w:pPr>/);
+        if (pPr) {
+            const rPr = pPr[0].match(/<w:rPr[\s\S]*?<\/w:rPr>/);
+            if (rPr) return rPr[0];
+        }
+        return '';
+    }
+
+    // 参照段落の段落書式(<w:pPr>)と文字書式(<w:rPr>)を継承して段落XMLを生成する。
+    // 既定インデント/行間は注入せず、原文の書式になじませる。
+    _buildParagraphsWithReferenceFormatting(text, referenceParagraphXml = '') {
         const pPrMatch = String(referenceParagraphXml || '').match(/<w:pPr[\s\S]*?<\/w:pPr>/);
-        let pPr = pPrMatch ? pPrMatch[0] : '<w:pPr></w:pPr>';
-        if (!/<w:ind\b/.test(pPr)) {
-            pPr = pPr.replace('</w:pPr>', '<w:ind w:left="420"/></w:pPr>');
-        }
-        if (!/<w:spacing\b/.test(pPr)) {
-            pPr = pPr.replace('</w:pPr>', '<w:spacing w:after="0" w:line="360" w:lineRule="auto"/></w:pPr>');
-        }
+        const pPr = pPrMatch ? pPrMatch[0] : '';
+        const rPr = this._extractRunProperties(referenceParagraphXml);
         return String(text || '')
             .split(/\r?\n/)
             .map(line => line.trim())
             .filter(Boolean)
-            .map(line => '<w:p>' + pPr + '<w:r><w:t xml:space="preserve">' + this._escapeXmlText(line) + '</w:t></w:r></w:p>')
+            .map(line => '<w:p>' + pPr + '<w:r>' + rPr + '<w:t xml:space="preserve">' + this._escapeXmlText(line) + '</w:t></w:r></w:p>')
             .join('');
     }
 
+    _buildInsertedParagraphXml(text, referenceParagraphXml = '') {
+        return this._buildParagraphsWithReferenceFormatting(text, referenceParagraphXml);
+    }
+
     _buildReplacementParagraphXml(text, referenceParagraphXml = '') {
-        const pPrMatch = String(referenceParagraphXml || '').match(/<w:pPr[\s\S]*?<\/w:pPr>/);
-        const pPr = pPrMatch ? pPrMatch[0] : '<w:pPr></w:pPr>';
-        return String(text || '')
-            .split(/\r?\n/)
-            .map(line => line.trim())
-            .filter(Boolean)
-            .map(line => '<w:p>' + pPr + '<w:r><w:t xml:space="preserve">' + this._escapeXmlText(line) + '</w:t></w:r></w:p>')
-            .join('');
+        return this._buildParagraphsWithReferenceFormatting(text, referenceParagraphXml);
     }
 
     applyRevisionsToDocx(buffer, revisions = []) {
@@ -517,12 +538,14 @@ class DocxService {
             }
 
             if (revision.normalizedOldText) {
-                const replaceIndex = paragraphs.findIndex((p, index) =>
-                    index >= startIndex
-                    && (
-                        p.normalized.includes(revision.normalizedOldText)
-                        || revision.normalizedOldText.includes(p.normalized)
-                    )
+                // 対象条項のスコープ末尾（次の見出し直前）を求め、条項をまたいだ置換を防ぐ
+                let scopeEnd = paragraphs.length;
+                for (let i = startIndex + 1; i < paragraphs.length; i++) {
+                    if (isInsertionBoundary(paragraphs[i].text)) { scopeEnd = i; break; }
+                }
+                const replaceIndex = paragraphs.findIndex((p, i) =>
+                    i >= startIndex && i < scopeEnd &&
+                    (p.normalized.includes(revision.normalizedOldText) || revision.normalizedOldText.includes(p.normalized))
                 );
                 if (replaceIndex >= 0) {
                     const target = paragraphs[replaceIndex];
@@ -560,9 +583,23 @@ class DocxService {
         return { buffer: zip.toBuffer(), insertedCount, requestedCount: normalizedRevisions.length, skipped };
     }
     /**
-     * Convert DOCX file to PDF using LibreOffice/soffice
+     * Convert DOCX file to PDF using LibreOffice/soffice.
+     * Serialized: only one soffice conversion runs at a time across the whole process
+     * (Windows single-instance safe). Concurrent callers queue rather than collide.
      */
     async convertToPdf(docxPath) {
+        const run = () => this._convertToPdfImpl(docxPath);
+        const task = __pdfConvertQueue.then(run, run);
+        // Keep the queue chain alive regardless of this task's success/failure.
+        __pdfConvertQueue = task.then(() => {}, () => {});
+        return task;
+    }
+
+    /**
+     * Actual LibreOffice conversion. Do NOT call directly — always go through
+     * convertToPdf() so invocations stay serialized.
+     */
+    async _convertToPdfImpl(docxPath) {
         const absoluteDocxPath = path.resolve(String(docxPath || ''));
         if (!absoluteDocxPath || !fs.existsSync(absoluteDocxPath)) {
             throw new Error('DOCX file not found for conversion');
@@ -599,12 +636,22 @@ class DocxService {
 
                 // Ensure a unique user installation to avoid lock conflicts in concurrent environments
                 const userInstallDir = path.join(os.tmpdir(), `soffice_user_${Date.now()}_${Math.floor(Math.random() * 1000)}`);
+                // Build a VALID file URI for -env:UserInstallation. On Windows the path is `C:/...`
+                // (no leading slash) and needs THREE slashes (file:///C:/...); two slashes makes
+                // LibreOffice read `C:` as the URL host and silently fail (exit!=0 / no PDF / hang) —
+                // this was a primary cause of PDF generation failing. On POSIX the path starts with
+                // `/`, so `file://` + `/tmp` already yields the correct `file:///tmp`.
+                const __slashed = userInstallDir.replace(/\\/g, '/');
+                const userInstallUrl = __slashed.startsWith('/') ? `file://${__slashed}` : `file:///${__slashed}`;
                 
                 await execFileAsync(
                     command,
                     [
                         '--headless',
-                        `-env:UserInstallation=file://${userInstallDir.replace(/\\/g, '/')}`,
+                        '--norestore',
+                        '--nolockcheck',
+                        '--nodefault',
+                        `-env:UserInstallation=${userInstallUrl}`,
                         '--convert-to', 'pdf:writer_pdf_Export',
                         '--outdir', outputDir,
                         absoluteDocxPath
