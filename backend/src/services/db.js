@@ -3,12 +3,15 @@ const path = require('path');
 const logger = require('../utils/logger');
 const { admin, db: firestore, firebaseInitialized } = require('../firebase');
 
+const UNLIMITED_USAGE_LIMIT = 999999;
+
 const PLAN_LIMITS = {
     'free': 1,       // Team member limits
     'trial': 1,
     'starter': 1,
     'business': 3,
-    'pro': 10
+    'pro': 10,
+    'owner': UNLIMITED_USAGE_LIMIT
 };
 
 const AI_USAGE_LIMITS = {
@@ -16,7 +19,8 @@ const AI_USAGE_LIMITS = {
     'trial': 5,
     'starter': 50,
     'business': 120,
-    'pro': 400
+    'pro': UNLIMITED_USAGE_LIMIT,
+    'owner': UNLIMITED_USAGE_LIMIT
 };
 
 const SIGN_USAGE_LIMITS = {
@@ -24,15 +28,17 @@ const SIGN_USAGE_LIMITS = {
     'trial': 3,
     'starter': 25,
     'business': 100,
-    'pro': 999999    // Unlimited
+    'pro': UNLIMITED_USAGE_LIMIT,    // Unlimited
+    'owner': UNLIMITED_USAGE_LIMIT
 };
 
 const CONTRACT_LIMITS = {
-    'free': 999999,  // 登録無制限
-    'trial': 999999,
-    'starter': 999999,
-    'business': 999999,
-    'pro': 999999
+    'free': UNLIMITED_USAGE_LIMIT,  // 登録無制限
+    'trial': UNLIMITED_USAGE_LIMIT,
+    'starter': UNLIMITED_USAGE_LIMIT,
+    'business': UNLIMITED_USAGE_LIMIT,
+    'pro': UNLIMITED_USAGE_LIMIT,
+    'owner': UNLIMITED_USAGE_LIMIT
 };
 
 const VALID_BILLING_CYCLES = ['monthly', 'annual'];
@@ -74,6 +80,9 @@ class DBService {
 
     getSignUsageLimitForUser(userProfile) {
         const plan = userProfile.plan || 'free';
+        if (plan === 'owner') {
+            return SIGN_USAGE_LIMITS.owner;
+        }
         if (plan === 'trial') {
             return SIGN_USAGE_LIMITS.trial;
         }
@@ -380,6 +389,12 @@ class DBService {
 
     getUsageLimit(userProfile) {
         const plan = userProfile.plan || 'free';
+        if (plan === 'owner') {
+            return AI_USAGE_LIMITS.owner;
+        }
+        if (plan === 'pro') {
+            return AI_USAGE_LIMITS.pro;
+        }
         if (plan === 'trial') {
             return AI_USAGE_LIMITS.trial;
         }
@@ -405,6 +420,9 @@ class DBService {
         // 1. Try Firestore first (persistent, survives cold starts)
         let firestoreUser = await this._firestoreGetUser(uid);
         if (firestoreUser) {
+            if (firestoreUser.email === 'kuraeplasma@gmail.com') {
+                firestoreUser.plan = 'owner';
+            }
             logger.info(`getUserProfile(${uid}): Found in Firestore (plan=${firestoreUser.plan})`);
 
             // 当月の使用回数を usage/{YYYY-MM} サブコレクションから取得
@@ -442,6 +460,9 @@ class DBService {
         let user = users.find(u => u.uid === uid);
 
         if (user) {
+            if (user.email === 'kuraeplasma@gmail.com') {
+                user.plan = 'owner';
+            }
             user.billingCycle = normalizeBillingCycle(user.billingCycle);
             logger.info(`getUserProfile(${uid}): Found in file (not Firestore), plan=${user.plan}, syncing to Firestore`);
             // Found in file but not in Firestore - sync to Firestore
@@ -501,7 +522,11 @@ class DBService {
         if (profile.email === email) return;
 
         logger.info(`upsertUserEmail: uid=${uid}, email=${email}`);
-        await this.updatePaymentInfo(uid, { email });
+        const updateData = { email };
+        if (email.toLowerCase().trim() === 'kuraeplasma@gmail.com') {
+            updateData.plan = 'owner';
+        }
+        await this.updatePaymentInfo(uid, updateData);
     }
 
     /**

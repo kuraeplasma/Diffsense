@@ -3,6 +3,7 @@
 .gitignore
 node_modules/
 # .env
+nul
 *.log
 .DS_Store
 coverage/

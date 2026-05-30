@@ -89,6 +89,7 @@ async function bootstrap() {
         const notificationRoutes = require('./routes/notifications');
         const cronRoutes = require('./routes/cron');
         const slackRoutes = require('./routes/slack');
+        const contactRoutes = require('./routes/contact');
         const { createMcpAuthRouter, createMcpRouter } = require('./mcp-server/mcpServer');
         const cronService = require('./services/cronService');
 
@@ -350,6 +351,9 @@ async function bootstrap() {
             });
         });
 
+        app.use('/api/contact', contactRoutes);
+        app.use('/contact', contactRoutes);
+
         // --- Signature Routes ---
         // Public endpoints skip authentication, while others (like /create, /list) require it.
         const signMiddleware = (req, res, next) => {
@@ -467,3 +471,4 @@ if (require.main === module) {
 }
 
 module.exports = { app, bootstrap };
+

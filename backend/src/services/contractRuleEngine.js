@@ -26,7 +26,8 @@ class ContractRuleEngine {
         const TITLE_BRACKET_REGEX = /^\s*([（(【［\[][^）)】］］\]]+[）)】］］\]]|記|以上|附則|別紙|別表)\s*$/;
 
         for (let i = 0; i < lines.length; i++) {
-            const line = lines[i].trim();
+            const rawLine = lines[i].trimEnd();
+            const line = rawLine.trim();
             
             // LOSSLESS: Do NOT skip blank lines. They are part of the original document structure.
             if (!line) {
@@ -91,7 +92,7 @@ class ContractRuleEngine {
 
             // STEP 4: Content Connection
             if (currentBlock) {
-                currentBlock.rawLines.push(line);
+                currentBlock.rawLines.push(rawLine);
             } else {
                 // Preamble or header before the first clause
                 if (line) {
@@ -100,10 +101,10 @@ class ContractRuleEngine {
                             type: 'preamble',
                             clauseNumber: '前文',
                             title: '前文',
-                            rawLines: [line]
+                            rawLines: [rawLine]
                         });
                     } else {
-                        blocks[0].rawLines.push(line);
+                        blocks[0].rawLines.push(rawLine);
                     }
                 }
             }

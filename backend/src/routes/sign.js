@@ -61,9 +61,15 @@ function findSignRequestById(requests, signRequestId) {
 }
 
 function isLocalUnlimitedMode(req) {
-    const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').toLowerCase();
-    const isLocalHost = host.includes('localhost') || host.includes('127.0.0.1');
-    return process.env.NODE_ENV === 'development' && process.env.AUTH_BYPASS === 'true' && isLocalHost;
+    if (process.env.NODE_ENV === 'production') return false;
+    const host = String(req?.headers?.['x-forwarded-host'] || req?.headers?.host || '').toLowerCase();
+    if (host.includes('diffsense.spacegleam.co.jp')) return false;
+    const isLocalHost = host.includes('localhost') || host.includes('127.0.0.1') || host.includes('::1');
+    if (!isLocalHost) return false;
+    if (process.env.LOCAL_UNLIMITED === 'true' && process.env.AUTH_BYPASS === 'true') {
+        return true;
+    }
+    return process.env.NODE_ENV === 'development' && process.env.AUTH_BYPASS === 'true';
 }
 
 function annotateFieldsWithRecipientEmail(fields, recipients) {

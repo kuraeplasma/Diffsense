@@ -3174,10 +3174,10 @@ class DashboardApp {
             plan: isLocal ? 'owner' : 'free', 
             billingCycle: 'monthly', 
             usageCount: 0, 
-            usageLimit: 999999, 
+            usageLimit: isLocal ? 999999 : 3, 
             daysRemaining: null, 
-            planLimit: 999999,
-            signUsageLimit: 999999
+            planLimit: isLocal ? 999999 : 3,
+            signUsageLimit: isLocal ? 999999 : 10
         };
         this.userPlan = isLocal ? 'owner' : 'free';
         if (isLocal) this.userRole = '管理者';
@@ -3187,9 +3187,9 @@ class DashboardApp {
         const _isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '[::1]' || window.location.hostname.endsWith('.local');
         const forcedPlan = _isLocalHost ? urlParams.get('forcePlan') : null;
         const forcedPlanData = {
-            free:     { plan: 'free',     billingCycle: 'monthly', usageCount: 0, usageLimit: 999999, daysRemaining: null, planLimit: 999999, signUsageLimit: 999999 },
-            starter:  { plan: 'starter',  billingCycle: 'monthly', usageCount: 0, usageLimit: 999999, daysRemaining: null, planLimit: 999999, signUsageLimit: 999999 },
-            business: { plan: 'business', billingCycle: 'monthly', usageCount: 0, usageLimit: 999999, daysRemaining: null, planLimit: 999999, signUsageLimit: 999999 },
+            free:     { plan: 'free',     billingCycle: 'monthly', usageCount: 0, usageLimit: 3, daysRemaining: null, planLimit: 3, signUsageLimit: 10 },
+            starter:  { plan: 'starter',  billingCycle: 'monthly', usageCount: 0, usageLimit: 50, daysRemaining: null, planLimit: 50, signUsageLimit: 25 },
+            business: { plan: 'business', billingCycle: 'monthly', usageCount: 0, usageLimit: 120, daysRemaining: null, planLimit: 120, signUsageLimit: 100 },
             pro:      { plan: 'pro',      billingCycle: 'monthly', usageCount: 0, usageLimit: 999999, daysRemaining: null, planLimit: 999999, signUsageLimit: 999999 },
         };
         if (forcedPlan && forcedPlanData[forcedPlan]) {
@@ -4874,9 +4874,9 @@ class DashboardApp {
         if (forcedPlan) {
             const forcedPlanMap = {
                 owner:    { plan: 'owner',    billingCycle: 'monthly', usageCount: 0, usageLimit: 999999, daysRemaining: null, planLimit: 999999, signUsageLimit: 999999 },
-                free:     { plan: 'free',     billingCycle: 'monthly', usageCount: 0, usageLimit: 999999, daysRemaining: null, planLimit: 999999, signUsageLimit: 999999 },
-                starter:  { plan: 'starter',  billingCycle: 'monthly', usageCount: 0, usageLimit: 999999, daysRemaining: null, planLimit: 999999, signUsageLimit: 999999 },
-                business: { plan: 'business', billingCycle: 'monthly', usageCount: 0, usageLimit: 999999, daysRemaining: null, planLimit: 999999, signUsageLimit: 999999 },
+                free:     { plan: 'free',     billingCycle: 'monthly', usageCount: 0, usageLimit: 3, daysRemaining: null, planLimit: 3, signUsageLimit: 10 },
+                starter:  { plan: 'starter',  billingCycle: 'monthly', usageCount: 0, usageLimit: 50, daysRemaining: null, planLimit: 50, signUsageLimit: 25 },
+                business: { plan: 'business', billingCycle: 'monthly', usageCount: 0, usageLimit: 120, daysRemaining: null, planLimit: 120, signUsageLimit: 100 },
                 pro:      { plan: 'pro',      billingCycle: 'monthly', usageCount: 0, usageLimit: 999999, daysRemaining: null, planLimit: 999999, signUsageLimit: 999999 },
             };
             if (forcedPlanMap[forcedPlan]) {

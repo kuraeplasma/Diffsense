@@ -104,14 +104,7 @@ router.post('/final-docx-to-pdf', (req, res) => {
         try {
             const revisedResult = docxService.applyRevisionsToDocx(fileBuffer, revisions);
             logger.info(`Final DOCX revisions requested=${revisedResult.requestedCount} inserted=${revisedResult.insertedCount} skipped=${JSON.stringify(revisedResult.skipped || [])}`);
-            if (revisedResult.insertedCount !== revisedResult.requestedCount) {
-                return res.status(422).json({
-                    error: 'Some revisions were not inserted into DOCX',
-                    requestedCount: revisedResult.requestedCount,
-                    insertedCount: revisedResult.insertedCount,
-                    skipped: revisedResult.skipped || []
-                });
-            }
+            // 部分成功を許容: 反映できた分でPDFを生成し、未反映分はヘッダで通知する
             fs.writeFileSync(revisedPath, revisedResult.buffer);
             const pdfPath = await docxService.convertToPdf(revisedPath);
             const pdfBuffer = fs.readFileSync(pdfPath);
@@ -120,6 +113,10 @@ router.post('/final-docx-to-pdf', (req, res) => {
             fs.unlinkSync(pdfPath);
 
             res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('X-Revisions-Requested', String(revisedResult.requestedCount));
+            res.setHeader('X-Revisions-Inserted', String(revisedResult.insertedCount));
+            res.setHeader('X-Revisions-Skipped', encodeURIComponent(JSON.stringify(revisedResult.skipped || [])));
+            res.setHeader('Access-Control-Expose-Headers', 'X-Revisions-Requested, X-Revisions-Inserted, X-Revisions-Skipped');
             res.send(pdfBuffer);
         } catch (err) {
             logger.error('Final DOCX conversion error:', err);
@@ -162,18 +159,15 @@ router.post('/final-docx', (req, res) => {
         try {
             const revisedResult = docxService.applyRevisionsToDocx(fileBuffer, revisions);
             logger.info(`Final DOCX download requested=${revisedResult.requestedCount} inserted=${revisedResult.insertedCount} skipped=${JSON.stringify(revisedResult.skipped || [])}`);
-            if (revisedResult.insertedCount !== revisedResult.requestedCount) {
-                return res.status(422).json({
-                    error: 'Some revisions were not inserted into DOCX',
-                    requestedCount: revisedResult.requestedCount,
-                    insertedCount: revisedResult.insertedCount,
-                    skipped: revisedResult.skipped || []
-                });
-            }
 
+            // 部分成功を許容: 一致した修正は反映し、未反映分はヘッダで通知する（全or無で全消失させない）
             const safeName = String(fileName || 'document.docx').replace(/[^a-zA-Z0-9_.-]/g, '_').replace(/\.docx?$/i, '');
             res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
             res.setHeader('Content-Disposition', `attachment; filename="${safeName}_final.docx"`);
+            res.setHeader('X-Revisions-Requested', String(revisedResult.requestedCount));
+            res.setHeader('X-Revisions-Inserted', String(revisedResult.insertedCount));
+            res.setHeader('X-Revisions-Skipped', encodeURIComponent(JSON.stringify(revisedResult.skipped || [])));
+            res.setHeader('Access-Control-Expose-Headers', 'X-Revisions-Requested, X-Revisions-Inserted, X-Revisions-Skipped');
             res.send(revisedResult.buffer);
         } catch (err) {
             logger.error('Final DOCX download error:', err);

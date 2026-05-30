@@ -10,6 +10,7 @@ const urlService = require('../services/url');
 const docxService = require('../services/docxService');
 const diffService = require('../services/diffService');
 const dbService = require('../services/db');
+const mailer = require('../services/mailer');
 const { toLegacyArticleArray, fromLegacyArticleArray } = require('../services/contractStructure');
 const logger = require('../utils/logger');
 const crypto = require('crypto');
@@ -120,9 +121,15 @@ router.patch('/:id', async (req, res, next) => {
 });
 
 function isLocalUnlimitedMode(req) {
-    const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').toLowerCase();
-    const isLocalHost = host.includes('localhost') || host.includes('127.0.0.1');
-    return process.env.NODE_ENV === 'development' && process.env.AUTH_BYPASS === 'true' && isLocalHost;
+    if (process.env.NODE_ENV === 'production') return false;
+    const host = String(req?.headers?.['x-forwarded-host'] || req?.headers?.host || '').toLowerCase();
+    if (host.includes('diffsense.spacegleam.co.jp')) return false;
+    const isLocalHost = host.includes('localhost') || host.includes('127.0.0.1') || host.includes('::1');
+    if (!isLocalHost) return false;
+    if (process.env.LOCAL_UNLIMITED === 'true' && process.env.AUTH_BYPASS === 'true') {
+        return true;
+    }
+    return process.env.NODE_ENV === 'development' && process.env.AUTH_BYPASS === 'true';
 }
 
 function isAiFailureSummary(summary) {
@@ -136,6 +143,22 @@ function isAiResultReady(result) {
     if (isAiFailureSummary(summary)) return false;
     if (result?.aiSucceeded === false) return false;
     return true;
+}
+
+async function notifyAnalysisFailure(req, details = {}) {
+    try {
+        await mailer.sendAnalysisFailureAlertEmail({
+            userEmail: req?.user?.email || '',
+            userId: req?.user?.uid || '',
+            contractId: details.contractId,
+            method: details.method,
+            endpoint: req?.originalUrl || req?.path || '',
+            contractName: details.contractName,
+            errorMessage: details.error?.stack || details.error?.message || details.errorMessage || 'Unknown analysis failure'
+        });
+    } catch (mailError) {
+        logger.error(`Analysis failure alert email failed: ${mailError.message}`);
+    }
 }
 
 function hasMeaningfulContractMeta(meta) {
@@ -655,7 +678,7 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
                     'free': { name: 'Starter', limit: 50, price: '¥1,480' },
                     'trial': { name: 'Starter', limit: 50, price: '¥1,480' },
                     'starter': { name: 'Business', limit: 120, price: '¥4,980' },
-                    'business': { name: 'Pro', limit: 400, price: '¥9,800' },
+                    'business': { name: 'Pro', limit: '無制限', price: '¥9,800' },
                     'pro': null
                 };
                 const next = nextPlanMap[plan];
@@ -895,6 +918,7 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
 
         } catch (error) {
             logger.error('Non-fatal analysis error:', error);
+            await notifyAnalysisFailure(req, { contractId, method, error });
             // We don't rethrow, just return what we have (file is saved)
             aiResult.summary = `解析中にエラーが発生しました: ${error.message}`;
             aiResult.riskReason = 'エラーにより解析中断';
@@ -914,7 +938,7 @@ router.post('/analyze', rateLimit, async (req, res, next) => {
         const isFree = plan === 'free';
         const isStarter = plan === 'starter';
 
-        const isLimited = isFree || isStarter || aiResult.isLimited === true;
+        const isLimited = !localUnlimited && (isFree || isStarter || aiResult.isLimited === true);
 
         logger.info(`analyze response contractId=${contractId} success=${aiResult.success} aiSucceeded=${aiResult.aiSucceeded} isLimited=${isLimited}`);
         res.json({
@@ -1092,7 +1116,7 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
                 'free': { name: 'Starter', limit: 50, price: '¥1,480' },
                 'trial': { name: 'Starter', limit: 50, price: '¥1,480' },
                 'starter': { name: 'Business', limit: 120, price: '¥4,980' },
-                'business': { name: 'Pro', limit: 400, price: '¥9,800' },
+                'business': { name: 'Pro', limit: '無制限', price: '¥9,800' },
                 'pro': null
             };
             const next = nextPlanMap[plan];
@@ -1352,7 +1376,7 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
         const isFree = plan === 'free';
         const isStarter = plan === 'starter';
 
-        const isLimited = isFree || isStarter || aiResult.isLimited === true;
+        const isLimited = !localUnlimited && (isFree || isStarter || aiResult.isLimited === true);
 
         res.json({
             success: true,
@@ -1380,6 +1404,11 @@ router.post('/upload-docx', rateLimit, async (req, res, next) => {
         });
     } catch (error) {
         logger.error('DOCX upload error:', error);
+        await notifyAnalysisFailure(req, {
+            contractId: req.body?.contractId,
+            method: 'docx',
+            error
+        });
         next(error);
     }
 });
@@ -1413,9 +1442,15 @@ router.get('/:id/original-file', async (req, res, next) => {
         const uploadsDir = pathMod.join(__dirname, '../../uploads');
 
         let resolved = null;
+        let storagePath = null;
         if (contract.original_file_path) {
-            const candidate = pathMod.resolve(contract.original_file_path);
-            if (fs.existsSync(candidate)) resolved = candidate;
+            const rawPath = String(contract.original_file_path || '').trim();
+            if (rawPath.startsWith('contracts/')) {
+                storagePath = rawPath;
+            } else {
+                const candidate = pathMod.resolve(rawPath);
+                if (fs.existsSync(candidate)) resolved = candidate;
+            }
         }
 
         // Fallback: search /uploads/ for contract-{id}-*.docx or docx-{id}-*.docx
@@ -1430,6 +1465,33 @@ router.get('/:id/original-file', async (req, res, next) => {
         }
 
         if (!resolved) {
+            if (storagePath && bucket) {
+                const originalName = contract.original_filename || pathMod.basename(storagePath);
+                const ext = pathMod.extname(originalName).toLowerCase();
+                const contentTypeMap = {
+                    '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                    '.doc':  'application/msword',
+                    '.pdf':  'application/pdf'
+                };
+                const contentType = contentTypeMap[ext] || 'application/octet-stream';
+
+                res.setHeader('Content-Type', contentType);
+                res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(originalName)}`);
+                res.setHeader('Cache-Control', 'no-store');
+                bucket.file(storagePath)
+                    .createReadStream()
+                    .on('error', (streamError) => {
+                        logger.error(`Original file storage stream error for contract ${contractId}:`, streamError);
+                        if (!res.headersSent) {
+                            res.status(404).json({ success: false, error: '原本ファイルが保存されていません' });
+                        } else {
+                            res.destroy(streamError);
+                        }
+                    })
+                    .pipe(res);
+                logger.info(`Served original storage file for contract ${contractId}: ${storagePath}`);
+                return;
+            }
             return res.status(404).json({ success: false, error: '原本ファイルが保存されていません' });
         }
 
@@ -1693,7 +1755,7 @@ router.post('/:id/reanalyze', rateLimit, async (req, res, next) => {
                 'free': { name: 'Starter', limit: 50, price: '¥1,480' },
                 'trial': { name: 'Starter', limit: 50, price: '¥1,480' },
                 'starter': { name: 'Business', limit: 120, price: '¥4,980' },
-                'business': { name: 'Pro', limit: 400, price: '¥9,800' },
+                'business': { name: 'Pro', limit: '無制限', price: '¥9,800' },
                 'pro': null
             };
             const next = nextPlanMap[plan];

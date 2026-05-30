@@ -2,11 +2,14 @@
 
 const { Resend } = require('resend');
 const logger = require('../utils/logger');
+const mailQuota = require('./mailQuota');
 
 const FROM = process.env.MAIL_FROM || 'noreply@send.spacegleam.co.jp';
 const REPLY_TO = process.env.MAIL_REPLY_TO || 'contact@spacegleam.co.jp';
+const CONTACT_TO = process.env.CONTACT_NOTIFY_EMAIL || process.env.MAIL_QUOTA_ALERT_TO || REPLY_TO;
 
 let resendClient = null;
+let rawResendSend = null;
 
 function getResendClient() {
     if (resendClient) {
@@ -17,6 +20,19 @@ function getResendClient() {
         throw new Error('RESEND_API_KEY is not configured');
     }
     resendClient = new Resend(apiKey);
+    rawResendSend = resendClient.emails.send.bind(resendClient.emails);
+    resendClient.emails.send = async (payload) => {
+        const result = await rawResendSend(payload);
+        if (!result.error) {
+            try {
+                const status = await mailQuota.recordMailSent('general');
+                if (status.warningLevel) await sendQuotaWarningEmail(status);
+            } catch (error) {
+                logger.warn(`[mailer] quota tracking failed: ${error.message}`);
+            }
+        }
+        return result;
+    };
     return resendClient;
 }
 
@@ -31,6 +47,36 @@ function formatResendError(error) {
     }
 }
 
+
+function _notificationEmailTo() {
+    return process.env.MAIL_QUOTA_ALERT_TO || process.env.CONTACT_NOTIFY_EMAIL || REPLY_TO || 'contact@spacegleam.co.jp';
+}
+
+async function sendQuotaWarningEmail(status) {
+    if (!rawResendSend) return;
+    try {
+        const to = _notificationEmailTo();
+        const subject = `【DIFFsense】メール送信数が月間上限の${status.warningLevel}%に達しました`;
+        const text = [
+            'DIFFsenseのメール送信数が上限に近づいています。',
+            '',
+            `対象月: ${status.yearMonth}`,
+            `送信数: ${status.total} / ${status.limit}`,
+            `到達率: ${status.percent}%`,
+            '',
+            '95%に到達すると、お問い合わせフォームの送信だけを一時停止します。',
+            '会員招待・署名通知など重要メールは停止しません。'
+        ].join('\n');
+        const result = await rawResendSend({ from: FROM, to: [to], reply_to: REPLY_TO, subject, text });
+        if (result.error) {
+            logger.error(`[mailer] sendQuotaWarningEmail failed error=${formatResendError(result.error)}`);
+            return;
+        }
+        await mailQuota.recordMailSent('quota_warning', { suppressWarnings: true });
+    } catch (error) {
+        logger.error(`[mailer] sendQuotaWarningEmail failed: ${error.message}`);
+    }
+}
 function _isEmailLike(value) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
 }
@@ -148,6 +194,40 @@ async function sendRecipientActionEmail({ to, senderName, fileName, recipientNam
         throw new Error(detail);
     }
     logger.info(`[mailer] sendRecipientActionEmail sent to=${to} emailId=${result.data?.id || 'unknown'}`);
+}
+
+async function sendInviteEmail({ to, name, role, inviterName, tempPassword }) {
+    const resend = getResendClient();
+    const frontendUrl = _frontendBaseUrl();
+    const loginUrl = `${frontendUrl}/login.html`;
+    const result = await resend.emails.send({
+        from: FROM,
+        to: [to],
+        reply_to: REPLY_TO,
+        subject: '【DIFFsense】チームへの招待・ログイン情報のお知らせ',
+        html: _inviteHtml({ to, name, role, inviterName, tempPassword, loginUrl }),
+        text: [
+            `${name} 様`,
+            '',
+            `${inviterName} 様から DIFFsense チームへ招待されました。`,
+            '',
+            '以下のログイン情報でアクセスしてください:',
+            '',
+            `メールアドレス: ${to}`,
+            `仮パスワード: ${tempPassword}`,
+            `権限: ${role}`,
+            '',
+            `ログインURL: ${loginUrl}`,
+            '',
+            '※セキュリティのため、初回ログイン後にパスワードの変更を推奨します。'
+        ].join('\n')
+    });
+    if (result.error) {
+        const detail = formatResendError(result.error);
+        logger.error(`[mailer] sendInviteEmail failed to=${to} from=${FROM} replyTo=${REPLY_TO} error=${detail}`);
+        throw new Error(detail);
+    }
+    logger.info(`[mailer] sendInviteEmail sent to=${to} emailId=${result.data?.id || 'unknown'}`);
 }
 
 function _signingHtml({ recipientName, senderName, fileName, signingUrl }) {
@@ -290,6 +370,51 @@ function _recipientActionHtml({ senderName, fileName, recipientName, actionLabel
 </body></html>`;
 }
 
+function _inviteHtml({ to, name, role, inviterName, tempPassword, loginUrl }) {
+    return `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#fdfcfb;font-family:'Noto Sans JP','Inter','Hiragino Sans','Yu Gothic','Meiryo',sans-serif;color:#2b2623;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#fdfcfb;padding:40px 20px;">
+<tr><td align="center">
+<table width="560" cellpadding="0" cellspacing="0"
+       style="background:#ffffff;border-radius:16px;border:1px solid #e7e0d6;overflow:hidden;box-shadow:0 12px 32px rgba(26,21,18,0.08);">
+  <tr><td style="padding:32px;">
+    <p style="margin:0 0 24px;font-size:17px;line-height:1;font-family:Helvetica,Arial,sans-serif;font-weight:600;letter-spacing:0.5px;color:#c5a059;">DIFFsense</p>
+    <p style="margin:0 0 8px;font-size:15px;font-weight:700;color:#2b2623;">${_e(name)} 様</p>
+    <p style="margin:0 0 24px;font-size:14px;color:#5e544d;line-height:1.8;">
+      ${_e(inviterName)} 様から DIFFsense チームへ招待されました。<br>
+      以下のログイン情報でアクセスしてください。
+    </p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#fbfaf8;border:1px solid #eee3d2;border-radius:12px;padding:16px 20px;margin-bottom:28px;">
+      <tr>
+        <td style="padding:8px 0;color:#8a7a6a;font-size:12px;width:120px;">メールアドレス</td>
+        <td style="padding:8px 0;color:#2b2623;font-size:14px;font-weight:700;">${_e(to)}</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 0;color:#8a7a6a;font-size:12px;">仮パスワード</td>
+        <td style="padding:8px 0;color:#2b2623;font-size:15px;font-weight:700;font-family:Consolas,Menlo,monospace;letter-spacing:1px;">${_e(tempPassword)}</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 0;color:#8a7a6a;font-size:12px;">権限</td>
+        <td style="padding:8px 0;color:#2b2623;font-size:14px;font-weight:700;">${_e(role)}</td>
+      </tr>
+    </table>
+    <div style="text-align:center;margin:30px 0;">
+      <a href="${loginUrl}"
+         style="display:inline-block;background:#c5a059;color:#fff;text-decoration:none;border-radius:12px;padding:13px 34px;font-size:14px;font-weight:700;box-shadow:0 8px 18px rgba(197,160,89,0.28);">
+        ログインする
+      </a>
+    </div>
+    <p style="margin:26px 0 0;padding-top:18px;border-top:1px solid #eee3d2;color:#8a7a6a;font-size:12px;line-height:1.7;">
+      ※ セキュリティのため、初回ログイン後にパスワードの変更を推奨します。<br>
+      ※ このメールに心当たりのない場合は、無視してください。
+    </p>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>`;
+}
+
 function _e(s) {
     return String(s || '')
         .replace(/&/g, '&amp;')
@@ -322,6 +447,40 @@ async function sendPaymentSuccessEmail({ to, plan, billingCycle }) {
         throw new Error(detail);
     }
     logger.info(`[mailer] sendPaymentSuccessEmail sent to=${to} emailId=${result.data?.id || 'unknown'}`);
+}
+
+async function sendAnalysisFailureAlertEmail({ userEmail, userId, contractId, method, errorMessage, endpoint, contractName }) {
+    const to = _notificationEmailTo();
+    const safeMethod = String(method || 'unknown').toUpperCase();
+    const subject = `【DIFFsense】資料解析に失敗しました (${safeMethod})`;
+    const text = [
+        'DIFFsenseで資料解析エラーが発生しました。',
+        '',
+        `発生日時: ${new Date().toISOString()}`,
+        `エンドポイント: ${endpoint || '-'}`,
+        `契約ID: ${contractId || '-'}`,
+        `契約名: ${contractName || '-'}`,
+        `形式: ${safeMethod}`,
+        `ユーザーID: ${userId || '-'}`,
+        `ユーザーEmail: ${userEmail || '-'}`,
+        '',
+        'エラー:',
+        String(errorMessage || 'Unknown error').slice(0, 4000)
+    ].join('\n');
+
+    const result = await getResendClient().emails.send({
+        from: FROM,
+        to: [to],
+        reply_to: REPLY_TO,
+        subject,
+        text
+    });
+    if (result.error) {
+        const detail = formatResendError(result.error);
+        logger.error(`[mailer] sendAnalysisFailureAlertEmail failed to=${to} error=${detail}`);
+        throw new Error(detail);
+    }
+    logger.info(`[mailer] sendAnalysisFailureAlertEmail sent to=${to} emailId=${result.data?.id || 'unknown'}`);
 }
 
 function _paymentSuccessHtml({ planName, cycleName }) {
@@ -423,11 +582,59 @@ DIFFsense ― 契約の変更点を見逃さない<br>
     return result;
 }
 
+
+async function sendContactInquiryEmail({ company, name, email, category, subject, message, source, meta = {} }) {
+    const mailSubject = `【DIFFsense】お問い合わせ: ${subject}`;
+    const text = [
+        'DIFFsense LPからお問い合わせが届きました。',
+        '',
+        `会社名: ${company}`,
+        `お名前: ${name}`,
+        `メール: ${email}`,
+        `種別: ${category}`,
+        `件名: ${subject}`,
+        '',
+        'お問い合わせ内容:',
+        message
+    ].join('\n');
+    const html = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f5f7fb;font-family:'Noto Sans JP','Inter','Hiragino Sans','Yu Gothic','Meiryo',sans-serif;color:#06163b;">
+<table width="100%" cellpadding="0" cellspacing="0" style="padding:32px 16px;background:#f5f7fb;"><tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border:1px solid #dbe6f5;border-radius:14px;overflow:hidden;">
+<tr><td style="background:#071326;color:#fff;padding:20px 28px;font-weight:800;font-size:18px;">DIFFsense お問い合わせ</td></tr>
+<tr><td style="padding:28px;">
+<p><strong>会社名:</strong> ${_e(company)}</p>
+<p><strong>お名前:</strong> ${_e(name)}</p>
+<p><strong>メール:</strong> <a href="mailto:${_e(email)}">${_e(email)}</a></p>
+<p><strong>種別:</strong> ${_e(category)}</p>
+<p><strong>件名:</strong> ${_e(subject)}</p>
+<div style="margin-top:22px;padding:18px;border-radius:12px;background:#f8fbff;border:1px solid #e1ebf8;white-space:pre-wrap;line-height:1.8;">${_e(message)}</div>
+</td></tr></table></td></tr></table></body></html>`;
+
+    const result = await getResendClient().emails.send({
+        from: FROM,
+        to: [CONTACT_TO],
+        reply_to: email,
+        subject: mailSubject,
+        html,
+        text
+    });
+    if (result.error) {
+        const detail = formatResendError(result.error);
+        logger.error(`[mailer] sendContactInquiryEmail failed from=${email} to=${CONTACT_TO} error=${detail}`);
+        throw new Error(detail);
+    }
+    logger.info(`[mailer] sendContactInquiryEmail sent from=${email} to=${CONTACT_TO} emailId=${result.data?.id || 'unknown'}`);
+}
 module.exports = {
+    sendInviteEmail,
     sendSigningRequestEmail,
     sendCompletionEmail,
     sendReminderEmail,
     sendRecipientActionEmail,
     sendPaymentSuccessEmail,
-    sendCrawlChangeAlertEmail
+    sendAnalysisFailureAlertEmail,
+    sendCrawlChangeAlertEmail,
+    sendContactInquiryEmail
 };
+

@@ -10,7 +10,8 @@
     "check:env:prod": "node scripts/check-production-env.js",
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --check src/routes/contracts.js && node --check src/services/db.js && node --check src/services/mailer.js && node --check test/upload-analysis-smoke.mjs",
+    "test:upload-analysis": "node test/upload-analysis-smoke.mjs",
     "healthcheck": "node test/healthcheck.js",
     "deploy:test": "node scripts/deploy-and-test.js"
   },
@@ -25,7 +26,6 @@
   "dependencies": {
     "@google-cloud/secret-manager": "^6.1.1",
     "@modelcontextprotocol/sdk": "^1.28.0",
-    "@sendgrid/mail": "^8.1.6",
     "adm-zip": "^0.5.16",
     "axios": "^1.6.2",
     "cheerio": "^1.2.0",

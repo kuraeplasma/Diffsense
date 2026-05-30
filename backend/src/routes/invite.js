@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const emailService = require('../services/email');
+const mailer = require('../services/mailer');
 const logger = require('../utils/logger');
 const authMiddleware = require('../middleware/authMiddleware');
 const dbService = require('../services/db');
@@ -81,17 +81,23 @@ router.post('/', authMiddleware, async (req, res) => {
 
         // Try to send invitation email with login credentials
         let emailSent = false;
-        const hasEmailConfig = process.env.SENDGRID_API_KEY && process.env.SENDGRID_API_KEY.startsWith('SG.');
+        const hasEmailConfig = Boolean(process.env.RESEND_API_KEY);
 
         if (hasEmailConfig) {
             try {
-                await emailService.sendInviteEmail(email, name, role, inviterName || '管理者', tempPassword);
+                await mailer.sendInviteEmail({
+                    to: email,
+                    name,
+                    role,
+                    inviterName: inviterName || '管理者',
+                    tempPassword
+                });
                 emailSent = true;
             } catch (emailError) {
                 logger.warn(`Email send failed (non-fatal): ${emailError.message}`);
             }
         } else {
-            logger.info('SendGrid not configured - skipping email, member registered only');
+            logger.info('Resend not configured - skipping email, member registered only');
         }
 
         res.status(200).json({

@@ -65,7 +65,7 @@ function normalizeLineText(text) {
     line = line.replace(/^第\s*第?\s*([0-9０-９一二三四五六七八九十百千〇零]+)\s*条\s*条?/, '第$1条');
     line = line.replace(/^第\s+([0-9０-９一二三四五六七八九十百千〇零]+)\s+条/, '第$1条');
 
-    return line.trim();
+    return line.trimEnd();
 }
 
 const ARTICLE_HEADER_TOKEN_REGEX = /第\s*[0-9０-９一二三四五六七八九十百千〇零]+\s*条(?=(?:\s|$|[（(【]))/g;

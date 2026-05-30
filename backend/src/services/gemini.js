@@ -946,7 +946,7 @@ function parseRetryAfterMs(error) {
 function getGeminiRequestBudget() {
     // ローカル/本番で同一実装。必要時は環境変数で同じキーを調整する。
     const timeoutMsRaw = Number(process.env.GEMINI_TIMEOUT_MS || 120000);
-    const maxAttemptsRaw = Number(process.env.GEMINI_MAX_ATTEMPTS || 3);
+    const maxAttemptsRaw = Number(process.env.GEMINI_MAX_ATTEMPTS || 5);
     const retryBaseMsRaw = Number(process.env.GEMINI_RETRY_BASE_MS || 1000);
     return {
         timeoutMs: Number.isFinite(timeoutMsRaw) && timeoutMsRaw >= 5000 ? Math.floor(timeoutMsRaw) : 120000,
