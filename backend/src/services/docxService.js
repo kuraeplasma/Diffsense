@@ -501,6 +501,21 @@ class DocxService {
             return false;
         };
 
+        // 後文(結語「以上の通り…」)・署名欄の日付など、条見出しではないが
+        // 「本文の終わり」を示す段落。追加条項がこの後ろへ流れ込むのを防ぐための境界。
+        // どんな契約書でも末尾(後文・署名押印欄)より前に追加条項が入るようにする。
+        const isClosingBoundary = text => {
+            const value = String(text || '').trim();
+            if (!value) return false;
+            if (/^以上/.test(value)) return true;
+            if (/(本書|本契約書|本契約).{0,16}[0-9０-９一二三四五六七八九十]+\s*通/.test(value)) return true;
+            if (/(記名|署名)\s*(押印|捺印)/.test(value)) return true;
+            if (/(各自|各)\s*[0-9０-９一二三四五六七八九十]+\s*通.{0,16}(所持|保有|有する)/.test(value)) return true;
+            if (/(令和|平成|昭和|西暦)[\s　○◯0-9０-９元]*年[\s　○◯0-9０-９]*月[\s　○◯0-9０-９]*日/.test(value) && value.length <= 24) return true;
+            if (/^[0-9０-９○◯]{1,4}\s*年[\s　]*[0-9０-９○◯]{1,2}\s*月[\s　]*[0-9０-９○◯]{1,2}\s*日/.test(value)) return true;
+            return false;
+        };
+
         const findStartIndex = (paragraphs, revision) => {
             if (revision.articleAnchor) {
                 const byArticle = paragraphs.findIndex(p => p.normalized.includes(revision.articleAnchor));
@@ -563,7 +578,7 @@ class DocxService {
 
             let insertAfter = startIndex;
             for (let i = startIndex + 1; i < paragraphs.length; i += 1) {
-                if (isInsertionBoundary(paragraphs[i].text)) break;
+                if (isInsertionBoundary(paragraphs[i].text) || isClosingBoundary(paragraphs[i].text)) break;
                 insertAfter = i;
             }
 
