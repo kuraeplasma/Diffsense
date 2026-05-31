@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>解析進捗モーダル 名称変更版</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        body {
+            margin: 0; padding: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #fbfdff; 
+            height: 100vh; display: flex; align-items: center; justify-content: center;
+            overflow: hidden; position: relative;
+        }
+
+        /* 背景の動くグラデーション（白系・ゆったりした波） */
+        body::before, body::after {
+            content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+            pointer-events: none; opacity: 0.8; z-index: 0;
+        }
+        body::before {
+            background: radial-gradient(ellipse at 30% 30%, rgba(59, 130, 246, 0.12) 0%, transparent 60%);
+            animation: dsWave1 40s ease-in-out infinite alternate;
+        }
+        body::after {
+            background: radial-gradient(ellipse at 70% 70%, rgba(16, 185, 129, 0.08) 0%, transparent 60%);
+            animation: dsWave2 50s ease-in-out infinite alternate-reverse;
+        }
+
+        @keyframes dsWave1 {
+            0% { transform: translate(0, 0) scale(1) rotate(0deg); }
+            33% { transform: translate(5%, 10%) scale(1.1) rotate(5deg); }
+            66% { transform: translate(-5%, 5%) scale(0.9) rotate(-5deg); }
+            100% { transform: translate(0, 0) scale(1) rotate(0deg); }
+        }
+        @keyframes dsWave2 {
+            0% { transform: translate(0, 0) scale(1) rotate(0deg); }
+            33% { transform: translate(-8%, -5%) scale(0.95) rotate(-8deg); }
+            66% { transform: translate(8%, -10%) scale(1.05) rotate(8deg); }
+            100% { transform: translate(0, 0) scale(1) rotate(0deg); }
+        }
+
+        .ds-progress-modal {
+            position: relative;
+            background: #ffffff; width: 900px; border-radius: 20px; 
+            box-shadow: 0 40px 120px rgba(0,0,0,0.4); z-index: 10006;
+            padding: 0; overflow: hidden; animation: dsModalFade 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        @keyframes dsModalFade { from { opacity: 0; transform: scale(0.99) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+
+        .ds-modal-inner { padding: 48px; }
+        .ds-modal-close { position: absolute; top: 24px; right: 24px; font-size: 20px; color: #94a3b8; cursor: pointer; }
+
+        /* 上部エリア */
+        .ds-modal-top { display: flex; align-items: center; gap: 40px; margin-bottom: 40px; }
+        .ds-top-visual { position: relative; width: 140px; height: 140px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        
+        .ds-visual-analyzing { position: relative; }
+        .ds-visual-analyzing::before {
+            content: ''; position: absolute; width: 180px; height: 180px;
+            background: radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%);
+            animation: dsGlow 4s ease-in-out infinite;
+        }
+        @keyframes dsGlow { 0%, 100% { opacity: 0.5; transform: scale(1); } 50% { opacity: 1; transform: scale(1.1); } }
+
+        .ds-doc-box { 
+            width: 80px; height: 104px; background: #fff; 
+            border-radius: 8px; position: relative; 
+            box-shadow: 
+                0 15px 35px rgba(0,0,0,0.05),
+                0 5px 15px rgba(0,0,0,0.03);
+            overflow: hidden;
+            animation: dsBreathe 4s ease-in-out infinite;
+            padding: 24px 16px; display: flex; flex-direction: column; gap: 10px;
+            border: 1px solid #f1f5f9;
+        }
+        
+        @keyframes dsBreathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.03); } }
+
+        .ds-visual-line { 
+            height: 4px; background: #f1f5f9; border-radius: 4px; width: 100%; 
+        }
+        .ds-visual-line:nth-child(1) { width: 50%; height: 6px; background: #e2e8f0; margin-bottom: 4px; }
+        .ds-visual-line:nth-child(2) { width: 90%; }
+        .ds-visual-line:nth-child(3) { width: 85%; }
+        .ds-visual-line:nth-child(4) { width: 70%; }
+        
+        /* スキャンライン */
+        .ds-doc-box::after {
+            content: ''; position: absolute; top: -50%; left: 0; width: 100%; height: 40%;
+            background: linear-gradient(to bottom, transparent, rgba(59, 130, 246, 0.05), transparent);
+            animation: dsScan 3s linear infinite;
+            z-index: 1;
+        }
+        @keyframes dsScan { 0% { top: -50%; } 100% { top: 120%; } }
+
+        .ds-visual-complete { width: 80px; height: 80px; background: #10b981; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 40px; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.3); animation: dsPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        @keyframes dsPop { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+        .ds-top-content h3 { margin: 0 0 8px; font-size: 28px; font-weight: 800; color: #0f172a; letter-spacing: -0.02em; }
+        .ds-top-content p { margin: 0; font-size: 15px; color: #64748b; }
+
+        /* 6ステップ・プログレスバー */
+        .ds-steps-container { display: flex; justify-content: space-between; position: relative; margin-bottom: 48px; padding: 0 10px; }
+        .ds-steps-line { position: absolute; top: 20px; left: 50px; right: 50px; height: 2px; background: #f1f5f9; z-index: 0; }
+        .ds-steps-line-active { position: absolute; top: 20px; left: 50px; height: 2px; background: #10b981; z-index: 1; transition: width 0.8s ease; width: 0; }
+        
+        .ds-step-item { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 12px; width: 120px; }
+        .ds-step-circle { 
+            width: 40px; height: 40px; border-radius: 50%; background: #fff; border: 2px solid #f1f5f9;
+            display: flex; align-items: center; justify-content: center; font-size: 18px; color: #cbd5e1;
+            transition: all 0.4s ease;
+        }
+        .ds-step-name { font-size: 12px; font-weight: 700; color: #64748b; white-space: nowrap; margin-bottom: 4px; }
+        .ds-step-status { font-size: 11px; font-weight: 600; color: #94a3b8; }
+
+        .ds-step-item.active .ds-step-circle { background: #3b82f6; border-color: #3b82f6; color: #fff; box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.15); transform: scale(1.1); }
+        .ds-step-item.active .ds-step-name { color: #1e40af; }
+        .ds-step-item.active .ds-step-status { color: #3b82f6; }
+        
+        .ds-step-item.completed .ds-step-circle { background: #fff; border-color: #10b981; color: #10b981; }
+        .ds-step-item.completed .ds-step-name { color: #334155; }
+        .ds-step-item.completed .ds-step-status { color: #10b981; }
+
+        /* ステータスカード */
+        .ds-status-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px 32px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; }
+        .ds-status-main { display: flex; align-items: center; gap: 24px; }
+        
+        /* リアル・スピナー */
+        .ds-status-spinner { position: relative; width: 44px; height: 44px; }
+        .ds-dot-spinner { width: 100%; height: 100%; position: relative; }
+        .ds-dot-spinner div { 
+            position: absolute; width: 100%; height: 100%;
+            transform-origin: center center;
+            animation: dsFadeSpinner 1.2s linear infinite;
+        }
+        .ds-dot-spinner div:after {
+            content: " "; display: block; position: absolute;
+            top: 0; left: 19px; width: 6px; height: 6px;
+            border-radius: 50%; background: #3b82f6;
+        }
+        .ds-dot-spinner div:nth-child(1) { transform: rotate(0deg); }
+        .ds-dot-spinner div:nth-child(2) { transform: rotate(30deg); }
+        .ds-dot-spinner div:nth-child(3) { transform: rotate(60deg); }
+        .ds-dot-spinner div:nth-child(4) { transform: rotate(90deg); }
+        .ds-dot-spinner div:nth-child(5) { transform: rotate(120deg); }
+        .ds-dot-spinner div:nth-child(6) { transform: rotate(150deg); }
+        .ds-dot-spinner div:nth-child(7) { transform: rotate(180deg); }
+        .ds-dot-spinner div:nth-child(8) { transform: rotate(210deg); }
+        .ds-dot-spinner div:nth-child(9) { transform: rotate(240deg); }
+        .ds-dot-spinner div:nth-child(10) { transform: rotate(270deg); }
+        .ds-dot-spinner div:nth-child(11) { transform: rotate(300deg); }
+        .ds-dot-spinner div:nth-child(12) { transform: rotate(330deg); }
+        
+        .ds-dot-spinner div:nth-child(1) { animation-delay: -1.1s; }
+        .ds-dot-spinner div:nth-child(2) { animation-delay: -1.0s; }
+        .ds-dot-spinner div:nth-child(3) { animation-delay: -0.9s; }
+        .ds-dot-spinner div:nth-child(4) { animation-delay: -0.8s; }
+        .ds-dot-spinner div:nth-child(5) { animation-delay: -0.7s; }
+        .ds-dot-spinner div:nth-child(6) { animation-delay: -0.6s; }
+        .ds-dot-spinner div:nth-child(7) { animation-delay: -0.5s; }
+        .ds-dot-spinner div:nth-child(8) { animation-delay: -0.4s; }
+        .ds-dot-spinner div:nth-child(9) { animation-delay: -0.3s; }
+        .ds-dot-spinner div:nth-child(10) { animation-delay: -0.2s; }
+        .ds-dot-spinner div:nth-child(11) { animation-delay: -0.1s; }
+        .ds-dot-spinner div:nth-child(12) { animation-delay: 0s; }
+        @keyframes dsFadeSpinner { 0% { opacity: 1; } 100% { opacity: 0.1; } }
+
+        .ds-status-text h4 { margin: 0 0 4px; font-size: 16px; font-weight: 700; color: #1e293b; }
+        .ds-status-text p { margin: 0; font-size: 13px; color: #64748b; }
+
+        /* サマリーグリッド */
+        .ds-summary-section { margin-bottom: 32px; animation: dsFadeIn 0.5s ease forwards; }
+        @keyframes dsFadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .ds-summary-title { font-size: 16px; font-weight: 800; color: #10b981; margin-bottom: 20px; }
+        .ds-summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 16px; }
+        .ds-summary-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; display: flex; align-items: center; gap: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.02); }
+        .ds-card-icon { width: 40px; height: 40px; border-radius: 10px; background: #f8fafc; color: #3b82f6; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+        .ds-card-info div:first-child { font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 2px; }
+        .ds-card-info div:last-child { font-size: 13px; font-weight: 700; color: #334155; }
+        .ds-card-info span { color: #3b82f6; font-size: 15px; margin: 0 2px; }
+
+        .ds-success-box { background: #f0fdf4; border: 1px solid #bcf0da; border-radius: 12px; padding: 20px; display: flex; align-items: flex-start; gap: 16px; margin-top: 24px; }
+        .ds-success-icon { font-size: 24px; color: #10b981; margin-top: 2px; }
+        .ds-success-content h4 { margin: 0 0 4px; font-size: 15px; font-weight: 800; color: #065f46; }
+        .ds-success-content p { margin: 0; font-size: 13px; color: #047857; line-height: 1.5; }
+
+        /* フッター */
+        .ds-modal-footer { background: #fcfdfe; border-top: 1px solid #f1f5f9; padding: 24px 48px; display: flex; align-items: center; justify-content: center; min-height: 80px; }
+        .ds-security-note { font-size: 12px; color: #94a3b8; display: flex; align-items: center; gap: 8px; }
+        .ds-footer-actions { width: 100%; display: flex; align-items: center; justify-content: space-between; animation: dsFadeIn 0.5s ease forwards; }
+        
+        .ds-btn-outline { padding: 12px 24px; border-radius: 10px; border: 1px solid #e2e8f0; background: #fff; color: #475569; font-weight: 700; font-size: 14px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 8px;}
+        .ds-btn-outline:hover { background: #f8fafc; border-color: #cbd5e1; }
+        .ds-btn-primary { padding: 12px 32px; border-radius: 10px; border: none; background: #0b2d62; color: #fff; font-weight: 700; font-size: 14px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 12px; }
+        .ds-btn-primary:hover { background: #1a3a6e; transform: translateY(-1px); box-shadow: 0 4px 15px rgba(11, 45, 98, 0.2); }
+
+        /* シミュレーションボタン */
+        .demo-controls { position: fixed; bottom: 30px; right: 30px; z-index: 10010; }
+        .demo-btn { background: #3b82f6; color: white; border: none; padding: 14px 28px; border-radius: 40px; font-weight: 800; cursor: pointer; box-shadow: 0 10px 25px rgba(59, 130, 246, 0.4); }
+    </style>
+</head>
+<body>
+
+    <!-- プレビュー用のダッシュボード・モック（透過確認用） -->
+    <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; padding: 40px; display: flex; flex-direction: column; gap: 24px; opacity: 0.5;">
+        <div style="display: flex; gap: 20px;">
+            <div style="width: 250px; height: 100vh; background: #010816; border-radius: 0 20px 20px 0; position: fixed; left: 0; top: 0;"></div>
+            <div style="flex: 1; margin-left: 270px;">
+                <div style="font-size: 24px; font-weight: 700; color: #1e293b; margin-bottom: 24px;">ダッシュボード</div>
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
+                    <div style="height: 120px; background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); padding: 20px;">
+                        <div style="width: 40%; height: 10px; background: #e2e8f0; border-radius: 5px; margin-bottom: 10px;"></div>
+                        <div style="width: 80%; height: 20px; background: #f1f5f9; border-radius: 5px;"></div>
+                    </div>
+                    <div style="height: 120px; background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); padding: 20px;"></div>
+                    <div style="height: 120px; background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); padding: 20px;"></div>
+                </div>
+                <div style="margin-top: 40px; height: 400px; background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="ds-progress-modal" id="ds-analysis-modal">
+        <div class="ds-modal-close"><i class="fa-solid fa-xmark"></i></div>
+        <div class="ds-modal-inner">
+            <div class="ds-modal-top" id="modal-top">
+                <div class="ds-top-visual ds-visual-analyzing" id="visual-area">
+                    <div class="ds-doc-box">
+                        <div class="ds-visual-line"></div>
+                        <div class="ds-visual-line"></div>
+                        <div class="ds-visual-line"></div>
+                        <div class="ds-visual-line"></div>
+                    </div>
+                </div>
+                <div class="ds-top-content">
+                    <h3 id="main-title">契約書を解析中です</h3>
+                    <p id="sub-title">AIが契約書の内容を詳細に分析しています...</p>
+                </div>
+            </div>
+
+            <div class="ds-steps-container">
+                <div class="ds-steps-line"></div>
+                <div class="ds-steps-line-active" id="line-active"></div>
+                
+                <div class="ds-step-item active" id="step-1">
+                    <div class="ds-step-circle"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+                    <div class="ds-step-name">1. 資料の取り込み</div>
+                    <div class="ds-step-status" id="status-1">解析中...</div>
+                </div>
+                <div class="ds-step-item" id="step-2">
+                    <div class="ds-step-circle"><i class="fa-solid fa-list-check"></i></div>
+                    <div class="ds-step-name">2. 条文の構造解析</div>
+                    <div class="ds-step-status" id="status-2">待機中</div>
+                </div>
+                <div class="ds-step-item" id="step-3">
+                    <div class="ds-step-circle"><i class="fa-solid fa-shield-halved"></i></div>
+                    <div class="ds-step-name">3. 要約・リスク解析</div>
+                    <div class="ds-step-status" id="status-3">待機中</div>
+                </div>
+                <div class="ds-step-item" id="step-4">
+                    <div class="ds-step-circle"><i class="fa-solid fa-pen-to-square"></i></div>
+                    <div class="ds-step-name">4. 修正案の作成</div>
+                    <div class="ds-step-status" id="status-4">待機中</div>
+                </div>
+                <div class="ds-step-item" id="step-5">
+                    <div class="ds-step-circle"><i class="fa-solid fa-calendar-days"></i></div>
+                    <div class="ds-step-name">5. 期限の取得</div>
+                    <div class="ds-step-status" id="status-5">待機中</div>
+                </div>
+                <div class="ds-step-item" id="step-6">
+                    <div class="ds-step-circle"><i class="fa-solid fa-circle-check"></i></div>
+                    <div class="ds-step-name">6. 完了</div>
+                    <div class="ds-step-status" id="status-6">待機中</div>
+                </div>
+            </div>
+
+            <div id="modal-body">
+                <div class="ds-status-card" id="analyzing-card">
+                    <div class="ds-status-main">
+                        <div class="ds-status-spinner">
+                            <div class="ds-dot-spinner">
+                                <div></div><div></div><div></div><div></div><div></div>
+                                <div></div><div></div><div></div><div></div><div></div>
+                                <div></div><div></div>
+                            </div>
+                        </div>
+                        <div class="ds-status-text">
+                            <h4>AIが処理を実行中です</h4>
+                            <p>リスク項目の抽出、要約の生成を行っています。通常30〜60秒程度で完了します。</p>
+                        </div>
+                    </div>
+                    <button class="ds-btn-outline">キャンセル</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="ds-modal-footer" id="modal-footer">
+            <div class="ds-security-note">
+                <i class="fa-solid fa-lock"></i>
+                アップロードしたファイルは暗号化され、安全に処理されます。
+            </div>
+        </div>
+    </div>
+
+    <div class="demo-controls">
+        <button class="demo-btn" onclick="startSimulation()">最初から再生</button>
+    </div>
+
+    <script>
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+        async function updateStep(num, status) {
+            const stepEl = document.getElementById(`step-${num}`);
+            const statusEl = document.getElementById(`status-${num}`);
+            const line = document.getElementById('line-active');
+            
+            if (status === 'completed') {
+                stepEl.classList.remove('active');
+                stepEl.classList.add('completed');
+                stepEl.querySelector('.ds-step-circle').innerHTML = '<i class="fa-solid fa-check"></i>';
+                statusEl.innerText = '完了';
+            } else if (status === 'active') {
+                document.querySelectorAll('.ds-step-item').forEach(s => s.classList.remove('active'));
+                stepEl.classList.add('active');
+                statusEl.innerText = '解析中...';
+            }
+            
+            const progress = ((num - 1) / 5) * 100;
+            line.style.width = `calc(${progress}% + 10px)`;
+        }
+
+        async function run() {
+            // Step 1
+            await updateStep(1, 'active');
+            await sleep(1500);
+            await updateStep(1, 'completed');
+            
+            // Step 2
+            await updateStep(2, 'active');
+            await sleep(1800);
+            await updateStep(2, 'completed');
+            
+            // Step 3
+            await updateStep(3, 'active');
+            await sleep(2500);
+            await updateStep(3, 'completed');
+
+            // Step 4
+            await updateStep(4, 'active');
+            await sleep(2000);
+            await updateStep(4, 'completed');
+
+            // Step 5
+            await updateStep(5, 'active');
+            await sleep(1500);
+            await updateStep(5, 'completed');
+
+            // Step 6
+            await updateStep(6, 'active');
+            await sleep(1000);
+            await updateStep(6, 'completed');
+
+            // Transition to Summary View
+            const modalTop = document.getElementById('modal-top');
+            const modalBody = document.getElementById('modal-body');
+            const modalFooter = document.getElementById('modal-footer');
+
+            modalTop.innerHTML = `
+                <div class="ds-top-visual">
+                    <div class="ds-visual-complete"><i class="fa-solid fa-check"></i></div>
+                </div>
+                <div class="ds-top-content">
+                    <h3>解析が完了しました！</h3>
+                    <p>契約書の分析が正常に完了しました</p>
+                </div>
+            `;
+
+            modalBody.innerHTML = `
+                <div class="ds-summary-section">
+                    <div class="ds-summary-title">解析結果のサマリー</div>
+                    <div class="ds-summary-grid">
+                        <div class="ds-summary-card">
+                            <div class="ds-card-icon"><i class="fa-solid fa-shield-halved"></i></div>
+                            <div class="ds-card-info">
+                                <div>リスク項目</div>
+                                <div>重要なリスクを<span>8件</span>検出</div>
+                            </div>
+                        </div>
+                        <div class="ds-summary-card">
+                            <div class="ds-card-icon"><i class="fa-solid fa-file-lines"></i></div>
+                            <div class="ds-card-info">
+                                <div>要約</div>
+                                <div>契約内容を<span>1,248文字</span>で要約</div>
+                            </div>
+                        </div>
+                        <div class="ds-summary-card">
+                            <div class="ds-card-icon"><i class="fa-solid fa-pen-to-square"></i></div>
+                            <div class="ds-card-info">
+                                <div>修正案</div>
+                                <div>修正提案を<span>12件</span>作成</div>
+                            </div>
+                        </div>
+                        <div class="ds-summary-card">
+                            <div class="ds-card-icon"><i class="fa-solid fa-calendar-check"></i></div>
+                            <div class="ds-card-info">
+                                <div>期限情報</div>
+                                <div>重要な期限を<span>5件</span>取得</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="ds-success-box">
+                        <div class="ds-success-icon"><i class="fa-solid fa-lightbulb"></i></div>
+                        <div class="ds-success-content">
+                            <h4>すべての解析結果が生成されました</h4>
+                            <p>各セクションから詳細を確認できます。特定されたリスクへの対策や修正案を検討してください。</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            modalFooter.innerHTML = `
+                <div class="ds-footer-actions">
+                    <button class="ds-btn-outline"><i class="fa-solid fa-list"></i> 契約書一覧へ戻る</button>
+                    <button class="ds-btn-primary">解析結果を表示する <i class="fa-solid fa-arrow-right"></i></button>
+                </div>
+            `;
+        }
+
+        function startSimulation() {
+            location.reload();
+        }
+
+        // Auto start
+        window.onload = run;
+    </script>
+
+</body>
+</html>

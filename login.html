@@ -6,7 +6,14 @@
     <script src="js/env.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ログイン - DIFFsense</title>
-    <link rel="icon" type="image/png" href="favicon2.png?v=2">
+    <link rel="icon" href="/favicon.ico?v=20260521_logo" sizes="any">
+    <link rel="icon" type="image/png" sizes="256x256" href="/favicon-diffsense.png?v=20260521_logo">
+    <link rel="shortcut icon" href="/favicon.ico?v=20260521_logo">
+    <link rel="apple-touch-icon" sizes="256x256" href="/favicon-diffsense.png?v=20260521_logo">
+    <link rel="manifest" href="/site.webmanifest?v=20260521_logo">
+    <meta name="theme-color" content="#06142b">
+    <link rel="preload" as="image" href="images/hero_abstract_bg.png">
+    <link rel="preload" as="image" href="images/logo_official.png">
     <script src="js/attribution.js?v=20260417a"></script>
 
     <!-- Google tag (gtag.js) -->
@@ -25,17 +32,39 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
-        href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@300;400;500;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
     <style>
         *, *::before, *::after { box-sizing: border-box; }
 
         body {
-            background-color: #f4f1ed;
+            background-color: #010816;
             font-family: var(--font-body);
             min-height: 100vh;
             margin: 0;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        .auth-page-bg {
+            position: fixed;
+            inset: 0;
+            background-image: url("/images/hero_abstract_bg.png?v=20260521_login_bg");
+            background-size: cover;
+            background-position: center;
+            transform: scale(1.08);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .auth-page-bg::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background:
+                linear-gradient(180deg, rgba(1, 8, 22, 0.62), rgba(1, 8, 22, 0.72)),
+                radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.16), transparent 42%);
         }
 
         .auth-card {
@@ -46,6 +75,7 @@
             width: 100%;
             max-width: 440px;
             position: relative;
+            z-index: 2;
             display: flex;
             flex-direction: column;
         }
@@ -60,6 +90,8 @@
             align-items: center;
             padding: 2rem;
             min-height: 100vh;
+            position: relative;
+            z-index: 1;
         }
 
         /* Horizontal Auth Tabs (SaaS Style) */
@@ -100,7 +132,7 @@
         .auth-logo {
             text-align: center;
             margin-bottom: 1.9rem;
-            font-family: "Helvetica", "Arial", sans-serif;
+            font-family: "Suisse Int'l", Inter, system-ui, sans-serif;
             font-weight: 800;
             font-size: 1.8rem;
             color: #c5a059;
@@ -370,54 +402,902 @@
             color: #c5a059;
             text-decoration: underline;
         }
+
+        /* Auth navy refresh: keep behavior intact, align visual tone with LP */
+        :root {
+            --auth-navy: #0b2d62;
+            --auth-navy-dark: #061b3d;
+            --auth-blue: #1d6fd8;
+            --auth-bg: #f7f9fc;
+            --auth-border: rgba(11, 45, 98, 0.14);
+            --auth-muted: #56657a;
+        }
+
+        body {
+            background:
+                linear-gradient(180deg, #fff 0%, var(--auth-bg) 100%) !important;
+            color: #10213d;
+            font-family: Inter, "Noto Sans JP", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+
+        .auth-container {
+            align-items: center;
+            padding: clamp(1.5rem, 4vw, 3rem) !important;
+        }
+
+        .auth-card {
+            max-width: 468px;
+            padding: clamp(2rem, 4vw, 3rem);
+            border: 1px solid var(--auth-border);
+            border-radius: 14px;
+            box-shadow: 0 18px 42px rgba(11, 45, 98, 0.10);
+            background: rgba(255, 255, 255, 0.98);
+        }
+
+        .auth-logo {
+            margin-bottom: 1.9rem;
+            text-align: center;
+            color: var(--auth-navy) !important;
+            font-family: "Suisse Int'l", Inter, system-ui, sans-serif !important;
+            font-size: clamp(1.95rem, 2vw + 1rem, 2.35rem);
+            font-weight: 900;
+            letter-spacing: 0.018em;
+        }
+
+        .auth-logo a {
+            justify-content: center;
+            color: var(--auth-navy) !important;
+            text-decoration: none;
+            font-family: inherit !important;
+        }
+
+        .auth-logo i {
+            color: var(--auth-navy) !important;
+            font-size: 1.45rem;
+        }
+
+        .auth-tabs {
+            justify-content: flex-start;
+            gap: 0.35rem;
+            width: 100%;
+            margin-bottom: 1.65rem;
+            padding: 0.25rem;
+            border: 1px solid rgba(11, 45, 98, 0.10);
+            border-radius: 999px;
+            background: #eef3f8;
+        }
+
+        .auth-tab {
+            flex: 1;
+            margin-bottom: 0;
+            padding: 0.66rem 0.9rem;
+            border: 0;
+            border-radius: 999px;
+            color: var(--auth-muted);
+            font-family: "Suisse Int'l", Inter, system-ui, sans-serif;
+            font-size: 0.94rem;
+            font-weight: 800;
+            text-align: center;
+            letter-spacing: -0.01em;
+            transition: background-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+        }
+
+        .auth-tab.active,
+        .auth-tab:hover:not(.active) {
+            color: #fff;
+            border-bottom: 0;
+            background: var(--auth-navy);
+            box-shadow: none;
+        }
+
+        .auth-views-wrapper {
+            min-height: 384px;
+        }
+
+        .form-group {
+            margin-bottom: 1.35rem;
+        }
+
+        .form-label {
+            color: var(--auth-navy);
+            font-size: 0.86rem;
+            font-weight: 800;
+            letter-spacing: 0;
+        }
+
+        .form-input {
+            min-height: 54px;
+            border: 1px solid rgba(11, 45, 98, 0.18);
+            border-radius: 12px;
+            color: #10213d;
+            background: #fff;
+            box-shadow: none;
+        }
+
+        .form-input:focus {
+            border-color: var(--auth-navy);
+            background: #fff;
+            box-shadow: 0 0 0 4px rgba(11, 45, 98, 0.10);
+        }
+
+        .toggle-password,
+        .toggle-password:hover,
+        #forgot-password-link,
+        .auth-links a,
+        .tos-note a {
+            color: var(--auth-navy) !important;
+        }
+
+        .google-auth-btn {
+            min-height: 50px;
+            border: 1px solid rgba(11, 45, 98, 0.22);
+            border-radius: 12px;
+            background: #fff;
+            color: #10213d;
+            font-weight: 800;
+            box-shadow: none;
+        }
+
+        .google-auth-btn:hover {
+            background: #f7f9fc;
+            border-color: var(--auth-navy);
+        }
+
+        #login-btn,
+        #signup-btn {
+            min-height: 50px;
+            margin-top: 0.75rem !important;
+            border: 1px solid var(--auth-navy) !important;
+            border-radius: 12px !important;
+            background: var(--auth-navy) !important;
+            color: #fff !important;
+            font-weight: 800 !important;
+            box-shadow: 0 12px 24px rgba(11, 45, 98, 0.18) !important;
+        }
+
+        #login-btn:hover,
+        #signup-btn:hover {
+            background: var(--auth-navy-dark) !important;
+            border-color: var(--auth-navy-dark) !important;
+            color: #fff !important;
+            transform: translateY(-1px);
+            filter: none;
+        }
+
+        .tos-note,
+        .signup-trust-inline,
+        .auth-links {
+            color: var(--auth-muted);
+        }
+
+        .signup-assurance-note {
+            color: var(--auth-navy);
+            background: #f7f9fc;
+            border-color: rgba(11, 45, 98, 0.12);
+            box-shadow: none;
+        }
+
+        .auth-separator {
+            color: var(--auth-muted);
+        }
+
+        .auth-separator::before,
+        .auth-separator::after {
+            border-top-color: rgba(11, 45, 98, 0.14);
+        }
+
+        .back-link {
+            color: var(--auth-muted) !important;
+            text-decoration: none !important;
+        }
+
+        .back-link:hover {
+            color: var(--auth-navy) !important;
+        }
+
+        @media (max-width: 640px) {
+            .auth-card {
+                padding: 2rem 1.4rem 1.8rem;
+                border-radius: 12px;
+            }
+
+            .auth-logo {
+                font-size: 1.8rem;
+            }
+        }
+
+        .auth-logo-mark {
+            display: block;
+            width: auto;
+            height: 64px;
+            margin-right: -22px;
+            margin-top: 4px;
+            object-fit: contain;
+            flex: 0 0 auto;
+            opacity: 1 !important;
+            visibility: visible !important;
+        }
+
+        .auth-logo {
+            font-size: 1.6rem !important;
+            line-height: 1 !important;
+            width: 100%;
+        }
+
+        .auth-logo a {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 0 !important;
+            transform: translateX(-11px);
+        }
+
+        @media (max-width: 640px) {
+            .auth-logo {
+                font-size: 1.5rem !important;
+            }
+
+            .auth-logo-mark {
+                height: 58px;
+                margin-right: -20px;
+            }
+
+            .auth-logo a {
+                transform: translateX(-10px);
+            }
+        }
+
+        html,
+        body {
+            background: #010816 url("/images/hero_abstract_bg.png?v=20260521_login_bg") center / cover fixed no-repeat !important;
+        }
+
+        .auth-container {
+            background: transparent !important;
+        }
+
+        /* Local LP signup redesign */
+        .auth-container {
+            padding: clamp(1.4rem, 3vw, 2.4rem) !important;
+        }
+
+        .auth-shell {
+            width: min(100%, 1080px);
+            height: min(720px, calc(100vh - 32px));
+            min-height: 640px;
+            display: grid;
+            grid-template-columns: minmax(360px, 0.95fr) minmax(390px, 0.82fr);
+            position: relative;
+            z-index: 2;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.22);
+            border-radius: 22px;
+            background: rgba(255, 255, 255, 0.98);
+            box-shadow: 0 32px 90px rgba(1, 8, 22, 0.38);
+        }
+
+        .auth-promo {
+            position: relative;
+            min-height: 100%;
+            padding: clamp(2.1rem, 3.6vw, 3.1rem);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            overflow: hidden;
+            color: #fff;
+            background:
+                radial-gradient(circle at 16% 22%, rgba(29, 111, 216, 0.22), transparent 28%),
+                radial-gradient(circle at 82% 80%, rgba(11, 92, 255, 0.18), transparent 34%),
+                linear-gradient(145deg, #020817 0%, #06152f 48%, #072b63 100%);
+        }
+
+        .auth-promo::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(circle, rgba(80, 160, 255, 0.32) 0 1px, transparent 1.4px) 0 0 / 30px 30px,
+                linear-gradient(180deg, rgba(255,255,255,0.05), transparent 38%);
+            opacity: 0.42;
+            pointer-events: none;
+        }
+
+        .auth-promo::after {
+            content: "";
+            position: absolute;
+            left: -13%;
+            right: -9%;
+            bottom: 12%;
+            height: 46%;
+            background-image: url("data:image/svg+xml,%3Csvg width='900' height='310' viewBox='0 0 900 310' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none'%3E%3Cpath d='M0 208 C92 146 152 266 246 196 C350 118 420 108 528 166 C648 230 742 72 900 102' stroke='%232b8cff' stroke-width='2.2' stroke-opacity='.82'/%3E%3Cpath d='M0 236 C110 174 176 282 286 204 C396 126 448 132 550 194 C676 270 766 116 900 142' stroke='%235bb0ff' stroke-width='1.4' stroke-opacity='.46'/%3E%3Cpath d='M0 182 C94 122 174 220 280 156 C398 86 470 82 584 136 C700 190 770 56 900 74' stroke='%231d6fd8' stroke-width='1.2' stroke-opacity='.52'/%3E%3Cpath d='M0 262 C130 222 214 304 330 238 C450 170 526 186 628 226 C728 264 796 196 900 206' stroke='%234ea1ff' stroke-width='1' stroke-opacity='.34'/%3E%3C/g%3E%3Cg fill='%233d9bff' fill-opacity='.78'%3E%3Ccircle cx='82' cy='172' r='2'/%3E%3Ccircle cx='146' cy='204' r='2'/%3E%3Ccircle cx='226' cy='198' r='2.2'/%3E%3Ccircle cx='312' cy='140' r='2'/%3E%3Ccircle cx='406' cy='104' r='1.8'/%3E%3Ccircle cx='512' cy='156' r='2'/%3E%3Ccircle cx='604' cy='198' r='1.8'/%3E%3Ccircle cx='704' cy='144' r='2'/%3E%3Ccircle cx='792' cy='86' r='1.8'/%3E%3Ccircle cx='858' cy='96' r='2'/%3E%3C/g%3E%3C/svg%3E");
+            background-size: 100% 100%;
+            background-repeat: no-repeat;
+            filter: drop-shadow(0 0 16px rgba(43, 140, 255, 0.46));
+            opacity: 0.92;
+            transform: rotate(-2deg);
+            pointer-events: none;
+        }
+
+        .auth-promo > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        .auth-promo-brand {
+            display: inline-flex;
+            align-items: center;
+            gap: 0;
+            font-weight: 900;
+            font-size: 1.08rem;
+            letter-spacing: 0;
+            color: #ffffff;
+            text-decoration: none;
+        }
+
+        .auth-promo-brand img {
+            width: auto;
+            height: 48px;
+            margin-right: -15px;
+        }
+
+        .auth-promo-copy {
+            max-width: 420px;
+            margin: clamp(1.8rem, 5.6vh, 4.2rem) 0 auto;
+        }
+
+        .auth-promo-eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            margin: 0 0 1rem;
+            color: rgba(255, 255, 255, 0.78);
+            -webkit-text-fill-color: rgba(255, 255, 255, 0.78) !important;
+            font-size: 0.78rem;
+            font-weight: 800;
+        }
+
+        .auth-promo h2 {
+            margin: 0;
+            max-width: 400px;
+            font-size: clamp(2.05rem, 3.2vw, 3.15rem);
+            line-height: 1.18;
+            letter-spacing: 0;
+            font-weight: 950;
+            color: #fff !important;
+            -webkit-text-fill-color: #fff !important;
+            text-shadow: 0 14px 40px rgba(0, 0, 0, 0.42);
+        }
+
+        .auth-promo p {
+            max-width: 390px;
+            margin: 1.2rem 0 0;
+            color: rgba(255, 255, 255, 0.86) !important;
+            -webkit-text-fill-color: rgba(255, 255, 255, 0.86) !important;
+            font-size: 0.98rem;
+            line-height: 1.85;
+            font-weight: 700;
+        }
+
+        .auth-promo-visual {
+            display: none;
+        }
+
+        .auth-promo-visual::before {
+            content: "";
+            position: absolute;
+            left: 50%;
+            top: 62%;
+            width: 310px;
+            height: 108px;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+            background:
+                radial-gradient(ellipse at center, rgba(93, 162, 255, 0.36), rgba(93, 162, 255, 0.10) 42%, transparent 70%);
+            filter: blur(2px);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .auth-promo-visual::after {
+            content: "";
+            position: absolute;
+            left: 50%;
+            bottom: 24px;
+            width: 260px;
+            height: 48px;
+            transform: translateX(-50%);
+            border-radius: 50%;
+            background:
+                radial-gradient(ellipse at center, rgba(64, 146, 255, 0.30), transparent 68%);
+            border: 1px solid rgba(93, 162, 255, 0.24);
+            z-index: 1;
+        }
+
+        .auth-geo-orbit {
+            position: absolute;
+            left: 50%;
+            top: 55%;
+            width: 280px;
+            height: 96px;
+            border: 1px solid rgba(120, 180, 255, 0.42);
+            border-radius: 50%;
+            transform: translate(-50%, -50%) rotate(-10deg);
+            z-index: 2;
+        }
+
+        .auth-geo-orbit::before,
+        .auth-geo-orbit::after {
+            content: "";
+            position: absolute;
+            inset: 13px 22px;
+            border: 1px solid rgba(120, 180, 255, 0.26);
+            border-radius: 50%;
+        }
+
+        .auth-geo-orbit::after {
+            inset: 25px 48px;
+            transform: rotate(18deg);
+        }
+
+        .auth-geo-shield {
+            position: absolute;
+            left: 50%;
+            top: 46%;
+            width: 116px;
+            height: 138px;
+            transform: translate(-50%, -50%);
+            display: grid;
+            place-items: center;
+            color: #fff;
+            background:
+                linear-gradient(160deg, rgba(124, 187, 255, 0.98), rgba(11, 92, 255, 0.78));
+            clip-path: polygon(50% 0, 88% 14%, 82% 68%, 50% 100%, 18% 68%, 12% 14%);
+            box-shadow:
+                0 28px 62px rgba(11, 92, 255, 0.42),
+                0 0 64px rgba(93, 162, 255, 0.42),
+                inset 0 1px 0 rgba(255,255,255,0.42);
+            z-index: 3;
+        }
+
+        .auth-geo-shield::before {
+            content: "";
+            position: absolute;
+            inset: 13px 17px 22px;
+            clip-path: inherit;
+            background: linear-gradient(180deg, rgba(255,255,255,0.24), rgba(255,255,255,0.06));
+        }
+
+        .auth-geo-shield i {
+            position: relative;
+            z-index: 1;
+            font-size: 2.65rem;
+            filter: drop-shadow(0 8px 16px rgba(1, 8, 22, 0.24));
+        }
+
+        .auth-geo-node {
+            position: absolute;
+            width: 52px;
+            height: 52px;
+            display: grid;
+            place-items: center;
+            border-radius: 14px;
+            color: #fff;
+            background:
+                linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.08));
+            border: 1px solid rgba(255, 255, 255, 0.20);
+            box-shadow: 0 14px 30px rgba(1, 8, 22, 0.24);
+            backdrop-filter: blur(10px);
+            z-index: 4;
+        }
+
+        .auth-geo-node i {
+            color: #fff;
+            font-size: 1.05rem;
+        }
+
+        .auth-geo-node:nth-child(3) {
+            left: 64px;
+            top: 64px;
+        }
+
+        .auth-geo-node:nth-child(4) {
+            right: 60px;
+            top: 72px;
+        }
+
+        .auth-geo-node:nth-child(5) {
+            left: 90px;
+            bottom: 72px;
+        }
+
+        .auth-geo-node:nth-child(6) {
+            right: 88px;
+            bottom: 68px;
+        }
+
+        .auth-geo-base {
+            position: absolute;
+            left: 50%;
+            bottom: 36px;
+            width: 250px;
+            height: 46px;
+            transform: translateX(-50%);
+            border-radius: 50%;
+            background: radial-gradient(ellipse, rgba(93, 162, 255, 0.38), transparent 68%);
+            border: 1px solid rgba(93, 162, 255, 0.18);
+            z-index: 1;
+        }
+
+        .auth-geo-feature {
+            position: absolute;
+            left: 0;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.56rem;
+            min-width: 132px;
+            padding: 0.7rem 0.82rem;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.10);
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            color: rgba(255,255,255,0.9);
+            -webkit-text-fill-color: rgba(255,255,255,0.9) !important;
+            font-size: 0.8rem;
+            font-weight: 850;
+            box-shadow: 0 14px 30px rgba(1, 8, 22, 0.18);
+            backdrop-filter: blur(10px);
+            z-index: 5;
+        }
+
+        .auth-geo-feature i {
+            color: #b9d6ff;
+            -webkit-text-fill-color: #b9d6ff !important;
+        }
+
+        .auth-geo-feature:nth-child(8) {
+            top: 30px;
+        }
+
+        .auth-geo-feature:nth-child(9) {
+            top: 86px;
+            left: 16px;
+        }
+
+        .auth-geo-feature:nth-child(10) {
+            top: 142px;
+        }
+
+        .auth-promo-points {
+            display: none;
+            grid-template-columns: 1fr;
+            gap: 0.52rem;
+            display: none;
+            padding: 0;
+            list-style: none;
+        }
+
+        .auth-promo-points li {
+            min-height: 38px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            text-align: left;
+            padding: 0.48rem 0;
+            border-radius: 0;
+            background: transparent;
+            border: 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.13);
+            color: rgba(255,255,255,0.9);
+            -webkit-text-fill-color: rgba(255,255,255,0.9) !important;
+            font-size: 0.82rem;
+            line-height: 1.45;
+            font-weight: 800;
+        }
+
+        .auth-promo-points li::before {
+            content: "";
+            width: 7px;
+            height: 7px;
+            margin-right: 0.7rem;
+            border-radius: 999px;
+            background: #5da2ff;
+            box-shadow: 0 0 18px rgba(93, 162, 255, 0.8);
+            flex: 0 0 auto;
+        }
+
+        .auth-card {
+            max-width: none !important;
+            width: 100% !important;
+            min-height: 100%;
+            padding: clamp(1.7rem, 3.4vw, 2.55rem) clamp(2rem, 4vw, 3.1rem) !important;
+            border: 0 !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            background: #fff !important;
+            justify-content: center;
+        }
+
+        .auth-close-link {
+            position: absolute;
+            top: 18px;
+            right: 18px;
+            width: 34px;
+            height: 34px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #68758a !important;
+            text-decoration: none !important;
+            border-radius: 999px;
+            z-index: 5;
+        }
+
+        .auth-close-link:hover {
+            background: #f2f6fb;
+            color: #0b2d62 !important;
+        }
+
+        .auth-logo {
+            display: none !important;
+        }
+
+        .auth-view-heading {
+            margin: 0 0 0.55rem;
+            color: #0a1f44;
+            font-size: clamp(1.72rem, 2vw, 2.12rem);
+            line-height: 1.2;
+            font-weight: 950;
+            letter-spacing: 0;
+        }
+
+        .auth-view-lead {
+            margin: 0 0 1.25rem;
+            color: #64748b;
+            font-size: 0.88rem;
+            line-height: 1.75;
+            font-weight: 700;
+        }
+
+        .auth-tabs {
+            order: 2;
+            margin-top: 1rem;
+            margin-bottom: 0 !important;
+        }
+
+        body[data-auth-mode="signup"] .auth-tabs {
+            display: none !important;
+        }
+
+        .auth-views-wrapper {
+            min-height: 0 !important;
+        }
+
+        body[data-auth-mode="signup"] #signup-google-btn {
+            margin-bottom: 0;
+            border-color: rgba(11, 92, 255, 0.22);
+        }
+
+        body[data-auth-mode="signup"] #signup-btn {
+            background: #0b5cff !important;
+            border-color: #0b5cff !important;
+            box-shadow: 0 16px 32px rgba(11, 92, 255, 0.24) !important;
+        }
+
+        body[data-auth-mode="signup"] .signup-trust-inline {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.5rem;
+            margin-top: 1rem;
+            color: #0a1f44;
+            font-size: 0;
+            text-align: left;
+        }
+
+        body[data-auth-mode="signup"] .signup-trust-inline span {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.42rem;
+            min-height: 34px;
+            justify-content: center;
+            padding: 0.46rem 0.5rem;
+            border-radius: 8px;
+            background: #f2f7ff;
+            color: #0b2d62;
+            font-size: 0.7rem;
+            line-height: 1.3;
+            font-weight: 850;
+        }
+
+        body[data-auth-mode="signup"] .signup-trust-inline span::before {
+            content: "✓";
+            color: #0b5cff;
+            font-weight: 950;
+        }
+
+        .auth-links {
+            margin-top: 0.95rem !important;
+        }
+
+        @media (max-width: 880px) {
+            .auth-shell {
+                grid-template-columns: 1fr;
+                max-width: 520px;
+            }
+
+            .auth-promo {
+                min-height: auto;
+                padding: 1.6rem;
+            }
+
+            .auth-promo-copy {
+                margin: 1.4rem 0 0;
+            }
+
+            .auth-promo h2 {
+                font-size: clamp(1.9rem, 9vw, 3rem);
+            }
+
+            .auth-promo-visual {
+                display: none;
+            }
+
+            .auth-promo-points {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (min-width: 881px) {
+            html,
+            body {
+                height: 100%;
+                overflow: hidden !important;
+            }
+
+            .auth-container {
+                min-height: 100vh;
+            }
+        }
+
+        @media (max-width: 520px) {
+            html,
+            body {
+                min-height: 100%;
+                height: auto !important;
+                overflow-x: hidden !important;
+                overflow-y: auto !important;
+            }
+
+            .auth-container {
+                padding: 0 !important;
+                min-height: 100dvh !important;
+                align-items: flex-start !important;
+            }
+
+            .auth-shell {
+                height: auto !important;
+                min-height: 100dvh;
+                border: 0;
+                border-radius: 0;
+                overflow: visible !important;
+            }
+
+            .auth-promo {
+                padding: 1.35rem 1.2rem;
+                min-height: 340px !important;
+            }
+
+            .auth-promo-points {
+                display: none;
+            }
+
+            .auth-card {
+                min-height: auto !important;
+                justify-content: flex-start !important;
+                padding: 1.7rem 1.25rem calc(2.4rem + env(safe-area-inset-bottom, 0px)) !important;
+            }
+
+            body[data-auth-mode="signup"] .signup-trust-inline {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (min-width: 521px) and (max-width: 1120px) {
+            body[data-auth-mode="signup"] .signup-trust-inline {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+        }
     </style>
     <meta name="description" content="DIFFsenseにログインして、契約書・利用規約の変更をAIで自動検知。">
 
     <!-- OGP Meta Tags -->
     <meta property="og:title" content="ログイン - DIFFsense">
     <meta property="og:description" content="DIFFsenseにログインして、契約書・利用規約の変更をAIで自動検知。">
-    <meta property="og:image" content="https://diffsense.spacegleam.co.jp/images/ogp.png">
+    <meta property="og:image" content="https://diffsense.spacegleam.co.jp/images/ogp2-1200x630.png?v=20260521_ogp2">
+    <meta property="og:image:secure_url" content="https://diffsense.spacegleam.co.jp/images/ogp2-1200x630.png?v=20260521_ogp2">
+    <meta property="og:image:type" content="image/png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
     <meta property="og:url" content="https://diffsense.spacegleam.co.jp/login.html">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="DIFFsense">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="ログイン - DIFFsense">
     <meta name="twitter:description" content="DIFFsenseにログインして、契約書・利用規約の変更をAIで自動検知。">
-    <meta name="twitter:image" content="https://diffsense.spacegleam.co.jp/images/ogp.png">
+    <meta name="twitter:image" content="https://diffsense.spacegleam.co.jp/images/ogp2-1200x630.png?v=20260521_ogp2">
 
 </head>
 
 <body>
+    <div class="auth-page-bg" aria-hidden="true"></div>
     <div class="auth-container">
+        <div class="auth-shell">
+        <section class="auth-promo" aria-label="DIFFsenseの新規登録メリット">
+            <a href="index.html" class="auth-promo-brand" aria-label="サービス紹介ページへ戻る">
+                <img src="images/logo_official.png" alt="" aria-hidden="true">
+                <span>DIFFsense</span>
+            </a>
+            <div class="auth-promo-copy">
+                <p class="auth-promo-eyebrow"><i class="fa-solid fa-chart-line" aria-hidden="true"></i> Data-driven contract review</p>
+                <h2>データに基づく<br>契約リスクの<br>最適解を。</h2>
+                <p>AIが契約書を解析し、リスクと検討ポイントを可視化します。</p>
+            </div>
+            <div>
+                <div class="auth-promo-visual" aria-hidden="true">
+                    <div class="auth-geo-orbit"></div>
+                    <div class="auth-geo-shield"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i></div>
+                    <div class="auth-geo-node"><i class="fa-solid fa-file-lines" aria-hidden="true"></i></div>
+                    <div class="auth-geo-node"><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i></div>
+                    <div class="auth-geo-node"><i class="fa-solid fa-signature" aria-hidden="true"></i></div>
+                    <div class="auth-geo-node"><i class="fa-solid fa-magnifying-glass-chart" aria-hidden="true"></i></div>
+                    <div class="auth-geo-base"></div>
+                    <div class="auth-geo-feature"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><span>リスク検出</span></div>
+                    <div class="auth-geo-feature"><i class="fa-solid fa-list-check" aria-hidden="true"></i><span>要点整理</span></div>
+                    <div class="auth-geo-feature"><i class="fa-solid fa-pen-nib" aria-hidden="true"></i><span>署名依頼</span></div>
+                </div>
+                <ul class="auth-promo-points">
+                    <li>差分の見落としを減らす</li>
+                    <li>リスクと要点を自動で整理</li>
+                    <li>確認後、そのまま署名依頼へ</li>
+                </ul>
+            </div>
+        </section>
         <div class="auth-card">
+            <a href="index.html" class="auth-close-link" aria-label="サービス紹介ページへ戻る">
+                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+            </a>
             <!-- Decorative Holes: Removed as per user request (Spine Only) -->
 
             <h1 class="auth-logo">
                 <a href="index.html">
-                    <i class="fa-solid fa-scale-balanced"></i>
+                    <img src="images/logo_official.png" alt="" class="auth-logo-mark" aria-hidden="true">
                     <span>DIFFsense</span>
                 </a>
             </h1>
 
             <div class="auth-tabs">
-                <div class="auth-tab" id="tab-login" onclick="switchTab('login')">ログイン</div>
-                <div class="auth-tab active" id="tab-signup" onclick="switchTab('signup')">新規登録</div>
+                <div class="auth-tab active" id="tab-login" onclick="switchTab('login')">ログイン</div>
+                <div class="auth-tab" id="tab-signup" onclick="switchTab('signup')">新規登録</div>
             </div>
 
             <div class="auth-views-wrapper">
                 <!-- LOGIN VIEW -->
-                <div id="view-login" style="display: none;">
+                <div id="view-login">
+                    <h2 class="auth-view-heading">ログイン</h2>
+                    <p class="auth-view-lead">アカウントをお持ちの方はこちらから続けられます。</p>
                     <form id="login-form">
+                        <button type="button" class="google-auth-btn" id="login-google-btn">
+                            <i class="fa-brands fa-google"></i> Googleでログイン
+                        </button>
+                        <div class="auth-separator">または</div>
                         <div class="form-group">
                             <label class="form-label" for="login-email">メールアドレス</label>
                             <div class="input-wrapper">
-                                <input type="email" id="login-email" class="form-input" required>
+                                <input type="email" id="login-email" class="form-input" placeholder="メールアドレスを入力" required>
                             </div>
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="login-password">パスワード</label>
                             <div class="input-wrapper">
-                                <input type="password" id="login-password" class="form-input" required>
+                                <input type="password" id="login-password" class="form-input" placeholder="パスワードを入力" required>
                                 <i class="fa-solid fa-eye-slash toggle-password" data-target="login-password"></i>
                             </div>
                             <div style="margin-top: 0.55rem; text-align: right;">
@@ -425,37 +1305,40 @@
                                     style="font-size: 0.82rem; color: #8a6a2d; text-decoration: underline;">パスワードをお忘れですか？</a>
                             </div>
                         </div>
-                        <button type="button" class="google-auth-btn" id="login-google-btn">
-                            <i class="fa-brands fa-google"></i> Googleでログイン
-                        </button>
                         <button type="submit" class="btn full-width" id="login-btn"
                             style="margin-top: 0.7rem; border-radius: 8px; padding: 0.98rem 1rem; background: #c5a059; color: #fff; border: none; font-weight: 700;">ログイン</button>
                     </form>
                 </div>
 
                 <!-- SIGNUP VIEW -->
-                <div id="view-signup">
+                <div id="view-signup" style="display: none;">
+                    <h2 class="auth-view-heading">無料で新規登録</h2>
                     <form id="signup-form">
+                        <button type="button" class="google-auth-btn" id="signup-google-btn">
+                            <i class="fa-brands fa-google"></i> Googleで今すぐ始める
+                        </button>
+                        <div class="auth-separator">または</div>
                         <div class="form-group">
                             <label class="form-label" for="signup-email">メールアドレス</label>
                             <div class="input-wrapper">
-                                <input type="email" id="signup-email" class="form-input" required>
+                                <input type="email" id="signup-email" class="form-input" placeholder="メールアドレスを入力" required>
                             </div>
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="signup-password">パスワード</label>
                             <div class="input-wrapper">
-                                <input type="password" id="signup-password" class="form-input" required minlength="6">
+                                <input type="password" id="signup-password" class="form-input" placeholder="6文字以上のパスワード" required minlength="6">
                                 <i class="fa-solid fa-eye-slash toggle-password" data-target="signup-password"></i>
                             </div>
                         </div>
-                        <button type="button" class="google-auth-btn" id="signup-google-btn">
-                            <i class="fa-brands fa-google"></i> Googleで今すぐ始める
-                        </button>
                         <button type="submit" class="btn full-width" id="signup-btn"
-                            style="margin-top: 0.7rem; border-radius: 8px; padding: 0.98rem 1rem; background: #c5a059; color: #fff; border: none; font-weight: 700;">無料で使ってみる</button>
+                            style="margin-top: 0.7rem; border-radius: 8px; padding: 0.98rem 1rem; background: #c5a059; color: #fff; border: none; font-weight: 700;">無料で解析してみる</button>
                         <p class="tos-note">登録することで<a href="terms.html" target="_blank">利用規約</a>と<a href="privacy.html" target="_blank">プライバシーポリシー</a>に同意したことになります</p>
-                        <p class="signup-trust-inline">ずっと無料 ・ カード不要 ・ いつでも解約可能 ・ AI学習不使用</p>
+                        <p class="signup-trust-inline">
+                            <span>カード不要</span>
+                            <span>いつでも解約可能</span>
+                            <span>AI学習不使用</span>
+                        </p>
                     </form>
                 </div>
             </div>
@@ -464,12 +1347,24 @@
                 <a href="index.html" class="back-link">← サービス紹介ページへ戻る</a>
             </div>
         </div>
+        </div>
     </div>
 
     <!-- Notification System -->
     <script type="module" src="js/notify.js?v=20260311b"></script>
     <script>
         // --- UI State Logic (works on file:// and http://) ---
+        const cleanAuthUrl = (tab = 'login') => {
+            try {
+                const url = new URL(window.location.href);
+                const basePath = url.pathname.endsWith('/login.html') ? '/login.html' : '/login';
+                const nextPath = tab === 'signup' ? `${basePath}?mode=signup` : basePath;
+                history.replaceState(null, '', `${url.origin}${nextPath}`);
+            } catch (e) {
+                // Ignore URL rewriting errors in restricted local environments.
+            }
+        };
+
         window.switchTab = (tab) => {
             const loginView = document.getElementById('view-login');
             const signupView = document.getElementById('view-signup');
@@ -477,23 +1372,17 @@
             const signupTab = document.getElementById('tab-signup');
 
             if (tab === 'login') {
+                document.body.dataset.authMode = 'login';
                 loginView.style.display = 'block';
                 signupView.style.display = 'none';
                 loginTab.classList.add('active');
                 signupTab.classList.remove('active');
             } else {
+                document.body.dataset.authMode = 'signup';
                 loginView.style.display = 'none';
                 signupView.style.display = 'block';
                 loginTab.classList.remove('active');
                 signupTab.classList.add('active');
-            }
-
-            try {
-                const url = new URL(window.location.href);
-                url.searchParams.set('tab', tab);
-                history.replaceState(null, '', url.toString());
-            } catch (e) {
-                // Ignore URL rewriting errors in restricted local environments.
             }
         };
 
@@ -511,6 +1400,7 @@
 
         // --- Initial State Check ---
         const urlParams = new URLSearchParams(window.location.search);
+        window.__DIFFSENSE_AUTH_QUERY__ = Object.fromEntries(urlParams.entries());
         const selectedPlan = urlParams.get('plan');
         const selectedBilling = urlParams.get('billing') === 'annual' ? 'annual' : 'monthly';
         if (selectedPlan && ['starter', 'business', 'pro'].includes(selectedPlan)) {
@@ -518,21 +1408,27 @@
             localStorage.setItem('diffsense_selected_billing_cycle', selectedBilling);
         }
 
-        if (urlParams.get('mode') === 'login' || urlParams.get('tab') === 'login') {
+        const requestedMode = urlParams.get('mode') || urlParams.get('tab') || 'login';
+
+        if (requestedMode === 'login') {
             switchTab('login');
             // ログイン専用モード：タブを非表示にしてログインのみ表示
             document.querySelector('.auth-tabs').style.display = 'none';
             document.getElementById('view-signup').style.display = 'none';
-        } else if (urlParams.get('mode') === 'signup' || urlParams.get('tab') === 'signup') {
+            cleanAuthUrl('login');
+        } else if (requestedMode === 'signup') {
             switchTab('signup');
             // 新規登録専用モード：タブを非表示にして新規登録のみ表示
             document.querySelector('.auth-tabs').style.display = 'none';
             document.getElementById('view-login').style.display = 'none';
+            cleanAuthUrl('signup');
+        } else {
+            cleanAuthUrl('login');
         }
     </script>
     <!-- Auth Logic -->
     <script type="module">
-        import { handleLogin, handleSignUp, handleGoogleLogin, handleGoogleRedirectResult, handlePasswordReset } from './js/auth.js?v=20260312a';
+        import { handleLogin, handleSignUp, handleGoogleLogin, handleGoogleRedirectResult, handlePasswordReset } from './js/auth.js?v=20260521_login_auth_fix_v1';
 
         await handleGoogleRedirectResult();
 

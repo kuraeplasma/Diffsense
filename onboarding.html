@@ -5,11 +5,11 @@
   <meta charset="UTF-8">
   <script src="js/env.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>契約書の差分チェック・リスク要約｜DIFFsense</title>
-  <meta name="description" content="契約書の変更点を自動検出し、リスクをAIが要約。見落としを防ぎ、レビュー時間を削減します。差分チェックから電子署名まで一括対応。">
+  <title>DIFFsense 導入サポートパック</title>
+  <meta name="description" content="契約確認業務を仕組み化する、法人向け導入支援プラン。10万円で実務定着まで伴走します。">
   <!-- OGP -->
-  <meta property="og:title" content="契約書の差分チェック・リスク要約｜DIFFsense">
-  <meta property="og:description" content="契約書の変更点を自動検出し、リスクをAIが要約。見落としを防ぎます。">
+  <meta property="og:title" content="DIFFsense 導入サポートパック">
+  <meta property="og:description" content="契約確認業務を仕組み化する、法人向け導入支援プラン。10万円で実務定着まで伴走します。">
   <meta property="og:image" content="https://diffsense.spacegleam.co.jp/images/onboarding_ogp.png">
   <meta property="og:url" content="https://diffsense.spacegleam.co.jp/onboarding">
   <meta property="og:type" content="website">
@@ -45,9 +45,10 @@
       --muted: #94a3b8;
       --soft: #475569;
       --line: #334155;
-      --gold: #c3924f;
-      --gold-lt: #d1a870;
-      --gold-pale: rgba(195, 146, 79, 0.1);
+      /* LP-unified palette: blue replaces previous gold tokens */
+      --gold: #2563eb;
+      --gold-lt: #3b82f6;
+      --gold-pale: rgba(37, 99, 235, 0.12);
       --shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
       --r: 20px;
       --r-sm: 12px;
@@ -94,9 +95,9 @@
     /* ─── Wide container ─── */
     .wrap {
       width: 100%;
-      max-width: 1920px;
+      max-width: 1280px;
       margin: 0 auto;
-      padding: 0 32px;
+      padding: 0 40px;
     }
 
     /* ─── Eyebrow ─── */
@@ -142,17 +143,17 @@
 
     .btn-gold {
       color: #fff;
-      background: linear-gradient(135deg, #d3a158 0%, #ab752a 100%);
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
       border: 1px solid rgba(255, 255, 255, 0.2);
-      box-shadow: 0 4px 12px rgba(171, 117, 42, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.3);
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.3);
       text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
       font-weight: 700;
     }
 
     .btn-gold:hover {
-      background: linear-gradient(135deg, #e3b673 0%, #b8853b 100%);
+      background: linear-gradient(135deg, #60a5fa 0%, #1d4ed8 100%);
       transform: translateY(-2px);
-      box-shadow: 0 8px 20px rgba(171, 117, 42, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.4);
+      box-shadow: 0 8px 20px rgba(37, 99, 235, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.4);
     }
 
     .btn-ghost {
@@ -186,31 +187,79 @@
       position: sticky;
       top: 0;
       z-index: 50;
-      background: rgba(11, 17, 33, 0.85);
-      /* Dark navy translucent */
+      background: rgba(255, 255, 255, 0.96);
       backdrop-filter: blur(14px);
-      border-bottom: 1px solid var(--line);
+      border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+      box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
       width: 100%;
     }
 
-    .header-inner {
+    .header-inner.wrap {
       display: flex;
       justify-content: space-between;
       align-items: center;
       min-height: 88px;
+      max-width: none;
+      padding-left: clamp(24px, 5vw, 64px);
+      padding-right: clamp(24px, 5vw, 64px);
     }
 
     .brand {
-      font-family: "Noto Sans JP", sans-serif;
-      font-size: 22px;
-      font-weight: 800;
-      color: var(--gold);
-      letter-spacing: .05em;
-      margin-left: -4px;
+      font-family: "Inter", "SuisseIntl", "Suisse Intl", "Noto Sans JP", sans-serif;
+      color: #06163b;
+      margin-left: 0;
       display: flex;
       align-items: center;
       gap: 10px;
       text-decoration: none;
+      line-height: 1;
+      min-width: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    .brand:hover {
+      opacity: 0.86;
+    }
+
+    .brand-logo-mark {
+      width: 46px;
+      height: 46px;
+      display: block;
+      flex: 0 0 auto;
+      overflow: hidden;
+      border-radius: 10px;
+      position: relative;
+    }
+
+    .brand-logo {
+      position: absolute;
+      left: -51px;
+      top: -17px;
+      width: 138px;
+      height: auto;
+      display: block;
+    }
+
+    .brand-copy {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      min-width: 0;
+    }
+
+    .brand-name {
+      font-size: 1.5rem;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      color: #06163b;
+    }
+
+    .brand-subtitle {
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      color: #2563eb;
+      text-transform: uppercase;
     }
 
     .brand i {
@@ -222,12 +271,25 @@
     .header-right {
       display: flex;
       align-items: center;
-      gap: 24px;
+      gap: 12px;
     }
 
     .header-label {
       font-size: 15px;
       color: var(--muted);
+    }
+
+    .btn-back-lp {
+      color: #06163b;
+      background: #ffffff;
+      border-color: rgba(11, 45, 98, 0.18);
+      box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+    }
+
+    .btn-back-lp:hover {
+      background: #f8fafc;
+      border-color: rgba(37, 99, 235, 0.28);
+      transform: translateY(-1px);
     }
 
     /* ════════════════════════════
@@ -238,6 +300,7 @@
       align-items: stretch;
       max-width: 1920px;
       margin: 0 auto;
+      min-height: clamp(620px, calc(100vh - 88px), 760px);
     }
 
     .hero-left {
@@ -258,6 +321,9 @@
       padding: 0;
       position: relative;
       flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      box-shadow: inset 18px 0 32px rgba(15, 23, 42, 0.08);
     }
 
     /* shimmer effect removed */
@@ -343,14 +409,17 @@
       width: 100%;
       overflow: hidden;
       min-height: 0;
+      height: 100%;
     }
 
     .hero-screen img {
       width: 100%;
       height: 100%;
       display: block;
-      object-fit: contain;
-      object-position: left center;
+      object-fit: cover;
+      object-position: 50% 52%;
+      transform: scale(1.06);
+      transform-origin: center;
     }
 
     /* ════════════════════════════
@@ -359,8 +428,11 @@
     .pain-section {
       padding: 120px 0;
       position: relative;
-      border-top: 1px solid var(--line);
-      border-bottom: 1px solid var(--line);
+      background:
+        radial-gradient(circle at 12% 18%, rgba(37, 99, 235, 0.12), transparent 30%),
+        linear-gradient(135deg, #f8fbff 0%, #eef4fb 52%, #f7f3ea 100%);
+      border-top: 1px solid rgba(37, 99, 235, 0.12);
+      border-bottom: 1px solid rgba(15, 23, 42, 0.08);
     }
 
     .pain-wrap {
@@ -378,37 +450,62 @@
     .pain-heading {
       font-size: clamp(30px, 3.8vw, 52px);
       font-weight: 700;
-      color: var(--text);
+      color: #07142f;
+      text-shadow: none;
+    }
+
+    .pain-section .eyebrow {
+      color: #2563eb;
+    }
+
+    .pain-left-visual {
+      text-align: center;
+      padding: 28px;
+      border-radius: 24px;
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid rgba(148, 163, 184, 0.28);
+      box-shadow: 0 24px 70px rgba(15, 23, 42, 0.12);
+      backdrop-filter: blur(8px);
+    }
+
+    .pain-left-visual img {
+      display: block;
+      max-width: 360px;
+      width: 100%;
+      margin: 0 auto;
+      border-radius: 18px;
+      border: 1px solid rgba(37, 99, 235, 0.14);
+      box-shadow: 0 18px 50px rgba(15, 23, 42, 0.16);
     }
 
     .pain-cards {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
       gap: 1px;
-      background: var(--line);
-      border: 1px solid var(--line);
-      border-radius: var(--r);
+      background: rgba(37, 99, 235, 0.12);
+      border: 1px solid rgba(37, 99, 235, 0.12);
+      border-radius: 24px;
       overflow: hidden;
+      box-shadow: 0 30px 80px rgba(15, 23, 42, 0.14);
     }
 
     .pain-card {
       padding: 44px 36px;
-      transition: background .3s, transform .3s;
-      background: var(--surface);
+      transition: background .3s, transform .3s, box-shadow .3s;
+      background: rgba(255, 255, 255, 0.86);
     }
 
     .pain-card:hover {
-      background: rgba(195, 146, 79, 0.05);
-      /* Premium dark gold hover */
+      background: #ffffff;
       transform: translateY(-2px);
+      box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.18);
     }
 
     .pain-num {
       font-family: "Outfit", sans-serif;
       font-size: 48px;
       font-weight: 800;
-      color: rgba(255, 255, 255, 0.1);
-      /* Subtle dark mode number */
+      color: rgba(37, 99, 235, 0.18);
       line-height: 1;
       margin-bottom: 16px;
       transition: color .3s;
@@ -422,13 +519,14 @@
       width: 100%;
       height: 180px;
       border-radius: 16px;
-      background: rgba(195, 146, 79, 0.06);
-      border: 1px solid rgba(195, 146, 79, 0.2);
+      background: #07142f;
+      border: 1px solid rgba(37, 99, 235, 0.22);
       display: flex;
       justify-content: center;
       align-items: center;
       overflow: hidden;
       margin-bottom: 20px;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14);
     }
 
     .pain-icon-wrap img {
@@ -445,7 +543,7 @@
     .pain-text {
       font-size: 17px;
       font-weight: 600;
-      color: var(--text);
+      color: #172033;
       line-height: 1.5;
     }
 
@@ -675,31 +773,63 @@
     .ba-section {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      min-height: 420px;
+      min-height: 620px;
+      background: #101827;
+    }
+
+    .ba-intro {
+      background:
+        linear-gradient(180deg, #0b1121 0%, #101827 100%);
+      padding: 104px 0 84px;
+      text-align: center;
+    }
+
+    .ba-intro .eyebrow {
+      margin-bottom: 18px;
+      color: rgba(255, 255, 255, 0.66);
+      letter-spacing: .2em;
+    }
+
+    .ba-intro-title {
+      margin: 0;
+      color: #ffffff;
+      font-size: clamp(30px, 3vw, 42px);
+      font-weight: 800;
+      letter-spacing: 0;
+      line-height: 1.25;
+      text-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
     }
 
     .ba-col {
-      padding: 72px 72px;
+      padding: clamp(56px, 5vw, 92px);
       display: flex;
       flex-direction: column;
       justify-content: flex-start;
+      align-items: center;
+      position: relative;
+      overflow: hidden;
     }
 
     .ba-before {
-      background: var(--surface);
-      border-right: 1px solid var(--line);
+      background:
+        radial-gradient(circle at 50% 24%, rgba(148, 163, 184, 0.14), transparent 34%),
+        linear-gradient(145deg, #202b3d 0%, #182333 100%);
+      border-right: 1px solid rgba(148, 163, 184, 0.18);
     }
 
     .ba-after {
-      background: var(--gold-pale);
+      background:
+        radial-gradient(circle at 62% 26%, rgba(59, 130, 246, 0.22), transparent 30%),
+        linear-gradient(145deg, #f9fbff 0%, #edf5ff 52%, #e6f0ff 100%);
     }
 
     .ba-label {
-      font-size: 44px;
+      width: min(100%, 560px);
+      font-size: clamp(34px, 3.1vw, 44px);
       font-weight: 900;
       letter-spacing: .08em;
       text-transform: uppercase;
-      margin-bottom: 24px;
+      margin: 0 0 24px;
       display: block;
       font-family: 'Space Grotesk', sans-serif;
     }
@@ -711,21 +841,68 @@
     }
 
     .ba-after .ba-label {
-      color: #fbbf24;
+      color: #2563eb;
       opacity: 0.95;
-      text-shadow: 0 4px 24px rgba(251, 191, 36, 0.3);
+      text-shadow: none;
+    }
+
+    .ba-visual {
+      margin: 0 0 40px;
+      padding: 0;
+      width: 100%;
+      max-width: 560px;
+      aspect-ratio: 16 / 10;
+      height: auto;
+      min-height: 0;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    .ba-visual img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .ba-before .ba-visual img {
+      mix-blend-mode: lighten;
+      object-position: center 46%;
+      transform: scale(1.02);
+      filter: drop-shadow(0 24px 36px rgba(0, 0, 0, 0.24)) saturate(0.82) brightness(0.86);
+    }
+
+    .ba-after .ba-visual {
+      max-width: 560px;
+      border-radius: 24px;
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.78);
+      border: 1px solid rgba(37, 99, 235, 0.16);
+      box-shadow: 0 22px 64px rgba(37, 99, 235, 0.16);
+    }
+
+    .ba-after .ba-visual img {
+      object-fit: cover;
+      object-position: center;
+      transform: scale(1.03);
     }
 
     .ba-list {
       display: flex;
       flex-direction: column;
-      gap: 20px;
+      gap: 16px;
+      width: min(100%, 560px);
     }
 
     .ba-item {
       display: flex;
-      align-items: flex-start;
+      align-items: center;
       gap: 14px;
+      min-height: 42px;
     }
 
     .ba-marker {
@@ -737,7 +914,6 @@
       font-size: 14px;
       font-weight: 700;
       flex-shrink: 0;
-      margin-top: 4px;
     }
 
     .ba-before .ba-marker {
@@ -746,15 +922,21 @@
     }
 
     .ba-after .ba-marker {
-      background: rgba(176, 125, 46, .15);
-      color: var(--gold);
+      background: rgba(37, 99, 235, 0.12);
+      color: #2563eb;
     }
 
     .ba-text {
-      font-size: 18px;
-      color: var(--text);
-      line-height: 1.75;
-      font-weight: 500;
+      font-size: clamp(16px, 1.08vw, 18px);
+      color: #f8fafc;
+      line-height: 1.62;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    .ba-after .ba-text {
+      color: #0f172a;
+      font-weight: 700;
     }
 
     /* ════════════════════════════
@@ -988,7 +1170,7 @@
     .pricing-sub {
       font-size: 16px;
       color: #64748b;
-      margin-bottom: 60px;
+      margin-bottom: 38px;
     }
 
     .price-badge {
@@ -1014,10 +1196,40 @@
       margin-bottom: 8px;
     }
 
+    .price-daily {
+      margin: 0 0 10px;
+      color: #475569;
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: .02em;
+    }
+
     .price-cap {
       font-size: 13px;
       color: #64748b;
-      margin-bottom: 48px;
+      margin-bottom: 22px;
+    }
+
+    .price-outcome {
+      margin: 0 auto 18px;
+      max-width: 620px;
+      color: #0b1121;
+      font-size: clamp(22px, 2.7vw, 34px);
+      font-weight: 900;
+      line-height: 1.45;
+      letter-spacing: .02em;
+    }
+
+    .price-outcome span {
+      color: #2563eb;
+    }
+
+    .price-note-line {
+      margin: 0 auto 42px;
+      color: #475569;
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 1.7;
     }
 
     .price-tags {
@@ -1036,11 +1248,14 @@
       border: 1px solid #e2e8f0;
       border-radius: 8px;
       padding: 10px 22px;
-      white-space: nowrap;
+      white-space: normal;
       text-align: center;
       display: flex;
       align-items: center;
+      justify-content: center;
       gap: 8px;
+      line-height: 1.55;
+      min-height: 54px;
     }
 
     .price-tag::before {
@@ -1213,11 +1428,30 @@
         padding: 64px 40px 32px 40px;
       }
 
+      .hero-right {
+        width: 100%;
+        min-height: 440px;
+        padding: 0;
+      }
+
+      .hero-screen {
+        min-height: 440px;
+      }
+
       .hero-right,
       .onboard-left,
       .onboard-right,
       .ba-col {
         padding: 40px;
+      }
+
+      .ba-visual,
+      .ba-after .ba-visual {
+        max-width: 560px;
+      }
+
+      .hero-right {
+        padding: 0;
       }
 
       .pain-cards,
@@ -1255,36 +1489,49 @@
         position: relative;
       }
 
-      .header-inner {
-        flex-direction: column;
-        justify-content: center;
+      .header-inner.wrap {
+        flex-direction: row;
+        justify-content: space-between;
         align-items: center;
+        min-height: 72px;
         height: auto;
-        padding: 16px 0 20px;
-        gap: 16px;
+        padding: 10px 16px;
+        gap: 12px;
         width: 100%;
       }
 
       .brand {
         display: flex;
-        flex-direction: column;
+        flex-direction: row;
         align-items: center;
-        text-align: center;
-        width: 100%;
-        justify-content: center;
+        text-align: left;
+        width: auto;
+        justify-content: flex-start;
         margin: 0;
         padding: 0;
-        gap: 6px;
-        font-size: 18px;
-        /* Reduce font size on mobile to prevent awkward wrapping */
+        gap: 8px;
       }
 
-      .brand span {
-        display: block;
-        font-size: 13px;
-        line-height: 1.4;
-        word-break: auto-phrase;
-        overflow-wrap: break-word;
+      .brand-logo-mark {
+        width: 42px;
+        height: 42px;
+        border-radius: 9px;
+      }
+
+      .brand-logo {
+        left: -47px;
+        top: -16px;
+        width: 126px;
+      }
+
+      .brand-name {
+        font-size: 1.24rem;
+      }
+
+      .brand-subtitle {
+        font-size: 0.68rem;
+        letter-spacing: 0.05em;
+        white-space: nowrap;
       }
 
       .brand i {
@@ -1292,15 +1539,15 @@
       }
 
       .header-right {
-        justify-content: center;
-        width: 100%;
-        gap: 12px;
-        flex-wrap: wrap;
+        justify-content: flex-end;
+        width: auto;
+        gap: 8px;
+        flex-wrap: nowrap;
       }
 
       .header-right .btn {
-        padding: 10px 16px;
-        font-size: 13px;
+        padding: 9px 12px;
+        font-size: 12px;
       }
 
       .wrap {
@@ -1340,6 +1587,34 @@
         padding: 40px 24px;
       }
 
+      .ba-visual,
+      .ba-after .ba-visual {
+        max-width: 100%;
+      }
+
+      .ba-list,
+      .ba-label {
+        width: 100%;
+      }
+
+      .ba-item {
+        align-items: flex-start;
+      }
+
+      .hero-right {
+        min-height: 300px;
+        padding: 0;
+      }
+
+      .hero-screen {
+        min-height: 300px;
+      }
+
+      .hero-screen img {
+        object-position: 50% 50%;
+        transform: scale(1.03);
+      }
+
       .pain-cards,
       .how-grid {
         grid-template-columns: 1fr;
@@ -1350,8 +1625,12 @@
       }
 
       .header-right {
+        display: flex;
+        /* Keep the LP return path visible on mobile. */
+      }
+
+      .header-right .btn-gold {
         display: none;
-        /* Hide header CTA on mobile */
       }
 
       .steps-flow {
@@ -1391,12 +1670,18 @@
   <!-- ═══ HEADER ═══ -->
   <header class="site-header">
     <div class="header-inner wrap">
-      <a href="/" class="brand">
-        <i class="fa-solid fa-scale-balanced"></i>
-        DIFFsense 導入サポートパック
+      <a href="index.html" class="brand" aria-label="DIFFsense LPに戻る">
+        <span class="brand-logo-mark" aria-hidden="true">
+          <img src="images/logo_official.png?v=20260512_v1" class="brand-logo" alt="">
+        </span>
+        <span class="brand-copy">
+          <span class="brand-name">DIFFsense</span>
+          <span class="brand-subtitle">導入サポートパック</span>
+        </span>
       </a>
       <div class="header-right">
-        <a class="btn btn-gold" href="/api/paypal-checkout" target="_blank" rel="noopener noreferrer">導入支援を申し込む</a>
+        <a class="btn btn-back-lp" href="index.html">LPに戻る</a>
+        <a class="btn btn-gold" href="/api/stripe-onboarding-checkout" target="_blank" rel="noopener noreferrer">導入支援を申し込む</a>
       </div>
     </div>
   </header>
@@ -1409,11 +1694,10 @@
     <section class="hero">
       <!-- LEFT -->
       <div class="hero-left">
-        <span class="eyebrow">Onboarding Solution</span>
         <h1 class="hero-title">契約確認を、<br>作業から<br><em>“経営判断”</em>へ。</h1>
         <p class="hero-sub">変更点を構造化し、確認すべき論点を整理。<br>導入初期から実務定着まで伴走します。</p>
         <div class="hero-cta-row">
-          <a class="btn btn-gold" href="/api/paypal-checkout" target="_blank" rel="noopener noreferrer">導入支援を申し込む</a>
+          <a class="btn btn-gold" href="/api/stripe-onboarding-checkout" target="_blank" rel="noopener noreferrer">導入支援を申し込む</a>
           <a class="btn btn-ghost"
             href="https://calendar.google.com/calendar/u/0/appointments/schedules/AcZssZ1vOuZKEJ_wbtUNZH1BpV2StHBkZgsYHnH0TgPLEIGnbr7u7SYkm5r4bjlhUS2TM1lPT6IRTW5l"
             target="_blank" rel="noopener noreferrer">無料相談する</a>
@@ -1422,9 +1706,9 @@
 
       <!-- RIGHT — dark panel with diff visualization -->
       <div class="hero-right">
-        <!-- Real dashboard screenshot -->
+        <!-- Original laptop visual -->
         <div class="hero-screen">
-          <img src="images/dashboard-latest-masked.png" alt="DIFFsense ダッシュボード — 差分ハイライトとAIリスク要約" loading="eager">
+          <img src="images/onboarding-hero-laptop-original.png?v=20260527_laptop" alt="契約レビュー画面を表示したノートパソコン" loading="eager">
         </div>
       </div>
     </section>
@@ -1440,9 +1724,8 @@
             <span class="eyebrow">Problems</span>
             <h2 class="pain-heading">こんな状態に<br>なっていませんか？</h2>
           </div>
-          <div style="text-align: center; padding: 20px 0;">
+          <div class="pain-left-visual">
             <img src="images/flat_problem_person.png" alt="煩雑な契約確認作業の課題"
-              style="max-width: 360px; width: 100%; border-radius: 16px; border: 1px solid var(--line); box-shadow: 0 16px 40px rgba(0,0,0,0.4);"
               loading="lazy">
           </div>
         </div>
@@ -1557,7 +1840,7 @@
                   <span style="font-size:12px;color:#e2e8f0;">田中 法務</span>
                 </div>
                 <span
-                  style="font-size:11px;font-weight:700;color:#c3924f;background:rgba(195,146,79,.12);border:1px solid rgba(195,146,79,.3);border-radius:5px;padding:2px 8px;">管理者</span>
+                  style="font-size:11px;font-weight:700;color:#3b82f6;background:rgba(37,99,235,.12);border:1px solid rgba(37,99,235,.3);border-radius:5px;padding:2px 8px;">管理者</span>
               </div>
               <div
                 style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:#1e293b;border-radius:8px;border:1px solid #334155;">
@@ -1595,20 +1878,19 @@
     <!-- ════════════════════════
      ⑤ BEFORE / AFTER
 ════════════════════════ -->
-    <div style="background:var(--bg);padding:100px 0 0;text-align:center;">
+    <div class="ba-intro">
       <div class="wrap">
         <span class="eyebrow">Comparison</span>
-        <h2 style="font-size:32px;font-weight:700;color:var(--text);margin-top:20px;letter-spacing:.05em;">従来手法との違い</h2>
+        <h2 class="ba-intro-title">従来手法との違い</h2>
       </div>
     </div>
-    <section class="ba-section" style="padding-top:60px;background:var(--bg);">
+    <section class="ba-section">
       <div class="ba-col ba-before">
         <span class="ba-label">Before</span>
         <!-- Before illustration: scattered docs -->
-        <div
-          style="margin:0 auto 50px;padding:0;width:100%;max-width:480px;height:300px;min-height:300px;flex-shrink:0;display:flex;align-items:center;justify-content:center;">
-          <img src="images/before_illustration_new.png" alt="従来の煩雑な契約確認"
-            style="width:100%;height:100%;object-fit:contain;mix-blend-mode:lighten;transform:scale(1.15);">
+        <div class="ba-visual">
+          <img src="images/before_illustration_clean.png?v=20260527_clean" alt="従来の煩雑な契約確認"
+            loading="lazy">
         </div>
         <ul class="ba-list">
           <li class="ba-item">
@@ -1627,11 +1909,9 @@
       </div>
       <div class="ba-col ba-after">
         <span class="ba-label">After</span>
-        <div
-          style="margin:0 auto 50px;padding:0;width:100%;max-width:480px;height:300px;min-height:300px;flex-shrink:0;display:flex;align-items:center;justify-content:center;">
-          <!-- Dashboard image -->
-          <img src="images/dashboard-latest-masked.png" alt="標準化された確認フロー"
-            style="width:100%;object-fit:contain;mix-blend-mode:lighten;border-radius:6px;box-shadow:0 6px 30px rgba(0,0,0,0.6);">
+        <div class="ba-visual">
+          <img src="images/onboarding-after-workflow-original.png?v=20260527_after_workflow" alt="標準化された契約確認フロー"
+            loading="lazy">
         </div>
         <ul class="ba-list">
           <li class="ba-item">
@@ -1749,23 +2029,25 @@
           <span class="eyebrow pricing-eyebrow">Pricing</span>
           <h2 class="pricing-heading">導入サポートパック</h2>
           <p class="pricing-sub">業務設計から実務定着まで、一貫してサポートします。</p>
-          <div class="price-badge">5社限定　先着受付中</div>
+          <p class="price-daily">1日あたり 約3,333円</p>
           <p class="price-num">¥100,000</p>
           <p class="price-cap">税込 / 導入初期の業務設計支援を含む</p>
+          <p class="price-outcome">30日で<br>契約管理・AI解析・期限管理を<br><span>社内運用レベルまで整備</span></p>
+          <p class="price-note-line">法務担当を増やす前に、まずは運用を整理。</p>
           <div class="price-tags" style="display:flex;flex-direction:column;align-items:center;gap:12px;">
             <span class="price-tag"
-              style="background:#f1f5f9;color:#334155;border-color:#cbd5e1;padding:12px 24px;width:100%;max-width:320px;text-align:center;">期間：30日間</span>
+              style="background:#f1f5f9;color:#334155;border-color:#cbd5e1;padding:12px 24px;width:100%;max-width:560px;text-align:center;">期間：30日間</span>
             <span class="price-tag"
-              style="background:#f1f5f9;color:#334155;border-color:#cbd5e1;padding:12px 24px;width:100%;max-width:320px;text-align:center;">差分チェック代行：最大5契約書</span>
+              style="background:#f1f5f9;color:#334155;border-color:#cbd5e1;padding:12px 24px;width:100%;max-width:560px;text-align:center;">AI解析（条文・差分・要約・リスク・修正案・期限）：最大10件</span>
             <span class="price-tag"
-              style="background:#f1f5f9;color:#334155;border-color:#cbd5e1;padding:12px 24px;width:100%;max-width:320px;text-align:center;">優先度マップ作成：最大5件</span>
+              style="background:#f1f5f9;color:#334155;border-color:#cbd5e1;padding:12px 24px;width:100%;max-width:560px;text-align:center;">優先度MAP：最大10件</span>
             <span class="price-tag"
-              style="background:#f1f5f9;color:#334155;border-color:#cbd5e1;padding:12px 24px;width:100%;max-width:320px;text-align:center;">社内フロー簡易設計：1回</span>
+              style="background:#f1f5f9;color:#334155;border-color:#cbd5e1;padding:12px 24px;width:100%;max-width:560px;text-align:center;">社内フロー構築：無制限</span>
             <span class="price-tag"
-              style="background:#f1f5f9;color:#334155;border-color:#cbd5e1;padding:12px 24px;width:100%;max-width:320px;text-align:center;">オンラインサポート：2回（各60分）</span>
+              style="background:#f1f5f9;color:#334155;border-color:#cbd5e1;padding:12px 24px;width:100%;max-width:560px;text-align:center;">オンラインサポート：4回（各60分）</span>
           </div>
           <div class="price-cta-wrap">
-            <a class="btn btn-gold btn-lg" href="/api/paypal-checkout" target="_blank"
+            <a class="btn btn-gold btn-lg" href="/api/stripe-onboarding-checkout" target="_blank"
               rel="noopener noreferrer">導入支援を申し込む
               — ¥100,000</a>
             <a class="btn btn-ghost"
@@ -1796,8 +2078,21 @@
     <a class="btn btn-ghost"
       href="https://calendar.google.com/calendar/u/0/appointments/schedules/AcZssZ1vOuZKEJ_wbtUNZH1BpV2StHBkZgsYHnH1BpV2StHBkZgsYHnH0TgPLEIGnbr7u7SYkm5r4bjlhUS2TM1lPT6IRTW5l"
       target="_blank" rel="noopener noreferrer">無料相談</a>
-    <a class="btn btn-gold" href="/api/paypal-checkout" target="_blank" rel="noopener noreferrer">導入支援を申し込む</a>
+    <a class="btn btn-gold" href="/api/stripe-onboarding-checkout" target="_blank" rel="noopener noreferrer">導入支援を申し込む</a>
   </div>
+
+  <script>
+    (() => {
+      const checkoutPath = '/api/stripe-onboarding-checkout';
+      const checkoutUrl = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+        ? `https://diffsense.spacegleam.co.jp${checkoutPath}`
+        : checkoutPath;
+
+      document.querySelectorAll(`a[href="${checkoutPath}"]`).forEach((link) => {
+        link.href = checkoutUrl;
+      });
+    })();
+  </script>
 
 </body>
 

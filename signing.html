@@ -3,12 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
-  <title>契約書の差分チェック・リスク要約｜DIFFsense</title>
-    <meta name="description" content="契約書の変更点を自動検出し、リスクをAIが要約。見落としを防ぎ、レビュー時間を削減します。差分チェックから電子署名まで一括対応。">
-    <meta property="og:title" content="契約書の差分チェック・リスク要約｜DIFFsense">
-    <meta property="og:description" content="契約書の変更点を自動検出し、リスクをAIが要約。見落としを防ぎます。">
-    <meta property="og:type" content="website">
-  <link rel="icon" type="image/png" href="favicon2.png?v=2">
+  <title>電子署名 - DIFFsense</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <style>
@@ -1012,7 +1007,7 @@
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
     const PROD_API_BASE = 'https://api-qf37m5ba2q-an.a.run.app';
-    const IS_LOCAL_SIGNING_HOST = location.hostname === 'localhost' || location.hostname === '127.0.0.1' || location.hostname.startsWith('192.168.') || location.hostname.endsWith('.local');
+    const IS_LOCAL_SIGNING_HOST = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
 
     const API_BASE = (() => {
       const params = new URLSearchParams(location.search);
@@ -1032,7 +1027,7 @@
       }
 
       const forceProd = params.get('api') === 'prod' || localStorage.getItem('diffsense_api_mode') === 'prod';
-      return forceProd ? PROD_API_BASE : 'http://' + location.hostname + ':3001';
+      return forceProd ? PROD_API_BASE : 'http://localhost:3001';
     })();
 
     console.log('API_BASE:', API_BASE);

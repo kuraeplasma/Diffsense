@@ -4,11 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>契約書の差分チェック・リスク要約｜DIFFsense</title>
-    <meta name="description" content="契約書の変更点を自動検出し、リスクをAIが要約。見落としを防ぎ、レビュー時間を削減します。差分チェックから電子署名まで一括対応。">
-    <meta property="og:title" content="契約書の差分チェック・リスク要約｜DIFFsense">
-    <meta property="og:description" content="契約書の変更点を自動検出し、リスクをAIが要約。見落としを防ぎます。">
-    <meta property="og:type" content="website">
+    <title>お知らせ - DIFFsense</title>
 
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=AW-17941578077"></script>
@@ -26,7 +22,10 @@
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/style.css?v=20260329_mcp_visuals8">
-    <link rel="icon" type="image/png" href="favicon2.png?v=2">
+    <link rel="icon" href="/favicon.ico?v=20260521_logo" sizes="any">
+    <link rel="icon" type="image/png" sizes="256x256" href="/favicon-diffsense.png?v=20260521_logo">
+    <link rel="shortcut icon" href="/favicon.ico?v=20260521_logo">
+    <link rel="apple-touch-icon" sizes="256x256" href="/favicon-diffsense.png?v=20260521_logo">
 
     <style>
         *,
@@ -392,27 +391,454 @@
                 align-self: center;
             }
         }
+
+        /* Site-wide: kill blue tap-highlight on click for all interactive elements */
+        * {
+            -webkit-tap-highlight-color: transparent !important;
+        }
+        /* === LP-matched Header (copied from index.html inline styles) === */
+        body.header-navy .header {
+            top: 0 !important;
+            z-index: 1003 !important;
+            background: rgba(1, 8, 22, 0.94) !important;
+            backdrop-filter: blur(14px) !important;
+            border-bottom: 1px solid rgba(255,255,255,0.08) !important;
+            box-shadow: 0 12px 32px rgba(1, 8, 22, 0.18) !important;
+        }
+        .header-container {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            position: relative !important;
+        }
+        .header-left {
+            display: flex !important;
+            align-items: center !important;
+            gap: 0 !important;
+        }
+        .logo { display: flex !important; align-items: center !important; gap: 0 !important; text-decoration: none !important; }
+        .logo-img {
+            height: 64px !important;
+            width: auto !important;
+            margin-right: -22px !important;
+            margin-top: 4px !important;
+            vertical-align: middle !important;
+            display: block !important;
+        }
+        .logo-text {
+            font-size: 1.6rem !important;
+            font-weight: 800 !important;
+            letter-spacing: -0.02em !important;
+            line-height: 1 !important;
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+            font-family: 'SuisseIntl', 'Suisse Intl', 'Inter', sans-serif !important;
+        }
+        .header-news-inline {
+            display: flex !important;
+            align-items: center !important;
+            gap: 6px !important;
+            white-space: nowrap !important;
+            flex: 0 0 auto !important;
+        }
+        @media (max-width: 1240px) {
+            .header-news-inline {
+                display: none !important;
+            }
+        }
+        .header-right {
+            display: flex !important;
+            align-items: center !important;
+            gap: 14px !important;
+        }
+        .nav, .nav-list { display: flex !important; }
+        .nav-list {
+            list-style: none !important;
+            gap: 14px !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        .nav-list a {
+            color: rgba(255,255,255,0.9) !important;
+            font-size: 1.05rem !important;
+            font-weight: 500 !important;
+            text-decoration: none !important;
+            white-space: nowrap !important;
+        }
+        body.header-navy .nav-list a,
+        body.header-navy .logo-text,
+        body.header-navy .header-news-inline,
+        body.header-navy .news-text {
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+        }
+        .auth-buttons {
+            display: flex !important;
+            align-items: center !important;
+            gap: 12px !important;
+            flex-shrink: 0 !important;
+        }
+        .auth-buttons .btn {
+            white-space: nowrap !important;
+            flex-shrink: 0 !important;
+        }
+        .header .btn-primary, .header .btn-primary.btn-sm {
+            background: #2563eb !important;
+            border-color: #2563eb !important;
+            color: #fff !important;
+        }
+        .news-badge {
+            background: linear-gradient(135deg, #2563eb, #6366f1) !important;
+            color: #fff !important;
+            -webkit-text-fill-color: #fff !important;
+            padding: 4px 10px !important;
+            border-radius: 5px !important;
+            font-size: 0.72rem !important;
+            font-weight: 800 !important;
+        }
+        .news-link {
+            color: #93c5fd !important;
+            -webkit-text-fill-color: #93c5fd !important;
+            text-decoration: none !important;
+            font-size: 0.9rem !important;
+            font-weight: 600 !important;
+        }
+        .news-link:hover { color: #bfdbfe !important; }
+
+        @media (max-width: 768px) {
+            .header,
+            body.header-navy .header {
+                top: 0 !important;
+                height: 70px !important;
+            }
+
+            .header-container {
+                height: 70px !important;
+                padding: 0 16px !important;
+            }
+
+            .logo-img {
+                height: 42px !important;
+                margin-left: -16px !important;
+                margin-right: -12px !important;
+                margin-top: 2px !important;
+            }
+
+            .logo-text {
+                font-size: 1.25rem !important;
+                letter-spacing: 0 !important;
+            }
+
+            .header-news-inline {
+                display: none !important;
+            }
+
+            .header-right {
+                position: absolute !important;
+                top: calc(100% + 10px) !important;
+                left: 18px !important;
+                right: 18px !important;
+                display: none !important;
+                flex-direction: column !important;
+                align-items: center !important;
+                gap: 14px !important;
+                padding: 16px !important;
+                border: 1px solid #dbe7f7 !important;
+                border-radius: 14px !important;
+                background: #ffffff !important;
+                box-shadow: 0 18px 42px rgba(15, 35, 75, 0.18) !important;
+                z-index: 1004 !important;
+            }
+
+            .header-right.is-open,
+            .header-right:has(.nav.active) {
+                display: flex !important;
+            }
+
+            .header-right .nav {
+                position: static !important;
+                display: none !important;
+                width: 100% !important;
+                max-width: 320px !important;
+                height: auto !important;
+                padding: 0 !important;
+                background: transparent !important;
+                border: 0 !important;
+                box-shadow: none !important;
+            }
+
+            .header-right .nav.active {
+                display: block !important;
+            }
+
+            .header-right .nav-list {
+                display: flex !important;
+                flex-direction: column !important;
+                width: 100% !important;
+                gap: 0 !important;
+            }
+
+            .header-right .nav-list li {
+                display: block !important;
+                width: 100% !important;
+            }
+
+            .header-right .nav-list a,
+            body.header-navy .header-right .nav-list a {
+                display: flex !important;
+                width: 100% !important;
+                min-height: 48px !important;
+                align-items: center !important;
+                justify-content: center !important;
+                margin: 0 !important;
+                padding: 0.75rem 1rem !important;
+                border-bottom: 1px solid #e6edf7 !important;
+                color: #06163b !important;
+                -webkit-text-fill-color: #06163b !important;
+                font-weight: 900 !important;
+                text-decoration: none !important;
+                background: transparent !important;
+            }
+
+            .header-right .auth-buttons {
+                display: flex !important;
+                flex-direction: column !important;
+                width: 100% !important;
+                max-width: 320px !important;
+                gap: 10px !important;
+                margin: 0 auto !important;
+                padding: 0 !important;
+            }
+
+            .header-right .auth-buttons .btn {
+                width: 100% !important;
+                min-height: 44px !important;
+                justify-content: center !important;
+                margin: 0 !important;
+                border-radius: 999px !important;
+            }
+
+            .header-right .auth-buttons .btn-outline {
+                background: #ffffff !important;
+                border: 1px solid #c9d7ea !important;
+                color: #06163b !important;
+                -webkit-text-fill-color: #06163b !important;
+            }
+
+            .header .menu-toggle {
+                display: flex !important;
+                width: 44px !important;
+                height: 44px !important;
+                align-items: center !important;
+                justify-content: center !important;
+                border: 0 !important;
+                border-radius: 0 !important;
+                background: transparent !important;
+                box-shadow: none !important;
+                position: relative !important;
+                z-index: 1005 !important;
+            }
+
+            .header .menu-toggle span {
+                position: absolute !important;
+                left: 50% !important;
+                top: 50% !important;
+                width: 25px !important;
+                height: 2px !important;
+                border-radius: 999px !important;
+                background: #ffffff !important;
+                box-shadow: 0 0 12px rgba(37, 99, 235, 0.28) !important;
+                transform-origin: center !important;
+                transition: transform 0.2s ease, opacity 0.16s ease !important;
+            }
+
+            .header .menu-toggle span:nth-child(1) {
+                transform: translate(-50%, calc(-50% - 7px)) !important;
+            }
+
+            .header .menu-toggle span:nth-child(2) {
+                transform: translate(-50%, -50%) !important;
+            }
+
+            .header .menu-toggle span:nth-child(3) {
+                transform: translate(-50%, calc(-50% + 7px)) !important;
+            }
+
+            .header .menu-toggle.active span:nth-child(1) {
+                transform: translate(-50%, -50%) rotate(45deg) !important;
+            }
+
+            .header .menu-toggle.active span:nth-child(2) {
+                opacity: 0 !important;
+                transform: translate(-50%, -50%) scaleX(0) !important;
+            }
+
+            .header .menu-toggle.active span:nth-child(3) {
+                transform: translate(-50%, -50%) rotate(-45deg) !important;
+            }
+        }
+
+        /* === LP-matched Footer (copied from index.html inline styles) === */
+        .site-footer {
+            position: relative !important;
+            z-index: 2 !important;
+            margin-top: 0 !important;
+            padding-top: 4rem !important;
+            background: url('images/hero_abstract_bg.png') center/cover !important;
+            color: #fff !important;
+            border-top: none !important;
+            overflow: hidden !important;
+        }
+        .site-footer::before {
+            content: '' !important;
+            position: absolute !important;
+            inset: 0 !important;
+            background: linear-gradient(
+                to bottom,
+                #ffffff                  0px,
+                rgba(255,255,255,0.95)   60px,
+                rgba(255,255,255,0.7)    110px,
+                rgba(255,255,255,0.3)    180px,
+                rgba(1,8,22,0.0)         260px,
+                rgba(1,8,22,0.6)         360px,
+                rgba(1,8,22,0.93)        460px,
+                rgba(1,8,22,0.93)        100%
+            ) !important;
+            z-index: 1 !important;
+            pointer-events: none !important;
+        }
+        .site-footer .container,
+        .site-footer .footer-container,
+        .site-footer .footer-copy {
+            position: relative !important;
+            z-index: 3 !important;
+        }
+        .footer-container {
+            padding-top: 4rem !important;
+            padding-bottom: 3rem !important;
+            border-bottom: none !important;
+        }
+        .footer-logo {
+            display: flex !important;
+            align-items: center !important;
+            gap: 0 !important;
+            text-decoration: none !important;
+            color: #fff !important;
+            font-size: 1.45rem !important;
+            font-weight: 800 !important;
+            letter-spacing: -0.02em !important;
+            margin-bottom: 0.9rem !important;
+        }
+        .footer-logo-img {
+            height: 52px !important;
+            width: auto !important;
+            margin-right: -16px !important;
+            display: block !important;
+        }
+        .footer-logo span {
+            color: #fff !important;
+            -webkit-text-fill-color: #fff !important;
+        }
+        .footer-social {
+            gap: 1rem !important;
+            margin: 0 !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+        .footer-social-link {
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+            background: none !important;
+            border: none !important;
+            box-shadow: none !important;
+            padding: 0 !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            width: 24px !important;
+            height: 24px !important;
+            opacity: 0.8 !important;
+            transition: opacity 0.2s !important;
+        }
+        .footer-social-link:hover { opacity: 1 !important; }
+        .footer-social-link span { display: none !important; }
+        .footer-social-link svg,
+        .footer-x svg,
+        .x-icon { fill: #ffffff !important; color: #ffffff !important; width: 18px !important; height: 18px !important; display: block !important; }
+        .footer-social-link img.note-icon { width: 18px !important; height: 18px !important; display: block !important; filter: brightness(0) invert(1) !important; }
+        .footer-column h3 {
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+            font-size: 0.72rem !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.1em !important;
+            margin-bottom: 1rem !important;
+            font-weight: 700 !important;
+            opacity: 0.7 !important;
+        }
+        .footer-column a {
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+            font-size: 0.88rem !important;
+            text-decoration: none !important;
+            display: block !important;
+            margin-bottom: 0.6rem !important;
+            opacity: 0.88 !important;
+        }
+        .footer-column a:hover { opacity: 1 !important; }
+        .footer-copy {
+            color: rgba(255,255,255,0.6) !important;
+            font-size: 0.8rem !important;
+            padding-top: 1.5rem !important;
+            padding-bottom: 1.5rem !important;
+            border-top: none !important;
+            display: grid !important;
+            grid-template-columns: 1fr auto 1fr !important;
+            align-items: center !important;
+            gap: 1.5rem !important;
+        }
+        .footer-copy > span:first-child { justify-self: start !important; }
+        .footer-copy > span:last-child { justify-self: end !important; }
+        .footer-copy .footer-social { justify-self: center !important; }
     </style>
 </head>
 
-<body>
+<body class="header-navy">
 
     <!-- Header -->
     <header class="header">
-        <div class="container header-container">
-            <a href="index.html" class="logo">
-                <i class="fa-solid fa-scale-balanced"></i>DIFFsense
-            </a>
-            <nav class="nav">
-                <a href="index.html#features">機能</a>
-                <a href="index.html#pricing">料金</a>
-                <a href="index.html#onboarding">導入サポート</a>
-                <a href="news.html" class="active">お知らせ</a>
+        <div class="container header-container" style="max-width: 100% !important; padding: 0 24px !important;">
+            <div class="header-left">
+                <a href="index.html" class="logo">
+                    <img src="images/logo_official.png" alt="DIFFsense" class="logo-img">
+                    <span class="logo-text">DIFFsense</span>
+                </a>
+            </div>
+
+            <div class="header-news-inline">
+                <span class="news-badge">NEW</span>
+                <span class="news-text">PR TIMESに掲載されました</span>
+                <a href="https://prtimes.jp/main/html/rd/p/000000001.000178766.html" target="_blank" rel="noopener noreferrer" class="news-link">
+                    記事を読む <i class="fa-solid fa-arrow-right"></i>
+                </a>
+            </div>
+
+            <div class="header-right">
+                <nav class="nav">
+                    <ul class="nav-list">
+                        <li><a href="index.html#features">機能</a></li>
+                        <li><a href="index.html#pricing">料金</a></li>
+                        <li><a href="index.html#onboarding">導入サポート</a></li>
+                        <li><a href="news.html" class="active">お知らせ</a></li>
+                    </ul>
+                </nav>
                 <div class="auth-buttons">
-                    <a href="login.html?tab=login" class="btn-login">ログイン</a>
-                    <a href="login.html?mode=signup" class="btn btn-primary btn-sm btn-start-now">今すぐ無料で始める</a>
+                    <a class='btn btn-outline btn-sm' href='login.html?mode=login&v=20260508_authbg'>ログイン</a>
+                    <a class='btn btn-primary btn-sm' href='login.html?mode=signup&v=20260508_authbg'>今すぐ解析してみる</a>
                 </div>
-            </nav>
+            </div>
+
             <button class="menu-toggle" aria-label="メニューを開く">
                 <span></span>
                 <span></span>
@@ -539,7 +965,6 @@
                 <div class="news-item-arrow"><i class="fa-solid fa-arrow-right"></i></div>
             </a>
 
-            <!-- PR TIMES -->
             <!-- PR TIMES -->
             <a class="news-item" href="https://prtimes.jp/main/html/rd/p/000000001.000178766.html" target="_blank" rel="noopener noreferrer">
                 <div class="news-item-meta">
@@ -746,10 +1171,9 @@
     <footer class="site-footer">
         <div class="container footer-container">
             <div class="footer-brand">
-                <a href="index.html" class="footer-logo"><i class="fa-solid fa-scale-balanced"></i> DIFFsense</a>
-                <p class="footer-tagline">契約書の変更を、<br>見落とさない。</p>
-                <a href="https://x.com/DIFFsense_jp" class="footer-x" target="_blank" rel="noopener" aria-label="DIFFsense公式X" title="DIFFsense公式X">
-                    <span class="x-icon" aria-hidden="true">𝕏</span> @DIFFsense_jp
+                <a href="index.html" class="footer-logo">
+                    <img src="images/logo_official.png" alt="" class="footer-logo-img" aria-hidden="true">
+                    <span>DIFFsense</span>
                 </a>
             </div>
             <div class="footer-links">
@@ -760,21 +1184,34 @@
                     <a href="index.html#onboarding">導入サポート</a>
                 </div>
                 <div class="footer-column">
-                    <h3>サポート</h3>
-                    <a href="index.html#faq">よくある質問</a>
-                    <a href="mailto:contact@spacegleam.co.jp">お問い合わせ</a>
-                </div>
-                <div class="footer-column">
                     <h3>会社情報</h3>
                     <a href="company.html">会社概要</a>
                     <a href="law.html">特定商取引法</a>
                     <a href="terms.html">利用規約</a>
                     <a href="privacy.html">プライバシーポリシー</a>
                 </div>
+                <div class="footer-column">
+                    <h3>サポート</h3>
+                    <a href="index.html#faq">よくある質問</a>
+                    <a href="mailto:contact@spacegleam.co.jp">お問い合わせ</a>
+                    <a href="login.html?mode=signup&v=20260508_authbg">無料で始める</a>
+                </div>
             </div>
         </div>
         <div class="footer-copy">
             <span>© 2026 SpaceGleam Inc.</span>
+            <div class="footer-social">
+                <a href="https://x.com/DIFFsense_jp" class="footer-social-link footer-x" target="_blank" rel="noopener noreferrer" aria-label="DIFFsense公式X" title="DIFFsense公式X">
+                    <svg class="x-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path fill="currentColor" d="M18.901 1.153h3.68l-8.037 9.188 9.455 12.507h-7.406l-5.8-7.584-6.63 7.584H.48l8.595-9.826L0 1.154h7.594l5.243 6.932zm-1.29 19.491h2.039L6.486 3.735H4.298z"/>
+                    </svg>
+                    <span>X</span>
+                </a>
+                <a href="https://note.com/diffsense" class="footer-social-link footer-note" target="_blank" rel="noopener noreferrer" aria-label="DIFFsense公式note" title="DIFFsense公式note">
+                    <img src="images/note-icon.svg" class="note-icon" alt="" aria-hidden="true">
+                    <span>note</span>
+                </a>
+            </div>
             <span>All Rights Reserved.</span>
         </div>
     </footer>
@@ -985,7 +1422,7 @@
             render();
         })();
     </script>
-    <script src="js/main.js"></script>
+    <script src="js/main.js?v=20260527_mobile_nav_fix"></script>
 </body>
 
 </html>

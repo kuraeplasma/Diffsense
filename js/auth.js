@@ -13,7 +13,7 @@ import {
     signOut,
     onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { getApiBaseUrl } from './api-base.js';
+import { getApiBaseUrl, shouldUseLocalDevAuthBypass } from './api-base.js?v=20260507_prod_api_analysis';
 
 function resolveSafeNextUrl(nextRaw, fallbackPath = 'dashboard.html') {
     if (!nextRaw || typeof nextRaw !== 'string') {
@@ -68,7 +68,7 @@ function appendAttributionParams(url) {
 }
 
 function getPasswordResetContinueUrl() {
-    return `${window.location.origin}/login.html?tab=login`;
+    return `${window.location.origin}/login.html?mode=login&v=20260508_authbg`;
 }
 
 function persistPlanIntentFromUrl(options = {}) {
@@ -342,7 +342,7 @@ export async function handleLogout() {
     try {
         await signOut(auth);
         console.log("User signed out");
-        window.location.replace("login.html");
+        window.location.replace("login.html?mode=login&v=20260508_authbg");
     } catch (error) {
         console.error("Error signing out:", error);
     }
@@ -353,18 +353,19 @@ export async function handleLogout() {
  * Call this on pages that require login (e.g. dashboard)
  */
 export function requireAuth() {
-    // ローカル/LAN環境ではログインなしでオーナーとして動作（開発用）
-    const _rh = window.location.hostname;
-    const _isLocalAuth = _rh === 'localhost' || _rh === '127.0.0.1' || _rh === '[::1]' || _rh.endsWith('.local') || _rh.startsWith('192.168.') || _rh.startsWith('10.');
-    if (_isLocalAuth) {
-        console.log('[Local] requireAuth skipped — local/LAN environment, owner mode.');
+    // Development bypass is allowed only when the selected API is the local backend.
+    // When localhost points at the production API, Firebase Auth must run so API calls carry an ID token.
+    if (shouldUseLocalDevAuthBypass()) {
+        console.log("Local API development detected, bypassing Firebase Auth check.");
+        processDevBypass();
         return;
     }
+
     onAuthStateChanged(auth, (user) => {
         if (!user) {
             console.log("No user found, redirecting to login.");
             const next = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-            window.location.replace(`${window.location.origin}/login.html?next=${encodeURIComponent(next)}`);
+            window.location.replace(`${window.location.origin}/login.html?mode=login&v=20260508_authbg&next=${encodeURIComponent(next)}`);
         } else {
             console.log("User is authenticated:", user.email);
             const userEmailEl = document.getElementById('user-email-display');
@@ -374,23 +375,49 @@ export function requireAuth() {
         }
     });
 }
+
+function processDevBypass() {
+    console.log("DEV AUTH BYPASS ACTIVE");
+    const userEmailEl = document.getElementById('user-email-display');
+    if (userEmailEl) {
+        userEmailEl.textContent = 'dev@localhost';
+    }
+    const userNameEl = document.getElementById('user-name-display');
+    if (userNameEl) {
+        userNameEl.textContent = 'テストユーザー';
+    }
+}
+/**
+ * Module-level promise that resolves once Firebase auth is initialized.
+ * Shared across all getIdToken() calls to avoid race condition on first load.
+ */
+const _authReady = new Promise((resolve) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+        unsubscribe();
+        resolve(user);
+    });
+});
+
 /**
  * Get current user's ID Token
+ * Uses auth.currentUser fast-path if already initialized,
+ * otherwise waits for the shared _authReady promise.
  */
-export function getIdToken() {
-    return new Promise((resolve, reject) => {
-        const unsubscribe = onAuthStateChanged(auth, async (user) => {
-            unsubscribe();
-            if (user) {
-                try {
-                    const token = await user.getIdToken();
-                    resolve(token);
-                } catch (e) {
-                    reject(e);
-                }
-            } else {
-                resolve(null);
-            }
-        });
-    });
+export async function getIdToken() {
+    // Fast path: auth already initialized
+    if (auth.currentUser) {
+        try {
+            return await auth.currentUser.getIdToken();
+        } catch (e) {
+            throw e;
+        }
+    }
+    // Slow path: wait for Firebase auth to restore persisted session
+    const user = await _authReady;
+    if (!user) return null;
+    try {
+        return await user.getIdToken();
+    } catch (e) {
+        throw e;
+    }
 }

@@ -2,14 +2,19 @@
  * DIFFsense Simulated Database Service (localStorage + Backend API)
  * Data is isolated per user (UID-based keys or Backend Auth)
  */
-import { getIdToken } from './auth.js';
-import { toApiUrl } from './api-base.js?v=20260321f';
+import { getIdToken } from './auth.js?v=20260510_auth_ready_fix';
+import { shouldUseLocalDevAuthBypass, toApiUrl } from './api-base.js?v=20260507_prod_api_analysis';
 
 const LOCAL_CACHE_VERSION = '20260310v2';
 
 export const dbService = {
+    DEBUG: false, // Set to true to enable logs
     // Current user UID (set on login)
     _uid: null,
+
+    log(...args) {
+        if (this.DEBUG) console.log('[DBService]', ...args);
+    },
 
     // Base key names (UID prefix added dynamically)
     _BASE_KEYS: {
@@ -19,7 +24,8 @@ export const dbService = {
         INITIALIZED: 'initialized',
         DIFF_RESULTS: 'diff_results',
         RECENT_DIFF: 'recent_diff',
-        SIGN_REQUESTS: 'sign_requests'
+        SIGN_REQUESTS: 'sign_requests',
+        DIFF_MEMOS: 'diff_memos'
     },
 
     cloneContent(value) {
@@ -72,6 +78,7 @@ export const dbService = {
     isConfirmedStatus(status) {
         return this.normalizeContractStatus(status) === '確認済み';
     },
+
     // Dynamic KEYS getter (with UID prefix)
     get KEYS() {
         const prefix = this._uid ? `diffsense_${this._uid}_` : 'diffsense_';
@@ -82,7 +89,8 @@ export const dbService = {
             INITIALIZED: `${prefix}initialized`,
             DIFF_RESULTS: `${prefix}diff_results_${LOCAL_CACHE_VERSION}`,
             RECENT_DIFF: `${prefix}recent_diff_${LOCAL_CACHE_VERSION}`,
-            SIGN_REQUESTS: `${prefix}sign_requests`
+            SIGN_REQUESTS: `${prefix}sign_requests`,
+            DIFF_MEMOS: `${prefix}diff_memos_${LOCAL_CACHE_VERSION}`
         };
     },
 
@@ -91,8 +99,12 @@ export const dbService = {
      * Must be called before init() after login
      */
     setCurrentUser(uid) {
-        this._uid = uid;
-        console.log(`DB Service: User set to ${uid}`);
+        if (!uid && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+            this._uid = 'owner_dev';
+        } else {
+            this._uid = uid;
+        }
+        this.log(`User set to ${this._uid}`);
     },
 
     /**
@@ -107,15 +119,15 @@ export const dbService = {
                 }
             };
 
-            const token = await getIdToken();
+            const useLocalAuthBypass = shouldUseLocalDevAuthBypass();
+            const token = useLocalAuthBypass ? null : await getIdToken();
             if (token) {
                 fetchOptions.headers.Authorization = `Bearer ${token}`;
-            } else if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '[::1]' || window.location.hostname.endsWith('.local') || window.location.hostname.startsWith('192.168.') || window.location.hostname.startsWith('10.')) {
-                // Local/LAN development uses backend AUTH_BYPASS, so allow API access without Firebase login.
-                console.warn(`API Call proceeding without authenticated user in local/LAN dev: ${endpoint}`);
+            } else if (useLocalAuthBypass) {
+                // Local development uses backend AUTH_BYPASS, so allow API access without Firebase login.
+                this.log(`API Call proceeding without authenticated user in local dev: ${endpoint}`);
             } else {
-                console.error('API Call failed: No authenticated user');
-                return null;
+                throw new Error('ログイン認証が確認できません。再ログインしてから取り込んでください。');
             }
 
             if (body) {
@@ -148,7 +160,7 @@ export const dbService = {
                     const isEndpointNotFound = response.status === 404 && /endpoint not found/i.test(message);
                     const canRetry = isEndpointNotFound && i < candidates.length - 1;
                     if (canRetry) {
-                        console.warn(`API fallback retry: ${candidate} -> ${candidates[i + 1]}`);
+                        this.log(`API fallback retry: ${candidate} -> ${candidates[i + 1]}`);
                         continue;
                     }
                     const error = new Error(message);
@@ -163,7 +175,7 @@ export const dbService = {
 
             throw (lastError || new Error('API request failed'));
         } catch (error) {
-            console.error(`API Call failed (${endpoint}):`, error);
+            this.log(`API Call failed (${endpoint}):`, error);
             if (options.throwOnError) {
                 throw error;
             }
@@ -177,25 +189,35 @@ export const dbService = {
         'business': 3,
         'pro': 5
     },
+
+    /**
+     * Initialize DB if not already done
+     */
     init() {
+        // Development Bypass: Force a consistent UID for local testing if not set
+        if (!this._uid && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+            this.log('Local development detected. Forcing UID to "owner_dev".');
+            this._uid = 'owner_dev';
+        }
+
         // Migrate legacy data (no UID prefix) to current user if needed
         this._migrateLegacyData();
 
-        const currentContracts = JSON.parse(localStorage.getItem(this.KEYS.CONTRACTS) || '[]');
-
-        if (!localStorage.getItem(this.KEYS.INITIALIZED) && currentContracts.length === 0) {
-            console.log('Initializing Seed Data...');
-            this._seed();
-            localStorage.setItem(this.KEYS.INITIALIZED, 'true');
-        }
-
-        // Always seed signatures if missing, for restoration purposes
-        if (!localStorage.getItem(this.KEYS.SIGN_REQUESTS)) {
-            console.log('Restoring Signature Seed Data...');
-            this._seedSignatures();
+        // Prune diff results to avoid QuotaExceededError on startup
+        try {
+            const resultsKey = this.KEYS.DIFF_RESULTS;
+            const resultsData = localStorage.getItem(resultsKey);
+            if (resultsData) {
+                let results = JSON.parse(resultsData);
+                if (Array.isArray(results) && results.length > 5) {
+                    this.log(`Pruning diff results from ${results.length} to 5 on init`);
+                    localStorage.setItem(resultsKey, JSON.stringify(results.slice(0, 5)));
+                }
+            }
+        } catch (e) {
+            this.log('Failed to prune diff results on init:', e);
         }
     },
-
 
     /**
      * Migrate old non-UID data to the current user (one-time)
@@ -208,7 +230,7 @@ export const dbService = {
 
         // Only migrate if legacy data exists AND user has no data yet
         if (legacyData && !localStorage.getItem(userKey)) {
-            console.log('Migrating legacy data to user-scoped storage...');
+            this.log('Migrating legacy data to user-scoped storage...');
             localStorage.setItem(userKey, legacyData);
 
             const legacyLogs = localStorage.getItem('diffsense_logs');
@@ -224,7 +246,7 @@ export const dbService = {
             localStorage.removeItem('diffsense_logs');
             localStorage.removeItem('diffsense_users');
             localStorage.removeItem('diffsense_initialized');
-            console.log('Legacy data migration complete.');
+            this.log('Legacy data migration complete.');
         }
     },
 
@@ -244,70 +266,18 @@ export const dbService = {
         Object.values(this.KEYS).forEach(key => {
             localStorage.removeItem(key);
         });
-        console.log('All local data cleared.');
+        this.log('All local data cleared.');
     },
 
     // --- Contract Methods ---
     getContracts() {
-        return JSON.parse(localStorage.getItem(this.KEYS.CONTRACTS) || '[]');
-    },
-
-    hasAnalysisOrDeadlineData(contract) {
-        return Boolean(
-            String(contract?.ai_summary || contract?.summary || '').trim()
-            || String(contract?.ai_risk_reason || contract?.risk_reason || '').trim()
-            || (Array.isArray(contract?.ai_changes) && contract.ai_changes.length > 0)
-            || contract?.ai_succeeded === true
-            || contract?.expiry_date
-            || contract?.renewal_deadline
-            || contract?.contract_start
-            || contract?.auto_renewal === true
-            || contract?.auto_renewal === false
-        );
-    },
-
-    mergeContractSyncResult(remote, cached) {
-        if (!cached) return remote;
-
-        const merged = { ...remote };
-        if (!merged.original_content && cached.original_content) {
-            merged.original_content = cached.original_content;
+        try {
+            const data = JSON.parse(localStorage.getItem(this.KEYS.CONTRACTS) || '[]');
+            return Array.isArray(data) ? data : [];
+        } catch (e) {
+            this.log('Failed to parse contracts from localStorage:', e);
+            return [];
         }
-
-        const cachedTime = this.toSortableTime(cached.last_updated_at || cached.last_analyzed_at || cached.created_at);
-        const remoteTime = this.toSortableTime(remote.last_updated_at || remote.last_analyzed_at || remote.created_at);
-        const cachedHasResult = this.hasAnalysisOrDeadlineData(cached);
-        const remoteHasResult = this.hasAnalysisOrDeadlineData(remote);
-        const shouldPreserveLocalResult = cachedHasResult && (!remoteHasResult || cachedTime > remoteTime);
-
-        if (shouldPreserveLocalResult) {
-            // 解析直後のローカル結果を、保存完了前の古いAPI同期で消さない。
-            [
-                'summary',
-                'ai_summary',
-                'risk_level',
-                'risk_reason',
-                'ai_risk_reason',
-                'ai_changes',
-                'ai_is_fallback',
-                'ai_succeeded',
-                'ai_limited',
-                'expiry_date',
-                'renewal_deadline',
-                'contract_start',
-                'auto_renewal',
-                'notice_period_days',
-                'contract_category',
-                'date_confidence',
-                'last_analyzed_at',
-                'last_updated_at',
-                'status'
-            ].forEach((field) => {
-                if (cached[field] !== undefined) merged[field] = cached[field];
-            });
-        }
-
-        return merged;
     },
 
     async syncContractsFromApi() {
@@ -317,7 +287,10 @@ export const dbService = {
             const local = this.getContracts();
             const merged = apiData.map(remote => {
                 const cached = local.find(c => String(c.id) === String(remote.id));
-                return this.mergeContractSyncResult(remote, cached);
+                if (cached && !remote.original_content && cached.original_content) {
+                    return { ...remote, original_content: cached.original_content };
+                }
+                return remote;
             });
             localStorage.setItem(this.KEYS.CONTRACTS, JSON.stringify(merged));
             return merged;
@@ -364,7 +337,7 @@ export const dbService = {
                     this._mergeContractIntoCache(saved, tempId);
                 }
             } catch (error) {
-                console.warn('Contract sync failed:', error);
+                this.log('Contract sync failed:', error);
             }
         })();
     },
@@ -482,11 +455,81 @@ export const dbService = {
             is_current: true
         });
 
-        return docs.filter((doc) => doc.content).sort((a, b) => a.sort_order - b.sort_order);
+        return docs.sort((a, b) => a.sort_order - b.sort_order);
+    },
+
+    getDocumentsMetaByContractId(id) {
+        const contract = this.getContractById(id);
+        if (!contract) return [];
+
+        const docs = [];
+        const baseName = contract.name || '契約書';
+        const fileType = (contract.original_filename || '').split('.').pop() || contract.source_type || 'document';
+        const history = Array.isArray(contract.history) ? contract.history : [];
+
+        history.forEach((entry, index) => {
+            docs.push({
+                id: `contract-${contract.id}-hist-${entry.version ?? index + 1}`,
+                contract_id: contract.id,
+                document_name: entry.original_filename || `${baseName}_ver${entry.version ?? index + 1}`,
+                file_type: fileType,
+                uploaded_at: entry.date || contract.last_updated_at || '',
+                user_id: this._uid || null,
+                content: entry.content || null,
+                version_label: `ver${entry.version ?? index + 1}`,
+                sort_order: index + 1,
+                is_current: false
+            });
+        });
+
+        docs.push({
+            id: `contract-${contract.id}-current`,
+            contract_id: contract.id,
+            document_name: contract.original_filename || baseName,
+            file_type: fileType,
+            uploaded_at: contract.last_analyzed_at || contract.last_updated_at || '',
+            user_id: this._uid || null,
+            content: contract.original_content || null,
+            version_label: `ver${history.length + 1}`,
+            sort_order: history.length + 1,
+            is_current: true
+        });
+
+        return docs.sort((a, b) => a.sort_order - b.sort_order);
     },
 
     getDiffResults() {
         return JSON.parse(localStorage.getItem(this.KEYS.DIFF_RESULTS) || '[]');
+    },
+
+    getDiffMemos(docAId, docBId) {
+        try {
+            const allMemos = JSON.parse(localStorage.getItem(this.KEYS.DIFF_MEMOS) || '[]');
+            return allMemos.filter(m => String(m.docA_id) === String(docAId) && String(m.docB_id) === String(docBId));
+        } catch (e) {
+            this.log('Failed to get diff memos:', e);
+            return [];
+        }
+    },
+
+    saveDiffMemo(docAId, docBId, contractId, memoText) {
+        try {
+            const allMemos = JSON.parse(localStorage.getItem(this.KEYS.DIFF_MEMOS) || '[]');
+            const newMemo = {
+                docA_id: docAId,
+                docB_id: docBId,
+                contract_id: contractId || null,
+                author: 'あなた',
+                text: memoText,
+                timestamp: new Date().toISOString()
+            };
+            allMemos.push(newMemo);
+            localStorage.setItem(this.KEYS.DIFF_MEMOS, JSON.stringify(allMemos));
+            return newMemo;
+        } catch (e) {
+            this.log('Failed to save diff memo:', e);
+            return null;
+        }
     },
 
     getDiffResult(docAId, docBId, contractId = null) {
@@ -503,7 +546,14 @@ export const dbService = {
     },
 
     saveDiffResult(payload) {
-        const results = this.getDiffResults();
+        let results = [];
+        try {
+            results = this.getDiffResults();
+        } catch (e) {
+            this.log('Failed to get diff results:', e);
+            results = [];
+        }
+
         const existingIndex = results.findIndex((item) => item.docA_id === payload.docA_id && item.docB_id === payload.docB_id);
         const nextValue = {
             contract_id: payload.contract_id || null,
@@ -513,12 +563,46 @@ export const dbService = {
             created_at: payload.created_at || new Date().toISOString(),
             updated_at: new Date().toISOString()
         };
+
         if (existingIndex >= 0) {
             results[existingIndex] = { ...results[existingIndex], ...nextValue };
         } else {
             results.unshift(nextValue);
         }
-        localStorage.setItem(this.KEYS.DIFF_RESULTS, JSON.stringify(results));
+
+        // Limit maximum cache size to prevent QuotaExceededError
+        const maxCacheSize = 5;
+        if (results.length > maxCacheSize) {
+            results = results.slice(0, maxCacheSize);
+        }
+
+        // Attempt to save to localStorage with progressive eviction if quota exceeded
+        let saveSuccess = false;
+        while (results.length > 0) {
+            try {
+                localStorage.setItem(this.KEYS.DIFF_RESULTS, JSON.stringify(results));
+                saveSuccess = true;
+                break;
+            } catch (error) {
+                if (error.name === 'QuotaExceededError' || error.code === 22) {
+                    this.log('QuotaExceededError while saving diff results. Evicting oldest entry...');
+                    results.pop(); // Remove the oldest entry and try again
+                } else {
+                    this.log('Failed to write diff results to localStorage:', error);
+                    break;
+                }
+            }
+        }
+
+        if (!saveSuccess) {
+            // Final fallback: try to save just the single latest diff result
+            try {
+                localStorage.setItem(this.KEYS.DIFF_RESULTS, JSON.stringify([nextValue]));
+            } catch (fallbackError) {
+                this.log('Critical: Failed to save even a single diff result:', fallbackError);
+            }
+        }
+
         return nextValue;
     },
 
@@ -605,7 +689,8 @@ export const dbService = {
     /**
      * Add a new contract (Monitoring Target)
      */
-    addContract(data) {
+    addContract(data, options = {}) {
+        const { skipRemotePersist = false } = options;
         const contracts = this.getContracts();
         const newId = Date.now();
         const newContract = {
@@ -629,7 +714,9 @@ export const dbService = {
         contracts.unshift(newContract); // Add to top
         localStorage.setItem(this.KEYS.CONTRACTS, JSON.stringify(contracts));
         this.addActivityLog("新規登録", data.name, "ユーザー", "成功");
-        this._persistContractToApi(newContract, 'POST', newId);
+        if (!skipRemotePersist) {
+            this._persistContractToApi(newContract, 'POST', newId);
+        }
         return newContract;
     },
 
@@ -681,7 +768,13 @@ export const dbService = {
 
     // --- Log Methods ---
     getActivityLogs() {
-        return JSON.parse(localStorage.getItem(this.KEYS.ACTIVITY_LOGS) || '[]');
+        try {
+            const data = JSON.parse(localStorage.getItem(this.KEYS.ACTIVITY_LOGS) || '[]');
+            return Array.isArray(data) ? data : [];
+        } catch (e) {
+            this.log('Failed to parse logs from localStorage:', e);
+            return [];
+        }
     },
 
     addActivityLog(action, target_name, actor = "ユーザー", status = "成功") {
@@ -697,7 +790,16 @@ export const dbService = {
             timestamp: now.getTime()
         };
         logs.unshift(newLog); // Newest first
-        localStorage.setItem(this.KEYS.ACTIVITY_LOGS, JSON.stringify(logs));
+        try {
+            localStorage.setItem(this.KEYS.ACTIVITY_LOGS, JSON.stringify(logs.slice(0, 200)));
+        } catch (error) {
+            if (error?.name !== 'QuotaExceededError') throw error;
+            try {
+                localStorage.setItem(this.KEYS.ACTIVITY_LOGS, JSON.stringify(logs.slice(0, 30)));
+            } catch (fallbackError) {
+                this.log('Failed to save activity logs after compaction:', fallbackError);
+            }
+        }
     },
 
     /**
@@ -724,7 +826,7 @@ export const dbService = {
         });
 
         if (filteredLogs.length !== logs.length) {
-            console.log(`Cleaned up ${logs.length - filteredLogs.length} old logs for plan: ${plan}`);
+            this.log(`Cleaned up ${logs.length - filteredLogs.length} old logs for plan: ${plan}`);
             localStorage.setItem(this.KEYS.ACTIVITY_LOGS, JSON.stringify(filteredLogs));
         }
         return filteredLogs;
@@ -732,7 +834,13 @@ export const dbService = {
 
     // --- User Methods ---
     getUsers() {
-        return JSON.parse(localStorage.getItem(this.KEYS.USERS) || '[]');
+        try {
+            const data = JSON.parse(localStorage.getItem(this.KEYS.USERS) || '[]');
+            return Array.isArray(data) ? data : [];
+        } catch (e) {
+            this.log('Failed to parse users from localStorage:', e);
+            return [];
+        }
     },
 
     updateUserRole(email, newRole) {
@@ -801,7 +909,13 @@ export const dbService = {
 
     // --- MCP Methods ---
     async getMcpApiKey() {
-        return await this._callApi('/api/user/mcp-key');
+        try {
+            const data = await this._callApi('/api/user/mcp-key');
+            return data && typeof data === 'object' ? data : {};
+        } catch (error) {
+            this.log('dbService.getMcpApiKey error:', error);
+            return {};
+        }
     },
 
     async generateMcpApiKey() {
@@ -825,8 +939,12 @@ export const dbService = {
                 contract.extracted_text_hash = data.extractedTextHash;
                 contract.extracted_text_length = data.extractedTextLength;
                 contract.source_type = sourceType || data.sourceType;
-                contract.pdf_storage_path = sourceType === 'DOCX' ? null : data.pdfStoragePath;
-                contract.pdf_url = sourceType === 'DOCX' ? null : data.pdfUrl;
+                if (Object.prototype.hasOwnProperty.call(data, 'pdfStoragePath')) {
+                    contract.pdf_storage_path = data.pdfStoragePath || null;
+                }
+                if (Object.prototype.hasOwnProperty.call(data, 'pdfUrl')) {
+                    contract.pdf_url = data.pdfUrl || null;
+                }
                 if (data.rawExtractedText !== undefined) {
                     contract.pdf_raw_text = data.rawExtractedText || '';
                 }
@@ -837,21 +955,13 @@ export const dbService = {
                     contract.doc_type = 'docx';
                     contract.doc_size = Number(data.extractedTextLength || 0) || 0;
                 }
-                if (sourceType === 'DOCX') {
-                    contract.original_file_path = null;
+                const originalFilePath = data.originalFilePath || data.original_file_path;
+                if (originalFilePath !== undefined) {
+                    contract.original_file_path = originalFilePath || null;
                 }
             }
 
             // ステータスを更新
-            // 解析・差分データがあれば保存
-            if (data.ai_changes) contract.ai_changes = data.ai_changes;
-            if (data.summary) contract.summary = data.summary;
-            if (data.ai_summary) contract.ai_summary = data.ai_summary;
-            if (data.risk_level) contract.risk_level = data.risk_level;
-            if (data.ai_risk_reason) contract.ai_risk_reason = data.ai_risk_reason;
-            if (data.contract_meta) contract.contract_meta = data.contract_meta;
-            if (data.ai_succeeded !== undefined) contract.ai_succeeded = data.ai_succeeded;
-
             contract.extract_status = 'success';
             contract.status = data.status || '未処理';
             contract.last_updated_at = this.nowIso();
@@ -871,12 +981,13 @@ export const dbService = {
         const contracts = this.getContracts();
         const contract = contracts.find(c => String(c.id) === String(id));
         if (contract) {
-            const sourceType = String(analysisData.sourceType || '').toUpperCase();
-            const incomingContent = this.cloneContent(analysisData.extractedText);
-            const hasIncomingContent = incomingContent !== undefined && incomingContent !== null && this.contentSignature(incomingContent).length > 0;
-            const currentSignature = this.contentSignature(contract.original_content);
-            const incomingSignature = hasIncomingContent ? this.contentSignature(incomingContent) : '';
-            const shouldBumpVersion = Boolean(hasIncomingContent && currentSignature && incomingSignature && incomingSignature !== currentSignature);
+            const sourceType = String(analysisData.sourceType || analysisData.source_type || '').toUpperCase();
+            const incomingContent = this.cloneContent(analysisData.extractedText || analysisData.original_content);
+            const hasIncomingContent = incomingContent !== undefined && incomingContent !== null;
+            
+            // 本文が変更されているか、または強制更新フラグがあるかチェック
+            const isContentChanged = hasIncomingContent && this.contentSignature(incomingContent) !== this.contentSignature(contract.original_content);
+            const shouldBumpVersion = isContentChanged || options.forceNewVersion === true;
 
             // バージョン保存 (新しい本文がある場合のみ履歴に追加)
             if (shouldBumpVersion) {
@@ -900,23 +1011,20 @@ export const dbService = {
             }
 
             // PDF情報も更新（新バージョン取り込み時）
-            if (Object.prototype.hasOwnProperty.call(analysisData, 'pdfUrl')) {
-                contract.pdf_url = analysisData.pdfUrl || null;
+            // pdfUrl が実際に存在するときのみ上書き。null/undefined なら既存 URL を保持する。
+            if (analysisData.pdfUrl) {
+                contract.pdf_url = analysisData.pdfUrl;
                 contract.pdf_storage_path = analysisData.pdfStoragePath || null;
             }
             if (sourceType) {
                 contract.source_type = sourceType;
             }
-            if (sourceType === 'DOCX') {
-                contract.pdf_url = null;
-                contract.pdf_storage_path = null;
-            }
 
             // 元のDOCX/PDFファイルパスを保存（docx-preview/PDFビューア用）
-            if (Object.prototype.hasOwnProperty.call(analysisData, 'originalFilePath')) {
-                contract.original_file_path = analysisData.originalFilePath || null;
-            } else if (sourceType === 'DOCX') {
-                contract.original_file_path = null;
+            const hasOriginalFilePath = Object.prototype.hasOwnProperty.call(analysisData, 'originalFilePath')
+                || Object.prototype.hasOwnProperty.call(analysisData, 'original_file_path');
+            if (hasOriginalFilePath) {
+                contract.original_file_path = analysisData.originalFilePath || analysisData.original_file_path || null;
             }
             if (analysisData.doc && typeof analysisData.doc === 'object') {
                 contract.doc_type = analysisData.doc.type || sourceType || contract.doc_type || null;
@@ -948,6 +1056,10 @@ export const dbService = {
             contract.ai_risk_reason = analysisData.riskReason || analysisData.ai_risk_reason || '';
             contract.ai_changes = analysisData.changes || analysisData.ai_changes || [];
             contract.ai_is_fallback = analysisData.isFallback === true || analysisData.is_fallback === true;
+            // 修正案データを保存
+            if (analysisData.clauses !== undefined) contract.ai_clauses = analysisData.clauses || [];
+            if (analysisData.finalDocument !== undefined) contract.ai_final_document = analysisData.finalDocument || '';
+            if (analysisData.negotiationText !== undefined) contract.ai_negotiation_text = analysisData.negotiationText || '';
 
             // 期限情報（contract_meta）を保存
             const metaSource = (analysisData.contract_meta && typeof analysisData.contract_meta === 'object')
@@ -964,6 +1076,8 @@ export const dbService = {
             const autoRenewal = pickMeta('auto_renewal');
             const noticePeriodDays = pickMeta('notice_period_days');
             const contractCategory = pickMeta('contract_category');
+            const contractAmount = pickMeta('contract_amount');
+            const parties = pickMeta('parties');
             const dateConfidence = pickMeta('date_confidence');
             if (expiryDate !== undefined) contract.expiry_date = expiryDate || null;
             if (renewalDeadline !== undefined) contract.renewal_deadline = renewalDeadline || null;
@@ -974,6 +1088,8 @@ export const dbService = {
                 contract.notice_period_days = Number.isFinite(numericNotice) ? numericNotice : null;
             }
             if (contractCategory !== undefined) contract.contract_category = contractCategory || null;
+            if (contractAmount !== undefined) contract.contract_amount = contractAmount || null;
+            if (parties !== undefined) contract.parties = parties || null;
             if (dateConfidence !== undefined) contract.date_confidence = dateConfidence || 'unknown';
              
             // フラグの強制Boolean化
@@ -1060,6 +1176,21 @@ export const dbService = {
     /**
      * クローリング結果を保存
      */
+    updateContract(id, data) {
+        const contracts = this.getContracts();
+        const index = contracts.findIndex(c => String(c.id) === String(id));
+        if (index !== -1) {
+            contracts[index] = { 
+                ...contracts[index], 
+                ...data, 
+                last_updated_at: this.nowIso() 
+            };
+            localStorage.setItem(this.KEYS.CONTRACTS, JSON.stringify(contracts));
+            return true;
+        }
+        return false;
+    },
+
     updateCrawlResult(id, data) {
         const contracts = this.getContracts();
         const contract = contracts.find(c => String(c.id) === String(id));
@@ -1089,14 +1220,98 @@ export const dbService = {
         const apiData = await this._callApi('/api/sign/list');
         if (apiData) {
             // Update local cache
-            localStorage.setItem(this.KEYS.SIGN_REQUESTS, JSON.stringify(apiData));
+            this.saveSignRequestsCache(apiData);
             return apiData;
         }
         // Fallback to local
         return JSON.parse(localStorage.getItem(this.KEYS.SIGN_REQUESTS) || '[]');
     },
 
-    async addSignRequest(data, options = {}) {
+    compactSignRequestsForStorage(requests) {
+        return (Array.isArray(requests) ? requests : []).slice(0, 80).map((request) => {
+            const next = { ...request };
+            ['document_snapshot', 'contract_snapshot'].forEach((snapshotKey) => {
+                if (next[snapshotKey] && typeof next[snapshotKey] === 'object') {
+                    next[snapshotKey] = {
+                        ...next[snapshotKey],
+                        original_content: '',
+                        ai_summary: '',
+                        ai_changes: [],
+                        ai_rewrite_clauses: []
+                    };
+                }
+            });
+            return next;
+        });
+    },
+
+    freeStorageForSignDraft() {
+        try {
+            [
+                this.KEYS.DIFF_RESULTS,
+                this.KEYS.RECENT_DIFF,
+                this.KEYS.DIFF_MEMOS
+            ].filter(Boolean).forEach((key) => localStorage.removeItem(key));
+
+            const logs = this.getActivityLogs().slice(0, 30);
+            try {
+                localStorage.setItem(this.KEYS.ACTIVITY_LOGS, JSON.stringify(logs));
+            } catch {
+                localStorage.removeItem(this.KEYS.ACTIVITY_LOGS);
+            }
+        } catch (error) {
+            this.log('Failed to free storage for sign draft:', error);
+        }
+    },
+
+    saveSignRequestsCache(requests) {
+        const key = this.KEYS.SIGN_REQUESTS;
+        const value = Array.isArray(requests) ? requests : [];
+        try {
+            localStorage.setItem(key, JSON.stringify(value));
+            return value;
+        } catch (error) {
+            if (error?.name !== 'QuotaExceededError') throw error;
+        }
+
+        const compacted = this.compactSignRequestsForStorage(value);
+        try {
+            localStorage.removeItem(key);
+            localStorage.setItem(key, JSON.stringify(compacted));
+            return compacted;
+        } catch (error) {
+            if (error?.name !== 'QuotaExceededError') throw error;
+        }
+
+        this.freeStorageForSignDraft();
+        const minimal = compacted.slice(0, 20).map((request) => ({
+            id: request.id,
+            contractId: request.contractId,
+            contract_id: request.contract_id,
+            document_name: request.document_name,
+            sender: request.sender,
+            status: request.status,
+            recipients: Array.isArray(request.recipients) ? request.recipients : [],
+            created_at: request.created_at,
+            updated_at: request.updated_at,
+            document_snapshot: request.document_snapshot ? {
+                id: request.document_snapshot.id,
+                name: request.document_snapshot.name,
+                type: request.document_snapshot.type,
+                pdf_url: request.document_snapshot.pdf_url,
+                pdf_storage_path: request.document_snapshot.pdf_storage_path,
+                original_file_url: request.document_snapshot.original_file_url,
+                original_file_path: request.document_snapshot.original_file_path,
+                source_url: request.document_snapshot.source_url,
+                original_filename: request.document_snapshot.original_filename
+            } : null
+        }));
+        localStorage.removeItem(key);
+        localStorage.setItem(key, JSON.stringify(minimal));
+        return minimal;
+    },
+
+    async addSignRequest(data) {
         const recipients = Array.isArray(data?.recipients) ? data.recipients.filter(Boolean) : [];
         const shouldCreateLocalDraft = recipients.length === 0;
 
@@ -1110,39 +1325,34 @@ export const dbService = {
                 ...data
             };
             requests.unshift(newRequest);
-            localStorage.setItem(this.KEYS.SIGN_REQUESTS, JSON.stringify(requests));
-            this.addActivityLog('署名依頼ドラフト作成', newRequest.document_name || '未命名書類', 'user', '成功');
+            this.saveSignRequestsCache(requests);
+            try {
+                this.addActivityLog('署名依頼ドラフト作成', newRequest.document_name || '未命名書類', 'user', '成功');
+            } catch (error) {
+                this.log('Failed to write sign draft activity log:', error);
+            }
             return newRequest;
         }
 
-        try {
-            const result = await this._callApi('/api/sign/create', 'POST', data, options);
-            if (result) {
-                const requests = JSON.parse(localStorage.getItem(this.KEYS.SIGN_REQUESTS) || '[]');
-                requests.unshift(result);
-                localStorage.setItem(this.KEYS.SIGN_REQUESTS, JSON.stringify(requests));
+        // data should contain { contractId, recipients }
+        const result = await this._callApi('/api/sign/create', 'POST', data, { throwOnError: true });
+        if (result) {
+            // Update local cache immediately
+            const requests = JSON.parse(localStorage.getItem(this.KEYS.SIGN_REQUESTS) || '[]');
+            requests.unshift(result);
+            this.saveSignRequestsCache(requests);
+            
+            try {
                 this.addActivityLog('署名依頼作成', result.document_name, 'user', '成功');
-                return result;
+            } catch (error) {
+                this.log('Failed to write sign activity log:', error);
             }
-        } catch (error) {
-            console.warn('API addSignRequest failed, falling back to local mock:', error);
-            if (options.throwOnError && window.location.hostname !== 'localhost') {
-                throw error;
-            }
+            return result;
         }
 
-        // Local fallback for dev/local testing
-        const requests = JSON.parse(localStorage.getItem(this.KEYS.SIGN_REQUESTS) || '[]');
-        const mockRequest = {
-            id: 'local-' + Date.now(),
-            created_at: new Date().toISOString(),
-            status: 'sent',
-            ...data
-        };
-        requests.unshift(mockRequest);
-        localStorage.setItem(this.KEYS.SIGN_REQUESTS, JSON.stringify(requests));
-        this.addActivityLog('署名依頼作成 (ローカル模擬)', mockRequest.document_name || '未命名書類', 'user', '成功');
-        return mockRequest;
+        // Do not silently fall back for real signature requests.
+        // Otherwise production-only validation such as trial limits can be bypassed.
+        throw new Error('署名依頼の作成に失敗しました');
     },
 
     async getEmbeddedSignUrl(requestId, actionId) {
@@ -1150,31 +1360,23 @@ export const dbService = {
         return result ? result.url : null;
     },
 
-    async updateSignRequest(id, data, options = {}) {
-        try {
-            const result = await this._callApi(`/api/sign/${id}`, 'PATCH', data, options);
-            if (result) {
-                // Also update local cache
-                const requests = JSON.parse(localStorage.getItem(this.KEYS.SIGN_REQUESTS) || '[]');
-                const index = requests.findIndex(r => String(r.id) === String(id));
-                if (index !== -1) {
-                    requests[index] = { ...requests[index], ...result, updated_at: new Date().toISOString() };
-                    localStorage.setItem(this.KEYS.SIGN_REQUESTS, JSON.stringify(requests));
-                }
-                return result;
+    async updateSignRequest(id, data) {
+        const result = await this._callApi(`/api/sign/${id}`, 'PATCH', data);
+        if (result) {
+            // Also update local cache
+            const requests = JSON.parse(localStorage.getItem(this.KEYS.SIGN_REQUESTS) || '[]');
+            const index = requests.findIndex(r => String(r.id) === String(id));
+            if (index !== -1) {
+                requests[index] = { ...requests[index], ...result, updated_at: new Date().toISOString() };
+                this.saveSignRequestsCache(requests);
             }
-        } catch (error) {
-            console.warn('API updateSignRequest failed, using local fallback:', error);
-            if (options.throwOnError && window.location.hostname !== 'localhost') {
-                throw error;
-            }
+            return result;
         }
-
         const requests = JSON.parse(localStorage.getItem(this.KEYS.SIGN_REQUESTS) || '[]');
         const index = requests.findIndex(r => String(r.id) === String(id));
         if (index !== -1) {
             requests[index] = { ...requests[index], ...data, updated_at: new Date().toISOString() };
-            localStorage.setItem(this.KEYS.SIGN_REQUESTS, JSON.stringify(requests));
+            this.saveSignRequestsCache(requests);
             return requests[index];
         }
         return null;
@@ -1187,7 +1389,7 @@ export const dbService = {
             const index = requests.findIndex(r => String(r.id) === String(id));
             if (index !== -1 && result.request) {
                 requests[index] = { ...requests[index], ...result.request };
-                localStorage.setItem(this.KEYS.SIGN_REQUESTS, JSON.stringify(requests));
+                this.saveSignRequestsCache(requests);
             }
             return result;
         }
@@ -1197,37 +1399,13 @@ export const dbService = {
     deleteSignRequest(id) {
         let requests = JSON.parse(localStorage.getItem(this.KEYS.SIGN_REQUESTS) || '[]');
         requests = requests.filter(r => String(r.id) !== String(id));
-        localStorage.setItem(this.KEYS.SIGN_REQUESTS, JSON.stringify(requests));
+        this.saveSignRequestsCache(requests);
         return true;
     },
 
     _seedSignatures() {
         // 資料をすべて削除する要望に対応し、サンプルデータは投入しない
-        localStorage.setItem(this.KEYS.SIGN_REQUESTS, JSON.stringify([]));
+        this.saveSignRequestsCache([]);
         return;
-        const seedData = [
-            {
-                id: 101,
-                document_name: '業務委託契約書_202403.pdf',
-                sender: '山田 太郎',
-                recipients: [
-                    { name: '田中 実', email: 'tanaka@example.com', status: 'completed' },
-                    { name: '佐藤 健', email: 'sato@example.com', status: 'pending' }
-                ],
-                status: 'pending',
-                created_at: '2024-03-15T10:00:00Z'
-            },
-            {
-                id: 102,
-                document_name: '秘密保持契約書(NDA).pdf',
-                sender: '山田 太郎',
-                recipients: [
-                    { name: '鈴木 一郎', email: 'suzuki@example.com', status: 'completed' }
-                ],
-                status: 'completed',
-                created_at: '2024-03-10T14:30:00Z'
-            }
-        ];
-        localStorage.setItem(this.KEYS.SIGN_REQUESTS, JSON.stringify(seedData));
     }
 };

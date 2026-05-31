@@ -17,7 +17,13 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-const auth = getAuth(app);
+
+let auth = null;
+try {
+    auth = getAuth(app);
+} catch (e) {
+    console.warn('Firebase Auth initialization failed:', e);
+}
 
 // Analytics is optional. In some local/browser contexts it throws during module load,
 // which prevents the dashboard bootstrap from running and leaves the page stuck on

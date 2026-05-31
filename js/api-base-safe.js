@@ -1,7 +1,7 @@
-import * as apiBase from './api-base.js?v=20260329_api_base_fix1';
+import * as apiBase from './api-base.js?v=20260507_prod_api_analysis';
 
 const PROD_API_BASE_URL = 'https://api-qf37m5ba2q-an.a.run.app';
-const LOCAL_API_BASE_URL = 'http://localhost:3001';
+const LOCAL_API_BASE_URL = 'http://127.0.0.1:3001';
 
 function normalizeBaseUrl(value) {
     const raw = String(value || '').trim().replace(/\/$/, '');
@@ -56,6 +56,7 @@ export function toApiUrl(endpoint = '') {
 }
 
 export function resolveBackendAssetUrl(value) {
+    if (typeof value !== 'string') return value;
     if (typeof apiBase.resolveBackendAssetUrl === 'function') {
         return apiBase.resolveBackendAssetUrl(value);
     }
@@ -74,7 +75,7 @@ export function resolveBackendAssetUrl(value) {
         return toApiUrl(normalized.slice(uploadsIndex));
     }
 
-    if (/\.pdf($|[?#])/i.test(normalized)) {
+    if (/\.(pdf|docx?)($|[?#])/i.test(normalized)) {
         const filename = normalized.split('/').pop();
         if (filename) {
             return toApiUrl(`/uploads/${filename}`);

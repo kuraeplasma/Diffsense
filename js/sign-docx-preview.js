@@ -145,6 +145,113 @@ function getDocxPageMetrics(page) {
     };
 }
 
+function getElementOuterHeight(element) {
+    if (!element || element.nodeType !== 1) return 0;
+    const style = window.getComputedStyle(element);
+    const marginTop = readCssPx(style.marginTop);
+    const marginBottom = readCssPx(style.marginBottom);
+    const rectHeight = element.getBoundingClientRect?.().height || 0;
+    return Math.max(1, rectHeight || element.offsetHeight || element.scrollHeight || 1) + marginTop + marginBottom;
+}
+
+function getSplittableDocxChildren(page) {
+    if (!page || page.nodeType !== 1) return [];
+    const directChildren = Array.from(page.children || []).filter(isElementVisiblePageCandidate);
+    if (directChildren.length > 1) return directChildren;
+    const leafChildren = collectDocxLeafElements(page).filter(isElementVisiblePageCandidate);
+    return leafChildren.length > 1 ? leafChildren : directChildren;
+}
+
+function splitDocxPageByRenderedHeight(page, targetParts = 0) {
+    if (!page || page.nodeType !== 1 || !page.parentNode) return [page].filter(Boolean);
+    const children = getSplittableDocxChildren(page);
+    if (children.length <= 1) return [page];
+
+    const metrics = getDocxPageMetrics(page);
+    const contentLimit = Math.max(360, metrics.contentPageHeight || (metrics.basePageHeight - metrics.paddingTop - metrics.paddingBottom) || 960);
+    const measuredChildren = children.map(child => ({ child, height: getElementOuterHeight(child) }));
+    const measuredHeight = Math.max(metrics.contentTotalHeight || 0, measuredChildren.reduce((sum, item) => sum + item.height, 0));
+    const naturalParts = Math.max(1, Math.ceil(measuredHeight / contentLimit));
+    const desiredParts = Math.max(1, Math.round(Number(targetParts) || naturalParts));
+    if (desiredParts <= 1 && measuredHeight <= contentLimit * 1.08) return [page];
+
+    const parent = page.parentNode;
+    const pages = [page];
+    page.innerHTML = '';
+    page.style.minHeight = `${metrics.basePageHeight}px`;
+    page.style.height = '';
+    page.dataset.baseHeight = String(metrics.basePageHeight);
+
+    let currentPage = page;
+    let currentHeight = 0;
+    const threshold = Math.max(240, Math.floor(contentLimit * 0.985));
+
+    measuredChildren.forEach(({ child, height: childHeight }) => {
+        const shouldStartNext = currentPage.children.length > 0
+            && currentHeight + childHeight > threshold
+            && pages.length < desiredParts;
+
+        if (shouldStartNext) {
+            currentPage = createSmartDocxPageContainer(page);
+            currentPage.style.minHeight = `${metrics.basePageHeight}px`;
+            currentPage.style.height = '';
+            currentPage.dataset.baseWidth = String(metrics.baseWidth);
+            currentPage.dataset.baseHeight = String(metrics.basePageHeight);
+            parent.insertBefore(currentPage, pages[pages.length - 1].nextSibling);
+            pages.push(currentPage);
+            currentHeight = 0;
+        }
+
+        currentPage.appendChild(child);
+        currentHeight += childHeight;
+    });
+
+    return pages.filter(candidate => candidate.textContent?.trim() || candidate.children.length);
+}
+
+function splitDocxPagesToExpectedCount(pages, expectedPageCount) {
+    const expected = normalizeExpectedDocxPageCount(expectedPageCount);
+    if (!expected || !Array.isArray(pages) || pages.length >= expected) return pages;
+
+    let nextPages = [...pages];
+    let guard = 0;
+    while (nextPages.length < expected && guard < expected * 2) {
+        guard += 1;
+        const candidate = nextPages
+            .map((page, index) => {
+                const metrics = getDocxPageMetrics(page);
+                const children = getSplittableDocxChildren(page);
+                const ratio = metrics.contentTotalHeight / Math.max(1, metrics.contentPageHeight);
+                return { page, index, ratio, children: children.length };
+            })
+            .filter(item => item.children > 1 && item.ratio > 1.08)
+            .sort((a, b) => b.ratio - a.ratio)[0];
+
+        if (!candidate) break;
+        const missing = expected - nextPages.length;
+        const targetParts = Math.min(missing + 1, Math.max(2, Math.ceil(candidate.ratio)));
+        const splitPages = splitDocxPageByRenderedHeight(candidate.page, targetParts);
+        if (splitPages.length <= 1) break;
+        nextPages.splice(candidate.index, 1, ...splitPages);
+    }
+
+    return nextPages;
+}
+
+function mergeDocxPagesToExpectedCount(pages, expectedPageCount) {
+    const expected = normalizeExpectedDocxPageCount(expectedPageCount);
+    if (!expected || !Array.isArray(pages) || pages.length <= expected) return pages;
+    const kept = pages.slice(0, expected);
+    const last = kept[kept.length - 1];
+    pages.slice(expected).forEach((page) => {
+        while (page?.firstChild) {
+            last.appendChild(page.firstChild);
+        }
+        page?.remove();
+    });
+    return kept;
+}
+
 function createSmartDocxPageContainer(originalPage) {
     const page = document.createElement('section');
     if (originalPage) {
@@ -155,11 +262,13 @@ function createSmartDocxPageContainer(originalPage) {
     page.style.width = '794px';
     page.style.minHeight = '1123px';
     page.style.padding = '80px 90px';
-    page.style.margin = '0 auto 32px auto';
+    page.style.margin = '0 auto 16px auto';
     page.style.boxSizing = 'border-box';
     page.style.boxShadow = '0 8px 30px rgba(0,0,0,0.15)';
     page.style.position = 'relative';
     page.style.overflow = 'visible';
+    page.style.border = 'none';
+    page.style.outline = 'none';
     page.dataset.baseWidth = '794';
     page.dataset.baseHeight = '1123';
     return page;
@@ -168,29 +277,64 @@ function createSmartDocxPageContainer(originalPage) {
 function collectDocxLeafElements(root) {
     const leaves = [];
     const candidates = ['P', 'TABLE', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'UL', 'OL', 'PRE', 'DIV'];
-    
     function walk(node) {
         if (node.nodeType !== 1) return;
         const isWrapper = /(^|\s)(docx-wrapper|docx-section)(\s|$)/i.test(node.className || '');
+        // Structural DIVs that wrap other elements would otherwise be pushed as a single
+        // tall leaf, causing one giant chunk to stay together on a single page. Recurse
+        // into DIVs that contain element children so the inner paragraphs become leaves.
+        if (node.tagName === 'DIV' && !isWrapper && node.children.length > 0) {
+            Array.from(node.children).forEach(walk);
+            return;
+        }
         const isCandidate = candidates.includes(node.tagName.toUpperCase());
-        
         if (isCandidate && !isWrapper) {
             leaves.push(node);
         } else {
             Array.from(node.children).forEach(walk);
         }
     }
-    
     walk(root);
     return leaves;
 }
 
-async function smartChunkDocxPages(root) {
+async function smartChunkDocxPages(root, options = {}) {
+    const expectedPageCount = normalizeExpectedDocxPageCount(options?.expectedPageCount);
+    // Prefer docx-preview's natural sections when the document has explicit page breaks.
+    const naturalPages = collectDocxPages(root);
+    if (expectedPageCount && naturalPages.length >= expectedPageCount) {
+        return mergeDocxPagesToExpectedCount(naturalPages, expectedPageCount);
+    }
+    if (naturalPages.length > 1) {
+        return splitDocxPagesToExpectedCount(naturalPages, expectedPageCount);
+    }
+    if (expectedPageCount === 1 && naturalPages.length === 1) {
+        return naturalPages;
+    }
+
+    // Fallback: when only 1 section was produced and its content overflows A4 height,
+    // visually split into multiple A4 pages so the viewer can paginate.
     const docxWrapper = root.querySelector('.docx-wrapper');
-    if (!docxWrapper) return collectDocxPages(root);
+    if (!docxWrapper) return naturalPages;
+
+    const singlePage = naturalPages[0] || null;
+    const totalHeight = singlePage ? (singlePage.scrollHeight || singlePage.offsetHeight || 0) : 0;
+    if (totalHeight && totalHeight <= 1400) return naturalPages;
 
     const allElements = collectDocxLeafElements(docxWrapper);
-    if (allElements.length === 0) return collectDocxPages(root);
+    if (allElements.length === 0) return naturalPages;
+
+    // Pre-measure heights ONCE before any DOM manipulation. Calling getBoundingClientRect
+    // inside the chunk loop after each appendChild causes layout thrashing (one reflow
+    // per element), which can freeze the UI on documents with 100+ paragraphs.
+    // Include vertical margins so headings (which often have large top/bottom margins
+    // in Word documents) aren't undercounted and don't cause overflow past the A4 frame.
+    const heights = allElements.map((el) => {
+        const style = window.getComputedStyle(el);
+        const marginTop = parseFloat(style.marginTop) || 0;
+        const marginBottom = parseFloat(style.marginBottom) || 0;
+        return Math.max(10, (el.offsetHeight || 20) + marginTop + marginBottom);
+    });
 
     const originalSections = Array.from(docxWrapper.querySelectorAll('section'));
     const baseStyleSection = originalSections[0] || null;
@@ -204,12 +348,11 @@ async function smartChunkDocxPages(root) {
     let currentHeight = 0;
     const pageHeightThreshold = 960;
 
-    for (const el of allElements) {
+    for (let i = 0; i < allElements.length; i++) {
+        const el = allElements[i];
         if (el.nodeType !== 1) continue;
-        
+        const elHeight = heights[i];
         currentPage.appendChild(el);
-        const elHeight = Math.max(10, el.getBoundingClientRect().height || el.offsetHeight || 20);
-
         if (currentHeight + elHeight > pageHeightThreshold && currentPage.children.length > 1) {
             currentPage = createSmartDocxPageContainer(baseStyleSection);
             docxWrapper.appendChild(currentPage);
@@ -221,82 +364,15 @@ async function smartChunkDocxPages(root) {
         }
     }
 
-    return pages;
-}
-
-function shouldVirtualizeDocxPage(page, metrics, pageCount) {
-    // 従来のピクセル単位での強制分割（仮想ページ化）は、行の途中で文字が切れる原因となるため、現在は無効化しています。
-    // 「余計な実装」を削除し、Wordプレビューライブラリの自然な描画を優先します。
-    return false;
+    return mergeDocxPagesToExpectedCount(
+        splitDocxPagesToExpectedCount(pages, expectedPageCount),
+        expectedPageCount
+    );
 }
 
 function normalizeExpectedDocxPageCount(expectedPageCount) {
     const numeric = Number(expectedPageCount);
     return Number.isFinite(numeric) && numeric >= 1 ? Math.floor(numeric) : 0;
-}
-
-function resolveVirtualDocxPageCount(metrics, expectedPageCount) {
-    const actualPageCount = Math.max(1, Math.ceil(metrics.contentTotalHeight / metrics.contentPageHeight));
-    const normalizedExpected = normalizeExpectedDocxPageCount(expectedPageCount);
-    if (normalizedExpected && actualPageCount === normalizedExpected + 1) {
-        return normalizedExpected;
-    }
-    return actualPageCount;
-}
-
-function createVirtualDocxPageSlices(page, metrics, expectedPageCount = 0) {
-    const totalPages = resolveVirtualDocxPageCount(metrics, expectedPageCount);
-    if (totalPages <= 1) return [page];
-
-    const slices = [];
-    for (let index = 0; index < totalPages; index += 1) {
-        const slice = document.createElement('div');
-        slice.className = 'docx-virtual-page';
-        slice.dataset.baseWidth = String(metrics.baseWidth);
-        slice.dataset.baseHeight = String(metrics.basePageHeight);
-        slice.style.position = 'relative';
-        slice.style.width = `${metrics.baseWidth}px`;
-        slice.style.height = `${metrics.basePageHeight}px`;
-        slice.style.minHeight = `${metrics.basePageHeight}px`;
-        slice.style.boxSizing = 'border-box';
-        slice.style.overflow = 'hidden';
-        slice.style.background = '#fff';
-
-        const contentViewport = document.createElement('div');
-        contentViewport.className = 'docx-virtual-page-viewport';
-        contentViewport.style.position = 'absolute';
-        contentViewport.style.left = `${metrics.paddingLeft}px`;
-        contentViewport.style.top = `${metrics.paddingTop}px`;
-        contentViewport.style.width = `${metrics.contentWidth}px`;
-        contentViewport.style.height = `${metrics.contentPageHeight}px`;
-        contentViewport.style.overflow = 'hidden';
-        contentViewport.style.boxSizing = 'border-box';
-        contentViewport.style.pointerEvents = 'none';
-
-        const layer = page.cloneNode(true);
-        layer.classList.add('docx-virtual-page-layer');
-        layer.style.position = 'absolute';
-        layer.style.left = '0';
-        layer.style.top = `${-1 * index * metrics.contentPageHeight}px`;
-        layer.style.margin = '0';
-        layer.style.boxShadow = 'none';
-        layer.style.transform = 'none';
-        layer.style.pointerEvents = 'none';
-        layer.style.background = 'transparent';
-        layer.style.width = `${metrics.contentWidth}px`;
-        layer.style.minHeight = '0';
-        layer.style.height = 'auto';
-        layer.style.padding = '0';
-        layer.style.border = '0';
-        layer.style.borderRadius = '0';
-        layer.style.overflow = 'visible';
-
-        contentViewport.appendChild(layer);
-        slice.appendChild(contentViewport);
-        slices.push(slice);
-    }
-
-    return slices;
 }
 
 export function wrapPreviewPageShell(page) {
@@ -314,28 +390,30 @@ export function wrapPreviewPageShell(page) {
 
     shell.style.position = 'relative';
     shell.style.display = 'block';
-    shell.style.width = `${baseWidth}px`;
-    shell.style.height = `${baseHeight}px`;
-    shell.style.minHeight = `${baseHeight}px`;
-    shell.style.margin = '0 auto 32px auto';
+    shell.style.width = '';
+    shell.style.height = '';
+    shell.style.minHeight = '';
+    shell.style.margin = '24px auto';
     shell.style.padding = '0';
     shell.style.boxSizing = 'border-box';
     shell.style.overflow = 'visible';
     shell.style.flex = '0 0 auto';
+    shell.dataset.baseWidth = String(baseWidth);
+    shell.dataset.baseHeight = String(baseHeight);
 
     page.classList.add('editor-page-wrapper');
     page.style.position = 'relative';
     page.style.left = '';
     page.style.top = '0';
     page.style.display = 'block';
-    page.style.margin = '0';
-    page.style.width = `${baseWidth}px`;
-    page.style.minHeight = `${baseHeight}px`;
+    if (!page.style.margin) page.style.margin = '0 auto';
     page.style.boxSizing = 'border-box';
     page.style.overflow = 'visible';
     page.style.transformOrigin = 'top left';
     page.style.transform = 'none';
     page.style.pointerEvents = 'auto';
+    page.style.border = 'none';
+    page.style.outline = 'none';
 
     return shell;
 }
@@ -348,7 +426,12 @@ async function sourceToArrayBuffer(source) {
     if (normalized instanceof Blob) {
         return normalized.arrayBuffer();
     }
+    // Note: URL fetching here is a fallback. 
+    // High-fidelity edit mode should pass a Blob from getDocxSourceForMammoth.
     const response = await fetch(normalized);
+    if (!response.ok) {
+        throw new Error(`DOCX fetch failed: ${response.status} (URL: ${normalized})`);
+    }
     return response.arrayBuffer();
 }
 
@@ -357,6 +440,8 @@ export function isDocxFileName(value) {
 }
 
 export async function loadDocxPreviewAssets() {
+    document.getElementById('docx-internal-reset')?.remove();
+
     await loadScriptOnce(
         'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
         () => Boolean(window.JSZip)
@@ -365,6 +450,53 @@ export async function loadDocxPreviewAssets() {
         'https://cdn.jsdelivr.net/npm/docx-preview@0.3.6/dist/docx-preview.min.js',
         () => Boolean(window.docx && typeof window.docx.renderAsync === 'function')
     );
+}
+
+export async function renderDocxPreviewAsEditor(source, options = {}) {
+    await loadDocxPreviewAssets();
+    const arrayBuffer = await sourceToArrayBuffer(source);
+    const expectedPageCount = normalizeExpectedDocxPageCount(options?.expectedPageCount);
+
+    const staging = document.createElement('div');
+    staging.style.cssText = 'position:fixed;left:-20000px;top:0;width:900px;visibility:hidden;pointer-events:none;overflow:hidden;';
+    document.body.appendChild(staging);
+
+    const renderRoot = document.createElement('div');
+    staging.appendChild(renderRoot);
+
+    try {
+        await window.docx.renderAsync(arrayBuffer, renderRoot, null, {
+            inWrapper: true,
+            breakPages: true,
+            ignoreLastRenderedPageBreak: false,
+            ignoreWidth: false,
+            ignoreHeight: false,
+            renderHeaders: true,
+            renderFooters: true,
+            useBase64URL: true
+        });
+
+        await nextFrame();
+        await nextFrame();
+
+        const pages = await smartChunkDocxPages(renderRoot, { expectedPageCount });
+        return pages.map(page => {
+            page.style.position = 'relative';
+            page.style.left = '';
+            page.style.top = '';
+            page.style.right = '';
+            page.style.bottom = '';
+            page.style.transform = '';
+            page.style.margin = '0 auto';
+            page.style.width = '794px';
+            page.style.boxSizing = 'border-box';
+            page.style.background = '#fff';
+            page.remove();
+            return page;
+        });
+    } finally {
+        staging.remove();
+    }
 }
 
 export async function renderDocxPreviewPages(container, source, options = {}) {
@@ -411,6 +543,7 @@ export async function renderDocxPreviewPages(container, source, options = {}) {
     await window.docx.renderAsync(arrayBuffer, renderRoot, null, {
         inWrapper: true,
         breakPages: true,
+        ignoreLastRenderedPageBreak: false,
         ignoreWidth: false,
         ignoreHeight: false,
         renderHeaders: true,
@@ -422,13 +555,12 @@ export async function renderDocxPreviewPages(container, source, options = {}) {
 
     const docxWrapper = renderRoot.querySelector('.docx-wrapper');
     if (docxWrapper) {
-        docxWrapper.style.width = 'auto';
+        docxWrapper.style.width = '100%';
         docxWrapper.style.background = 'transparent';
-        docxWrapper.style.padding = '0';
         docxWrapper.style.margin = '0 auto';
     }
 
-    const pages = await smartChunkDocxPages(renderRoot);
+    const pages = await smartChunkDocxPages(renderRoot, { expectedPageCount });
 
     pages.forEach((page) => {
         const metrics = getDocxPageMetrics(page);
@@ -438,14 +570,13 @@ export async function renderDocxPreviewPages(container, source, options = {}) {
         wrapPreviewPageShell(page);
     });
 
-    if (expectedPageCount && pages.length === expectedPageCount + 1) {
-        const extras = pages.splice(expectedPageCount);
-        extras.forEach((page) => page?.parentNode?.removeChild(page));
+    if (expectedPageCount && pages.length > expectedPageCount) {
+        const mergedPages = mergeDocxPagesToExpectedCount(pages, expectedPageCount);
+        pages.splice(0, pages.length, ...mergedPages);
     }
 
     pages.forEach((page) => {
         page.style.background = page.style.background || '#fff';
-        page.style.boxShadow = page.style.boxShadow || '0 8px 30px rgba(0,0,0,0.15)';
         wrapPreviewPageShell(page);
     });
 
@@ -546,7 +677,7 @@ export async function renderDocxPreviewHtml(container, contractId, authToken) {
             background: #fff;
             box-shadow: 0 8px 30px rgba(0,0,0,0.15);
             box-sizing: border-box;
-            margin: 0 auto 32px auto;
+            margin: 0 auto 16px auto;
             border-radius: 4px;
             overflow: hidden;
             position: relative;

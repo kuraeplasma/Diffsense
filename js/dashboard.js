@@ -1,8 +1,25 @@
+// Automatically clean up any failed or timeout states from sessionStorage on load
+try {
+    for (let i = sessionStorage.length - 1; i >= 0; i--) {
+        const key = sessionStorage.key(i);
+        if (key && key.startsWith('diff-check-ai-state:')) {
+            try {
+                const val = JSON.parse(sessionStorage.getItem(key));
+                if (val && ['failed', 'timeout'].includes(val.status)) {
+                    sessionStorage.removeItem(key);
+                }
+            } catch(e){}
+        }
+    }
+} catch(e){}
+
 import { Notify } from './notify.js';
-import { dbService } from './db-service.js?v=20260428_sync_preserve_analysis';
-import { aiService } from './ai-service.js?v=20260426_final';
-import { getApiBaseUrl, shouldUseLocalDevAuthBypass } from './api-base.js';
+import { dbService } from './db-service.js?v=20260519_sign_storage_fix_v2';
+import { aiService } from '/js/ai-service.js?v=20260511_docx_dom_fix_v9';
+import { getApiBaseUrl, toApiUrl, shouldUseLocalDevAuthBypass, isLocalHostEnvironment, resolveBackendAssetUrl } from './api-base.js';
 import { auth } from './firebase-config.js?v=20260422_auth_timeout';
+import { handleLogout as handleAuthLogout } from './auth.js?v=20260511_docx_dom_fix_v9';
+import { SignUI } from './sign-ui.js?v=20260519_sign_storage_fix_v2';
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 // =========================================================================
@@ -11,10 +28,11 @@ import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/fi
 // module extraction. See /js/modules/.
 // =========================================================================
 const routes = {
-    dashboard: () => import('./modules/dashboard.js?v=12'),
-    contracts: () => import('./modules/contracts.js?v=12'),
-    history: () => import('./modules/history.js?v=12'),
-    team: () => import('./modules/team.js?v=12'),
+    dashboard: () => import('./modules/dashboard.js?v=20260430_dashboard_v2'),
+    contracts: () => import('./modules/contracts.js?v=20260521_contracts_diff_button_v1'),
+    'diff-check': () => import('./modules/diff-check.js?v=20260519_diff_ai_state_clear_v3'),
+    history: () => import('./modules/history.js'),
+    team: () => import('./modules/team.js'),
 };
 
 async function navigateLazy(page, renderOptions = {}) {
@@ -81,6 +99,14 @@ const waitForAuthStateReady = (authInstance, timeoutMs = 4000) => new Promise((r
     });
 });
 
+function isBenignAbortError(error) {
+    const name = error?.name || '';
+    const message = String(error?.message || error || '');
+    return name === 'AbortError'
+        || message === 'AbortError'
+        || message.includes('transaction was aborted');
+}
+
 // MCP: URL Resolution helper for Claude/Cursor
 // The OAuth discovery (.well-known/oauth-authorization-server) issuer is https://diffsense.spacegleam.co.jp/
 // So the correct MCP URL for Claude must always be https://diffsense.spacegleam.co.jp/mcp
@@ -143,13 +169,24 @@ function loadExternalScriptOnce(src, globalGuard = null) {
 
 const parseArticleNumeric = (label) => {
     if (!label) return 0;
-    const m = String(label).match(/第\s*([0-9０-９一二三四五六七八九十百千〇零]+)\s*条/);
+    const m = String(label).match(/第\s*([0-9０-９零〇一二三四五六七八九十百千]+)\s*条/);
     if (!m) return 0;
     const raw = m[1].replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xfee0));
     if (/^\d+$/.test(raw)) return parseInt(raw, 10);
-    const map = { '零': 0, '〇': 0, '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9 };
-    if (map[raw] !== undefined) return map[raw];
-    return 0;
+    const digitMap = { '零': 0, '〇': 0, '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9 };
+    if (digitMap[raw] !== undefined) return digitMap[raw];
+    let total = 0;
+    let current = 0;
+    const unitMap = { '十': 10, '百': 100, '千': 1000 };
+    for (const char of raw) {
+        if (digitMap[char] !== undefined) {
+            current = digitMap[char];
+        } else if (unitMap[char]) {
+            total += (current || 1) * unitMap[char];
+            current = 0;
+        }
+    }
+    return total + current;
 };
 
 const normalizeStructuredDisplayContent = (content) => {
@@ -240,44 +277,6 @@ const renderClauseParagraphs = (text) => {
     return lines.map((line) => `<p class="clause-p">${escapeHtmlText(line)}</p>`).join('');
 };
 
-const normalizeAnalysisDisplayText = (value) => String(value || '')
-    .replace(/\r\n/g, '\n')
-    .replace(/[ \t]+/g, ' ')
-    .replace(/\s*[【\[［]\s*影響\s*[】\]］]\s*/g, '\n【影響】\n')
-    .replace(/\s*[【\[［]\s*推奨(?:対応|対象)\s*[】\]］]\s*/g, '\n【推奨対応】\n')
-    .replace(/\s*[【\[［]\s*(?:対応案|実務対応)\s*[】\]］]\s*/g, '\n【推奨対応】\n')
-    .replace(/\s*(影響)\s*[:：]\s*/g, '\n【$1】\n')
-    .replace(/\s*(推奨(?:対応|対象)|対応案|実務対応)\s*[:：]\s*/g, '\n【推奨対応】\n')
-    .replace(/。\s*(?=\S)/g, '。\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-
-const splitAnalysisDisplayLines = (value) => normalizeAnalysisDisplayText(value)
-    .split(/\n+/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-const getFirstAnalysisLine = (value, fallback = '') => {
-    const first = splitAnalysisDisplayLines(value)
-        .find((line) => !/^【[^】]+】$/.test(line));
-    return first || fallback;
-};
-
-const renderAnalysisTextBlocks = (value, fallback = '') => {
-    const lines = splitAnalysisDisplayLines(value || fallback);
-    if (lines.length === 0) return '';
-
-    return `<div class="analysis-text-blocks">${
-        lines.map((line) => {
-            const heading = line.match(/^【([^】]+)】$/);
-            if (heading) {
-                return `<div class="analysis-text-heading">${escapeHtmlText(heading[1])}</div>`;
-            }
-            return `<p class="analysis-text-paragraph">${escapeHtmlText(line)}</p>`;
-        }).join('')
-    }</div>`;
-};
-
 const hasAnalysisRecord = (payload) => {
     if (!payload || typeof payload !== 'object') return false;
     const summary = String(payload.summary || payload.ai_summary || '').trim();
@@ -301,13 +300,8 @@ const AI_ANALYSIS_RETRY_GUIDANCE = 'AI解析に失敗しました。消費はし
 const isAiAnalysisResultReady = (payload) => {
     if (!payload || typeof payload !== 'object') return false;
     if (payload.aiFailed === true || payload.ai_failed === true) return false;
-    
-    // サマリーがあれば「解析結果あり」と見なす
-    const summary = String(payload.summary || payload.ai_summary || '').trim();
-    if (!summary || summary.length < 5) return false;
-    if (/AI解析に失敗|エラーが発生|取得できません/.test(summary)) return false;
-
-    return true;
+    if (payload.isFallback === true || payload.ai_is_fallback === true) return false;
+    return hasAnalysisRecord(payload);
 };
 
 const sanitizeAnalysisPayload = (payload) => {
@@ -648,20 +642,115 @@ const contentToComparableText = (content) => {
 
 const resolveExtractedContentPayload = (data) => {
     if (!data || typeof data !== 'object') return null;
+    const buildStructuredContentFromPlainText = (text) => {
+        const raw = String(text || '').trim();
+        if (!raw || typeof parseContractIntoClauses !== 'function') return null;
+        const clauses = parseContractIntoClauses(raw);
+        if (!Array.isArray(clauses) || clauses.length === 0) return null;
+
+        const preamble = clauses
+            .filter((clause) => String(clause.title || '').trim() === '前文')
+            .flatMap((clause) => Array.isArray(clause.paragraphs) ? clause.paragraphs : [])
+            .join('\n')
+            .trim();
+        const articles = clauses
+            .filter((clause) => String(clause.title || '').trim() !== '前文')
+            .map((clause, index) => {
+                const articleNumber = String(clause.title || `第${index + 1}条`).trim();
+                const title = String(clause.header || '').trim();
+                const content = (Array.isArray(clause.paragraphs) ? clause.paragraphs : [])
+                    .map((paragraph) => String(paragraph || '').trim())
+                    .filter(Boolean)
+                    .join('\n');
+                return { articleNumber, title, content };
+            })
+            .filter((article) => article.content || article.title);
+
+        if (articles.length === 0) return null;
+        return { title: data.title || '', version: data.version || '', preamble, articles };
+    };
+
+    const getCandidateStats = (candidate) => {
+        if (!candidate) return { articleCount: 0, maxArticleNumber: 0, textLength: 0 };
+        const articles = Array.isArray(candidate)
+            ? candidate
+            : (typeof candidate === 'object' && Array.isArray(candidate.articles) ? candidate.articles : []);
+        const textLength = contentToComparableText(candidate).length;
+        const maxArticleNumber = articles.reduce((max, article, index) => {
+            const value = parseArticleNumeric(article?.articleNumber || article?.article || article?.title || `第${index + 1}条`);
+            return Math.max(max, value || 0);
+        }, 0);
+        return { articleCount: articles.length, maxArticleNumber, textLength };
+    };
+
     const candidates = [
         data.structuredContract,
         data.extractedText,
         data.structured_contract,
         data.extracted_text,
+        buildStructuredContentFromPlainText(data.rawExtractedText || data.raw_extracted_text || ''),
         data.contractText,
         data.text
-    ];
+    ].filter((candidate) => {
+        if (candidate === null || candidate === undefined) return false;
+        if (typeof candidate === 'string' && candidate.trim().length === 0) return false;
+        return true;
+    });
+    let bestStructured = null;
+    let bestStats = { articleCount: 0, maxArticleNumber: 0, textLength: 0 };
     for (const candidate of candidates) {
-        if (candidate === null || candidate === undefined) continue;
-        if (typeof candidate === 'string' && candidate.trim().length === 0) continue;
-        return candidate;
+        const stats = getCandidateStats(candidate);
+        const isBetter = stats.maxArticleNumber > bestStats.maxArticleNumber
+            || (stats.maxArticleNumber === bestStats.maxArticleNumber && stats.articleCount > bestStats.articleCount)
+            || (stats.maxArticleNumber === bestStats.maxArticleNumber && stats.articleCount === bestStats.articleCount && stats.textLength > bestStats.textLength);
+        if (stats.articleCount > 0 && isBetter) {
+            bestStructured = candidate;
+            bestStats = stats;
+        }
     }
-    return null;
+    if (bestStructured) return bestStructured;
+    return candidates[0] || null;
+};
+
+const buildStructuredContentFromClauses = (clauses, meta = {}) => {
+    if (!Array.isArray(clauses) || clauses.length === 0) return null;
+    const preamble = clauses
+        .filter((clause) => String(clause.title || '').trim() === '前文')
+        .flatMap((clause) => Array.isArray(clause.paragraphs) ? clause.paragraphs : [])
+        .join('\n')
+        .trim();
+    const articles = clauses
+        .filter((clause) => String(clause.title || '').trim() !== '前文')
+        .map((clause, index) => ({
+            articleNumber: String(clause.title || `第${index + 1}条`).trim(),
+            title: String(clause.header || '').trim(),
+            content: (Array.isArray(clause.paragraphs) ? clause.paragraphs : [])
+                .map((paragraph) => String(paragraph || '').trim())
+                .filter(Boolean)
+                .join('\n')
+        }))
+        .filter((article) => article.content || article.title);
+    if (articles.length === 0) return null;
+    return {
+        title: meta.title || '',
+        version: meta.version || '',
+        preamble,
+        articles
+    };
+};
+
+const getArticleCoverage = (items) => (Array.isArray(items) ? items : []).reduce((stats, item, index) => {
+    const articleNumber = parseArticleNumeric(item?.articleNumber || item?.article || item?.title || `第${index + 1}条`);
+    return {
+        count: stats.count + 1,
+        max: Math.max(stats.max, articleNumber || 0)
+    };
+}, { count: 0, max: 0 });
+
+const isArticleCoverageBetter = (candidateItems, currentItems) => {
+    const candidate = getArticleCoverage(candidateItems);
+    const current = getArticleCoverage(currentItems);
+    return candidate.max > current.max || (candidate.max === current.max && candidate.count > current.count);
 };
 
 const normalizeDiffContractId = (value) => {
@@ -824,7 +913,10 @@ const renderStructuredDiffView = (previousContent, currentContent, options = {})
 
         return `
             <div class="contract-structured-container structured-diff-shell">
-
+                <button class="mobile-clause-nav-fab mobile-only" type="button" onclick="window.app?.toggleMobileClauseNav(this)" aria-label="条文目次">
+                    <i class="fa-solid fa-list-ul"></i>
+                    <span>条文</span>
+                </button>
                 ${navHtml}
                 <div class="clause-cards-container structured-diff-stack">
                     ${cards}
@@ -897,8 +989,21 @@ const parseContractIntoClauses = (content) => {
 
     // If content is already structured (Array from backend)
     if (Array.isArray(content)) {
+        // F-D: when an item has no real 第N条 number (括弧見出しのみの条項), prefer its
+        // bracket heading（（明渡し）等）as the label instead of fabricating 第${idx}条.
+        // Real backend output always sets item.article, so this only guards malformed
+        // /synthetic arrays — behavior is unchanged for every real contract.
+        const deriveBracketHeading = (it) => {
+            const cands = [it && it.title, it && it.header, Array.isArray(it && it.paragraphs) ? it.paragraphs[0] : '', it && it.body];
+            for (const c of cands) {
+                const s = String(c == null ? '' : c).trim();
+                const m = s.match(/^[（(【]\s*([^）)】。、．，!?！？]{1,20})\s*[）)】]/);
+                if (m) return `（${m[1].trim()}）`;
+            }
+            return '';
+        };
         return content.map((item, idx) => {
-            let title = item.article || (idx === 0 ? '前文' : `第${idx}条`);
+            let title = item.article || (idx === 0 ? '前文' : (deriveBracketHeading(item) || `第${idx}条`));
             // 「前文/ヘッダー」などの冗長な表記を正規化
             if (title === '前文/ヘッダー') title = '前文';
 
@@ -921,16 +1026,37 @@ const parseContractIntoClauses = (content) => {
         });
     }
 
-    // Fallback: parse from plain text
-    const lines = content.split(/\r?\n/);
+    // Fallback: parse from plain text. PDF extraction may collapse headings and
+    // article starts onto one visual line, so normalize inline "第n条" tokens
+    // before scanning line-by-line.
+    const articleTokenPattern = /(第\s*[\d０-９零〇一二三四五六七八九十百千]+\s*条|【\s*第\s*[\d０-９零〇一二三四五六七八九十百千]+\s*条\s*】)/g;
+    const normalizedPlainText = String(content || '')
+        .replace(/([（(【][^）)】]{1,24}[）)】])\s*(第\s*[\d０-９零〇一二三四五六七八九十百千]+\s*条|【\s*第\s*[\d０-９零〇一二三四五六七八九十百千]+\s*条\s*】)/g, '\n$1\n$2')
+        .replace(/([^\r\n])\s*(第\s*[\d０-９零〇一二三四五六七八九十百千]+\s*条|【\s*第\s*[\d０-９零〇一二三四五六七八九十百千]+\s*条\s*】)/g, '$1\n$2')
+        .replace(articleTokenPattern, '\n$1')
+        .replace(/\n{2,}/g, '\n');
+    const lines = normalizedPlainText.split(/\r?\n/);
     const clauses = [];
     let currentClause = { title: '前文', header: '', body: [] };
 
-    const clauseRegex = /^(?:第\s*[\d０-９]+\s*条|【\s*第\s*[\d０-９]+\s*条\s*】)/;
+    const clauseRegex = /^(?:第\s*[\d０-９零〇一二三四五六七八九十百千]+\s*条|【\s*第\s*[\d０-９零〇一二三四五六七八九十百千]+\s*条\s*】)/;
+    const takePendingHeading = () => {
+        if (!Array.isArray(currentClause.body) || currentClause.body.length === 0) return '';
+        const last = String(currentClause.body[currentClause.body.length - 1] || '').trim();
+        const unwrapped = last.replace(/^[（(【]\s*/, '').replace(/\s*[）)】]$/, '').trim();
+        const isHeading = unwrapped.length > 0
+            && unwrapped.length <= 20
+            && !/[。．！？!?、,]/.test(unwrapped)
+            && (/^[（(【].+[）)】]$/.test(last) || !/^第\s*/.test(unwrapped));
+        if (!isHeading) return '';
+        currentClause.body.pop();
+        return unwrapped;
+    };
 
     lines.forEach(line => {
         const trimmedLine = line.trim();
         if (clauseRegex.test(trimmedLine)) {
+            const pendingHeading = takePendingHeading();
             if (currentClause.body.length > 0 || currentClause.title !== '前文') {
                 clauses.push({
                     title: currentClause.title,
@@ -939,12 +1065,12 @@ const parseContractIntoClauses = (content) => {
                 });
             }
             // Split title into "Clause Number" and "Header" if possible
-            const match = trimmedLine.match(/^(第\s*[\d０-９]+\s*条|【\s*第\s*[\d０-９]+\s*条\s*】)(.*)/);
+            const match = trimmedLine.match(/^(第\s*[\d０-９零〇一二三四五六七八九十百千]+\s*条|【\s*第\s*[\d０-９零〇一二三四五六七八九十百千]+\s*条\s*】)(.*)/);
             if (match) {
                 const rawHeader = match[2].trim().replace(/^[\(（【]|[）\)】]$/g, '');
                 const normalizedHeader = String(rawHeader || '');
                 const isValidTitle = normalizedHeader.length > 0 && normalizedHeader.length <= 20 && !normalizedHeader.includes('。');
-                currentClause = { title: match[1].replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0)), header: isValidTitle ? normalizedHeader : '', body: [] };
+                currentClause = { title: match[1].replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0)), header: isValidTitle ? normalizedHeader : pendingHeading, body: [] };
                 if (!isValidTitle && normalizedHeader) {
                     currentClause.body.push(normalizedHeader);
                 }
@@ -968,8 +1094,12 @@ const parseContractIntoClauses = (content) => {
 };
 
 const composeClauseHeading = (title, header) => {
-    const t = String(title || '').trim();
+    let t = String(title || '').trim();
     const h = String(header || '').trim();
+    // F-C: 「前文」は構造上のマーカーであり見出しラベルではない。
+    // 本文先頭に「前文」という行が増えて見えるのを防ぐため、ラベルとしては描画しない。
+    if (t === '前文' || t === '前文/ヘッダー') t = '';
+    if (!t) return h;
     if (!h) return t;
     if (/^[（(【]/.test(h)) return `${t}${h}`;
     return `${t} ${h}`.trim();
@@ -1064,7 +1194,10 @@ const renderStructuredView = (content, idPrefix = 'clause') => {
 
         return `
             <div class="contract-structured-container">
-
+                <button class="mobile-clause-nav-fab mobile-only" type="button" onclick="window.app?.toggleMobileClauseNav(this)" aria-label="条文目次">
+                    <i class="fa-solid fa-list-ul"></i>
+                    <span>条文</span>
+                </button>
                 ${navHtml}
                 ${cardsHtml}
             </div>
@@ -1075,76 +1208,171 @@ const renderStructuredView = (content, idPrefix = 'clause') => {
     }
 };
 
-const renderDashboardOverview = (app) => {
-    const stats = dbService.getStats();
-    const currentFilter = app ? app.dashboardFilter : 'pending';
-    const filteredItems = dbService.getFilteredContracts(currentFilter);
+const renderDashboardOverview = () => {
+    try {
+        const stats = (typeof dbService.getStats === 'function' ? dbService.getStats() : {}) || {};
+        const rawContracts = typeof dbService.getContracts === 'function' ? dbService.getContracts() : dbService.getFilteredContracts('total');
+        const contracts = Array.isArray(rawContracts) ? rawContracts : [];
+        const now = new Date();
+        const esc = escapeHtmlText;
+        const nav = (view, id = '') => `window.app.navigate('${view}'${id === '' ? '' : `, ${JSON.stringify(id)}`})`;
+        const toDate = (value) => {
+            if (!value) return null;
+            const date = new Date(value);
+            return Number.isFinite(date.getTime()) ? date : null;
+        };
+        const toTime = (value) => {
+            const date = toDate(value);
+            return date ? date.getTime() : 0;
+        };
+        const fmtDate = (value) => value ? formatDisplayTimestamp(value).replace(/\s+\d{1,2}:\d{2}.*/, '') : '-';
+        const confirmed = (status) => isConfirmedStatus(status);
+        const deadlineInfo = (contract) => {
+            if (!contract) return null;
+            const date = toDate(contract.expiry_date || contract.renewal_deadline || contract.deadline_at);
+            if (!date) return null;
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const due = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+            return { date, days: Math.ceil((due - today) / 86400000) };
+        };
 
-    let sectionTitle = "要確認アイテム (優先度順)";
-    if (currentFilter === 'pending') sectionTitle = "未処理のアイテム (新着・変更検知)";
-    if (currentFilter === 'risk') sectionTitle = "リスク要判定アイテム";
-    if (currentFilter === 'total') sectionTitle = "全監視対象（最新順）";
+        const highRisk = contracts.filter((c) => c?.risk_level === 'High');
+        const pending = contracts.filter((c) => !confirmed(c?.status));
+        const analyzed = contracts.filter((c) => c && (c.last_analyzed_at || c.ai_summary || c.ai_changes?.length || c.ai_rewrite_clauses?.length));
+        const analyzedThisMonth = analyzed.filter((c) => {
+            const date = toDate(c?.last_analyzed_at || c?.last_updated_at || c?.created_at);
+            return date && date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
+        });
+        const deadlines = contracts
+            .map((contract) => ({ contract, info: deadlineInfo(contract) }))
+            .filter((item) => item.info && item.info.days >= 0 && item.info.days <= 30)
+            .sort((a, b) => a.info.days - b.info.days);
+        const actionMap = new Map();
+        [...highRisk, ...deadlines.map((item) => item.contract), ...pending].forEach((contract) => {
+            if (contract?.id != null && !actionMap.has(String(contract.id))) actionMap.set(String(contract.id), contract);
+        });
+        const actions = [...actionMap.values()].slice(0, 3);
+        const recent = [...contracts]
+            .sort((a, b) => toTime(b?.last_analyzed_at || b?.last_updated_at || b?.created_at) - toTime(a?.last_analyzed_at || a?.last_updated_at || a?.created_at))
+            .slice(0, 3);
 
-    const canOperateContract = typeof app?.can === 'function' && app.can('operate_contract');
-    const tableRows = filteredItems.length > 0 ? filteredItems.slice(0, 10).map(c => {
-        let riskBadgeClass = 'badge-neutral';
-        if (c.risk_level === 'High') riskBadgeClass = 'badge-danger';
-        else if (c.risk_level === 'Medium') riskBadgeClass = 'badge-warning';
-        else if (c.risk_level === 'Low') riskBadgeClass = 'badge-success';
+        const actionCount = actions.length || pending.length;
+        const riskCount = highRisk.length || Number(stats.highRisk || 0);
+        const deadlineCount = deadlines.length;
+        const totalCount = Number(stats.total || contracts.length || 0);
+        const renderEmpty = (text) => `<div class="dashboard-v2-empty">${esc(text)}</div>`;
+        const metricCards = [
+            ['danger', 'fa-solid fa-triangle-exclamation', '要対応の契約', actionCount, `高リスク：${riskCount}件<br>期限間近：${deadlineCount}件`],
+            ['warning', 'fa-regular fa-calendar', '期限が近い契約', deadlineCount, `30日以内：${deadlineCount}件`],
+            ['success', 'fa-solid fa-shield-halved', '解析済みの契約', analyzed.length, `今月：${analyzedThisMonth.length}件`],
+            ['info', 'fa-regular fa-file-lines', '総契約書数', totalCount, 'すべての契約書']
+        ].map(([tone, icon, label, value, sub]) => `
+            <article class="dashboard-v2-metric">
+                <div class="dashboard-v2-icon is-${tone}"><i class="${icon}"></i></div>
+                <div>
+                    <div class="dashboard-v2-metric-label">${label}</div>
+                    <div class="dashboard-v2-metric-value">${value}<span>件</span></div>
+                    <div class="dashboard-v2-metric-sub">${sub}</div>
+                </div>
+            </article>
+        `).join('');
 
-        const statusBadge = renderContractStatusBadge(c.status);
+        const actionRows = actions.length ? actions.map((contract) => {
+            if (!contract) return '';
+            const deadline = deadlines.find((item) => item.contract.id === contract.id);
+            const mainChip = contract.risk_level === 'High' ? '高リスク' : (deadline ? '期限間近' : '要確認');
+            const tone = mainChip === '高リスク' ? 'danger' : (mainChip === '期限間近' ? 'warning' : 'neutral');
+            const rewrite = contract.ai_rewrite_clauses?.[0];
+            const firstChip = rewrite?.issue ? esc(rewrite.issue) : (deadline ? `契約終了まで残り${deadline.info.days}日` : '重要な変更あり');
+            const secondChip = rewrite?.suggestion ? esc(rewrite.suggestion) : (contract.risk_level === 'High' ? 'リスク確認が必要' : (deadline ? '更新期限を確認' : ''));
+            return `
+                <div class="dashboard-v2-action-row" onclick="${nav('diff', contract.id)}">
+                    <span class="dashboard-v2-status is-${tone}">${mainChip}</span>
+                    <div class="dashboard-v2-contract-main">
+                        <strong>${esc(contract.name || '名称未設定')}</strong>
+                        <span>${esc(contract.counterparty || contract.company_name || contract.type || '契約書')}</span>
+                    </div>
+                    <div class="dashboard-v2-chips">
+                        <span>${firstChip}</span>
+                        ${secondChip ? `<span>${secondChip}</span>` : ''}
+                    </div>
+                    <div class="dashboard-v2-date">${fmtDate(contract.last_updated_at || contract.last_analyzed_at || contract.created_at)}</div>
+                    <button class="dashboard-v2-button">確認する <i class="fa-solid fa-arrow-right"></i></button>
+                </div>
+            `;
+        }).join('') : renderEmpty('要対応の契約はありません');
 
-        const actionBtn = canOperateContract
-            ? `<button class="btn-dashboard">${isConfirmedStatus(c.status) ? '履歴を見る' : '確認する'}</button>`
-            : `<button class="btn-dashboard">詳細を見る</button>`;
+        const fileIcon = (contract) => {
+            const name = String(contract?.name || '').toLowerCase();
+            if (name.includes('.pdf')) return '<span class="dashboard-v2-file is-pdf"><i class="fa-regular fa-file-pdf"></i></span>';
+            if (contract?.source_url || name.startsWith('http')) return '<span class="dashboard-v2-file is-url"><i class="fa-solid fa-link"></i></span>';
+            return '<span class="dashboard-v2-file is-word"><i class="fa-regular fa-file-word"></i></span>';
+        };
+
+        const recentRows = recent.length ? recent.map((contract) => `
+            <div class="dashboard-v2-compact-row">
+                ${fileIcon(contract)}
+                <div class="dashboard-v2-compact-main">
+                    <strong>${esc(contract?.name || '名称未設定')}</strong>
+                    <span>更新日：${formatDisplayTimestamp(contract?.last_analyzed_at || contract?.last_updated_at || contract?.created_at)}</span>
+                </div>
+                <span class="dashboard-v2-pill is-success">${contract?.last_analyzed_at ? '解析完了' : '取得・解析完了'}</span>
+                <button class="dashboard-v2-button" onclick="${nav('diff', contract?.id)}">結果を見る <i class="fa-solid fa-arrow-right"></i></button>
+            </div>
+        `).join('') : renderEmpty('最近の解析はありません');
+
+        const deadlineRows = deadlines.slice(0, 3).map(({ contract, info }) => {
+            const weekday = ['日', '月', '火', '水', '木', '金', '土'][info.date.getDay()];
+            const tone = info.days <= 7 ? 'danger' : 'warning';
+            return `
+                <div class="dashboard-v2-calendar-row">
+                    <strong>${info.date.getMonth() + 1}/${info.date.getDate()} (${weekday})</strong>
+                    <span>${esc(contract?.name || '名称未設定')}</span>
+                    <em class="is-${tone}">残り${info.days}日</em>
+                </div>
+            `;
+        }).join('') || renderEmpty('今後30日の期限はありません');
 
         return `
-                <tr onclick="window.app.navigate('diff', ${c.id})">
-                    <td><span class="badge ${riskBadgeClass}">${c.risk_level === 'High' ? 'High' : (c.risk_level === 'Medium' ? 'Medium' : (c.risk_level === 'Low' ? 'Low' : c.risk_level))}</span></td>
-                    <td class="col-name" title="${escapeHtmlText(c.name)}">${escapeHtmlText(c.name)}</td>
-                    <td>${formatDisplayTimestamp(c.last_updated_at || c.last_analyzed_at || c.created_at)}</td>
-                    <td>${statusBadge}</td>
-                    <td>${actionBtn}</td>
-                </tr>
-            `;
-    }).join('') : '<tr><td colspan="5" class="text-center text-muted" style="padding:40px;">該当するアイテムはありません</td></tr>';
-
-    return `
-            <h2 id="page-header-title" class="page-title pc-only">ダッシュボード</h2>
-            <div class="dashboard-sticky-header">
-                <div class="stats-grid">
-                    <div class="stat-card ${currentFilter === 'pending' ? 'active' : ''}" onclick="window.app.setDashboardFilter('pending')">
-                        <div class="stat-label ${currentFilter === 'pending' ? 'text-warning' : ''}"><i class="fa-regular fa-square-check"></i> 未処理</div>
-                        <div class="stat-value">${stats.pending}件</div>
+            <div class="page-title">ダッシュボード</div>
+            <div class="dashboard-v2">
+                <div class="dashboard-v2-metrics">${metricCards}</div>
+                <section class="dashboard-v2-panel">
+                    <div class="dashboard-v2-panel-head">
+                        <h2>要対応の契約</h2>
+                        <button onclick="${nav('contracts')}" class="dashboard-v2-link">すべて見る <i class="fa-solid fa-arrow-right"></i></button>
                     </div>
-                    <div class="stat-card ${currentFilter === 'risk' ? 'active' : ''}" onclick="window.app.setDashboardFilter('risk')">
-                        <div class="stat-label ${currentFilter === 'risk' ? 'text-danger' : ''}"><i class="fa-solid fa-triangle-exclamation"></i> リスク要判定</div>
-                        <div class="stat-value">${stats.highRisk}件</div>
-                    </div>
-                    <div class="stat-card ${currentFilter === 'total' ? 'active' : ''}" onclick="window.app.setDashboardFilter('total')">
-                        <div class="stat-label"><i class="fa-solid fa-satellite-dish"></i> 監視中</div>
-                        <div class="stat-value text-muted">${stats.total}</div>
-                    </div>
+                    <div class="dashboard-v2-action-list">${actionRows}</div>
+                </section>
+                <div class="dashboard-v2-bottom">
+                    <section class="dashboard-v2-panel">
+                        <div class="dashboard-v2-panel-head">
+                            <h2>最近の解析</h2>
+                            <button onclick="${nav('history')}" class="dashboard-v2-link">すべて見る <i class="fa-solid fa-arrow-right"></i></button>
+                        </div>
+                        <div class="dashboard-v2-compact-list">${recentRows}</div>
+                    </section>
+                    <section class="dashboard-v2-panel">
+                        <div class="dashboard-v2-panel-head">
+                            <h2>期限カレンダー <span>（今後30日）</span></h2>
+                            <button onclick="${nav('deadlines')}" class="dashboard-v2-link">すべて見る <i class="fa-solid fa-arrow-right"></i></button>
+                        </div>
+                        <div class="dashboard-v2-calendar-list">${deadlineRows}</div>
+                        <button onclick="${nav('deadlines')}" class="dashboard-v2-calendar-link">カレンダーで確認する <i class="fa-solid fa-arrow-right"></i></button>
+                    </section>
                 </div>
-                <h3 id="dashboard-section-title" style="font-size:16px; margin-bottom:16px; font-weight:600;">${sectionTitle}</h3>
-            </div>
-            <div class="table-container">
-                <table class="data-table dashboard-table">
-                    <thead>
-                        <tr>
-                            <th>リスク</th>
-                            <th>契約・規約名</th>
-                            <th>日付</th>
-                            <th>ステータス</th>
-                            <th>アクション</th>
-                        </tr>
-                    </thead>
-                    <tbody id="dashboard-table-body">
-                        ${tableRows}
-                    </tbody>
-                </table>
             </div>
         `;
+    } catch (e) {
+        console.error('Failed to render dashboard overview:', e);
+        return `
+            <div class="dashboard-v2-error">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <p>ダッシュボードの読み込み中にエラーが発生しました。</p>
+                <button onclick="location.reload()" class="dashboard-v2-button">再読み込み</button>
+            </div>
+        `;
+    }
 };
 
 const Views = {
@@ -1183,7 +1411,7 @@ const Views = {
             return `
                 <div class="page-title">プラン管理</div>
                 <div class="plan-loading" style="text-align:center; padding:50px;">
-                    <i class="fa-solid fa-spinner fa-spin" style="font-size:2rem; color:#c19b4a; margin-bottom:16px;"></i>
+                    <i class="fa-solid fa-spinner fa-spin" style="font-size:2rem; color:#0b2d62; margin-bottom:16px;"></i>
                     <p>利用状況を確認しています...</p>
                 </div>
             `;
@@ -1371,20 +1599,18 @@ const Views = {
         `;
 
         return `
-            <div class="plan-view-container">
-                <div class="page-title">プラン管理</div>
-                <div class="plan-billing-toolbar">
-                    <div class="plan-cycle-switch" role="group" aria-label="請求サイクル切替">
-                        <button class="plan-cycle-btn ${selectedBillingCycle === 'monthly' ? 'active' : ''}" onclick="window.app.setPlanBillingCycle('monthly')">月額</button>
-                        <button class="plan-cycle-btn ${selectedBillingCycle === 'annual' ? 'active' : ''}" onclick="window.app.setPlanBillingCycle('annual')" ${annualKnownUnavailable ? 'disabled' : ''}>年額（2ヶ月分お得）</button>
-                    </div>
-                    <p class="plan-cycle-note">${annualKnownUnavailable ? '年額プランは現在準備中です。' : ''}</p>
+            <div class="page-title">プラン管理</div>
+            <div class="plan-billing-toolbar">
+                <div class="plan-cycle-switch" role="group" aria-label="請求サイクル切替">
+                    <button class="plan-cycle-btn ${selectedBillingCycle === 'monthly' ? 'active' : ''}" onclick="window.app.setPlanBillingCycle('monthly')">月額</button>
+                    <button class="plan-cycle-btn ${selectedBillingCycle === 'annual' ? 'active' : ''}" onclick="window.app.setPlanBillingCycle('annual')" ${annualKnownUnavailable ? 'disabled' : ''}>年額（2ヶ月分お得）</button>
                 </div>
-                ${paymentSection}
-                ${cancelSection}
-                <div class="plan-grid">
-                    ${cards}
-                </div>
+                <p class="plan-cycle-note">${annualKnownUnavailable ? '年額プランは現在準備中です。' : ''}</p>
+            </div>
+            ${paymentSection}
+            ${cancelSection}
+            <div class="plan-grid">
+                ${cards}
             </div>
         `;
     },
@@ -1398,822 +1624,285 @@ const Views = {
     diff: (id, appState = null) => {
         const app = appState || window.app || null;
         const contract = dbService.getContractById(id);
-        const comparisonContext = app?.getHistoryComparisonContext(id) || null;
-        const documentOptions = dbService.getDocumentsByContractId(id);
-        const hasComparableVersion = documentOptions.length >= 2;
-        const storedCompareState = app?.getDocumentCompareState(id) || null;
+        if (!contract) return '<div class="alert alert-danger">契約が見つかりませんでした</div>';
 
-        const fallbackSourceDoc = hasComparableVersion ? documentOptions[documentOptions.length - 2] : null;
-        const fallbackTargetDoc = hasComparableVersion ? documentOptions[documentOptions.length - 1] : null;
-
-        const selectedSourceCandidate = hasComparableVersion
-            ? (documentOptions.find((doc) => doc.id === storedCompareState?.docAId) || fallbackSourceDoc)
-            : null;
-        const selectedTargetCandidate = hasComparableVersion
-            ? (documentOptions.find((doc) => doc.id === storedCompareState?.docBId) || fallbackTargetDoc)
-            : null;
-
-        const selectedSourceDoc = isDocumentPairInContractScope(id, selectedSourceCandidate, selectedTargetCandidate)
-            ? selectedSourceCandidate
-            : null;
-        const selectedTargetDoc = selectedSourceDoc ? selectedTargetCandidate : null;
-
-        const displaySourceDoc = selectedSourceDoc;
-        const displayTargetDoc = selectedTargetDoc;
-
-        const rawDiffItem = (selectedSourceDoc && selectedTargetDoc)
-            ? (dbService.getDiffResult(selectedSourceDoc.id, selectedTargetDoc.id, id) || null)
-            : null;
-        const selectedDiffPayload = rawDiffItem?.diff_data || rawDiffItem;
-        const effectiveSelectedDiffData = selectedDiffPayload?.isFallback === true
-            ? null
-            : selectedDiffPayload;
-
-        const shouldShowStructuredFallbackPanel = false;
-        const shouldForceAutoPairAnalysis = false;
-        const shouldAutoPairAnalysis = Boolean(
-            false
-            && !comparisonContext
-            && selectedSourceDoc
-            && selectedTargetDoc
-            && app?.can('operate_contract')
-            && (
-                !selectedDiffPayload
-                || shouldForceAutoPairAnalysis
-                || selectedDiffPayload?.riskReason === 'AI差分未保存'
-            )
-        );
-
-        if (shouldAutoPairAnalysis) {
-            app.scheduleAutoPairAnalysis(
-                id,
-                selectedSourceDoc.id,
-                selectedTargetDoc.id,
-                { force: shouldForceAutoPairAnalysis }
-            );
-        }
-
-        const isAutoPairAnalysisPending = Boolean(
-            selectedSourceDoc
-            && selectedTargetDoc
-            && app?.isPairAnalysisPending(id, selectedSourceDoc.id, selectedTargetDoc.id)
-        );
-
-        const shouldUseStructuredDisplayChanges = false;
-        const requestedActiveTab = app ? app.activeDetailTab : 'diff';
-        const runtimePdfUrl = app?.getRuntimePdfPreviewUrl(id) || null;
-        const resolvedPdfPreviewUrl = resolvePdfPreviewUrl(contract, runtimePdfUrl);
-        const sourceType = String(contract?.source_type || '').toUpperCase();
-        const isPdfSource = sourceType === 'PDF' || (contract?.original_filename || '').toLowerCase().endsWith('.pdf');
-        const hasPdfPreview = Boolean(resolvedPdfPreviewUrl);
-        const showPdfViewerInRightPane = false;
-
-        const hasAIResults = Boolean(
-            (contract.ai_succeeded === true || contract.ai_is_fallback === true || contract.ai_summary)
-            && (
-                String(contract.ai_summary || contract.summary || '').trim()
-                || String(contract.ai_risk_reason || contract.risk_reason || '').trim()
-                || (Array.isArray(contract.ai_changes) && contract.ai_changes.length > 0)
-            )
-        );
-
-        const shouldHideDiffTab = !hasComparableVersion;
-        const activeTab = shouldHideDiffTab ? 'original' : requestedActiveTab;
-        const canTriggerPairAnalysis = Boolean(selectedSourceDoc && selectedTargetDoc && app?.can('operate_contract'));
-
-        const state = {
-            contractId: id,
-            contract,
-            comparison: {
-                context: comparisonContext,
-                documentState: storedCompareState,
-                documentOptions,
-                hasComparableVersion,
-                selectedSourceDoc,
-                selectedTargetDoc,
-                displaySourceDoc,
-                displayTargetDoc
-            },
-            diff: {
-                selectedPayload: selectedDiffPayload,
-                shouldHideTab: shouldHideDiffTab,
-                activeTab,
-                canTriggerPairAnalysis
-            },
-            analysis: {
-                hasResults: hasAIResults,
-                isAnalyzing: Boolean(app?.analyzingContractIds?.has(Number(contract.id))),
-                data: null
-            }
+        const stripLegacyConfidence = (text) => {
+            if (!text) return '';
+            return text.replace(/判定確度：[高中低]|判定確度:[高中低]/g, '').trim();
         };
 
-        if (app) {
-            app.detailState = state;
-        }
-
-        if (state.diff.activeTab === 'diff' && state.comparison.hasComparableVersion) {
-            logDiffExecution('render', {
-                contractId: id,
-                docAId: state.comparison.selectedSourceDoc?.id || null,
-                docBId: state.comparison.selectedTargetDoc?.id || null
-            });
-        }
-
-        let diffData = {
-            summary: '',
-            riskLevel: 1,
-            riskReason: '',
-            changes: [],
-            aiSucceeded: !!contract.ai_succeeded,
-            isLimited: !!contract.ai_limited
-        };
-
-        try {
-            if (effectiveSelectedDiffData) {
-                const cached = sanitizeAnalysisPayload(effectiveSelectedDiffData);
-                diffData = {
-                    title: `${contract.name} - 文書比較`,
-                    summary: cached.summary || '選択した2文書の差分結果を表示しています。',
-                    riskLevel: cached.riskLevel ?? 1,
-                    riskReason: cached.riskReason || '保存済みの差分結果を表示しています。',
-                    changes: cached.changes || [],
-                    isFallback: cached.isFallback === true,
-                    aiSucceeded: cached.aiSucceeded ?? contract.ai_succeeded,
-                    isLimited: cached.isLimited ?? contract.ai_limited
-                };
-            } else if (selectedSourceDoc && selectedTargetDoc) {
-                diffData = {
-                    title: `${contract.name} - 文書比較`,
-                    summary: 'この文書ペアのAI差分要約はまだ保存されていません。必要に応じてAI差分解析を実行してください。',
-                    riskLevel: 1,
-                    riskReason: 'AI差分未保存',
-                    changes: [],
-                    isFallback: false
-                };
-            } else if (comparisonContext?.analysis) {
-                diffData = {
-                    title: `${contract.name} - 比較解析`,
-                    summary: comparisonContext.analysis.summary || '選択した履歴との差分比較を表示しています。',
-                    riskLevel: comparisonContext.analysis.riskLevel ?? 1,
-                    riskReason: comparisonContext.analysis.riskReason || '選択した履歴との差分を解析しました。',
-                    changes: comparisonContext.analysis.changes || [],
-                    isFallback: comparisonContext.analysis.isFallback === true
-                };
-            } else if (comparisonContext?.analysisNotice) {
-                diffData = {
-                    title: `${contract.name} - 比較表示`,
-                    summary: comparisonContext.analysisNotice,
-                    riskLevel: 1,
-                    riskReason: '比較表示のみ',
-                    changes: [],
-                    isFallback: false
-                };
-            } else if (hasAIResults) {
-                const normalizedStored = sanitizeAnalysisPayload({
-                    summary: contract.ai_summary || contract.summary || '',
-                    riskLevel: (contract.risk_level === 'High' || contract.risk_level === '3' || contract.risk_level === 3) ? 3 : ((contract.risk_level === 'Medium' || contract.risk_level === '2' || contract.risk_level === 2) ? 2 : 1),
-                    riskReason: contract.ai_risk_reason || contract.risk_reason || '',
-                    changes: contract.ai_changes || [],
-                    isFallback: contract.ai_is_fallback === true
-                });
-                diffData = {
-                    title: `${contract.name} - AIリスク解析`,
-                    summary: normalizedStored.summary || 'AI解析結果を表示しています。',
-                    riskLevel: normalizedStored.riskLevel ?? 1,
-                    riskReason: normalizedStored.riskReason || 'AIリスク解析結果',
-                    changes: normalizedStored.changes || [],
-                    isFallback: normalizedStored.isFallback === true,
-                    aiSucceeded: !!contract.ai_succeeded,
-                    isLimited: !!contract.ai_limited
-                };
-            } else {
-                diffData = {
-                    title: `${contract.name} - 解析`,
-                    summary: 'AI解析結果がありません。',
-                    riskLevel: 1,
-                    riskReason: '未解析',
-                    changes: [],
-                    isFallback: false
-                };
-            }
-        } catch (e) {
-            console.error(`[ERROR] Views.diff data preparation failed:`, e);
-            throw e;
-        }
-
-        const compareBannerHtml = activeTab === 'diff' ? `
-            <div class="document-compare-toolbar">
-                <div class="document-compare-grid">
-                    <label class="document-compare-field">
-                        <span class="document-compare-label">比較元</span>
-                        <select class="document-compare-select" onchange="window.app.handleDocumentCompareChange(${id}, 'docA', this.value)">
-                            <option value="">文書を選択</option>
-                            ${documentOptions.map((doc) => `
-                                <option value="${doc.id}" ${selectedSourceDoc?.id === doc.id ? 'selected' : ''}>${escapeHtmlText(buildDocumentOptionLabel(doc))}</option>
-                            `).join('')}
-                        </select>
-                    </label>
-                    <label class="document-compare-field">
-                        <span class="document-compare-label">比較先</span>
-                        <select class="document-compare-select" onchange="window.app.handleDocumentCompareChange(${id}, 'docB', this.value)">
-                            <option value="">文書を選択</option>
-                            ${documentOptions.map((doc) => `
-                                <option value="${doc.id}" ${selectedTargetDoc?.id === doc.id ? 'selected' : ''}>${escapeHtmlText(buildDocumentOptionLabel(doc))}</option>
-                            `).join('')}
-                        </select>
-                    </label>
-                </div>
-                <div class="document-compare-status">
-                    ${selectedSourceDoc && selectedTargetDoc
-                ? `比較中: <strong>${escapeHtmlText(trimDocumentLabel(selectedSourceDoc.document_name, '比較元資料'))}</strong> → <strong>${escapeHtmlText(trimDocumentLabel(selectedTargetDoc.document_name, '比較先資料'))}</strong>`
-                : '比較元と比較先を選択してください'}
-                </div>
-            </div>
-        ` : '';
-
-        const displayChanges = normalizeChangesForDisplay(
-            shouldUseStructuredDisplayChanges
-                ? mergeStructuredChangesWithAnalysis([], diffData.changes)
-                : diffData.changes
-        );
-
-        const changesHtml = (displayChanges.length > 0 ? displayChanges : []).map((c) => {
-            const changeType = (() => {
-                const t = String(c.type || '').toUpperCase();
-                if (t === 'ADD') return '追加';
-                if (t === 'DELETE') return '削除';
-                return '変更';
-            })();
-            const oldText = escapeHtmlText(typeof c.old === 'string' ? c.old : JSON.stringify(c.old || ''));
-            const newText = escapeHtmlText(typeof c.new === 'string' ? c.new : JSON.stringify(c.new || ''));
-            return `
-            <article class="mobile-change-card">
-                <div class="mobile-change-card-header">
-                    <span>${escapeHtmlText(c.section || '変更点')}</span>
-                    <span>${changeType}</span>
-                </div>
-                <div class="diff-container mobile-diff-stack" style="height:auto; min-height:100px;">
-                    <div class="diff-pane diff-left">
-                        <div class="diff-pane-label">変更前</div>
-                        <span class="diff-del">${oldText || '（該当なし）'}</span>
-                    </div>
-                    <div class="diff-pane diff-right">
-                        <div class="diff-pane-label">変更後</div>
-                        <span class="diff-add">${newText || '（該当なし）'}</span>
-                    </div>
-                </div>
-                ${(c.impact || c.concern) ? `
-                <div class="mobile-change-impact">
-                    ${c.impact ? `<div><strong><i class="fa-solid fa-scale-balanced"></i> 法的影響</strong>${renderAnalysisTextBlocks(c.impact)}</div>` : ''}
-                    ${c.concern ? `<div><strong><i class="fa-solid fa-triangle-exclamation"></i> 懸念点</strong>${renderAnalysisTextBlocks(c.concern)}</div>` : ''}
-                </div>
-                ` : ''}
-            </article>
-        `;
-        }).join('');
-
-        const mobileRiskTone = diffData.riskLevel >= 3 ? 'high' : (diffData.riskLevel >= 2 ? 'medium' : 'low');
-        const mobileRiskLabel = diffData.riskLevel >= 3 ? 'High' : (diffData.riskLevel >= 2 ? 'Medium' : 'Low');
-
-        state.analysis.data = diffData;
-        const isAnalyzingContract = state.analysis.isAnalyzing;
-        const hasDeadlineInfo = Boolean(
-            contract.expiry_date
-            || contract.renewal_deadline
-            || contract.contract_start
-            || contract.contract_category
-            || contract.auto_renewal === true
-            || contract.auto_renewal === false
-        );
-        const hasAnalysisPayload = Boolean(diffData.summary || diffData.riskReason || (Array.isArray(diffData.changes) && diffData.changes.length > 0));
-        const shouldShowAnalysis = Boolean(hasAIResults && hasAnalysisPayload);
-
-        const mobilePrimaryAction = (() => {
-            if (!app?.can('operate_contract')) return null;
-            if (!hasAIResults && contract.ai_succeeded !== false) {
-                return {
-                    label: 'リスク解析＋期限取得',
-                    icon: 'fa-wand-magic-sparkles',
-                    action: `window.app.confirmReanalyze('${contract.id}')`
-                };
-            }
-            if (contract.status === '未確認') {
-                return {
-                    label: '確認済みにする',
-                    icon: 'fa-check',
-                    action: `window.app.confirmContract(${id})`
-                };
-            }
-            return {
-                label: '署名判断へ',
-                icon: 'fa-file-signature',
-                action: "window.app.navigate('sign')"
-            };
+        const storedArticles = (contract.original_content && typeof contract.original_content === 'object' && Array.isArray(contract.original_content.articles))
+            ? contract.original_content.articles
+            : [];
+        const rawTextArticles = (() => {
+            const raw = String(contract.pdf_raw_text || '').trim();
+            if (!raw) return [];
+            const clauses = parseContractIntoClauses(raw);
+            return clauses
+                .filter((clause) => String(clause.title || '').trim() !== '前文')
+                .map((clause, index) => ({
+                    articleNumber: String(clause.title || `第${index + 1}条`).trim(),
+                    title: String(clause.header || '').trim(),
+                    content: (Array.isArray(clause.paragraphs) ? clause.paragraphs : [])
+                        .map((paragraph) => String(paragraph || '').trim())
+                        .filter(Boolean)
+                        .join('\n')
+                }))
+                .filter((article) => article.content || article.title);
         })();
+        const storedCoverage = getArticleCoverage(storedArticles);
+        const rawCoverage = getArticleCoverage(rawTextArticles);
+        const articles = isArticleCoverageBetter(rawTextArticles, storedArticles)
+            ? rawTextArticles
+            : storedArticles;
+
+        const aiChanges = Array.isArray(contract.ai_changes) ? contract.ai_changes : [];
+        
+        const rlNorm = String(contract.risk_level || 'None').toLowerCase();
+        const riskClass = rlNorm.includes('high') || rlNorm.includes('高') ? 'high' : (rlNorm.includes('medium') || rlNorm.includes('中') ? 'medium' : 'low');
+        const riskLevelText = riskClass === 'high' ? '高' : (riskClass === 'medium' ? '中' : '低');
+        const riskPalette = {
+            high: { bg: '#fee2e2', color: '#b91c1c', border: '#fecaca' },
+            medium: { bg: '#fef3c7', color: '#b45309', border: '#fde68a' },
+            low: { bg: '#dcfce7', color: '#15803d', border: '#bbf7d0' }
+        };
+        const p = riskPalette[riskClass] || riskPalette.low;
+
+        const clauseListHtml = articles.length > 0
+            ? articles.map((art, idx) => {
+                const aiSummary = Array.isArray(contract.ai_summary) ? contract.ai_summary : [];
+                const risk = [...aiChanges, ...aiSummary].find(c => {
+                    const section = (c.section || c.article || c.articleNumber || '').toString().replace(/\s+/g, '');
+                    const artNum = (art.articleNumber || art.article || '').toString().replace(/\s+/g, '');
+                    if (!section || !artNum) return false;
+                    return section.includes(artNum) || artNum.includes(section);
+                });
+                const rlRaw = String(risk?.riskLevel || risk?.risk_level || 'None');
+                const bClass = rlRaw.toLowerCase().includes('high') || rlRaw.includes('高') ? 'high' : (rlRaw.toLowerCase().includes('medium') || rlRaw.includes('中') ? 'medium' : 'low');
+                const riskPalette = {
+                    high: { bg: '#fee2e2', color: '#b91c1c', border: '#fecaca' },
+                    medium: { bg: '#fef3c7', color: '#b45309', border: '#fde68a' },
+                    low: { bg: '#dcfce7', color: '#15803d', border: '#bbf7d0' }
+                };
+                const p = riskPalette[bClass] || riskPalette.low;
+                const riskLabelMap = { 'high': '高', 'medium': '中', 'low': '低', 'none': '低' };
+                const bText = riskLabelMap[bClass] || '低';
+                const artNum = (art.articleNumber || art.article || `第${idx+1}条`).replace(/'/g, '');
+                const articleBody = escapeHtmlText(art.content || '内容を取得できませんでした').replace(/\n/g, '<br>');
+                return `
+                    <div class="v3-list-item" data-expanded="false" onclick="window.app.toggleClauseDetail(event, this);" style="display:flex !important; flex-direction:column !important; padding:12px 16px !important; margin-bottom:8px !important; border:1px solid #e2e8f0 !important; border-radius:8px !important; background:#f8fafc !important; cursor:pointer !important; gap:0 !important; box-sizing:border-box !important;">
+                        <div class="v3-list-item-header" style="display:flex !important; align-items:center !important; justify-content:space-between !important; width:100% !important; pointer-events:none !important;">
+                            <div style="display:flex !important; align-items:center !important; gap:12px !important; min-width:0 !important; flex:1 !important;">
+                                <span class="v3-badge-risk ${bClass}" style="flex-shrink:0 !important; background:${p.bg} !important; color:${p.color} !important; border:1px solid ${p.border} !important; font-weight:800 !important; font-size:11px !important; padding:2px 6px !important; border-radius:4px !important;">${bText}</span>
+                                <span style="font-size:13px !important; font-weight:800 !important; flex-shrink:0 !important; color:#1e293b !important;">${artNum}</span>
+                                <span style="font-size:12px !important; color:#64748b !important; white-space:nowrap !important; overflow:hidden !important; text-overflow:ellipsis !important;">${(art.content || '').substring(0, 40).replace(/\n/g, ' ')}...</span>
+                            </div>
+                            <i class="fa-solid fa-chevron-right" style="color:#cbd5e1 !important; flex-shrink:0 !important; margin-left:8px !important; transition:transform 0.2s !important;"></i>
+                        </div>
+                        <div class="v3-clause-expanded-content" style="display:none !important; width:100% !important; box-sizing:border-box !important; padding:12px !important; margin-top:12px !important; border-top:1px solid #dbeafe !important; background:#ffffff !important; border-radius:4px !important;">
+                            <div style="margin-bottom:8px !important; font-weight:700 !important; color:#1e293b !important; font-size:13px !important;">条文の内容</div>
+                            <div style="font-size:13px !important; line-height:1.7 !important; color:#334155 !important;">${articleBody}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('')
+            : aiChanges.length > 0
+                ? aiChanges.map((c, idx) => {
+                    const rlRaw = String(c.riskLevel || 'Low');
+                    const bClass = rlRaw.toLowerCase().includes('high') || rlRaw.includes('高') ? 'high' : (rlRaw.toLowerCase().includes('medium') || rlRaw.includes('中') ? 'medium' : 'low');
+                    const riskPalette = {
+                        high: { bg: '#fee2e2', color: '#b91c1c', border: '#fecaca' },
+                        medium: { bg: '#fef3c7', color: '#b45309', border: '#fde68a' },
+                        low: { bg: '#dcfce7', color: '#15803d', border: '#bbf7d0' }
+                    };
+                    const p = riskPalette[bClass] || riskPalette.low;
+                    const riskLabelMap = { 'high': '高', 'medium': '中', 'low': '低', 'none': '-' };
+                    const bText = riskLabelMap[bClass] || '-';
+                    const secName = (c.section || `項目 ${idx+1}`).replace(/'/g, '');
+                    const detailText = escapeHtmlText(c.description || c.old || '詳細情報はありません').replace(/\n/g, '<br>');
+                    return `
+                        <div class="v3-list-item" data-expanded="false" onclick="window.app.toggleClauseDetail(event, this);" style="display:flex !important; flex-direction:column !important; padding:12px 16px !important; margin-bottom:8px !important; border:1px solid #e2e8f0 !important; border-radius:8px !important; background:#f8fafc !important; cursor:pointer !important; gap:0 !important; box-sizing:border-box !important;">
+                            <div class="v3-list-item-header" style="display:flex !important; align-items:center !important; justify-content:space-between !important; width:100% !important; pointer-events:none !important;">
+                                <div style="display:flex !important; align-items:center !important; gap:12px !important; min-width:0 !important; flex:1 !important;">
+                                    <span class="v3-badge-risk ${bClass}" style="flex-shrink:0 !important; background:${p.bg} !important; color:${p.color} !important; border:1px solid ${p.border} !important; font-weight:800 !important; font-size:11px !important; padding:2px 6px !important; border-radius:4px !important;">${bText}</span>
+                                    <span style="font-size:13px !important; font-weight:800 !important; flex-shrink:0 !important; color:#1e293b !important;">${secName}</span>
+                                    <span style="font-size:12px !important; color:#64748b !important; white-space:nowrap !important; overflow:hidden !important; text-overflow:ellipsis !important;">${(c.description || c.old || '').substring(0, 40).replace(/\n/g, ' ')}...</span>
+                                </div>
+                                <i class="fa-solid fa-chevron-right" style="color:#cbd5e1 !important; flex-shrink:0 !important; margin-left:8px !important; transition:transform 0.2s !important;"></i>
+                            </div>
+                            <div class="v3-clause-expanded-content" style="display:none !important; width:100% !important; box-sizing:border-box !important; padding:12px !important; margin-top:12px !important; border-top:1px solid #dbeafe !important; background:#ffffff !important; border-radius:4px !important;">
+                                <div style="margin-bottom:8px !important; font-weight:700 !important; color:#1e293b !important; font-size:13px !important;">詳細</div>
+                                <div style="font-size:13px !important; line-height:1.7 !important; color:#334155 !important;">${detailText}</div>
+                            </div>
+                        </div>
+                    `;
+                }).join('')
+                : `<div class="v3-list-item" style="opacity:0.6; pointer-events:none; justify-content:center;">解析データが見つかりませんでした</div>`;
+
+        const documentBodyHtml = articles.length > 0
+            ? articles.map((art, idx) => `
+                <div id="clause-${idx}" style="margin-bottom:40px; scroll-margin-top:100px;">
+                    <h3 style="font-size:17px; font-weight:800; margin-bottom:14px; color:var(--v3-text-main);">${art.articleNumber || art.article || `第${idx+1}条`}</h3>
+                    <p style="font-size:15px; line-height:2.4; color:#1e293b; letter-spacing:0.02em;">${(art.content || '').replace(/\n/g, '<br>')}</p>
+                </div>
+            `).join('')
+            : `<div style="white-space: pre-wrap; font-size:15px; line-height:2.4;">${(typeof contract.original_content === 'string' ? contract.original_content : JSON.stringify(contract.original_content)) || '原本データはありません'}</div>`;
 
         return `
-            <div class="detail-split-container">
-                <div class="detail-split-header flex justify-between items-center">
-                    <div class="detail-header-main">
-                        <a class="btn-viewer-back" onclick="window.app.navigate('contracts')" title="戻る">
-                            <i class="fa-solid fa-chevron-left"></i>
-                        </a>
-                        <div class="detail-header-title-wrap">
-                            <h2 style="font-size:18px; font-weight:700; color:var(--text-main); margin:0;">${diffData.title}</h2>
-                            <div class="detail-header-meta" style="font-size:12px; color:#666; margin-top:4px;">
-                                ${contract.source_url ? `<span class="detail-header-meta-item"><i class="fa-solid fa-link"></i> Source: <a href="${contract.source_url}" target="_blank" style="color:#2196F3; text-decoration:underline;">${contract.source_url}</a></span>` : ''}
-                                ${contract.original_filename ? `<span class="detail-header-meta-item"><i class="fa-solid fa-file-lines"></i> Original File: ${contract.original_filename}</span>` : ''}
+            <div class="analysis-v3-container">
+                <!-- Header -->
+                <header class="analysis-v3-header">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <h1 style="font-size:18px; font-weight:800; color:var(--v3-text-main); margin:0;">${contract.name} - AIリスク解析結果</h1>
+                            <div style="display:flex; align-items:center; gap:16px; margin-top:8px; font-size:12px; color:var(--v3-text-sub);">
+                                <span><i class="fa-regular fa-file-lines"></i> ${contract.original_filename || 'document.docx'}</span>
+                                <span style="background:#e6f7ec; color:#047857; padding:2px 8px; border-radius:4px; font-weight:800;">解析完了</span>
+                                <span>${contract.last_analyzed_at ? new Date(contract.last_analyzed_at).toLocaleString('ja-JP') : '-'}</span>
                             </div>
                         </div>
                     </div>
-                    <div class="flex gap-sm" style="flex-wrap: wrap; justify-content: flex-end; margin-left: auto;">
-                        ${app?.can('operate_contract') ? `<button class="btn-dashboard" onclick="window.app.shareReport(${contract.id})"><i class="fa-solid fa-share-nodes"></i> 共有</button>` : ''}
-                        ${(['owner', 'pro', 'business'].includes(app?.subscription?.plan)) ? `<button class="btn-dashboard" onclick="window.app.exportPDF(${contract.id})"><i class="fa-solid fa-file-pdf"></i> PDF出力</button>` : ''}
-                        ${app?.can('operate_contract') ? `<button class="btn-dashboard" onclick="window.app.showHistoryModal(${id})"><i class="fa-solid fa-note-sticky"></i> メモ</button>` : ''}
-                        ${app?.can('operate_contract')
-                ? (['確認済み', '確認済'].includes(contract.status)
-                    ? `<button class="btn-dashboard" disabled><i class="fa-solid fa-check"></i> 確認済み</button>`
-                    : (contract.status === '未処理'
-                        ? ''
-                        : `<button class="btn-dashboard btn-primary-action" onclick="window.app.confirmContract(${id})"><i class="fa-solid fa-check"></i> 確認済みにする</button>`))
-                : ''}
-                    </div>
+                </header>
+
+                <div class="analysis-v3-split-layout">
+                    <aside class="analysis-v3-side-panel">
+                        <div class="v3-side-fixed-top">
+                            <div class="analysis-v3-grid analysis-summary-grid" style="gap:12px; align-items:stretch; grid-template-columns:repeat(2, minmax(0, 1fr));">
+                                <!-- AI Risk Summary -->
+                                <section class="v3-card analysis-summary-card is-risk" style="grid-column:1 / -1; padding:20px; display:flex; align-items:center; gap:24px; min-height:100px;">
+                                    <div class="analysis-risk-badge-panel" style="text-align:center; min-width:140px; border-right:1px solid #f1f5f9; padding-right:24px;">
+                                        <div class="v3-card-title" style="margin-bottom:12px; justify-content:center;">リスク要約</div>
+                                        <div class="v3-badge-risk-lg ${riskClass}" style="font-size:24px; padding:10px 24px; background:${p.bg}; color:${p.color}; border:1px solid ${p.border}; border-radius:12px; display:inline-flex; align-items:center; justify-content:center; font-weight:800;">${riskLevelText}</div>
+                                    </div>
+                                    <div class="analysis-risk-copy" style="flex:1;">
+                                        <p style="font-size:16px; color:var(--v3-text-main); line-height:1.7; margin:0;">
+                                            ${stripLegacyConfidence(contract.ai_summary || contract.ai_risk_reason || '要約データはありません')}
+                                        </p>
+                                    </div>
+                                </section>
+
+                                <!-- Metric: Expiry Info -->
+                                <section class="v3-card analysis-summary-card is-deadline" style="padding:16px; min-width:0; display:flex; flex-direction:column; height:100%; box-sizing:border-box;">
+                                    <div style="margin-bottom:12px;">
+                                        <div class="v3-card-title" style="margin:0;">期限情報</div>
+                                    </div>
+                                    <div class="analysis-deadline-list" style="display:flex; flex-direction:column; gap:8px; font-size:12px; flex:1;">
+                                        ${(() => {
+                                            const fmt = (d) => { if (!d) return null; const dt = new Date(d); if (isNaN(dt)) return d; return `${dt.getFullYear()}年${dt.getMonth()+1}月${dt.getDate()}日`; };
+                                            const days = (d) => { if (!d) return null; const diff = Math.ceil((new Date(d) - new Date()) / 86400000); return isNaN(diff) ? null : diff; };
+                                            const row = (label, dateStr) => {
+                                                if (!dateStr) return '';
+                                                const d = days(dateStr);
+                                                const expired = d !== null && d < 0;
+                                                const urgent = d !== null && d >= 0 && d <= 60;
+                                                const dayLabel = d === null ? '' : expired ? `期限切れ（${Math.abs(d)}日経過）` : d === 0 ? '本日期限' : `あと${d}日`;
+                                                const dateColor = expired ? '#e11d48' : '#1e293b';
+                                                const dayColor = expired ? '#e11d48' : urgent ? '#f59e0b' : '#1e293b';
+                                                return `<div class="analysis-deadline-row" style="display:flex;justify-content:space-between;align-items:flex-start;padding:7px 0;border-bottom:1px solid #f1f5f9;gap:8px;">
+                                                    <span style="color:#334155;font-size:16px;white-space:nowrap;flex-shrink:0;padding-top:1px;">${label}</span>
+                                                    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;">
+                                                        <strong style="color:${dateColor};font-size:16px;white-space:nowrap;">${fmt(dateStr)}</strong>
+                                                        ${d !== null ? `<span style="font-size:13px;color:${dayColor};white-space:nowrap;font-weight:600;">${dayLabel}</span>` : ''}
+                                                    </div>
+                                                </div>`;
+                                            };
+                                            const hasAnyDate = contract.expiry_date || contract.contract_start;
+                                            if (!hasAnyDate) {
+                                                return `<div style="color:#94a3b8;font-size:16px;text-align:center;padding:8px 0;">この書類には期限の記述がありませんでした</div>`;
+                                            }
+                                            return [
+                                                row('契約開始日', contract.contract_start),
+                                                row('契約終了日', contract.expiry_date),
+                                                 contract.auto_renewal !== null && contract.auto_renewal !== undefined ? `<div class="analysis-deadline-row" style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;gap:8px;">
+                                                    <span style="color:#334155;font-size:16px;white-space:nowrap;flex-shrink:0;">自動更新</span>
+                                                    <strong style="color:${contract.auto_renewal?'#f59e0b':'#1e293b'};font-size:16px;white-space:nowrap;">${contract.auto_renewal?'あり（要注意）':'なし'}</strong>
+                                                </div>` : ''
+                                            ].join('');
+                                        })()}
+                                    </div>
+                                    <div class="analysis-card-action" style="margin-top:auto; padding-top:14px; text-align:center;">
+                                        <a onclick="window.app.navigate('deadlines')" style="display:inline-flex;align-items:center;justify-content:center;gap:6px;color:#2563eb;font-size:13px;font-weight:700;cursor:pointer;">
+                                            <span>期限一覧を見る</span>
+                                            <i class="fa-solid fa-chevron-right" style="font-size:10px;"></i>
+                                        </a>
+                                    </div>
+                                </section>
+
+                                <!-- Metric: Revision Summary -->
+                                <section class="v3-card analysis-summary-card is-revision" style="padding:16px; display:flex; flex-direction:column; min-width:0; height:100%; box-sizing:border-box;">
+                                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                                        <div class="v3-card-title" style="margin:0;">修正案</div>
+                                        ${aiChanges.length > 0 ? `<span style="font-size:12px;font-weight:700;background:#fef3c7;color:#d97706;padding:2px 8px;border-radius:10px;white-space:nowrap;">${aiChanges.length}件</span>` : `<span style="font-size:12px;font-weight:700;background:#dcfce7;color:#16a34a;padding:2px 8px;border-radius:10px;white-space:nowrap;">問題なし</span>`}
+                                    </div>
+                                    <div class="analysis-revision-body">
+                                    ${aiChanges.length > 0 ? (() => {
+                                        // 「〇〇だったため、〇〇の修正を行いました」形式で生成
+                                        const total = aiChanges.length;
+                                        const top = aiChanges.slice(0, 2);
+                                        const reasons = top.map(c => (c.reason || c.concern || '').replace(/。$/, '')).filter(Boolean);
+                                        const sections = aiChanges.slice(0, 3).map(c => (c.section || '').replace(/\s+/g,'')).filter(Boolean);
+                                        let text = '';
+                                        if (reasons.length >= 2) {
+                                            text = `${reasons[0]}ため、また${reasons[1]}ため、${sections.join('・')}など計${total}件の修正を行いました。`;
+                                        } else if (reasons.length === 1) {
+                                            text = `${reasons[0]}ため、${sections.join('・')}など計${total}件の修正を行いました。`;
+                                        } else {
+                                            text = `${sections.join('・')}など計${total}件の修正を行いました。`;
+                                        }
+                                        return `<p style="font-size:14px;color:#475569;line-height:1.8;margin:0;flex:1;">${text}</p>`;
+                                    })() : `
+                                        <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 0;gap:8px;">
+                                            <i class="fa-regular fa-circle-check" style="font-size:28px;color:#10b981;"></i>
+                                            <p style="font-size:16px;color:#64748b;text-align:center;margin:0;line-height:1.7;">AIが解析した結果、<br>修正提案はありませんでした</p>
+                                        </div>
+                                    `}
+                                    </div>
+                                    <div class="analysis-card-action" style="margin-top:auto; padding-top:12px; text-align:center;">
+                                        <a onclick="window.signViewer && window.signViewer.switchViewMode('revised')" style="display:inline-flex;align-items:center;justify-content:center;gap:6px;color:#2563eb;font-size:13px;font-weight:700;cursor:pointer;">
+                                            <span>修正案を見る</span>
+                                            <i class="fa-solid fa-chevron-right" style="font-size:10px;"></i>
+                                        </a>
+                                    </div>
+                                </section>
+                            </div>
+                        </div>
+
+                        <div class="v3-side-scroll-area" style="overflow:hidden; padding-bottom:16px;">
+                            <div class="analysis-v3-grid" style="gap:12px; height:100%;">
+                                <!-- Clause List (Vertically Long) -->
+                                <section class="v3-card analysis-summary-card is-clauses" style="grid-column:1 / -1; padding:16px; display:flex; flex-direction:column; height:100%; box-sizing:border-box; overflow:hidden; min-height:200px;">
+                                    <div class="v3-card-title" style="margin-bottom:12px; flex-shrink:0;">条文一覧</div>
+                                    <div class="analysis-clause-list" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:8px; padding-right:6px; scrollbar-width:thin; min-height:0;">
+                                        ${clauseListHtml}
+                                    </div>
+                                </section>
+                            </div>
+                        </div>
+                    </aside>
+
+                    <main class="v3-viewer-container">
+                        <div class="v3-viewer-sidebar">
+                            <!-- Thumbnails will be injected by SignViewer -->
+                        </div>
+                        <div class="v3-viewer-main" style="display:flex; flex-direction:column; min-height:0; height:100%;">
+                            
+                            <div class="v3-viewer-toolbar" id="v3-viewer-toolbar">
+                                <!-- Placeholder for SignViewer Toolbar if needed, or keeping it empty to let SignViewer manage it -->
+                                <div style="flex:1; display:flex; align-items:center; justify-content:center; font-size:16px; color:var(--v3-text-sub);">
+                                    <i class="fa-solid fa-spinner fa-spin" style="margin-right:8px;"></i> 契約書を表示中
+                                </div>
+                            </div>
+
+                            <div class="v3-pdf-sheet" id="v3-pdf-sheet" style="padding:0; margin:0; border:none; background:transparent; overflow:hidden; position:relative; flex:1; min-height:0;">
+                                <!-- SignViewer will render PDF pages here -->
+                                <div style="display:none;">${documentBodyHtml}</div>
+                            </div>
+                        </div>
+                    </main>
                 </div>
-
-                ${isAnalyzingContract ? `
-                <section class="mobile-risk-sticky mobile-only" style="background:#f8fafc; border-top:1px solid #e2e8f0; padding:12px;" aria-label="解析中">
-                    <div style="display:flex; align-items:center; gap:10px; font-size:12px; color:#1a73e8;">
-                        <i class="fa-solid fa-spinner fa-spin"></i>
-                        <span style="font-weight:700;">AIが解析中です...</span>
-                    </div>
-                </section>
-                ` : (contract.ai_limited ? `
-                <section class="mobile-risk-sticky mobile-only" style="background:#fffcf5; border-top:1px solid #e8d9b8;" aria-label="アップグレード案内">
-                    <div style="display:flex; align-items:center; gap:10px;">
-                        <i class="fa-solid fa-crown" style="color:#c5a059;"></i>
-                        <span style="font-size:12px; color:#2b2623; font-weight:700;">AI詳細解析はアップグレードが必要です</span>
-                        <a onclick="window.app.navigate('plan')" style="margin-left:auto; font-size:11px; color:#c5a059; font-weight:700; text-decoration:underline;">詳細</a>
-                    </div>
-                </section>
-                ` : (shouldShowAnalysis ? `
-                <section class="mobile-risk-sticky mobile-risk-${mobileRiskTone} mobile-only" aria-label="リスク判定">
-                    <div class="mobile-risk-row">
-                        <span class="mobile-risk-pill">${mobileRiskLabel}</span>
-                        <span class="mobile-risk-reason">${escapeHtmlText(getFirstAnalysisLine(diffData.riskReason, 'リスク判定を確認してください'))}</span>
-                    </div>
-                    <div class="mobile-risk-summary-label">AI要約</div>
-                    <div class="mobile-risk-summary">${escapeHtmlText(getFirstAnalysisLine(diffData.summary, 'AI要約はまだありません。'))}</div>
-                </section>
-                ` : (contract.ai_succeeded === false ? `
-                <section class="mobile-risk-sticky mobile-only" style="background:#fff5f5; border-top:1px solid #feb2b2; padding:12px;" aria-label="解析失敗">
-                    <div style="display:flex; align-items:center; gap:10px; color:#c53030; font-size:12px;">
-                        <i class="fa-solid fa-circle-exclamation"></i>
-                        <span>AI解析に失敗しました。</span>
-                        <a onclick="window.app.confirmReanalyze('${id}')" style="margin-left:auto; font-weight:700; cursor:pointer;">再試行</a>
-                    </div>
-                </section>
-                ` : '')))}
-
-                <div class="detail-split-body">
-                    <div class="pane">
-                        <div class="pane-header" style="min-height:56px; box-sizing:border-box;">
-                            <span><i class="fa-solid fa-magnifying-glass-chart" style="margin-right:8px;"></i> AI解析・差分判定</span>
-                            <button id="btn-reanalyze" class="btn-upload-version" onclick="window.app.confirmReanalyze('${id}')" style="margin-left:auto">
-                                <i class="fa-solid fa-wand-magic-sparkles"></i>リスク解析＋期限取得
-                            </button>
-                        </div>
-                        <div class="pane-scroll-area">
-                            <div class="analysis-pane-content">
-                                ${isAnalyzingContract ? `
-                                <div class="skeleton-analysis-wrap">
-                                    <div class="analysis-section-title">
-                                        <i class="fa-solid fa-spinner fa-spin text-primary"></i>
-                                        <span id="analysis-status-text">AIが資料を解析しています。しばらくお待ちください。</span>
-                                    </div>
-                                    <div class="analysis-card">
-                                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
-                                            <div style="width:60px; height:20px; background:#e2e8f0; border-radius:4px; animation: pulse 1.5s infinite;"></div>
-                                            <div style="width:140px; height:16px; background:#f1f5f9; border-radius:4px; animation: pulse 1.5s infinite;"></div>
-                                        </div>
-                                        <div style="space-y:8px;">
-                                            <div style="width:100%; height:14px; background:#f1f5f9; border-radius:4px; margin-bottom:6px; animation: pulse 1.5s infinite;"></div>
-                                            <div style="width:90%; height:14px; background:#f1f5f9; border-radius:4px; margin-bottom:6px; animation: pulse 1.5s infinite; animation-delay: 0.2s;"></div>
-                                            <div style="width:75%; height:14px; background:#f1f5f9; border-radius:4px; animation: pulse 1.5s infinite; animation-delay: 0.4s;"></div>
-                                        </div>
-                                    </div>
-                                </div>
-                                ` : (shouldShowAnalysis ? `
-                                <div class="analysis-section-title">
-                                    <span><i class="fa-solid fa-robot text-primary"></i> AIリスク要約</span>
-                                </div>
-                                <div class="analysis-card">
-                                    <div class="analysis-risk-header">
-                                        <span class="badge ${diffData.riskLevel >= 3 ? 'badge-danger' : diffData.riskLevel >= 2 ? 'badge-warning' : 'badge-success'}">
-                                            ${diffData.riskLevel >= 3 ? 'High' : diffData.riskLevel >= 2 ? 'Medium' : 'Low'}
-                                        </span>
-                                        <span class="analysis-risk-label">AI評価</span>
-                                    </div>
-                                    ${renderAnalysisTextBlocks(diffData.riskReason, '')}
-                                    <div class="analysis-summary-block">${renderAnalysisTextBlocks(diffData.summary, 'AI解析結果がありません')}</div>
-                                </div>
-                                ${(effectiveSelectedDiffData && displayChanges.length > 0) ? (() => {
-                                    return '<div class="analysis-section-title" style="margin-top:16px;"><span><i class="fa-solid fa-list-check text-primary"></i> 検出された重要な変更点</span></div>'
-                                        + displayChanges.map((c) => {
-                                            const _t = String(c.type || '').toUpperCase();
-                                            const _ct = _t === 'ADD' ? '追加' : _t === 'DELETE' ? '削除' : '変更';
-                                            const _old = escapeHtmlText(typeof c.old === 'string' ? c.old : JSON.stringify(c.old || ''));
-                                            const _new = escapeHtmlText(typeof c.new === 'string' ? c.new : JSON.stringify(c.new || ''));
-                                            return '<div class="analysis-card" style="margin-top:8px; padding:12px 14px;">'
-                                                + '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">'
-                                                + '<span style="font-size:12px; font-weight:700; color:#2b2623;">' + escapeHtmlText(c.section || '変更点') + '</span>'
-                                                + '<span style="font-size:11px; background:#f0f0f0; border-radius:4px; padding:2px 8px; color:#555;">' + _ct + '</span>'
-                                                + '</div>'
-                                                + '<div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:' + ((c.impact || c.concern) ? '10px' : '0') + ';">'
-                                                + '<div><div style="font-size:10px; color:#999; margin-bottom:4px;">変更前</div><div style="font-size:12px; background:#fff5f5; border-left:3px solid #fc8181; padding:6px 8px; border-radius:0 4px 4px 0; color:#742a2a; white-space:pre-wrap;">' + (_old || '（該当なし）') + '</div></div>'
-                                                + '<div><div style="font-size:10px; color:#999; margin-bottom:4px;">変更後</div><div style="font-size:12px; background:#f0fff4; border-left:3px solid #68d391; padding:6px 8px; border-radius:0 4px 4px 0; color:#22543d; white-space:pre-wrap;">' + (_new || '（該当なし）') + '</div></div>'
-                                                + '</div>'
-                                                + ((c.impact || c.concern)
-                                                    ? '<div style="font-size:12px; color:#5e544d; line-height:1.6; border-top:1px solid #f0ede8; padding-top:8px;">'
-                                                        + (c.impact ? '<div class="analysis-change-note"><strong><i class="fa-solid fa-scale-balanced" style="color:#1976d2; margin-right:4px;"></i>法的影響</strong>' + renderAnalysisTextBlocks(c.impact) + '</div>' : '')
-                                                        + (c.concern ? '<div class="analysis-change-note"><strong><i class="fa-solid fa-triangle-exclamation" style="color:#f57c00; margin-right:4px;"></i>懸念点</strong>' + renderAnalysisTextBlocks(c.concern) + '</div>' : '')
-                                                        + '</div>'
-                                                    : '')
-                                                + '</div>';
-                                        }).join('');
-                                })() : ''}
-                                ` : (contract.ai_succeeded === false ? `
-                                <div class="analysis-card-error">
-                                    <div style="color:#c53030; font-weight:700; margin-bottom:12px;">
-                                        <i class="fa-solid fa-circle-exclamation" style="margin-right:8px;"></i>AI解析に失敗しました
-                                    </div>
-                                    <div style="font-size:12px; color:#742a2a; margin-bottom:16px; line-height:1.6;">
-                                        ${contract.errorMessage || '書類の内容が複雑すぎるか、AIの一時的なエラーにより解析を完了できませんでした。'}<br>
-                                        <span style="font-weight:700;">解析回数は消費されていません。</span>
-                                    </div>
-                                    <button class="btn-dashboard btn-primary-action" onclick="window.app.confirmReanalyze('${id}')" style="margin:0 auto;">
-                                        <i class="fa-solid fa-rotate-right"></i> もう一度解析を試す
-                                    </button>
-                                </div>
-                                ` : ''))}
-                            </div>
-
-                            ${((hasComparableVersion || hasAIResults || isAnalyzingContract || hasDeadlineInfo) && (isAnalyzingContract || shouldShowAnalysis || hasDeadlineInfo || contract.ai_succeeded === false)) ? `
-                            ${(hasDeadlineInfo) ? (() => {
-                                const fmtDate = (d) => {
-                                    if (!d) return null;
-                                    const dt = new Date(d);
-                                    if (isNaN(dt.getTime())) return d;
-                                    return dt.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' });
-                                };
-                                const daysUntil = (d) => {
-                                    if (!d) return null;
-                                    const dt = new Date(d); if (isNaN(dt.getTime())) return null;
-                                    const today = new Date(); today.setHours(0,0,0,0); dt.setHours(0,0,0,0);
-                                    return Math.round((dt - today) / 86400000);
-                                };
-                                const expiryDays = daysUntil(contract.expiry_date);
-                                const renewalDays = daysUntil(contract.renewal_deadline);
-                                const urgentDays = renewalDays !== null ? renewalDays : expiryDays;
-                                const alertColor = urgentDays !== null && urgentDays <= 7 ? '#e53935' : urgentDays !== null && urgentDays <= 30 ? '#f57c00' : '#2e7d32';
-                                const confBadge = contract.date_confidence === 'high'
-                                    ? '<span style="font-size:10px;background:#e8f5e9;color:#2e7d32;border-radius:4px;padding:2px 6px;margin-left:6px;">AI自動抽出</span>'
-                                    : contract.date_confidence === 'partial'
-                                    ? '<span style="font-size:10px;background:#fff8e1;color:#f57c00;border-radius:4px;padding:2px 6px;margin-left:6px;">一部手動確認推奨</span>'
-                                    : '';
-                                const dayLabel = (days) => days === null ? '' : days === 0 ? '本日' : days < 0 ? '期限切れ' : `あと${days}日`;
-                                return `<div class="deadline-card">
-                                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
-                                        <i class="fa-solid fa-calendar-check" style="color:#1976d2;"></i>
-                                        <span style="font-size:14px;font-weight:700;color:#1976d2;">AIが検出した期限情報</span>
-                                        ${confBadge}
-                                        ${contract.contract_category ? `<span style="font-size:11px;background:#e3f2fd;color:#1976d2;border-radius:4px;padding:2px 7px;margin-left:auto;">${escapeHtmlText(contract.contract_category)}</span>` : ''}
-                                    </div>
-                                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:10px;">
-                                        ${contract.contract_start ? `<div style="background:#fff;border-radius:8px;padding:10px 14px;border:1px solid #e3f2fd;"><div style="font-size:11px;color:#8a7a6a;margin-bottom:2px;">契約開始日</div><div style="font-size:13px;font-weight:600;">${fmtDate(contract.contract_start)}</div></div>` : ''}
-                                        ${contract.expiry_date ? `<div style="background:#fff;border-radius:8px;padding:10px 14px;border:1px solid #e3f2fd;"><div style="font-size:11px;color:#8a7a6a;margin-bottom:2px;">契約終了日</div><div style="font-size:13px;font-weight:600;">${fmtDate(contract.expiry_date)}</div>${expiryDays !== null ? `<div style="font-size:11px;color:${expiryDays <= 30 ? alertColor : '#666'};margin-top:2px;">${dayLabel(expiryDays)}</div>` : ''}</div>` : ''}
-                                        ${contract.renewal_deadline ? `<div style="background:#fff;border-radius:8px;padding:10px 14px;border:1px solid #ffe0b2;"><div style="font-size:11px;color:#8a7a6a;margin-bottom:2px;">更新拒絶期限</div><div style="font-size:13px;font-weight:600;">${fmtDate(contract.renewal_deadline)}</div>${renewalDays !== null ? `<div style="font-size:11px;color:${renewalDays <= 30 ? alertColor : '#666'};margin-top:2px;">${dayLabel(renewalDays)}</div>` : ''}</div>` : ''}
-                                        ${((contract.auto_renewal === true || contract.auto_renewal === false) ? `<div style="background:#fff;border-radius:8px;padding:10px 14px;border:1px solid #e3f2fd;"><div style="font-size:11px;color:#8a7a6a;margin-bottom:2px;">自動更新</div><div style="font-size:13px;font-weight:600;color:${contract.auto_renewal ? '#e53935' : '#2e7d32'}">${contract.auto_renewal ? 'あり（要注意）' : 'なし'}</div></div>` : '')}
-                                    </div>
-                                    <div style="margin-top:10px;text-align:right;">
-                                        <a onclick="window.app.navigate('deadlines')" style="font-size:12px;color:#1976d2;cursor:pointer;"><i class="fa-solid fa-arrow-right" style="margin-right:4px;"></i>期限一覧を見る</a>
-                                    </div>
-                                </div>`;
-                            })() : (hasAIResults && !isAnalyzingContract ? `
-                                <div class="deadline-card" style="border-style: dashed; background: #fafafa; padding: 20px; text-align: center;">
-                                    <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:10px;">
-                                        <i class="fa-solid fa-calendar-xmark" style="color:#999;"></i>
-                                        <span style="font-size:14px;font-weight:700;color:#666;">期限情報はありませんでした</span>
-                                    </div>
-                                    <div style="font-size:12px; color:#999; line-height:1.6;">
-                                        AIによる解析の結果、この書類には有効期限や更新期限に関する具体的な記述は見つかりませんでした。<br>
-                                        手動で期限を設定する場合は、期限管理画面から編集可能です。
-                                    </div>
-                                </div>
-                            ` : '')}
-                            ` : `
-                            <div style="padding:40px 20px; text-align:center; color:#999;">
-                                <i class="fa-solid fa-file-invoice" style="font-size:32px; margin-bottom:16px; display:block; opacity:0.1;"></i>
-                                <div style="font-size:14px; color:#666;">ドキュメントを読み込みました</div>
-                                <div style="font-size:12px; margin-top:8px; line-height:1.6; color:#999;">
-                                    右上の「リスク解析＋期限取得」ボタンをクリックすると、AIがリスクを判定します。<br>
-                                    新しいバージョンをアップロードすれば、差分を自動解析します。
-                                </div>
-                            </div>
-                            `}
-                        </div>
-                        
-                        ${contract.source_type === 'URL' ? `
-                        <div style="margin-top: 24px; padding: 20px; border-top: 1px solid #eee;">
-                            ${['owner', 'pro'].includes(app?.subscription?.plan) ? `
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                                <div style="display:flex; align-items:center; gap:10px;">
-                                    <i class="fa-solid fa-satellite-dish" style="color:var(--accent-gold, #c19b4a); font-size:16px;"></i>
-                                    <span style="font-weight:600; font-size:14px;">定期監視</span>
-                                </div>
-                                <label class="toggle-switch">
-                                    <input type="checkbox" ${contract.monitoring_enabled ? 'checked' : ''} onchange="window.app.toggleMonitoring(${id}, this.checked)">
-                                    <span class="toggle-slider"></span>
-                                </label>
-                            </div>
-                            <p style="font-size:12px; color:#888; margin:0 0 16px; line-height:1.5;">
-                                URLの変更を自動チェックし、差分がある場合のみAI解析を実行します。
-                            </p>
-                            <div style="background:#f8f9fa; border-radius:8px; padding:14px; font-size:13px; margin-bottom:14px;">
-                                <div style="display:flex; justify-content:space-between; margin-bottom:8px; color:#555;">
-                                    <span>最終チェック</span>
-                                    <span style="font-weight:500;">${contract.last_checked_at ? new Date(contract.last_checked_at).toLocaleString('ja-JP') : '—'}</span>
-                                </div>
-                                <div style="display:flex; justify-content:space-between; color:#555;">
-                                    <span>監視頻度</span>
-                                    <span style="font-weight:500;">${contract.stable_count >= 14 ? '3日に1回（安定）' : (contract.stable_count >= 7 ? '2日に1回' : '毎日')}</span>
-                                </div>
-                            </div>
-                            <button class="btn-crawl-check" onclick="window.app.manualCrawl(${id})">
-                                <i class="fa-solid fa-arrows-rotate"></i> 今すぐ更新を確認
-                            </button>
-                            <p style="font-size:11px; color:#aaa; margin:8px 0 0; text-align:center;">※ 変更検出時にAI解析回数を1回消費します</p>
-                            ` : `
-                            <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
-                                <i class="fa-solid fa-satellite-dish" style="color:#ccc; font-size:16px;"></i>
-                                <span style="font-weight:600; font-size:14px; color:#999;">定期監視・Slack／メール通知</span>
-                                <span style="background:#f3f0ea; color:#c5a059; border:1px solid #e8d9b8; border-radius:10px; padding:2px 10px; font-size:11px; font-weight:700;">Pro限定</span>
-                            </div>
-                            <p style="font-size:12px; color:#aaa; margin:0 0 16px; line-height:1.5;">
-                                URLの変更を自動チェックし、差分をSlack・メールで通知します。
-                            </p>
-                            <button class="btn-dashboard" style="width:100%; background:#c5a059; color:#fff; border:none; border-radius:8px; padding:10px; font-size:13px; font-weight:600; cursor:pointer;" onclick="window.app.showProFeatureModal('定期URL監視・Slack／メール通知はProプラン限定の機能です。')">
-                                <i class="fa-solid fa-lock" style="margin-right:6px;"></i> Proプランで使う
-                            </button>
-                            `}
-                        </div>
-                        ` : ''}
-                    </div>
-
-                    <div class="pane">
-                        <div class="pane-header doc-pane-header">
-                            <div class="doc-pane-info">
-                                <span class="doc-pane-label"><i class="fa-solid fa-file-contract"></i> ドキュメント表示</span>
-                                ${contract.original_filename ? `<span class="doc-source-name" title="${contract.original_filename}"><i class="fa-solid fa-file-lines"></i> ${contract.original_filename}</span>` : ''}
-                            </div>
-                            ${app?.can('operate_contract') ? `
-                            <button class="btn-upload-version btn-upload-doc" onclick="window.app.uploadNewVersion('${id}')">
-                                <i class="fa-solid fa-cloud-arrow-up"></i><span class="upload-btn-text"> 新しいバージョンをアップロード</span><span class="upload-btn-short"> アップロード</span>
-                            </button>` : ''}
-                        </div>
-                        <div class="tabs-row">
-                            ${!shouldHideDiffTab ? `<button class="tab-item ${activeTab === 'diff' ? 'active' : ''}" onclick="window.app.setDetailTab('diff')">差分表示</button>` : ''}
-                            <button class="tab-item ${activeTab === 'original' ? 'active' : ''}" onclick="window.app.setDetailTab('original')">原本全文</button>
-                        </div>
-                        <div class="pane-scroll-area ${showPdfViewerInRightPane ? '' : 'document-pane-bg is-frameless'}" style="padding:0; flex:1; display:flex; flex-direction:column; overflow-y:auto;">
-                                ${showPdfViewerInRightPane
-                ? `<div style="width:100%; height:100%; display:flex; flex-direction:column;">
-                        <iframe src="${resolvedPdfPreviewUrl}" style="width:100%; flex:1; border:none; background:#525659; min-height:600px;"></iframe>
-                        <div style="padding:10px; text-align:center; background:#f9f9f9; border-top:1px solid #ddd; font-size:12px;">
-                            <a href="${resolvedPdfPreviewUrl}" target="_blank" class="text-primary"><i class="fa-solid fa-external-link-alt"></i> PDFを別ウィンドウで開く</a>
-                             <span style="margin-left:10px; color:#999;">(Shift+Clickでダウンロード)</span>
-                        </div>
-                   </div>`
-                : `${compareBannerHtml}<div class="document-paper-container is-frameless">
-                      <div class="document-content-full">
-                         <div class="document-top-anchor" aria-hidden="true"></div>
-                                        ${activeTab === 'diff'
-                    ? (() => {
-                        try {
-                            const renderAiChangeCards = () => {
-                                const aiOnlyHtml = normalizeChangesForDisplay(contract.ai_changes || []).map((c, idx) => {
-                                    const escapedOld = escapeHtmlText(c.old || '');
-                                    const escapedNew = escapeHtmlText(c.new || '');
-                                    const typeLabel = c.type === 'ADD' ? '追加' : (c.type === 'DELETE' ? '削除' : '変更');
-                                    return `
-                                    <div style="margin-bottom:18px; border:1px solid #e5e7eb; border-radius:8px; overflow:hidden; background:#fff;">
-                                        <div style="padding:10px 14px; background:#f8fafc; border-bottom:1px solid #e5e7eb; font-size:12px; font-weight:600;">
-                                            ${c.section || `変更 ${idx + 1}`} <span style="font-weight:normal; color:#667085; margin-left:8px;">(${typeLabel})</span>
-                                        </div>
-                                        <div class="diff-container" style="height:auto; min-height:90px;">
-                                            <div class="diff-pane diff-left"><span class="diff-del">${escapedOld || '（変更前なし）'}</span></div>
-                                            <div class="diff-pane diff-right"><span class="diff-add">${escapedNew || '（変更後なし）'}</span></div>
-                                        </div>
-                                    </div>
-                                `;
-                                }).join('');
-                                return `<div class="document-content-diff-wrap">${aiOnlyHtml}</div>`;
-                            };
-
-                            const normalizePdfDisplayText = (text) => {
-                                const src = String(text || '');
-                                if (!src) return '';
-                                const lines = src.split(/\r?\n/);
-                                const out = [];
-                                const articleHeaderPattern = /^第\s*[0-9０-９一二三四五六七八九十百千〇零]+\s*条(?:\s+.*)?$/;
-                                const listLinePattern = /^([0-9０-９]+[\.．\)]|[・●○■□\-]|第\s*[0-9０-９一二三四五六七八九十百千〇零]+\s*条)/;
-                                const shortTailPattern = /^[\u3040-\u30ff\u3400-\u9fffA-Za-z0-9]{1,6}$/;
-
-                                for (let i = 0; i < lines.length; i += 1) {
-                                    const line = String(lines[i] || '').trim();
-                                    if (!line) {
-                                        if (out.length > 0 && out[out.length - 1] !== '') out.push('');
-                                        continue;
-                                    }
-                                    const prev = out.length > 0 ? out[out.length - 1] : '';
-                                    const prevTrim = String(prev || '').trim();
-                                    const isList = listLinePattern.test(line);
-                                    const isLikelyHeaderTail = shortTailPattern.test(line) && articleHeaderPattern.test(prevTrim);
-                                    const isLikelyWrappedContinuation = !isList && prevTrim && prevTrim !== '' && /[\u3040-\u30ff\u3400-\u9fffA-Za-z0-9）)】]$/.test(prevTrim);
-
-                                    if (out.length === 0 || prevTrim === '' || isList) {
-                                        out.push(line);
-                                    } else if (isLikelyHeaderTail || isLikelyWrappedContinuation) {
-                                        out[out.length - 1] = `${prevTrim}${line}`;
-                                    } else {
-                                        out.push(line);
-                                    }
-                                }
-                                return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
-                            };
-
-                            const historyEntries = Array.isArray(contract.history) ? contract.history : [];
-                            const currentVersion = displayTargetDoc?.content || selectedTargetDoc?.content || contract.original_content || '';
-                            const isWordSource = isWordDocumentFilename(contract.original_filename);
-                            const currentVersionText = contentToComparableText(currentVersion);
-
-                            const previousVersion = displaySourceDoc?.content || selectedSourceDoc?.content || comparisonContext?.historyItem?.content || (() => {
-                                for (let i = historyEntries.length - 1; i >= 0; i -= 1) {
-                                    const candidate = historyEntries[i];
-                                    if (contentToComparableText(candidate?.content) !== currentVersionText) {
-                                        return candidate?.content || null;
-                                    }
-                                }
-                                return historyEntries.length > 0 ? historyEntries[historyEntries.length - 1].content : null;
-                            })();
-
-                            if (!previousVersion) {
-                                if (contract.ai_changes && contract.ai_changes.length > 0) {
-                                    return renderAiChangeCards();
-                                }
-                                const initialDisplayText = (isPdfSource && typeof contract.pdf_raw_text === 'string' && contract.pdf_raw_text.trim())
-                                    ? contract.pdf_raw_text
-                                    : (isPdfSource ? normalizePdfDisplayText(currentVersionText) : currentVersionText);
-                                return `
-                                <div class="document-content-diff-wrap" style="padding: 8px 0;">
-                                    <div style="white-space:pre-wrap; line-height:1.9;">${escapeHtmlText(initialDisplayText)}</div>
-                                </div>
-                            `;
-                            }
-
-                            const previousVersionText = contentToComparableText(previousVersion);
-                            if (previousVersionText === currentVersionText) {
-                                return `
-                                <div class="text-muted text-center" style="padding:24px;">比較可能な差分がありません（旧版と同一内容です）</div>
-                            `;
-                            }
-
-                            if (isStructuredDocumentContent(previousVersion) || isStructuredDocumentContent(currentVersion)) {
-                                const previousLabel = displaySourceDoc
-                                    ? buildComparisonLabel(displaySourceDoc.document_name, displaySourceDoc.uploaded_at, '比較元資料')
-                                    : (comparisonContext?.previousLabel || buildComparisonLabel(contract.original_filename || contract.name, contract.last_updated_at, '比較元資料'));
-                                const currentLabel = displayTargetDoc
-                                    ? buildComparisonLabel(displayTargetDoc.document_name, displayTargetDoc.uploaded_at, '比較先資料')
-                                    : (comparisonContext?.currentLabel || buildComparisonLabel(contract.original_filename || contract.name, contract.last_analyzed_at || contract.last_updated_at, '比較先資料'));
-                                return renderStructuredDiffView(previousVersion, currentVersion, {
-                                    idPrefix: `diff-${id}`,
-                                    previousLabel,
-                                    currentLabel
-                                });
-                            }
-
-                            const renderDualFullDiff = () => {
-                                const lhsText = isPdfSource ? normalizePdfDisplayText(previousVersionText) : previousVersionText;
-                                const rhsText = isPdfSource ? normalizePdfDisplayText(currentVersionText) : currentVersionText;
-                                if (!window.Diff || typeof window.Diff.diffWordsWithSpace !== 'function') {
-                                    return `
-                                        <div class="document-content-diff-wrap">
-                                            <div class="dual-full-diff-grid">
-                                                <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px;">
-                                                    <div style="font-size:12px; font-weight:700; color:#b42318; margin-bottom:8px;">変更前（旧版全文）</div>
-                                                    <div style="white-space:pre-wrap; line-height:1.9;">${escapeHtmlText(lhsText)}</div>
-                                                </div>
-                                                <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px;">
-                                                    <div style="font-size:12px; font-weight:700; color:#027a48; margin-bottom:8px;">変更後（新版本文）</div>
-                                                    <div style="white-space:pre-wrap; line-height:1.9;">${escapeHtmlText(rhsText)}</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    `;
-                                }
-                                const chunks = window.Diff.diffWordsWithSpace(lhsText, rhsText);
-                                let oldHtml = '';
-                                let newHtml = '';
-                                for (const chunk of chunks) {
-                                    const safe = escapeHtmlText(chunk.value);
-                                    if (chunk.added) {
-                                        newHtml += `<span class="diff-inline-add">${safe}</span>`;
-                                    } else if (chunk.removed) {
-                                        oldHtml += `<span class="diff-inline-del">${safe}</span>`;
-                                    } else {
-                                        oldHtml += safe;
-                                        newHtml += safe;
-                                    }
-                                }
-                                return `
-                                <div class="document-content-diff-wrap">
-                                    <div class="dual-full-diff-grid">
-                                        <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px;">
-                                            <div style="font-size:12px; font-weight:700; color:#b42318; margin-bottom:8px;">変更前（旧版全文）</div>
-                                            <div style="white-space:pre-wrap; line-height:1.9;">${oldHtml}</div>
-                                        </div>
-                                        <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px;">
-                                            <div style="font-size:12px; font-weight:700; color:#027a48; margin-bottom:8px;">変更後（新版本文）</div>
-                                            <div style="white-space:pre-wrap; line-height:1.9;">${newHtml}</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            `;
-                            };
-
-                            if (isPdfSource || isWordSource) {
-                                return renderDualFullDiff();
-                            }
-
-                            const diff = (window.Diff && typeof window.Diff.diffChars === 'function')
-                                ? window.Diff.diffChars(previousVersionText, currentVersionText)
-                                : [{ value: currentVersionText }];
-
-                            // HTML生成
-                            let diffHtml = diff.map(part => {
-                                const colorClass = part.added ? 'diff-inline-add' :
-                                    part.removed ? 'diff-inline-del' : '';
-
-                                // エスケープ処理（XSS対策）
-                                const escapedValue = escapeHtmlText(part.value);
-
-                                return colorClass ? `<span class="${colorClass}">${escapedValue}</span>` : escapedValue;
-                            }).join('');
-
-                            return `<div class="document-content-diff-wrap">${diffHtml}</div>`;
-                        } catch (documentRenderError) {
-                            console.error('Document comparison render error:', documentRenderError);
-                            const fallbackPreviousText = contentToComparableText(
-                                displaySourceDoc?.content || selectedSourceDoc?.content || comparisonContext?.historyItem?.content || ''
-                            );
-                            const fallbackCurrentText = contentToComparableText(
-                                displayTargetDoc?.content || selectedTargetDoc?.content || contract.original_content || ''
-                            );
-                            const fallbackPreviousLabel = displaySourceDoc
-                                ? buildComparisonLabel(displaySourceDoc.document_name, displaySourceDoc.uploaded_at, '比較元資料')
-                                : (comparisonContext?.previousLabel || '比較元資料');
-                            const fallbackCurrentLabel = displayTargetDoc
-                                ? buildComparisonLabel(displayTargetDoc.document_name, displayTargetDoc.uploaded_at, '比較先資料')
-                                : (comparisonContext?.currentLabel || '比較先資料');
-                            return `
-                                <div class="document-content-diff-wrap">
-                                    <div class="dual-full-diff-grid">
-                                        <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px;">
-                                            <div style="font-size:12px; font-weight:700; color:#667085; margin-bottom:8px;">${escapeHtmlText(fallbackPreviousLabel)}</div>
-                                            <div style="white-space:pre-wrap; line-height:1.9;">${escapeHtmlText(fallbackPreviousText || '比較元データなし')}</div>
-                                        </div>
-                                        <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px;">
-                                            <div style="font-size:12px; font-weight:700; color:#667085; margin-bottom:8px;">${escapeHtmlText(fallbackCurrentLabel)}</div>
-                                            <div style="white-space:pre-wrap; line-height:1.9;">${escapeHtmlText(fallbackCurrentText || '比較先データなし')}</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            `;
-                        }
-                    })()
-                    : (contract.original_content
-                        ? `<div class="is-structured">${renderStructuredView(contract.original_content, `orig-${id}`)}</div>`
-                        : '<div class="text-center text-muted" style="padding:40px;">原本データがありません</div>')
-                }
-                    </div>
-                </div>`
-            }
             </div>
-            </div>
-        </div>
         `;
     },
-
-    // 4. History is lazy-loaded from js/modules/history.js.
     history: null,
 
     // 5. Team is lazy-loaded from js/modules/team.js.
@@ -2227,10 +1916,15 @@ const Views = {
         const activeTab = window.app.mcpActiveTab || 'cloud';
 
         return `
-            <div class="plan-view-container">
-                <div class="page-title" style="display:flex; align-items:center; gap:12px;">
-                    <span>MCP連携 (AIエージェント)</span>
-                </div>
+            <style>
+                .mcp-container { width: 960px; margin: 0 auto; position: relative; display: block; min-width: 960px; }
+                .mcp-grid { display: grid; grid-template-columns: 596px 340px; gap: 24px; align-items: start; }
+                .mcp-tab-item.active { border-bottom-color: #0b2d62 !important; color: #0f172a !important; background: #fff !important; font-weight: 700 !important; }
+                pre { max-width: 100%; overflow-x: auto; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; font-size: 11px; line-height: 1.4; white-space: pre-wrap; word-break: break-all; }
+            </style>
+            <div class="page-title" style="display:flex; align-items:center; gap:12px;">
+                <span>MCP連携 (AIエージェント)</span>
+            </div>
             
             <div class="mcp-container">
                 <div class="mcp-grid">
@@ -2286,13 +1980,13 @@ const Views = {
                 </div>
 
                 <div class="mcp-side-col">
-                    <article class="dashboard-card" style="background:#1e293b; color:#fff; border-radius:16px; padding:24px; border:none; box-shadow:0 12px 30px rgba(15,23,42,0.15);">
-                        <h4 style="margin:0 0 16px; font-size:15px; font-weight:800; color:#fff; display:flex; align-items:center; gap:8px;">
-                            <i class="fa-solid fa-key" style="color:#c19b4a;"></i> 連携用APIキー
+                    <article class="dashboard-card" style="background:#f3f7fc; color:#0f172a; border-radius:16px; padding:24px; border:1px solid #dbe7f5; box-shadow:0 12px 30px rgba(15,23,42,0.08);">
+                        <h4 style="margin:0 0 16px; font-size:15px; font-weight:800; color:#0f172a; display:flex; align-items:center; gap:8px;">
+                            <i class="fa-solid fa-key" style="color:#0b2d62;"></i> 連携用APIキー
                         </h4>
                         <div id="mcp-key-card-inner">
                             <div style="text-align:center; padding:20px;">
-                                <i class="fa-solid fa-spinner fa-spin" style="color:#c19b4a;"></i>
+                                <i class="fa-solid fa-spinner fa-spin" style="color:#0b2d62;"></i>
                             </div>
                         </div>
                     </article>
@@ -2304,8 +1998,8 @@ const Views = {
                         </p>
                     </div>
                 </div>
+                </div>
             </div>
-        </div>
         `;
     },
     mcpSetupCard: (activeTab) => {
@@ -2346,7 +2040,7 @@ const Views = {
                             <div style="font-weight:700; font-size:14px; margin-bottom:8px;">連携用URLをコピー</div>
                             <div style="position:relative;">
                                 <input type="text" value="${mcpUrl}" readonly style="width:100%; padding:10px 40px 10px 12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; font-size:12px; font-family:monospace; color:#475569;" id="mcp-claude-url">
-                                <button onclick="navigator.clipboard.writeText('${mcpUrl}'); Notify.success('URLをコピーしました')" style="position:absolute; right:8px; top:50%; transform:translateY(-50%); background:none; border:none; color:#c19b4a; cursor:pointer; padding:6px;">
+                                <button onclick="navigator.clipboard.writeText('${mcpUrl}'); Notify.success('URLをコピーしました')" style="position:absolute; right:8px; top:50%; transform:translateY(-50%); background:none; border:none; color:#0b2d62; cursor:pointer; padding:6px;">
                                     <i class="fa-solid fa-copy"></i>
                                 </button>
                             </div>
@@ -2393,13 +2087,92 @@ const Views = {
                 <h3 style="margin:0 0 16px; font-size:17px; font-weight:800; color:#0f172a;">Cursor / VS Code</h3>
                 <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding:24px; border-radius:12px;">
                     <div style="font-size:11px; font-weight:700; color:#64748b; margin-bottom:4px; text-transform:uppercase;">Endpoint (SSE)</div>
-                    <code style="display:block; word-break:break-all; font-size:12px; color:#c19b4a; font-family:monospace; background:#fff; border:1px solid #e2e8f0; padding:12px; border-radius:8px;">${mcpUrl}</code>
+                    <code style="display:block; word-break:break-all; font-size:12px; color:#0b2d62; font-family:monospace; background:#fff; border:1px solid #e2e8f0; padding:12px; border-radius:8px;">${mcpUrl}</code>
                     <button class="btn-dashboard" style="margin-top:12px; width:100%; font-size:12px; padding:10px; font-weight:700;" onclick="navigator.clipboard.writeText('${mcpUrl}'); Notify.success('URLをコピーしました')">
                         <i class="fa-solid fa-copy"></i> URLをコピーする
                     </button>
                 </div>
             `;
         }
+    },
+
+    /**
+     * Premium Analysis Results View (Dashboard v2 Style)
+     * Renders AI metadata, risk summary, and key change cards
+     */
+    analysisResults: (contract, analysisData) => {
+        if (!analysisData) return '<div class="text-center text-muted" style="padding:40px;">解析データがありません</div>';
+
+        const esc = escapeHtmlText;
+        const risks = (analysisData.changes || []).filter(c => c.impact || c.concern);
+        const topRisks = risks.slice(0, 3);
+        const riskTone = analysisData.riskLevel >= 3 ? 'danger' : (analysisData.riskLevel >= 2 ? 'warning' : 'success');
+        const riskLabel = analysisData.riskLevel >= 3 ? 'High Risk' : (analysisData.riskLevel >= 2 ? 'Medium Risk' : 'Low Risk');
+
+        const metaItems = [
+            { label: '契約当事者', value: analysisData.parties || contract.parties || '未検出', icon: 'fa-users' },
+            { label: '契約金額', value: analysisData.contract_amount || contract.contract_amount || '未検出', icon: 'fa-coins' },
+            { label: '契約種類', value: analysisData.contract_category || contract.contract_category || '未検出', icon: 'fa-tags' },
+            { label: '終了日/期限', value: analysisData.expiry_date ? formatDisplayTimestamp(analysisData.expiry_date).split(' ')[0] : (contract.expiry_date ? formatDisplayTimestamp(contract.expiry_date).split(' ')[0] : '未設定'), icon: 'fa-calendar-day' }
+        ];
+
+        return `
+            <div class="analysis-results-container" style="padding:24px; background:#f8fafc; min-height:100%;">
+                <!-- Header Stats -->
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:16px; margin-bottom:24px;">
+                    ${metaItems.map(item => `
+                        <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:16px; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+                            <div style="display:flex; align-items:center; gap:10px; color:#64748b; font-size:11px; font-weight:700; text-transform:uppercase; margin-bottom:8px;">
+                                <i class="fa-solid ${item.icon}" style="color:#0b2d62; opacity:0.7;"></i> ${item.label}
+                            </div>
+                            <div style="font-size:14px; font-weight:700; color:#0f172a; word-break:break-all;">${esc(item.value)}</div>
+                        </div>
+                    `).join('')}
+                </div>
+
+                <!-- Risk Banner -->
+                <div style="background:#fff; border:1px solid #e2e8f0; border-radius:16px; padding:24px; margin-bottom:24px; border-left:4px solid var(--accent-${riskTone}); box-shadow:0 4px 6px -1px rgba(0,0,0,0.05);">
+                    <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+                        <span class="badge badge-${riskTone}" style="padding:6px 12px; border-radius:8px; font-weight:800; font-size:12px;">${riskLabel}</span>
+                        <h3 style="margin:0; font-size:16px; font-weight:800; color:#0f172a;">AIによる総合リスク評価</h3>
+                    </div>
+                    <div style="font-size:14px; line-height:1.8; color:#334155; white-space:pre-wrap;">${esc(analysisData.summary || '解析結果がありません')}</div>
+                </div>
+
+                <!-- Key Findings -->
+                ${topRisks.length > 0 ? `
+                    <h4 style="margin:0 0 16px; font-size:13px; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:0.05em;">AIが検出した主な修正推奨事項</h4>
+                    <div style="display:grid; grid-template-columns:1fr; gap:16px;">
+                        ${topRisks.map(c => `
+                            <article style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:16px; transition:transform 0.2s; cursor:pointer;" onclick="window.app.setDetailTab('diff')">
+                                <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:12px;">
+                                    <span style="font-size:12px; font-weight:800; color:#0f172a; background:#f1f5f9; padding:4px 10px; border-radius:6px;">${esc(c.section || '重要条項')}</span>
+                                    <span style="font-size:11px; color:#ef4444; font-weight:700;"><i class="fa-solid fa-triangle-exclamation"></i> リスクあり</span>
+                                </div>
+                                <div style="font-size:13px; color:#475569; line-height:1.6; margin-bottom:12px;">
+                                    <strong>法的影響:</strong> ${esc(c.impact || '影響あり')}
+                                </div>
+                                <div style="font-size:13px; color:#b91c1c; background:#fef2f2; padding:10px; border-radius:8px; border-left:3px solid #ef4444;">
+                                    <strong>懸念点:</strong> ${esc(c.concern || '修正を推奨します')}
+                                </div>
+                            </article>
+                        `).join('')}
+                    </div>
+                ` : `
+                    <div style="text-align:center; padding:32px; background:#fff; border:1px solid #e2e8f0; border-radius:12px; color:#64748b;">
+                        <i class="fa-solid fa-circle-check" style="font-size:24px; color:#10b981; margin-bottom:12px;"></i>
+                        <p style="margin:0; font-size:14px;">重大な修正推奨事項は見つかりませんでした。</p>
+                    </div>
+                `}
+
+                <!-- Full List Link -->
+                <div style="margin-top:24px; text-align:center;">
+                    <button class="btn-dashboard" onclick="window.app.setDetailTab('diff')" style="background:#fff; color:#0b2d62; border:1px solid #cbd5e1; padding:10px 24px; font-weight:700; border-radius:10px; display:inline-flex; align-items:center; gap:8px;">
+                        すべての変更・リスクを確認する <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </div>
+            </div>
+        `;
     }
 };
 
@@ -2411,13 +2184,230 @@ class RegistrationFlow {
         this.modalBody = document.getElementById('modal-body');
         this.modalTitle = document.getElementById('modal-title');
         this.fileInput = document.getElementById('reg-file-input');
-        this.compareFileInput = document.getElementById('reg-compare-file-input');
         this.currentStep = 1;
         this.tempData = {};
-        this.compareFile = null;
     }
 
     init() {
+        // 最終版プレミアム・プログレスモーダルスタイル
+        if (!document.getElementById('ds-progress-styles')) {
+            const style = document.createElement('style');
+            style.id = 'ds-progress-styles';
+            style.textContent = `
+                /* 解析中全画面オーバーレイ（すりガラス＋オーロラグラデーション） */
+                .ds-analysis-overlay {
+                    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                    background: rgba(255, 255, 255, 0.4);
+                    backdrop-filter: blur(5px);
+                    -webkit-backdrop-filter: blur(5px);
+                    z-index: 10005;
+                    display: flex; align-items: center; justify-content: center;
+                    overflow: hidden;
+                    animation: dsFadeIn 0.5s ease;
+                }
+                @keyframes dsFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+                /* 背景の動くグラデーション（ゆったりした波・オーロラ効果） */
+                .ds-analysis-overlay::before, .ds-analysis-overlay::after {
+                    content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+                    pointer-events: none; opacity: 0.6;
+                }
+                .ds-analysis-overlay::before {
+                    background: radial-gradient(ellipse at 30% 30%, rgba(59, 130, 246, 0.12) 0%, transparent 60%);
+                    animation: dsWave1 40s ease-in-out infinite alternate;
+                }
+                .ds-analysis-overlay::after {
+                    background: radial-gradient(ellipse at 70% 70%, rgba(16, 185, 129, 0.08) 0%, transparent 60%);
+                    animation: dsWave2 50s ease-in-out infinite alternate-reverse;
+                }
+
+                @keyframes dsWave1 {
+                    0% { transform: translate(0, 0) scale(1) rotate(0deg); }
+                    33% { transform: translate(5%, 10%) scale(1.1) rotate(5deg); }
+                    66% { transform: translate(-5%, 5%) scale(0.9) rotate(-5deg); }
+                    100% { transform: translate(0, 0) scale(1) rotate(0deg); }
+                }
+                @keyframes dsWave2 {
+                    0% { transform: translate(0, 0) scale(1) rotate(0deg); }
+                    33% { transform: translate(-8%, -5%) scale(0.95) rotate(-8deg); }
+                    66% { transform: translate(8%, -10%) scale(1.05) rotate(8deg); }
+                    100% { transform: translate(0, 0) scale(1) rotate(0deg); }
+                }
+
+                .ds-progress-modal {
+                    position: relative; /* オーバーレイ内で中央配置されるため relative */
+                    background: #ffffff; width: 900px; border-radius: 24px; 
+                    box-shadow: 0 40px 120px rgba(0,0,0,0.4); 
+                    padding: 0; font-family: 'Inter', 'Noto Sans JP', sans-serif;
+                    overflow: hidden; animation: dsModalPop 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+                    border: 1px solid rgba(255,255,255,0.1);
+                    z-index: 10006;
+                }
+                @keyframes dsModalPop { from { opacity: 0; transform: scale(0.95) translateY(20px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+
+                .ds-modal-inner { padding: 48px; }
+                .ds-modal-close { position: absolute; top: 24px; right: 24px; font-size: 20px; color: #94a3b8; cursor: pointer; transition: color 0.2s; }
+                .ds-modal-close:hover { color: #475569; }
+
+                /* 上部エリア（イラスト＆ヘッダー） */
+                .ds-modal-top { display: flex; align-items: center; gap: 40px; margin-bottom: 40px; }
+                .ds-top-visual { position: relative; width: 140px; height: 140px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+                
+                /* 解析中：ドキュメントアニメーション（よりリアルに） */
+                .ds-visual-analyzing { position: relative; }
+                .ds-visual-analyzing::before {
+                    content: ''; position: absolute; width: 180px; height: 180px;
+                    background: radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%);
+                    animation: dsGlow 4s ease-in-out infinite;
+                }
+                @keyframes dsGlow { 0%, 100% { opacity: 0.5; transform: scale(1); } 50% { opacity: 1; transform: scale(1.1); } }
+
+                .ds-doc-box { 
+                    width: 80px; height: 104px; background: #fff; 
+                    border-radius: 8px; position: relative; 
+                    box-shadow: 
+                        0 15px 35px rgba(0,0,0,0.05),
+                        0 5px 15px rgba(0,0,0,0.03);
+                    overflow: hidden;
+                    animation: dsBreathe 4s ease-in-out infinite;
+                    padding: 24px 16px; display: flex; flex-direction: column; gap: 10px;
+                    border: 1px solid #f1f5f9;
+                }
+                /* ブリージング（呼吸）エフェクト */
+                @keyframes dsBreathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.03); } }
+
+                /* スキャンライン */
+                .ds-doc-box::after {
+                    content: ''; position: absolute; top: -50%; left: 0; width: 100%; height: 40%;
+                    background: linear-gradient(to bottom, transparent, rgba(59, 130, 246, 0.06), transparent);
+                    animation: dsScan 3s linear infinite;
+                    z-index: 1;
+                }
+                @keyframes dsScan { 0% { top: -50%; } 100% { top: 120%; } }
+
+                .ds-visual-line { 
+                    height: 4px; background: #f1f5f9; border-radius: 4px; width: 100%; 
+                    background: #f1f5f9;
+                }
+                .ds-visual-line:nth-child(1) { width: 50%; height: 6px; background: #e2e8f0; margin-bottom: 4px; }
+                .ds-visual-line:nth-child(2) { width: 90%; }
+                .ds-visual-line:nth-child(3) { width: 85%; }
+                .ds-visual-line:nth-child(4) { width: 70%; }
+                
+                /* 完了：チェックアニメーション */
+                .ds-visual-complete { width: 80px; height: 80px; background: #10b981; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 40px; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.3); animation: dsPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
+                @keyframes dsPop { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+                .ds-top-content h3 { margin: 0 0 8px; font-size: 28px; font-weight: 800; color: #0f172a; letter-spacing: -0.02em; }
+                .ds-top-content p { margin: 0; font-size: 15px; color: #64748b; }
+
+                /* 6ステップ・プログレスバー */
+                .ds-steps-container { display: flex; justify-content: space-between; position: relative; margin-bottom: 48px; padding: 0 10px; }
+                .ds-steps-line { position: absolute; top: 20px; left: 50px; right: 50px; height: 2px; background: #f1f5f9; z-index: 0; }
+                .ds-steps-line-active { position: absolute; top: 20px; left: 50px; height: 2px; background: #10b981; z-index: 1; transition: width 0.8s ease; width: 0; }
+                
+                .ds-step-item { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 12px; width: 120px; }
+                .ds-step-circle { 
+                    width: 40px; height: 40px; border-radius: 50%; background: #fff; border: 2px solid #f1f5f9;
+                    display: flex; align-items: center; justify-content: center; font-size: 18px; color: #cbd5e1;
+                    transition: all 0.4s ease;
+                }
+                .ds-step-info { text-align: center; }
+                .ds-step-name { font-size: 12px; font-weight: 700; color: #64748b; white-space: nowrap; margin-bottom: 4px; }
+                .ds-step-status { font-size: 11px; font-weight: 600; color: #94a3b8; }
+
+                .ds-step-item.active .ds-step-circle { background: #3b82f6; border-color: #3b82f6; color: #fff; box-shadow: 0 0 0 5px rgba(59, 130, 246, 0.1); transform: scale(1.1); }
+                .ds-step-item.active .ds-step-name { color: #1e40af; }
+                .ds-step-item.active .ds-step-status { color: #3b82f6; }
+                
+                .ds-step-item.completed .ds-step-circle { background: #fff; border-color: #10b981; color: #10b981; }
+                .ds-step-item.completed .ds-step-name { color: #334155; }
+                .ds-step-item.completed .ds-step-status { color: #10b981; }
+
+                /* ステータスカード（解析中） */
+                .ds-status-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px 32px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; }
+                .ds-status-main { display: flex; align-items: center; gap: 24px; }
+                
+                /* リアル・スピナー（12ドット残像） */
+                .ds-status-spinner { position: relative; width: 44px; height: 44px; }
+                .ds-dot-spinner { width: 100%; height: 100%; position: relative; }
+                .ds-dot-spinner div { 
+                    position: absolute; width: 100%; height: 100%;
+                    transform-origin: center center;
+                    animation: dsFadeSpinner 1.2s linear infinite;
+                }
+                .ds-dot-spinner div:after {
+                    content: " "; display: block; position: absolute;
+                    top: 0; left: 19px; width: 6px; height: 6px;
+                    border-radius: 50%; background: #3b82f6;
+                }
+                .ds-dot-spinner div:nth-child(1) { transform: rotate(0deg); }
+                .ds-dot-spinner div:nth-child(2) { transform: rotate(30deg); }
+                .ds-dot-spinner div:nth-child(3) { transform: rotate(60deg); }
+                .ds-dot-spinner div:nth-child(4) { transform: rotate(90deg); }
+                .ds-dot-spinner div:nth-child(5) { transform: rotate(120deg); }
+                .ds-dot-spinner div:nth-child(6) { transform: rotate(150deg); }
+                .ds-dot-spinner div:nth-child(7) { transform: rotate(180deg); }
+                .ds-dot-spinner div:nth-child(8) { transform: rotate(210deg); }
+                .ds-dot-spinner div:nth-child(9) { transform: rotate(240deg); }
+                .ds-dot-spinner div:nth-child(10) { transform: rotate(270deg); }
+                .ds-dot-spinner div:nth-child(11) { transform: rotate(300deg); }
+                .ds-dot-spinner div:nth-child(12) { transform: rotate(330deg); }
+                
+                .ds-dot-spinner div:nth-child(1) { animation-delay: -1.1s; }
+                .ds-dot-spinner div:nth-child(2) { animation-delay: -1.0s; }
+                .ds-dot-spinner div:nth-child(3) { animation-delay: -0.9s; }
+                .ds-dot-spinner div:nth-child(4) { animation-delay: -0.8s; }
+                .ds-dot-spinner div:nth-child(5) { animation-delay: -0.7s; }
+                .ds-dot-spinner div:nth-child(6) { animation-delay: -0.6s; }
+                .ds-dot-spinner div:nth-child(7) { animation-delay: -0.5s; }
+                .ds-dot-spinner div:nth-child(8) { animation-delay: -0.4s; }
+                .ds-dot-spinner div:nth-child(9) { animation-delay: -0.3s; }
+                .ds-dot-spinner div:nth-child(10) { animation-delay: -0.2s; }
+                .ds-dot-spinner div:nth-child(11) { animation-delay: -0.1s; }
+                .ds-dot-spinner div:nth-child(12) { animation-delay: 0s; }
+                
+                @keyframes dsFadeSpinner { 0% { opacity: 1; } 100% { opacity: 0.1; } }
+
+                .ds-status-text h4 { margin: 0 0 4px; font-size: 16px; font-weight: 700; color: #1e293b; }
+                .ds-status-text p { margin: 0; font-size: 13px; color: #64748b; }
+
+                /* サマリーグリッド（完了後） */
+                .ds-summary-section { margin-bottom: 32px; }
+                .ds-summary-title { font-size: 16px; font-weight: 800; color: #10b981; margin-bottom: 20px; }
+                .ds-summary-grid { display: grid; grid-template-columns: minmax(132px, .9fr) minmax(172px, 1.08fr) minmax(188px, 1.18fr) minmax(132px, .9fr); gap: 12px; margin-bottom: 16px; }
+                .ds-summary-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; display: flex; align-items: center; gap: 10px; min-width: 0; }
+                .ds-card-icon { width: 36px; height: 36px; flex: 0 0 36px; border-radius: 10px; background: #f8fafc; color: #3b82f6; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+                .ds-card-info { min-width: 0; flex: 1; }
+                .ds-card-info div:first-child { font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 2px; }
+                .ds-card-info div:last-child { font-size: 12px; font-weight: 700; color: #334155; line-height: 1.35; word-break: keep-all; overflow-wrap: normal; }
+                .ds-card-info span { color: #3b82f6; font-size: 14px; margin: 0 2px; }
+                .ds-card-value-nowrap { white-space: nowrap; display: inline-flex; align-items: baseline; gap: 1px; max-width: 100%; }
+                .ds-card-value-nowrap span { flex: 0 0 auto; margin: 0; }
+                .ds-card-value-nowrap em { font-style: normal; flex: 0 0 auto; }
+                @media (max-width: 760px) {
+                    .ds-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+                }
+
+                /* 完了通知ボックス */
+                .ds-success-box { background: #f0fdf4; border: 1px solid #bcf0da; border-radius: 12px; padding: 20px; display: flex; align-items: flex-start; gap: 16px; margin-top: 24px; }
+                .ds-success-icon { font-size: 24px; color: #10b981; margin-top: 2px; }
+                .ds-success-content h4 { margin: 0 0 4px; font-size: 15px; font-weight: 800; color: #065f46; }
+                .ds-success-content p { margin: 0; font-size: 13px; color: #047857; line-height: 1.5; }
+
+                /* フッター */
+                .ds-modal-footer { background: #fcfdfe; border-top: 1px solid #f1f5f9; padding: 24px 48px; display: flex; align-items: center; justify-content: center; }
+                .ds-security-note { font-size: 12px; color: #94a3b8; display: flex; align-items: center; gap: 8px; }
+                
+                .ds-footer-actions { width: 100%; display: flex; align-items: center; justify-content: space-between; }
+                .ds-btn-outline { padding: 12px 24px; border-radius: 10px; border: 1px solid #e2e8f0; background: #fff; color: #475569; font-weight: 700; font-size: 14px; cursor: pointer; transition: all 0.2s; }
+                .ds-btn-outline:hover { background: #f8fafc; border-color: #cbd5e1; }
+                .ds-btn-primary { padding: 12px 32px; border-radius: 10px; border: none; background: #0b2d62; color: #fff; font-weight: 700; font-size: 14px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 12px; }
+                .ds-btn-primary:hover { background: #1a3a6e; transform: translateY(-1px); box-shadow: 0 4px 15px rgba(11, 45, 98, 0.2); }
+            `;
+            document.head.appendChild(style);
+        }
+
         const openBtn = document.getElementById('open-registration-btn');
         const closeBtn = document.getElementById('close-registration-modal');
 
@@ -2431,542 +2421,844 @@ class RegistrationFlow {
         }
 
         if (this.fileInput) {
-            this.fileInput.onchange = (e) => this.handleFileSelect(e.target.files[0]);
-        }
-
-        if (this.compareFileInput) {
-            this.compareFileInput.onchange = (e) => this.handleCompareFileSelect(e.target.files[0]);
+            this.fileInput.onchange = (e) => {
+                if (e.target.files.length > 0) this.handleFileSelect(e.target.files[0]);
+            };
         }
     }
 
-    open() {
+    open(options = {}) {
         if (!this.app?.can('operate_contract')) {
             Notify.warning('閲覧のみの権限では新規登録できません');
             return;
         }
         this.currentStep = 1;
         this.tempData = {};
-
-        // 先にレンダリング
-        this.renderStep();
-
-        if (this.modal) {
-            this.modal.classList.remove('closing');
-            this.modal.style.display = 'flex';
-            // inline transform/transition をリセットして CSS 側に委ねる
-            const content = this.modal.querySelector('.modal-content');
-            if (content) { content.style.transform = ''; content.style.transition = ''; }
-        }
-
-        // スマホならスワイプで閉じれるように（重複バインド防止）
-        if (window.innerWidth <= 900) {
-            this.setupSwipeToClose();
-        }
-
-        // Use double rAF for reliable transition start
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                if (this.modal) this.modal.classList.add('active');
-            });
-        });
+        this.pendingChoice = null;
+        if (this.modal) this.modal.classList.add('active');
+        this.showUploadActionModal();
     }
 
     close() {
-        if (!this.modal) return;
-        const content = this.modal.querySelector('.modal-content');
-
-        if (window.innerWidth <= 900) {
-            // Mobile: Bottom Sheet Slide-down with consolidated CSS
-            this.modal.classList.add('closing');
-            this.modal.classList.remove('active');
-            
-            // Clear inline styles to allow CSS .closing class to take over
-            if (content) {
-                content.style.transition = '';
-                content.style.transform = '';
-            }
-            
-            // Wait for CSS transition (0.28s) before hiding
-            setTimeout(() => {
-                if (this.modal && !this.modal.classList.contains('active')) {
-                    this.modal.style.display = 'none';
-                    this.modal.classList.remove('closing');
-                    this.currentStep = 1;
-                    this.renderStep(1);
-                }
-            }, 400);
-        } else {
-            // Desktop logic
-            if (typeof this.app.closeModal === 'function') {
-                this.app.closeModal('registration-modal');
-            } else {
-                this.modal.classList.remove('active');
-                this.modal.style.display = 'none';
-            }
-            this.currentStep = 1;
-            this.renderStep(1);
-        }
-        
-        // Ensure body scroll is restored
-        document.body.style.overflow = '';
+        if (this.modal) this.modal.classList.remove('active');
         if (this.fileInput) this.fileInput.value = '';
-        if (this.compareFileInput) this.compareFileInput.value = '';
-        this.compareFile = null;
+        const _header = this.modal?.querySelector('.modal-header');
+        if (_header) _header.style.display = '';
     }
 
-    setupSwipeToClose() {
-        // 重複バインドを防ぐ
-        if (this._swipeBound) return;
-        this._swipeBound = true;
-
-        const content = this.modal.querySelector('.modal-content');
-        if (!content) return;
-
-        let startY = 0;
-        let currentY = 0;
-        let isDragging = false;
-        let lastY = 0;
-        let lastTime = 0;
-        let velocity = 0;
-
-        const onTouchStart = (e) => {
-            isDragging = true;
-            startY = e.touches[0].clientY;
-            lastY = startY;
-            lastTime = Date.now();
-            content.style.transition = 'none';
-        };
-
-        const onTouchMove = (e) => {
-            if (!isDragging) return;
-            const y = e.touches[0].clientY;
-            const now = Date.now();
-            
-            // Calculate velocity for flick gestures
-            const timeDiff = now - lastTime;
-            if (timeDiff > 0) {
-                velocity = (y - lastY) / timeDiff;
-            }
-            
-            currentY = y;
-            lastY = y;
-            lastTime = now;
-
-            const diff = currentY - startY;
-            if (diff > 0) {
-                content.style.transform = `translateY(${diff}px)`;
-            }
-        };
-
-        const onTouchEnd = () => {
-            isDragging = false;
-            content.style.transition = 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)';
-            const diff = currentY - startY;
-
-            // Close if swiped past threshold or flicked with velocity
-            if (diff > 120 || velocity > 0.5) {
-                this.close();
-            } else {
-                content.style.transform = 'translateY(0)';
-            }
-            
-            // Reset state
-            startY = 0;
-            currentY = 0;
-            velocity = 0;
-        };
-
-        content.addEventListener('touchstart', onTouchStart, { passive: true });
-        content.addEventListener('touchmove', onTouchMove, { passive: true });
-        content.addEventListener('touchend', onTouchEnd);
-    }
-
-        renderStep() {
+    renderStep() {
         if (!this.modalBody) return;
 
-        if (this.currentStep === 1) {
-            this.modalTitle.textContent = window.innerWidth <= 900 ? "登録方法の選択" : "新規登録 - 登録方法の選択";
-            const isMobile = window.innerWidth <= 900;
-            this.modalBody.innerHTML = `
-                <div class="reg-method-grid ${isMobile ? 'slim-grid' : ''}">
-                    <div class="reg-method-card" id="reg-card-docx">
-                        <div class="reg-method-icon"><i class="fa-solid fa-file-word"></i></div>
-                        ${isMobile ? `
-                            <div class="reg-method-label">Word</div>
-                        ` : `
-                            <div class="reg-method-info">
-                                <h4>Wordをアップロード</h4>
-                                <p>Wordファイル(.docx)を解析・比較します</p>
-                            </div>
-                        `}
-                    </div>
-                    <div class="reg-method-card" id="reg-card-pdf">
-                        <div class="reg-method-icon"><i class="fa-solid fa-file-pdf"></i></div>
-                        ${isMobile ? `
-                            <div class="reg-method-label">PDF</div>
-                        ` : `
-                            <div class="reg-method-info">
-                                <h4>PDFをアップロード</h4>
-                                <p>ファイルをここにドロップするか、クリックして選択</p>
-                            </div>
-                        `}
-                    </div>
-                    <div class="reg-method-card" id="reg-card-url">
-                        <div class="reg-method-icon"><i class="fa-solid fa-globe"></i></div>
-                        ${isMobile ? `
-                            <div class="reg-method-label">URL</div>
-                        ` : `
-                            <div class="reg-method-info">
-                                <h4>URLを登録 (Web規約)</h4>
-                                <p>公開URLを監視対象に設定します</p>
-                            </div>
-                        `}
+        // Step 1: 初期表示（アップロード/URL入力）
+        this.modalTitle.textContent = "契約書をアップロード";
+        this.modalBody.innerHTML = `
+            <div class="unified-reg-container">
+                <div class="unified-drop-zone" id="unified-drop-zone" onclick="document.getElementById('reg-file-input').click()">
+                    <div class="unified-drop-icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+                    <div class="unified-drop-title">ここにドラッグ＆ドロップ</div>
+                    <div class="unified-drop-sub">またはクリックしてファイルを選択</div>
+                    <div class="unified-drop-formats">対応ファイル: PDF / Word (.docx) / テキスト (.txt)</div>
+                    <div class="unified-drop-formats" style="margin-top:8px;line-height:1.7;color:#64748b;">
+                        DOCXは高精度で最終版生成できます。PDFは変換後に生成します。スキャンPDFはOCR由来のためレイアウト確認が必要です。
                     </div>
                 </div>
-                <div class="reg-mobile-actions mobile-only">
-                    <button class="btn-dashboard" onclick="event.preventDefault(); event.stopPropagation(); window.app.registration.close()">キャンセル</button>
-                </div>
-            `;
-            this.bindCardEvents();
-        } else if (this.currentStep === 2) {
-            this.modalTitle.textContent = "管理情報の入力";
-            const isPdf = this.tempData.method === 'pdf';
-            const isDocx = this.tempData.method === 'docx';
-            const methodLabel = (isPdf || isDocx) ? 'アップロードされたファイル' : '監視対象のURL';
-            const sourceVal = (isPdf || isDocx) ? (this.tempData.fileName || '選択済み') : "";
-            const defaultName = this.tempData.fileName ? this.tempData.fileName.replace(/\.[^/.]+$/, "") : "";
-
-            this.modalBody.innerHTML = `
-                <div class="reg-form-container">
-                    <div class="form-group">
-                        <label>管理名 (必須)</label>
-                        <input type="text" id="reg-name" class="form-control" placeholder="例: 利用規約 (2026年版)" value="${defaultName}">
-                    </div>
-                    <div class="form-group">
-                        <label>種別</label>
-                        <select id="reg-type" class="form-control">
-                            ${(() => { const fixed = ['利用規約','NDA','業務委託契約','プライバシーポリシー']; const dynamic = (typeof dbService !== 'undefined' && dbService.getContracts) ? dbService.getContracts().map(c => c.type).filter(Boolean) : []; const types = [...new Set([...fixed, ...dynamic.filter(t => t !== 'その他')])]; types.push('その他'); return types.map(t => `<option value="${t}">${t}</option>`).join(''); })()}
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>${methodLabel}</label>
-                        <input type="text" id="reg-source" class="form-control" 
-                            placeholder="${(isPdf || isDocx) ? '' : 'https://example.com/terms'}" 
-                            value="${sourceVal}" 
-                            ${(isPdf || isDocx) ? 'readonly style="background:#f5f5f5; cursor:not-allowed;"' : ''}>
+                <div class="modal-separator">または</div>
+                <div class="url-reg-section">
+                    <div class="url-reg-title">URLを貼り付けて登録</div>
+                    <div class="url-input-group">
+                        <input type="text" id="unified-url-input" class="url-input-field" placeholder="https://example.com/terms">
+                        <button class="btn-navy-submit" id="unified-url-submit">登録</button>
                     </div>
                 </div>
-                
-                <div class="${window.innerWidth <= 900 ? 'reg-mobile-actions' : 'reg-actions'}">
-                    <button class="btn-dashboard btn-primary-action" onclick="event.stopPropagation(); window.app.registration.submit()">登録を完了する</button>
-                </div>
-            `;
-        } else if (this.currentStep === 3) {
-            this.modalTitle.textContent = "登録完了";
-            this.modalBody.innerHTML = `
-                <div class="reg-form-container">
-                    <div class="reg-success-icon"><i class="fa-solid fa-check-circle"></i></div>
-                    <div class="reg-success-text">
-                        <h4>登録を受け付けました</h4>
-                        <p>「${this.tempData.name}」を監視対象として登録しました。ダッシュボードから確認できます。</p>
-                    </div>
-                </div>
-                <div class="${window.innerWidth <= 900 ? 'reg-mobile-actions' : 'reg-actions'}">
-                    <button class="btn-dashboard btn-primary-action" onclick="event.stopPropagation(); window.app.registration.close()">ダッシュボードへ</button>
-                </div>
-            `;
-        }
+            </div>
+        `;
+        this.bindUnifiedEvents();
     }
 
-    bindCardEvents() {
-        const cardPdf = document.getElementById('reg-card-pdf');
-        const cardDocx = document.getElementById('reg-card-docx');
-        const cardUrl = document.getElementById('reg-card-url');
+    bindUnifiedEvents() {
+        const dropZone = document.getElementById('unified-drop-zone');
+        const urlSubmit = document.getElementById('unified-url-submit');
+        const urlInput = document.getElementById('unified-url-input');
 
-        if (cardPdf) {
-            cardPdf.onclick = () => {
-                this.fileInput.accept = ".pdf";
-                this.fileInput.click();
-            };
-            cardPdf.ondragover = (e) => { e.preventDefault(); cardPdf.classList.add('drop-active'); };
-            cardPdf.ondragleave = () => { cardPdf.classList.remove('drop-active'); };
-            cardPdf.ondrop = (e) => {
+        if (dropZone) {
+            dropZone.ondragover = (e) => { e.preventDefault(); dropZone.classList.add('drop-active'); };
+            dropZone.ondragleave = () => { dropZone.classList.remove('drop-active'); };
+            dropZone.ondrop = (e) => {
                 e.preventDefault();
-                cardPdf.classList.remove('drop-active');
+                dropZone.classList.remove('drop-active');
                 if (e.dataTransfer.files.length > 0) this.handleFileSelect(e.dataTransfer.files[0]);
             };
         }
 
-        if (cardDocx) {
-            cardDocx.onclick = () => {
-                this.fileInput.accept = ".docx";
-                this.fileInput.click();
-            };
-            cardDocx.ondragover = (e) => { e.preventDefault(); cardDocx.classList.add('drop-active'); };
-            cardDocx.ondragleave = () => { cardDocx.classList.remove('drop-active'); };
-            cardDocx.ondrop = (e) => {
-                e.preventDefault();
-                cardDocx.classList.remove('drop-active');
-                if (e.dataTransfer.files.length > 0) this.handleFileSelect(e.dataTransfer.files[0]);
-            };
-        }
-
-        if (cardUrl) {
-            const isPro = ['owner', 'pro'].includes(this.app?.subscription?.plan);
-            cardUrl.onclick = () => {
+        if (urlSubmit) {
+            urlSubmit.onclick = () => {
+                const url = urlInput ? urlInput.value.trim() : '';
+                if (!url) {
+                    Notify.warning('URLを入力してください');
+                    return;
+                }
+                const isPro = ['owner', 'pro'].includes(this.app?.subscription?.plan);
                 if (!isPro) {
                     window.app.showProFeatureModal('URLを登録して定期的に変更を監視し、差分をSlack・メールで通知する機能はProプラン限定です。');
                     return;
                 }
-                this.nextStep(2, { method: 'url' });
+                this.nextStep(2, { method: 'url', source: url });
             };
         }
     }
 
-    handleFileSelect(file) {
+    async handleFileSelect(file) {
         if (!file) return;
 
         const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
         const isDocx = file.name.toLowerCase().endsWith('.docx');
+        const isTxt = file.type === 'text/plain' || file.name.toLowerCase().endsWith('.txt');
 
-        if (!isPdf && !isDocx) {
-            Notify.warning('PDFまたはWordファイル(.docx)を選択してください');
+        if (!isPdf && !isDocx && !isTxt) {
+            Notify.warning('PDF、Word(.docx)、またはテキスト(.txt)ファイルを選択してください');
             return;
         }
 
-        this.nextStep(2, {
-            method: isPdf ? 'pdf' : 'docx',
-            fileName: file.name,
+        // === Magic byte 検証: 拡張子と実体の不一致を検出 ===
+        // 過去に「拡張子.docxだが中身はHTML」のファイルがuploadされ、 contract内容が
+        // DIFFsense自身のUIテキストに化ける重大バグが発生したため追加。
+        // docx (= zip) は "PK\x03\x04"、 pdf は "%PDF" で始まる。
+        try {
+            if (isDocx) {
+                const bytes = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+                if (!(bytes[0] === 0x50 && bytes[1] === 0x4B && bytes[2] === 0x03 && bytes[3] === 0x04)) {
+                    Notify.error('拡張子は .docx ですが、ファイルの中身が Word 文書ではありません。正しい Word ファイルを選択してください。');
+                    return;
+                }
+            } else if (isPdf) {
+                const bytes = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+                if (!(bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46)) {
+                    Notify.error('拡張子は .pdf ですが、ファイルの中身が PDF ではありません。正しい PDF ファイルを選択してください。');
+                    return;
+                }
+            }
+        } catch (e) {
+            console.error('[Upload] magic byte check failed:', e);
+            // 検証エラー時は upload を進めずに警告
+            Notify.error('ファイルの検証中にエラーが発生しました。別のファイルでお試しください。');
+            return;
+        }
+
+        const fileName = file.name;
+        const defaultName = fileName.replace(/\.[^/.]+$/, "");
+        
+        this.tempData = {
+            method: isPdf ? 'pdf' : (isDocx ? 'docx' : 'txt'),
+            fileName: fileName,
             fileSize: file.size,
-            fileData: file
-        });
+            fileData: file,
+            name: defaultName,
+            type: 'その他',
+            source: fileName,
+            comparePrevId: null
+        };
+
+        const choice = this.pendingChoice;
+        this.pendingChoice = null;
+        if (choice === 'analyze') {
+            this.executeRegistration();
+        } else if (choice === 'save') {
+            this.executeRegistrationSaveOnly();
+        } else {
+            this.showUploadActionModal();
+        }
     }
 
-    handleCompareFileSelect(file) {
-        if (!file) return;
-        this.compareFile = file;
-        const displayEl = document.getElementById('reg-compare-filename');
-        if (displayEl) displayEl.textContent = file.name;
+    showUploadActionModal() {
+        const modalContent = this.modal?.querySelector('.registration-modal-content, .modal-content');
+        if (modalContent) modalContent.style.maxWidth = '800px';
+
+        const isPro = ['owner', 'pro'].includes(this.app?.subscription?.plan);
+        const urlSection = isPro ? `
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+  <div style="flex:1;height:1px;background:#e2e8f0"></div>
+  <span style="font-size:12px;color:#94a3b8;font-weight:500;white-space:nowrap">またはURLで登録（Pro）</span>
+  <div style="flex:1;height:1px;background:#e2e8f0"></div>
+</div>
+<div style="display:flex;gap:10px;align-items:center;margin-bottom:20px">
+  <div style="flex:1;position:relative">
+    <i class="fa-solid fa-link" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:13px"></i>
+    <input id="ua-url-input" type="url" placeholder="https://example.com/terms" style="width:100%;padding:11px 14px 11px 38px;border:1.5px solid #e2e8f0;border-radius:12px;font-size:13px;color:#0f172a;outline:none;box-sizing:border-box;transition:border-color .15s" onfocus="this.style.borderColor='#3b5bdb'" onblur="this.style.borderColor='#e2e8f0'">
+  </div>
+  <button style="padding:11px 20px;border-radius:12px;font-size:13px;font-weight:600;border:none;background:#0f172a;color:#fff;cursor:pointer;white-space:nowrap;transition:background .15s" onmouseenter="this.style.background='#1e293b'" onmouseleave="this.style.background='#0f172a'" onclick="window.app.registration.handleUrlFromModal()">登録</button>
+</div>` : '';
+
+        // Hide the modal header entirely
+        const modalHeader = this.modal?.querySelector('.modal-header');
+        if (modalHeader) modalHeader.style.display = 'none';
+
+        if (this.modalBody) {
+            this.modalBody.innerHTML = `
+<div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+  <button onclick="window.app.registration.close()" style="background:#f1f5f9;border:none;width:36px;height:36px;border-radius:10px;font-size:22px;color:#64748b;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0" onmouseenter="this.style.background='#e2e8f0';this.style.color='#0f172a'" onmouseleave="this.style.background='#f1f5f9';this.style.color='#64748b'">&times;</button>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px">
+  <!-- 保存のみカード -->
+  <div style="border:1.5px solid #e2e8f0;border-radius:20px;padding:28px 24px 24px;display:flex;flex-direction:column;background:#fff" onmouseenter="this.style.borderColor='#93c5fd';this.style.boxShadow='0 4px 20px rgba(59,91,219,.08)'" onmouseleave="this.style.borderColor='#e2e8f0';this.style.boxShadow='none'">
+    <div style="width:56px;height:56px;background:#f1f5f9;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:24px;color:#94a3b8;margin-bottom:16px">
+      <i class="fa-solid fa-folder"></i>
+    </div>
+    <div style="font-size:17px;font-weight:700;color:#0f172a;margin-bottom:10px">保存のみ（AI消費なし）</div>
+    <div style="font-size:13px;color:#64748b;line-height:1.7;margin-bottom:16px">契約書をそのまま保管します。<br>あとから必要なタイミングで<br>AI解析を実行できます。</div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">
+      <div style="display:flex;align-items:center;gap:10px;font-size:13px;color:#475569">
+        <i class="fa-solid fa-file" style="color:#94a3b8;width:16px;text-align:center"></i>契約書保存
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;font-size:13px;color:#475569">
+        <i class="fa-regular fa-folder-open" style="color:#94a3b8;width:16px;text-align:center"></i>フォルダ管理
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;font-size:13px;color:#475569">
+        <i class="fa-regular fa-clock" style="color:#94a3b8;width:16px;text-align:center"></i>履歴管理
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;font-size:13px;color:#475569">
+        <i class="fa-solid fa-rotate" style="color:#94a3b8;width:16px;text-align:center"></i>後からAI解析可能
+      </div>
+    </div>
+    <button style="margin-top:auto;padding:13px 0;border-radius:12px;font-size:14px;font-weight:600;border:1.5px solid #e2e8f0;background:#fff;color:#334155;cursor:pointer;width:100%;transition:background .15s,border-color .15s" onmouseenter="this.style.background='#f8fafc';this.style.borderColor='#cbd5e1'" onmouseleave="this.style.background='#fff';this.style.borderColor='#e2e8f0'" onclick="window.app.registration.onUploadActionChoice('save')">保存する</button>
+  </div>
+
+  <!-- AI解析カード -->
+  <div style="border:2px solid #3b5bdb;border-radius:20px;padding:28px 24px 24px;display:flex;flex-direction:column;background:linear-gradient(145deg,#eef2ff 0%,#f5f8ff 60%,#fff 100%)">
+    <span style="display:inline-flex;align-items:center;background:#3b5bdb;color:#fff;font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;align-self:flex-start;margin-bottom:14px;letter-spacing:.3px">おすすめ</span>
+    <div style="width:56px;height:56px;background:linear-gradient(135deg,#3b5bdb,#4f46e5);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:24px;color:#fff;margin-bottom:16px;box-shadow:0 4px 16px rgba(59,91,219,.35)">
+      <i class="fa-solid fa-robot"></i>
+    </div>
+    <div style="font-size:17px;font-weight:700;color:#1e3a8a;margin-bottom:10px">AI解析を実行（おすすめ）</div>
+    <div style="font-size:13px;color:#64748b;line-height:1.7;margin-bottom:16px">DIFFsenseが契約書を自動解析します。</div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:10px;font-size:13px;color:#1e40af;font-weight:500"><i class="fa-solid fa-circle-check" style="color:#3b5bdb;width:16px;text-align:center"></i>AI要約</div>
+      <div style="display:flex;align-items:center;gap:10px;font-size:13px;color:#1e40af;font-weight:500"><i class="fa-solid fa-circle-check" style="color:#3b5bdb;width:16px;text-align:center"></i>リスク分析</div>
+      <div style="display:flex;align-items:center;gap:10px;font-size:13px;color:#1e40af;font-weight:500"><i class="fa-solid fa-circle-check" style="color:#3b5bdb;width:16px;text-align:center"></i>修正提案</div>
+      <div style="display:flex;align-items:center;gap:10px;font-size:13px;color:#1e40af;font-weight:500"><i class="fa-solid fa-circle-check" style="color:#3b5bdb;width:16px;text-align:center"></i>期限抽出</div>
+      <div style="display:flex;align-items:center;gap:10px;font-size:13px;color:#1e40af;font-weight:500"><i class="fa-solid fa-circle-check" style="color:#3b5bdb;width:16px;text-align:center"></i>監視登録</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;background:#e8efff;border-radius:10px;padding:9px 14px;font-size:12.5px;color:#3b5bdb;font-weight:500;margin-bottom:16px">
+      <i class="fa-solid fa-circle-info"></i>AI解析回数を1回消費します
+    </div>
+    <button style="margin-top:auto;padding:13px 0;border-radius:12px;font-size:14px;font-weight:700;border:none;background:linear-gradient(135deg,#3b5bdb,#4f46e5);color:#fff;cursor:pointer;width:100%;box-shadow:0 4px 16px rgba(59,91,219,.4);transition:box-shadow .15s" onmouseenter="this.style.boxShadow='0 6px 22px rgba(59,91,219,.55)'" onmouseleave="this.style.boxShadow='0 4px 16px rgba(59,91,219,.4)'" onclick="window.app.registration.onUploadActionChoice('analyze')">AI解析を開始</button>
+  </div>
+</div>
+
+<p style="font-size:11px;color:#94a3b8;text-align:center;margin:10px 0 20px;display:flex;align-items:center;justify-content:center;gap:5px">
+  <i class="fa-solid fa-arrow-up-from-bracket" style="font-size:10px"></i>ボタンをクリック後、取り込む書類を選択します
+</p>
+
+${urlSection}
+
+<div style="display:flex;flex-direction:column;gap:4px;padding-top:16px;border-top:1px solid #f1f5f9">
+  <p style="font-size:12px;color:#94a3b8;margin:0">※ Freeプランでは解析回数に上限があります</p>
+  <p style="font-size:12px;color:#94a3b8;margin:0">※ 有料プランではURL自動監視・アップロード時の自動解析にも対応しています</p>
+</div>
+            `;
+        }
+        if (this.modal && !this.modal.classList.contains('active')) {
+            this.modal.classList.add('active');
+        }
+    }
+
+    onUploadActionChoice(choice) {
+        this.pendingChoice = choice;
+        this.close();
+        if (this.fileInput) this.fileInput.click();
+    }
+
+    handleUrlFromModal() {
+        const url = document.getElementById('ua-url-input')?.value?.trim();
+        if (!url) { Notify.warning('URLを入力してください'); return; }
+        const isPro = ['owner', 'pro'].includes(this.app?.subscription?.plan);
+        if (!isPro) {
+            this.close();
+            window.app.showProFeatureModal('URLを登録して定期的に変更を監視し、差分をSlack・メールで通知する機能はProプラン限定です。');
+            return;
+        }
+        this.nextStep(2, { method: 'url', source: url });
+    }
+
+    async executeRegistrationSaveOnly() {
+        try {
+            await this.ensureRegistrationBackendReady();
+            this.tempData.analysisInput = await aiService.prepareAnalysisSource({
+                method: this.tempData.method,
+                file: this.tempData.fileData,
+                source: this.tempData.source
+            });
+        } catch (error) {
+            Notify.error(error.message);
+            return;
+        }
+
+        this.close();
+
+        try {
+            const isWord = this.tempData.method === 'docx';
+            const newContract = dbService.addContract({
+                name: this.tempData.name,
+                type: this.tempData.type,
+                sourceUrl: this.tempData.method === 'url' ? this.tempData.source : '',
+                originalFilename: (this.tempData.method === 'pdf' || isWord || this.tempData.method === 'txt') ? this.tempData.fileName : ''
+            }, {
+                skipRemotePersist: true
+            });
+
+            const savedContract = await dbService.persistContractToApi(newContract, 'POST', {
+                throwOnError: true,
+                tempId: newContract.id
+            });
+
+            if (!savedContract) throw new Error('契約データの保存に失敗しました');
+
+            if (this.tempData.fileData) {
+                if (isWord) {
+                    this.app.setRuntimeOriginalPreviewFile(savedContract.id, this.tempData.fileData);
+                } else if (this.tempData.method === 'pdf') {
+                    this.app.setRuntimePdfPreviewUrl(savedContract.id, this.tempData.fileData);
+                }
+            }
+
+            Notify.success('契約書を保存しました');
+            this.app.navigate('contracts');
+        } catch (error) {
+            console.error('Save-only registration error:', error);
+            Notify.error('保存中にエラーが発生しました: ' + error.message);
+            this.app.navigate('contracts');
+        }
+    }
+
+    async ensureRegistrationBackendReady() {
+        if (!isLocalHostEnvironment()) return;
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        try {
+            const response = await fetch(toApiUrl('/health'), {
+                cache: 'no-store',
+                signal: controller.signal
+            });
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+        } catch (error) {
+            throw new Error('バックエンドAPI(3001)に接続できません。D:\\vv\\start-dev.bat でサーバーを起動してから、もう一度取り込んでください。');
+        } finally {
+            clearTimeout(timeoutId);
+        }
+    }
+
+    async executeRegistration() {
+        try {
+            await this.ensureRegistrationBackendReady();
+            this.tempData.analysisInput = await aiService.prepareAnalysisSource({
+                method: this.tempData.method,
+                file: this.tempData.fileData,
+                source: this.tempData.source
+            });
+        } catch (error) {
+            console.error('Registration backend preflight failed:', error);
+            Notify.error(error.message);
+            return;
+        }
+
+        // 取り込みモーダルを閉じ、解析開始の瞬間にプレミアム・オーバーレイ（すりガラス）を生成
+        this.close();
+        
+        const overlay = document.createElement('div');
+        overlay.className = 'ds-analysis-overlay';
+        overlay.id = 'ds-analysis-overlay';
+        document.body.appendChild(overlay);
+
+        try {
+            const isWord = this.tempData.method === 'docx';
+            const newContract = dbService.addContract({
+                name: this.tempData.name,
+                type: this.tempData.type,
+                sourceUrl: this.tempData.method === 'url' ? this.tempData.source : '',
+                originalFilename: (this.tempData.method === 'pdf' || isWord || this.tempData.method === 'txt') ? this.tempData.fileName : ''
+            }, {
+                skipRemotePersist: true
+            });
+
+            const savedContract = await dbService.persistContractToApi(newContract, 'POST', { 
+                throwOnError: true,
+                tempId: newContract.id 
+            });
+
+            if (!savedContract) throw new Error('契約データの保存に失敗しました');
+
+            // Set runtime preview files for SignViewer to use during/after analysis
+            if (this.tempData.fileData) {
+                const isWord = this.tempData.method === 'docx';
+                if (isWord) {
+                    this.app.setRuntimeOriginalPreviewFile(savedContract.id, this.tempData.fileData);
+                } else if (this.tempData.method === 'pdf') {
+                    this.app.setRuntimePdfPreviewUrl(savedContract.id, this.tempData.fileData);
+                }
+            }
+
+            // 既存のオーバーレイを利用して解析プログレスを開始
+            await this.runAnalysisWithSteppedProgress(savedContract.id);
+
+        } catch (error) {
+            console.error('Registration Error:', error);
+            this.cleanupProgressUI();
+            Notify.error('登録中にエラーが発生しました: ' + error.message);
+            this.app.navigate('contracts');
+        }
     }
 
     nextStep(step, data = {}) {
         this.tempData = { ...this.tempData, ...data };
+        if (data.method === 'url') {
+            const url = data.source;
+            this.tempData.name = "Web規約 (" + new URL(url).hostname + ")";
+            this.tempData.type = "利用規約";
+            this.executeRegistration();
+            return;
+        }
         this.currentStep = step;
         this.renderStep();
     }
 
-    async submit() {
-        const nameInput = document.getElementById('reg-name');
-        const typeInput = document.getElementById('reg-type');
-        const sourceInput = document.getElementById('reg-source');
+    async runAnalysisWithSteppedProgress(contractId) {
+        // executeRegistration で作成済みのオーバーレイを取得
+        const overlay = document.getElementById('ds-analysis-overlay') || document.body;
 
-        const comparePrevInput = document.getElementById('reg-compare-prev');
+        const modal = document.createElement('div');
+        modal.className = 'ds-progress-modal';
+        modal.id = 'ds-analysis-modal';
+        modal.innerHTML = `
+            <div class="ds-modal-close" onclick="window.app.registration.cleanupProgressUI()"><i class="fa-solid fa-xmark"></i></div>
+            <div class="ds-modal-inner">
+                <div class="ds-modal-top" id="ds-modal-top">
+                    <!-- Initial: Analyzing -->
+                    <div class="ds-top-visual ds-visual-analyzing">
+                        <div class="ds-doc-box">
+                            <div class="ds-visual-line"></div>
+                            <div class="ds-visual-line"></div>
+                            <div class="ds-visual-line"></div>
+                            <div class="ds-visual-line"></div>
+                        </div>
+                    </div>
+                    <div class="ds-top-content">
+                        <h3>契約書を解析中です</h3>
+                        <p>AIが契約書の内容を詳細に分析しています...</p>
+                    </div>
+                </div>
 
-        const name = nameInput ? nameInput.value : "";
-        const type = typeInput ? typeInput.value : "";
-        const source = sourceInput ? sourceInput.value : "";
-        const comparePrevId = comparePrevInput ? comparePrevInput.value : "";
+                <div class="ds-steps-container">
+                    <div class="ds-steps-line"></div>
+                    <div class="ds-steps-line-active" id="ds-line-active"></div>
+                    
+                    <div class="ds-step-item active" id="s-step-1">
+                        <div class="ds-step-circle"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+                        <div class="ds-step-info">
+                            <div class="ds-step-name">1. 資料の取り込み</div>
+                            <div class="ds-step-status" id="s-status-1">取り込み中...</div>
+                        </div>
+                    </div>
+                    <div class="ds-step-item" id="s-step-2">
+                        <div class="ds-step-circle"><i class="fa-solid fa-list-check"></i></div>
+                        <div class="ds-step-info">
+                            <div class="ds-step-name">2. 条文の構造解析</div>
+                            <div class="ds-step-status" id="s-status-2">待機中</div>
+                        </div>
+                    </div>
+                    <div class="ds-step-item" id="s-step-3">
+                        <div class="ds-step-circle"><i class="fa-solid fa-shield-halved"></i></div>
+                        <div class="ds-step-info">
+                            <div class="ds-step-name">3. 要約・リスク解析</div>
+                            <div class="ds-step-status" id="s-status-3">待機中</div>
+                        </div>
+                    </div>
+                    <div class="ds-step-item" id="s-step-4">
+                        <div class="ds-step-circle"><i class="fa-solid fa-pen-to-square"></i></div>
+                        <div class="ds-step-info">
+                            <div class="ds-step-name">4. 修正案の作成</div>
+                            <div class="ds-step-status" id="s-status-4">待機中</div>
+                        </div>
+                    </div>
+                    <div class="ds-step-item" id="s-step-5">
+                        <div class="ds-step-circle"><i class="fa-regular fa-calendar-check"></i></div>
+                        <div class="ds-step-info">
+                            <div class="ds-step-name">5. 期限の取得</div>
+                            <div class="ds-step-status" id="s-status-5">待機中</div>
+                        </div>
+                    </div>
+                    <div class="ds-step-item" id="s-step-6">
+                        <div class="ds-step-circle"><i class="fa-solid fa-circle-check"></i></div>
+                        <div class="ds-step-info">
+                            <div class="ds-step-name">6. 完了</div>
+                            <div class="ds-step-status" id="s-status-6">待機中</div>
+                        </div>
+                    </div>
+                </div>
 
-        if (!name) {
-            Notify.warning('管理名を入力してください');
-            return;
-        }
+                <div id="ds-modal-body">
+                    <!-- Default: Analyzing Card -->
+                    <div class="ds-status-card">
+                        <div class="ds-status-main">
+                            <div class="ds-status-spinner">
+                                <div class="ds-dot-spinner">
+                                    <div></div><div></div><div></div><div></div><div></div>
+                                    <div></div><div></div><div></div><div></div><div></div>
+                                    <div></div><div></div>
+                                </div>
+                            </div>
+                            <div class="ds-status-text">
+                                <h4>AIが処理を実行中です</h4>
+                                <p>リスク項目の抽出、要約の生成を行っています。通常30〜60秒程度で完了します。</p>
+                            </div>
+                        </div>
+                        <button class="ds-btn-outline" onclick="window.app.registration.cleanupProgressUI()">キャンセル</button>
+                    </div>
+                </div>
+            </div>
 
-        this.tempData.name = name;
-        this.tempData.type = type;
-        this.tempData.source = source;
-        this.tempData.comparePrevId = null; // 旧UIのID指定は無効化
+            <div class="ds-modal-footer" id="ds-modal-footer">
+                <div class="ds-security-note">
+                    <i class="fa-solid fa-lock"></i>
+                    アップロードしたファイルは暗号化され、安全に処理されます。
+                </div>
+            </div>
+        `;
+        overlay.appendChild(modal);
+        // document.body.appendChild(overlay); // すでに追加済みのため不要
 
-        // ローディング表示（抽出中）
-        const isPdf = this.tempData.method === 'pdf';
-        const isDocx = this.tempData.method === 'docx';
-        const loadingText = isPdf ? 'PDFを取り込み中...' : (isDocx ? 'Wordファイルを取り込み中...' : 'URLから規約を解析中...');
-        const loadingSubText = (isPdf || isDocx) ? '解析準備をしています' : 'Webサイトから詳細を取得しています';
+        this.cleanupProgressUI = () => {
+            const el = document.getElementById('ds-analysis-overlay');
+            if (el) el.remove();
+        };
 
-        const loadingMsg = document.createElement('div');
-        loadingMsg.id = 'reg-loading';
-        loadingMsg.style.cssText = 'position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:white; padding:30px; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,0.3); z-index:10005; text-align:center; min-width:300px;';
-        loadingMsg.innerHTML = `<div class="custom-loader"></div><br><strong>${loadingText}</strong><br><span style="font-size:12px; color:#666;">${loadingSubText}</span>`;
-        document.body.appendChild(loadingMsg);
+        const updateStep = (num, status = 'active') => {
+            const stepEl = document.getElementById(`s-step-${num}`);
+            const statusEl = document.getElementById(`s-status-${num}`);
+            const lineActive = document.getElementById('ds-line-active');
+            if (!stepEl || !statusEl) return;
+            
+            if (status === 'completed') {
+                stepEl.classList.remove('active');
+                stepEl.classList.add('completed');
+                stepEl.querySelector('.ds-step-circle').innerHTML = '<i class="fa-solid fa-check"></i>';
+                statusEl.innerText = '完了';
+            } else if (status === 'active') {
+                document.querySelectorAll('.ds-step-item').forEach(s => s.classList.remove('active'));
+                stepEl.classList.add('active');
+                statusEl.innerText = '解析中...';
+            } else if (status === 'skipped') {
+                stepEl.classList.remove('active');
+                statusEl.innerText = '未実行';
+            }
 
-        // 背景を暗くするオーバーレイ
-        const overlay = document.createElement('div');
-        overlay.id = 'reg-overlay';
-        overlay.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10004;';
-        document.body.appendChild(overlay);
+            if (lineActive) {
+                const percentage = ((num - 1) / 5) * 100;
+                lineActive.style.width = `calc(${percentage}% + 10px)`;
+            }
+        };
 
-        // UI描画を確実にするための短い遅延
-        await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 50)));
+        const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+        const renderAnalysisDegradedView = () => {
+            const modalTop = document.getElementById('ds-modal-top');
+            const modalBody = document.getElementById('ds-modal-body');
+            const modalFooter = document.getElementById('ds-modal-footer');
+
+            if (modalTop) {
+                modalTop.innerHTML = `
+                    <div class="ds-top-visual">
+                        <div class="ds-visual-complete" style="background:#f59e0b;box-shadow:0 10px 30px rgba(245,158,11,0.24);"><i class="fa-solid fa-file-circle-check"></i></div>
+                    </div>
+                    <div class="ds-top-content">
+                        <h3>簡易解析で保存しました</h3>
+                        <p>AIアクセスが集中していたため簡易解析で保存しました。内容はいつでも再解析できます。</p>
+                    </div>
+                `;
+            }
+
+            if (modalBody) {
+                modalBody.innerHTML = `
+                    <div class="ds-success-box" style="background:#fffbeb;border-color:#fde68a;">
+                        <div class="ds-success-icon" style="color:#d97706;"><i class="fa-solid fa-circle-info"></i></div>
+                        <div class="ds-success-content">
+                            <h4>資料と簡易解析を保存しました</h4>
+                            <p>現在AIアクセスが集中していたため、簡易的な解析結果で保存しました。時間をおいて契約書一覧から再解析すると、詳細なリスク評価と修正案が生成されます。</p>
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (modalFooter) {
+                modalFooter.innerHTML = `
+                    <div class="ds-footer-actions">
+                        <button class="ds-btn-outline" onclick="window.app.registration.cleanupProgressUI(); window.app.navigate('contracts');">
+                            <i class="fa-solid fa-list"></i> 契約書一覧へ戻る
+                        </button>
+                        <button class="ds-btn-primary" onclick="window.app.registration.cleanupProgressUI(); window.app.setDetailActiveTab('analysis'); window.app.navigate('diff', '${contractId}');">
+                            解析結果を表示する <i class="fa-solid fa-arrow-right"></i>
+                        </button>
+                    </div>
+                `;
+            }
+        };
 
         try {
-            // DBに登録
-            const isWord = this.tempData.method === 'docx';
-            const newContract = dbService.addContract({
-                name: this.tempData.name || ((this.tempData.method === 'pdf' || isWord) ? this.tempData.fileData.name : 'Web規約'),
-                type: this.tempData.type, // デフォルト
-                sourceUrl: this.tempData.method === 'url' ? this.tempData.source : '',
-                originalFilename: (this.tempData.method === 'pdf' || isWord) ? this.tempData.fileData.name : ''
+            // Step 1 & 2
+            await sleep(800);
+            updateStep(1, 'completed');
+            updateStep(2, 'active');
+            
+            const analysisInput = this.tempData.analysisInput || await aiService.prepareAnalysisSource({
+                method: this.tempData.method,
+                file: this.tempData.fileData,
+                source: this.tempData.source
             });
-            const savedContract = await dbService.persistContractToApi(newContract, 'POST', { throwOnError: true });
-            if (!savedContract) {
-                throw new Error('契約データの保存に失敗しました');
-            }
-            await dbService.syncContractsFromApi();
-            // 2. テキスト抽出を実行（失敗しても登録は維持する）
-            let extractionSucceeded = false;
-            try {
-                let previousText = null;
-                let previousFileBase64 = null;
+            await sleep(1000);
+            updateStep(2, 'completed');
 
-                // Wordの場合はファイル同士の比較を行う
-                if (isWord && this.compareFile) {
-                    previousFileBase64 = await aiService.convertFileToBase64(this.compareFile);
+            // Step 3 (Main AI)
+            updateStep(3, 'active');
+            
+            const result = await aiService.analyzeContract(
+                contractId,
+                analysisInput.method,
+                analysisInput.source,
+                null,
+                { ...analysisInput.options, userTriggered: true }
+            );
+
+            if (result.success) {
+                const data = result.data;
+                if (this.isAiAnalysisFailedPayload(data)) {
+                    // 429等でAIが簡易解析(フォールバック)を返した場合は失敗扱いにせず、
+                    // 簡易解析として保存し後で再解析できるようにする（赤いエラー画面を出さない）。
+                    dbService.updateContractAnalysis(contractId, {
+                        ...data,
+                        extractedText: resolveExtractedContentPayload(data),
+                        status: '未確認'
+                    });
+                    await this.app.refreshSubscriptionStatusSafe();
+                    updateStep(3, 'completed');
+                    updateStep(4, 'completed');
+                    updateStep(5, 'completed');
+                    updateStep(6, 'completed');
+                    renderAnalysisDegradedView();
+                    Notify.success('簡易解析で保存しました。後で再解析できます。');
+                    return;
+                }
+                dbService.updateContractAnalysis(contractId, {
+                    ...data,
+                    extractedText: resolveExtractedContentPayload(data),
+                    status: '未確認'
+                });
+                await this.app.refreshSubscriptionStatusSafe();
+                
+                updateStep(3, 'completed');
+                
+                // Steps 4, 5, 6
+                updateStep(4, 'active');
+                await sleep(600);
+                updateStep(4, 'completed');
+
+                updateStep(5, 'active');
+                await sleep(400);
+                updateStep(5, 'completed');
+
+                updateStep(6, 'active');
+                await sleep(800);
+                updateStep(6, 'completed');
+                
+                // --- Switch to Completed View ---
+                const modalTop = document.getElementById('ds-modal-top');
+                const modalBody = document.getElementById('ds-modal-body');
+                const modalFooter = document.getElementById('ds-modal-footer');
+
+                if (modalTop) {
+                    modalTop.innerHTML = `
+                        <div class="ds-top-visual">
+                            <div class="ds-visual-complete"><i class="fa-solid fa-check"></i></div>
+                        </div>
+                        <div class="ds-top-content">
+                            <h3>解析が完了しました！</h3>
+                            <p>契約書の分析が正常に完了しました</p>
+                        </div>
+                    `;
                 }
 
-                extractionSucceeded = await this.extractTextOnly(newContract.id, previousText, previousFileBase64) === true;
-                await dbService.syncContractsFromApi();
-            } catch (extractError) {
-                console.error('Text Extraction Failed (Non-fatal):', extractError);
-                // 失敗時はステータスを更新しておく（ユーザーには後で通知）
-                // NOTE: dbService側で自動的に '未処理' になっているはずだが、エラー情報を残すならここで更新
-            }
+                if (modalBody) {
+                    const rlRaw = String(data.riskLevel || data.risk_level || '1');
+                    const rlNum = parseInt(rlRaw) || (rlRaw.toUpperCase().includes('HIGH') ? 3 : rlRaw.toUpperCase().includes('MEDIUM') ? 2 : 1);
+                    const riskLabel = rlNum >= 3 ? '高' : rlNum === 2 ? '中' : '低';
+                    const riskColor = rlNum >= 3 ? '#e11d48' : rlNum === 2 ? '#d97706' : '#16a34a';
+                    const riskBg = rlNum >= 3 ? '#fff1f2' : rlNum === 2 ? '#fffbeb' : '#f0fdf4';
+                    const summaryLen = data.summary?.length || 0;
+                    const suggestCount = Array.isArray(data.changes) ? data.changes.filter(Boolean).length : 0;
+                    const meta = data.contract_meta || {};
+                    const hasDeadline = Boolean(meta.expiry_date || meta.contract_start || meta.renewal_deadline || data.expiry_date || data.contract_start);
+                    const deadlineLabel = hasDeadline ? '取得済み' : 'なし';
+                    const deadlineColor = hasDeadline ? '#16a34a' : '#94a3b8';
+                    const deadlineBg = hasDeadline ? '#f0fdf4' : '#f8fafc';
 
-            // 3. 完了処理
-            if (document.getElementById('reg-loading')) document.getElementById('reg-loading').remove();
-            if (document.getElementById('reg-overlay')) document.getElementById('reg-overlay').remove();
+                    modalBody.innerHTML = `
+                        <div class="ds-summary-section">
+                            <div class="ds-summary-title">解析結果のサマリー</div>
+                            <div class="ds-summary-grid">
+                                <div class="ds-summary-card">
+                                    <div class="ds-card-icon"><i class="fa-solid fa-shield-halved"></i></div>
+                                    <div class="ds-card-info">
+                                        <div>総合リスク</div>
+                                        <div><span style="background:${riskBg};color:${riskColor};padding:2px 10px;border-radius:6px;font-weight:800;font-size:15px;">${riskLabel}</span></div>
+                                    </div>
+                                </div>
+                                <div class="ds-summary-card">
+                                    <div class="ds-card-icon"><i class="fa-solid fa-file-lines"></i></div>
+                                    <div class="ds-card-info">
+                                        <div>要約</div>
+                                        <div class="ds-card-value-nowrap"><span>${summaryLen}文字</span><em>で要約完了</em></div>
+                                    </div>
+                                </div>
+                                <div class="ds-summary-card">
+                                    <div class="ds-card-icon"><i class="fa-solid fa-pen-to-square"></i></div>
+                                    <div class="ds-card-info">
+                                        <div>修正案</div>
+                                        <div class="ds-card-value-nowrap"><span>${suggestCount}件</span><em>の修正案を作成</em></div>
+                                    </div>
+                                </div>
+                                <div class="ds-summary-card">
+                                    <div class="ds-card-icon"><i class="fa-regular fa-calendar-check"></i></div>
+                                    <div class="ds-card-info">
+                                        <div>期限情報</div>
+                                        <div><span style="color:${deadlineColor};font-weight:700;">${deadlineLabel}</span></div>
+                                    </div>
+                                </div>
+                            </div>
 
-            this.close();
+                            <div class="ds-success-box">
+                                <div class="ds-success-icon"><i class="fa-solid fa-lightbulb"></i></div>
+                                <div class="ds-success-content">
+                                    <h4>すべての解析結果が生成されました</h4>
+                                    <p>各セクションから詳細を確認できます。特定されたリスクへの対策や修正案を検討してください。</p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
 
-            if (extractionSucceeded) {
-                // 4. 詳細ページへ遷移（まずは原本を表示して安心させる）
-                this.app.setDetailActiveTab('original');
-                this.app.navigate('diff', newContract.id);
-                Notify.toast('読み込みが完了しました。', {
-                    type: 'success',
-                    duration: 2000,
-                    closable: false,
-                    position: 'center'
-                });
+                if (modalFooter) {
+                    modalFooter.innerHTML = `
+                        <div class="ds-footer-actions">
+                            <button class="ds-btn-outline" onclick="window.app.registration.cleanupProgressUI(); window.app.navigate('contracts');">
+                                <i class="fa-solid fa-list"></i> 契約書一覧へ戻る
+                            </button>
+                            <button class="ds-btn-primary" onclick="window.app.registration.cleanupProgressUI(); window.app.setDetailActiveTab('analysis'); window.app.navigate('diff', '${contractId}');">
+                                解析結果を表示する <i class="fa-solid fa-arrow-right"></i>
+                            </button>
+                        </div>
+                    `;
+                }
+
+                Notify.success('解析が完了しました');
+
             } else {
-                this.app.navigate('contracts');
-                this.app.showToast('⚠️ 登録は完了しましたが、テキスト抽出に失敗しました', 'warning', 5000);
+                throw new Error(result.error || 'AI解析に失敗しました');
             }
 
         } catch (error) {
-            console.error('Registration Error:', error);
-            if (document.getElementById('reg-loading')) document.getElementById('reg-loading').remove();
-            if (document.getElementById('reg-overlay')) document.getElementById('reg-overlay').remove();
-            
-            // 登録失敗時もモーダルを閉じて、ユーザーが再試行や他操作をできるようにする
-            this.close();
-            
-            Notify.error('登録中にエラーが発生しました: ' + error.message);
+            console.error('Stepped Analysis Error:', error);
+            const recovered = await this.recoverTextExtractionOnly(contractId, error);
+            if (recovered) {
+                updateStep(1, 'completed');
+                [2, 3, 4, 5].forEach(num => updateStep(num, 'skipped'));
+                updateStep(6, 'completed');
+                renderAnalysisDegradedView();
+                Notify.success('簡易解析で保存しました。後で再解析できます。');
+            } else {
+                this.cleanupProgressUI();
+                this.app.navigate('contracts');
+                Notify.error('資料の取り込みに失敗しました。別のファイルでお試しください。');
+            }
         }
+    }
+
+    isAiAnalysisFailedPayload(data = {}) {
+        const summary = String(data.summary || '').trim();
+        return data.aiSucceeded === false
+            || data.isFallback === true
+            || /AI解析に失敗|AI分析に失敗|解析中にエラーが発生|上限に達しました/.test(summary);
+    }
+
+    async recoverTextExtractionOnly(contractId, originalError = null, options = {}) {
+        try {
+            const analysisInput = this.tempData.analysisInput || await aiService.prepareAnalysisSource({
+                method: this.tempData.method,
+                file: this.tempData.fileData,
+                source: this.tempData.source
+            });
+            const result = await aiService.analyzeContract(
+                contractId,
+                analysisInput.method,
+                analysisInput.source,
+                null,
+                { ...analysisInput.options, skipAI: true, userTriggered: true }
+            );
+            if (!result?.success) return false;
+            const extractedContent = resolveExtractedContentPayload(result.data || {});
+            dbService.updateContractAnalysis(contractId, {
+                ...(result.data || {}),
+                extractedText: extractedContent,
+                status: options.status || '未確認',
+                aiFailed: false,
+                aiSucceeded: false,
+                analysisSkipped: options.analysisSkipped === true || Boolean(originalError),
+                errorCode: options.analysisSkipped ? null : (originalError?.code || result?.code || null)
+            });
+            await this.app.refreshSubscriptionStatusSafe();
+            return true;
+        } catch (recoveryError) {
+            console.error('Text extraction recovery failed:', recoveryError);
+            return false;
+        }
+    }
+
+    cleanupProgressUI() {
+        const overlay = document.getElementById('ds-analysis-overlay');
+        if (overlay) overlay.remove();
+        
+        const modal = document.getElementById('ds-analysis-modal');
+        if (modal) modal.remove();
+
+        const oldOverlay = document.getElementById('reg-progress-overlay');
+        if (oldOverlay) oldOverlay.remove();
     }
 
     async extractTextOnly(contractId, previousVersion = null, previousFileBase64 = null) {
         try {
-            let sourceData = this.tempData.source;
-
-            // PDFまたはWordの場合はFileReaderでBase64に変換
-            if ((this.tempData.method === 'pdf' || this.tempData.method === 'docx') && this.tempData.fileData) {
-                sourceData = await aiService.convertFileToBase64(this.tempData.fileData);
-                if (this.tempData.method === 'pdf') {
-                    this.app?.setRuntimePdfPreviewUrl(contractId, this.tempData.fileData);
-                } else if (this.tempData.method === 'docx') {
-                    this.app?.setRuntimeOriginalPreviewFile(contractId, this.tempData.fileData);
-                }
-            }
-
-            // For DOCX + compare file, run full structural diff analysis immediately.
-            if (this.tempData.method === 'docx' && previousFileBase64) {
-                const result = await aiService.analyzeContract(
-                    contractId,
-                    'docx',
-                    sourceData,
-                    previousFileBase64,
-                    { userTriggered: true }
-                );
-
-                if (!result.success) {
-                    throw new Error(result.error || 'Word差分解析に失敗しました');
-                }
-                const extractedContent = resolveExtractedContentPayload(result.data);
-                if (!extractedContent) {
-                    throw new Error('Word解析結果に本文データが含まれていません');
-                }
-
-                dbService.updateContractAnalysis(contractId, {
-                    extractedText: extractedContent,
-                    baselineContent: result.data.previousArticles || null,
-                    sourceType: result.data.sourceType || 'DOCX',
-                    changes: result.data.changes || [],
-                    riskLevel: result.data.riskLevel,
-                    riskReason: result.data.riskReason,
-                    summary: result.data.summary,
-                    isFallback: result.data.isFallback === true,
-                    aiFailed: result.data.aiFailed === true,
-                    status: '未確認',
-                    originalFilename: this.tempData.fileData?.name || '',
-                    doc: result.data.doc || null
-                });
-                await this.app.refreshSubscriptionStatusSafe();
-
-                console.log('Word structured diff completed');
-                return true;
-            }
-
+            const analysisInput = await aiService.prepareAnalysisSource({
+                method: this.tempData.method,
+                file: this.tempData.fileData,
+                source: this.tempData.source
+            });
             const result = await aiService.analyzeContract(
                 contractId,
-                this.tempData.method,
-                sourceData,
-                previousFileBase64 || previousVersion, // Word比較ならBase64を優先
-                { skipAI: true, userTriggered: true }
+                analysisInput.method,
+                analysisInput.source,
+                previousFileBase64 || previousVersion,
+                { ...analysisInput.options, skipAI: true, userTriggered: true }
             );
-
-            // APIレスポンス形式 { success, data } を前提にチェック
-            if (result && result.success) {
-                const data = result.data || {};
-                const extractedContent = resolveExtractedContentPayload(data);
-                if (!extractedContent) {
-                    throw new Error('抽出結果に本文データが含まれていません');
-                }
-                // 抽出されたテキストと、もしあれば差分結果も保存
+            if (result.success) {
+                const extractedContent = resolveExtractedContentPayload(result.data);
                 dbService.updateContractText(contractId, {
                     extractedText: extractedContent,
-                    rawExtractedText: data.rawExtractedText,
-                    extractedTextHash: data.extractedTextHash,
-                    extractedTextLength: data.extractedTextLength,
-                    sourceType: data.sourceType,
-                    pdfStoragePath: String(data.sourceType || '').toUpperCase() === 'DOCX' ? null : data.pdfStoragePath,
-                    pdfUrl: String(data.sourceType || '').toUpperCase() === 'DOCX' ? null : data.pdfUrl,
-                    doc: data.doc || null,
-                    status: data.changes && data.changes.length > 0 ? '要確認' : (data.status || '未処理'),
-                    ai_changes: data.changes || [],
-                    summary: data.summary || null,
-                    ai_summary: data.summary || null,
-                    risk_level: data.riskLevel === 3 || data.riskLevel === "3" ? 'High' : (data.riskLevel === 2 || data.riskLevel === "2" ? 'Medium' : 'Low'),
-                    ai_risk_reason: data.riskReason || null,
-                    contract_meta: data.contract_meta || null
+                    sourceType: result.data.sourceType,
+                    status: '未処理'
                 });
-
-                console.log('Text extraction completed');
                 return true;
-            } else {
-                throw new Error(result?.error || 'テキスト抽出に失敗しました');
             }
-
+            return false;
         } catch (error) {
-            console.error('テキスト抽出エラー:', error);
-
-            // エラーステータスに更新
-            dbService.updateContractStatus(contractId, '登録失敗');
-
-            // ユーザーにエラーを通知
-            const methodLabel = this.tempData.method === 'pdf' ? 'PDF' : (this.tempData.method === 'docx' ? 'Word' : 'URL');
-            Notify.alert(`申し訳ありません。${methodLabel}からのテキスト抽出に失敗しました。\n\n原因: ${error.message}\n\n※画像PDFやパスワード付きPDF、または破損したWordファイルは対応していない場合があります。`, { type: 'error' });
-
-            console.warn(`テキスト抽出に失敗: ${error.message}`);
+            console.error('Text extraction error:', error);
             return false;
         }
     }
@@ -2976,20 +3268,26 @@ class RegistrationFlow {
 // --- App Logic ---
 class DashboardApp {
     constructor() {
+        this.DEBUG = false; // Set to true to enable logs
         this.currentView = 'dashboard';
         this.mainContent = document.getElementById('app-content');
-        this.pageTitle = document.getElementById('page-header-title');
+        this.pageTitle = document.querySelector('.page-title') || document.getElementById('page-header-title');
+        this.sidebar = document.getElementById('app-sidebar');
+        this.sidebarToggle = document.getElementById('sidebar-toggle');
+        this.subscription = null;
+        this._syncTimeout = null;
+        this._lastSyncTime = 0;
         this.currentViewParams = null;
         this.currentContractId = null;
         this.analysisResult = null;
         this.diffResult = null;
-        this.userRole = '管理者'; // Default: オーナー（API失敗時はチームメンバーではないのでオーナー扱い）
-
+        this.userRole = '管理者'; // Default: API失敗時は管理者扱い
 
         // Navigation State
         this.searchQuery = "";
         this.currentPage = 1;
         this.runtimePdfPreviewUrls = new Map();
+
         this.runtimeOriginalDocxFiles = new Map();
         this.historyComparisonContext = null;
         this.documentCompareState = null;
@@ -3027,6 +3325,15 @@ class DashboardApp {
         this.searchTimeout = null;
         this.detailClauseNavScrollCleanup = null;
         this.detailClauseNavRaf = null;
+        this.activeContractId = null;
+        this.isAnalyzed = false;
+        this.isAnalyzing = false;
+        this.selectedOldFile = 1;
+        this.selectedNewFile = 2;
+        this.diffLayout = 'split';
+        this.diffFilters = { added: true, removed: true, changed: true };
+        this.notifications = [];
+        this.showNotificationsList = false;
 
         // Registration Flow
         this.registration = new RegistrationFlow(this);
@@ -3040,16 +3347,30 @@ class DashboardApp {
         this.stripePublishableKey = '';
 
         // 初期表示をOwnerプランに設定 (ローカル開発・全機能解放)
-        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '[::1]' || window.location.hostname.endsWith('.local') || window.location.hostname.startsWith('192.168.') || window.location.hostname.startsWith('10.');
-        this.subscription = { 
-            plan: isLocal ? 'owner' : 'free', 
-            billingCycle: 'monthly', 
-            usageCount: 0, 
-            usageLimit: 999999, 
-            daysRemaining: null, 
-            planLimit: 999999,
-            signUsageLimit: 999999
-        };
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '[::1]' || window.location.hostname.endsWith('.local');
+        // 本番(非ローカル)の初期既定は Free の正規上限(AI=3 / 署名=10)に固定する。
+        // 既定を 999999(無制限)にすると、購読データ(GET /user/subscription)取得前の段階で
+        // 新規登録ユーザーが一時的に無制限扱いになり、解析・電子署名が制限されない不具合の原因になる。
+        // ローカル開発のみ全機能解放(owner=無制限)。
+        this.subscription = isLocal
+            ? {
+                plan: 'owner',
+                billingCycle: 'monthly',
+                usageCount: 0,
+                usageLimit: 999999,
+                daysRemaining: null,
+                planLimit: 999999,
+                signUsageLimit: 999999
+            }
+            : {
+                plan: 'free',
+                billingCycle: 'monthly',
+                usageCount: 0,
+                usageLimit: 3,
+                daysRemaining: null,
+                planLimit: 1,
+                signUsageLimit: 10
+            };
         this.userPlan = isLocal ? 'owner' : 'free';
         if (isLocal) this.userRole = '管理者';
 
@@ -3072,9 +3393,17 @@ class DashboardApp {
         this.memoryCache = new Map();
         this.pendingPairAnalysisKeys = new Set();
         this.attemptedAutoPairAnalysisKeys = new Set();
+        this.pdfClauseRepairInFlight = new Set();
+        this.pdfClauseRepairTimers = new Map();
         this.analyzingContractIds = new Set();
         this.bootstrapCompleted = false;
         this.hydrateCachedState();
+
+        this.init();
+    }
+
+    log(...args) {
+        if (this.DEBUG) console.log('[Dashboard]', ...args);
     }
 
     async loadAndRenderMcpSettings() {
@@ -3110,25 +3439,25 @@ class DashboardApp {
             const displayKey = (!hasVisibleKey || isKeyHidden) ? maskedKey : mcpKey;
             
             el.innerHTML = `
-                <div style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:10px; padding:16px; margin-bottom:16px;">
-                    <div style="font-size:11px; color:#94a3b8; margin-bottom:8px;">MCP専用APIキー</div>
+                <div style="background:#fff; border:1px solid #dbe7f5; border-radius:10px; padding:16px; margin-bottom:16px;">
+                    <div style="font-size:11px; color:#64748b; margin-bottom:8px;">MCP専用APIキー</div>
                     <div style="display:flex; align-items:center; gap:8px;">
-                        <code style="flex:1; font-family:monospace; font-size:13px; color:#fff; word-break:break-all;">${displayKey}</code>
+                        <code style="flex:1; font-family:monospace; font-size:13px; color:#0b2d62; word-break:break-all;">${displayKey}</code>
                     </div>
                     <div style="display:flex; gap:8px; margin-top:12px;">
-                        <button class="btn-dashboard" style="flex:1; background:rgba(255,255,255,0.1); border:none; color:#fff; font-size:11px; padding:6px; ${hasVisibleKey ? '' : 'opacity:0.5; cursor:not-allowed;'}" onclick="${hasVisibleKey ? 'window.app.toggleMcpKeyVisibility()' : 'Notify.info(`既存キーは安全のため再表示されません。必要なら新規発行してください`)'}">
+                        <button class="btn-dashboard" style="flex:1; background:#e5edf7; border:none; color:#0f172a; font-size:11px; padding:6px; ${hasVisibleKey ? '' : 'opacity:0.5; cursor:not-allowed;'}" onclick="${hasVisibleKey ? 'window.app.toggleMcpKeyVisibility()' : 'Notify.info(`既存キーは安全のため再表示されません。必要なら新規発行してください`)'}">
                             <i class="fa-solid ${hasVisibleKey && !isKeyHidden ? 'fa-eye-slash' : 'fa-eye'}"></i> ${hasVisibleKey ? (isKeyHidden ? '新規キーを表示' : '非表示にする') : '既存キーは再表示不可'}
                         </button>
-                        <button class="btn-dashboard" style="flex:1; background:rgba(255,255,255,0.1); border:none; color:#fff; font-size:11px; padding:6px; ${hasVisibleKey ? '' : 'opacity:0.5; cursor:not-allowed;'}" onclick="${hasVisibleKey ? `navigator.clipboard.writeText('${mcpKey}'); Notify.success('キーをコピーしました')` : `Notify.info('コピーできるのは新規発行直後のキーのみです')`}">
+                        <button class="btn-dashboard" style="flex:1; background:#e5edf7; border:none; color:#0f172a; font-size:11px; padding:6px; ${hasVisibleKey ? '' : 'opacity:0.5; cursor:not-allowed;'}" onclick="${hasVisibleKey ? `navigator.clipboard.writeText('${mcpKey}'); Notify.success('キーをコピーしました')` : `Notify.info('コピーできるのは新規発行直後のキーのみです')`}">
                             <i class="fa-solid fa-copy"></i> コピー
                         </button>
                     </div>
                 </div>
                 
-                <button class="btn-dashboard" style="width:100%; background:#c19b4a; border:none; color:#fff; font-weight:700; font-size:13px; padding:10px;" onclick="window.app.generateMcpKey()">
+                <button class="btn-dashboard" style="width:100%; background:#0b2d62; border:none; color:#fff; font-weight:700; font-size:13px; padding:10px;" onclick="window.app.generateMcpKey()">
                     <i class="fa-solid fa-rotate"></i> 新規キーを発行
                 </button>
-                <p style="font-size:10px; color:#94a3b8; margin-top:12px; line-height:1.4;">
+                <p style="font-size:10px; color:#64748b; margin-top:12px; line-height:1.4;">
                     ※キーは安全のため再表示しません。
                 </p>
             `;
@@ -3195,6 +3524,10 @@ class DashboardApp {
         }
     }
 
+    async handleLogout() {
+        await handleAuthLogout();
+    }
+
     setRuntimePdfPreviewUrl(contractId, file) {
         if (!contractId || !file || !(file instanceof File)) return;
         const key = String(contractId);
@@ -3227,28 +3560,38 @@ class DashboardApp {
     }
 
     async _savePdfToIDB(contractId, file) {
-        const db = await this._openDocxIDB();
-        const buf = await file.arrayBuffer();
-        return new Promise((resolve, reject) => {
-            const tx = db.transaction('docx-files', 'readwrite');
-            tx.objectStore('docx-files').put({ contractId: `pdf-${contractId}`, name: file.name, data: buf, savedAt: Date.now() });
-            tx.oncomplete = resolve;
-            tx.onerror = (e) => reject(e.target.error);
-        });
+        try {
+            const db = await this._openDocxIDB();
+            const buf = await file.arrayBuffer();
+            return await new Promise((resolve, reject) => {
+                const tx = db.transaction('docx-files', 'readwrite');
+                tx.objectStore('docx-files').put({ contractId: `pdf-${contractId}`, name: file.name, data: buf, savedAt: Date.now() });
+                tx.oncomplete = resolve;
+                tx.onabort = tx.onerror = (e) => reject(e.target.error || tx.error);
+            });
+        } catch (error) {
+            if (isBenignAbortError(error)) return null;
+            throw error;
+        }
     }
 
     async _loadPdfFromIDB(contractId) {
-        const db = await this._openDocxIDB();
-        return new Promise((resolve, reject) => {
-            const tx = db.transaction('docx-files', 'readonly');
-            const req = tx.objectStore('docx-files').get(`pdf-${contractId}`);
-            req.onsuccess = (e) => {
-                const rec = e.target.result;
-                if (rec) resolve(new File([rec.data], rec.name, { type: 'application/pdf' }));
-                else resolve(null);
-            };
-            req.onerror = (e) => reject(e.target.error);
-        });
+        try {
+            const db = await this._openDocxIDB();
+            return await new Promise((resolve, reject) => {
+                const tx = db.transaction('docx-files', 'readonly');
+                const req = tx.objectStore('docx-files').get(`pdf-${contractId}`);
+                req.onsuccess = (e) => {
+                    const rec = e.target.result;
+                    if (rec) resolve(new File([rec.data], rec.name, { type: 'application/pdf' }));
+                    else resolve(null);
+                };
+                tx.onabort = tx.onerror = req.onerror = (e) => reject(e.target.error || tx.error);
+            });
+        } catch (error) {
+            if (isBenignAbortError(error)) return null;
+            throw error;
+        }
     }
 
     setRuntimeOriginalPreviewFile(contractId, file) {
@@ -3276,28 +3619,38 @@ class DashboardApp {
     }
 
     async _saveDocxToIDB(contractId, file) {
-        const db = await this._openDocxIDB();
-        const buf = await file.arrayBuffer();
-        return new Promise((resolve, reject) => {
-            const tx = db.transaction('docx-files', 'readwrite');
-            tx.objectStore('docx-files').put({ contractId: String(contractId), name: file.name, data: buf, savedAt: Date.now() });
-            tx.oncomplete = resolve;
-            tx.onerror = (e) => reject(e.target.error);
-        });
+        try {
+            const db = await this._openDocxIDB();
+            const buf = await file.arrayBuffer();
+            return await new Promise((resolve, reject) => {
+                const tx = db.transaction('docx-files', 'readwrite');
+                tx.objectStore('docx-files').put({ contractId: String(contractId), name: file.name, data: buf, savedAt: Date.now() });
+                tx.oncomplete = resolve;
+                tx.onabort = tx.onerror = (e) => reject(e.target.error || tx.error);
+            });
+        } catch (error) {
+            if (isBenignAbortError(error)) return null;
+            throw error;
+        }
     }
 
     async _loadDocxFromIDB(contractId) {
-        const db = await this._openDocxIDB();
-        return new Promise((resolve, reject) => {
-            const tx = db.transaction('docx-files', 'readonly');
-            const req = tx.objectStore('docx-files').get(String(contractId));
-            req.onsuccess = (e) => {
-                const rec = e.target.result;
-                if (rec) resolve(new File([rec.data], rec.name, { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }));
-                else resolve(null);
-            };
-            req.onerror = (e) => reject(e.target.error);
-        });
+        try {
+            const db = await this._openDocxIDB();
+            return await new Promise((resolve, reject) => {
+                const tx = db.transaction('docx-files', 'readonly');
+                const req = tx.objectStore('docx-files').get(String(contractId));
+                req.onsuccess = (e) => {
+                    const rec = e.target.result;
+                    if (rec) resolve(new File([rec.data], rec.name, { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }));
+                    else resolve(null);
+                };
+                tx.onabort = tx.onerror = req.onerror = (e) => reject(e.target.error || tx.error);
+            });
+        } catch (error) {
+            if (isBenignAbortError(error)) return null;
+            throw error;
+        }
     }
 
     _openDocxIDB() {
@@ -3462,19 +3815,21 @@ class DashboardApp {
         if (urlParams.get('forcePlan')) return;
 
         // ローカル環境（Owner）の場合はキャッシュでの上書きを制限する
-        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '[::1]' || window.location.hostname.endsWith('.local') || window.location.hostname.startsWith('192.168.') || window.location.hostname.startsWith('10.');
-
-        // ローカルかつownerなら、キャッシュは一切適用しない（古いusageLimitなどで上書きを防ぐ）
-        if (isLocal && this.userPlan === 'owner') return;
-
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '[::1]' || window.location.hostname.endsWith('.local');
+        
         const cachedSub = this.getCachedItem(DASHBOARD_CACHE_KEYS.SUBSCRIPTION, 10 * 60 * 1000);
         if (cachedSub && cachedSub.plan) {
-            this.subscription = {
-                ...this.subscription,
-                ...cachedSub,
-                billingCycle: cachedSub.billingCycle === 'annual' ? 'annual' : 'monthly'
-            };
-            this.userPlan = cachedSub.plan;
+            // ローカルかつ現在がownerなら、キャッシュがowner以外なら上書きしない
+            if (isLocal && this.userPlan === 'owner' && cachedSub.plan !== 'owner') {
+                // Keep owner
+            } else {
+                this.subscription = {
+                    ...this.subscription,
+                    ...cachedSub,
+                    billingCycle: cachedSub.billingCycle === 'annual' ? 'annual' : 'monthly'
+                };
+                this.userPlan = cachedSub.plan;
+            }
         }
 
         const cachedUser = this.getCachedItem(DASHBOARD_CACHE_KEYS.USER_META, 30 * 60 * 1000);
@@ -3503,6 +3858,20 @@ class DashboardApp {
     }
 
     resetExecutionState(nextViewId = null) {
+        // Cleanup pending animations/processes
+        if (this.detailClauseNavRaf) {
+            cancelAnimationFrame(this.detailClauseNavRaf);
+            this.detailClauseNavRaf = null;
+        }
+        if (this._mcpPaneHeightRaf) {
+            cancelAnimationFrame(this._mcpPaneHeightRaf);
+            this._mcpPaneHeightRaf = null;
+        }
+        if (this._syncTimeout) {
+            clearTimeout(this._syncTimeout);
+            this._syncTimeout = null;
+        }
+
         this.currentContractId = null;
         this.analysisResult = null;
         this.diffResult = null;
@@ -3603,7 +3972,7 @@ class DashboardApp {
             if (clauses && clauses.length > 0) {
                 contentHtml = clauses.map(clause => {
                     const titleHtml = clause.title
-                        ? `<div style="font-size:13px;font-weight:700;color:#c5a059;margin-bottom:4px;">${clause.title}${clause.header ? `　${clause.header}` : ''}</div>`
+                        ? `<div style="font-size:13px;font-weight:700;color:#0b2d62;margin-bottom:4px;">${clause.title}${clause.header ? `　${clause.header}` : ''}</div>`
                         : '';
                     const bodyHtml = (clause.paragraphs || []).map(p =>
                         `<p style="margin:0 0 8px;line-height:1.8;font-size:13px;color:#2b2623;">${String(p).replace(/\n/g, '<br>')}</p>`
@@ -3632,7 +4001,7 @@ class DashboardApp {
         overlay.id = 'deadline-input-overlay';
         overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;';
         overlay.innerHTML = `
-            <div class="deadline-modal-container">
+            <div style="background:#fff;border-radius:12px;width:100%;max-width:1100px;height:88vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,0.22);overflow:hidden;">
 
                 <!-- Header -->
                 <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid #eee;flex-shrink:0;">
@@ -3643,28 +4012,28 @@ class DashboardApp {
                     <button onclick="document.getElementById('deadline-input-overlay').remove()" style="background:none;border:none;font-size:22px;color:#aaa;cursor:pointer;line-height:1;padding:4px 8px;">✕</button>
                 </div>
 
-                <!-- Body -->
-                <div class="deadline-modal-body">
+                <!-- Body: left=doc, right=form -->
+                <div style="display:flex;flex:1;overflow:hidden;min-height:0;">
 
-                    <!-- Document viewer -->
-                    <div class="deadline-doc-viewer">
+                    <!-- Document viewer (scrollable) -->
+                    <div style="flex:1;overflow:hidden;min-width:0;border-right:1px solid #eee;">
                         <div style="height:100%;overflow-y:auto;padding:20px 24px;box-sizing:border-box;">
                             ${contentHtml}
                         </div>
                     </div>
 
                     <!-- Deadline input form -->
-                    <div class="deadline-form-sidebar">
-                        <div style="flex:1;"></div>
-                        <div style="font-size:13px;font-weight:700;color:#2b2623;margin-bottom:2px;"><i class="fa-solid fa-calendar-days" style="color:#c5a059;margin-right:6px;"></i>期限を入力</div>
+                    <div style="width:280px;flex-shrink:0;display:flex;flex-direction:column;padding:24px 20px;gap:16px;overflow-y:auto;">
+                        <div style="font-size:13px;font-weight:700;color:#2b2623;margin-bottom:4px;"><i class="fa-solid fa-calendar-days" style="color:#0b2d62;margin-right:6px;"></i>期限を入力</div>
                         <div>
-                            <label style="font-size:11px;font-weight:600;color:#5e544d;display:block;margin-bottom:3px;">契約終了日</label>
+                            <label style="font-size:11px;font-weight:600;color:#5e544d;display:block;margin-bottom:5px;">契約終了日</label>
                             <input type="date" id="dl-expiry" value="${c.expiry_date || ''}"
                                 style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;box-sizing:border-box;">
                         </div>
-                        <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px;">
+                        <div style="flex:1;"></div>
+                        <div style="display:flex;flex-direction:column;gap:8px;">
                             <button onclick="window.app.saveDeadlineInput('${contractId}')"
-                                style="padding:10px;border:none;border-radius:6px;background:#c5a059;color:#fff;font-size:13px;font-weight:600;cursor:pointer;width:100%;">
+                                style="padding:10px;border:none;border-radius:6px;background:#0b2d62;color:#fff;font-size:13px;font-weight:600;cursor:pointer;width:100%;">
                                 <i class="fa-solid fa-check" style="margin-right:6px;"></i>保存
                             </button>
                             <button onclick="document.getElementById('deadline-input-overlay').remove()"
@@ -3681,15 +4050,6 @@ class DashboardApp {
      * Show confirmation popup before running single-doc reanalysis.
      */
     confirmReanalyze(contractId) {
-        // Use detailState (always current) to detect if two docs are selected for comparison
-        const detailState = (this.detailState?.contractId && String(this.detailState.contractId) === String(contractId))
-            ? this.detailState : null;
-        const selectedSourceDoc = detailState?.comparison?.selectedSourceDoc;
-        const selectedTargetDoc = detailState?.comparison?.selectedTargetDoc;
-        const hasPair = Boolean(detailState?.diff?.canTriggerPairAnalysis && selectedSourceDoc && selectedTargetDoc);
-        const docAId = hasPair ? selectedSourceDoc.id : '';
-        const docBId = hasPair ? selectedTargetDoc.id : '';
-
         const overlay = document.createElement('div');
         overlay.id = 'reanalyze-confirm-overlay';
         overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9500;display:flex;align-items:center;justify-content:center;';
@@ -3697,58 +4057,31 @@ class DashboardApp {
             <div style="background:#fff;border-radius:12px;padding:28px 32px;width:400px;max-width:92vw;box-shadow:0 8px 32px rgba(0,0,0,0.18);">
                 <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:20px;">
                     <div style="width:40px;height:40px;border-radius:10px;background:#fef3e2;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                        <i class="fa-solid fa-wand-magic-sparkles" style="color:#c5a059;font-size:18px;"></i>
+                        <i class="fa-solid fa-wand-magic-sparkles" style="color:#0b2d62;font-size:18px;"></i>
                     </div>
                     <div>
                         <div style="font-size:15px;font-weight:700;color:#2b2623;margin-bottom:6px;">AIリスク解析＋期限取得を実行しますか？</div>
                         <div style="font-size:13px;color:#5e544d;line-height:1.6;">
                             リスク解析と期限解析を同時に行います。<br>
-                            <strong style="color:#c5a059;">解析1回を消費します。</strong>
+                            <strong style="color:#0b2d62;">解析1回を消費します。</strong>
                         </div>
                     </div>
                 </div>
                 <div style="background:#f8f6f3;border-radius:8px;padding:12px 14px;margin-bottom:20px;font-size:12px;color:#7a6a5a;line-height:1.6;">
-                    <i class="fa-solid fa-circle-info" style="color:#c5a059;margin-right:6px;"></i>
-                    ${hasPair ? 'AIが書類全体のリスク・期限取得に加え、新旧差分のリスクも解析します。' : '差分チェックなしでも、AIが書類全体のリスクと契約期限を抽出します。'}
+                    <i class="fa-solid fa-circle-info" style="color:#0b2d62;margin-right:6px;"></i>
+                    差分チェックなしでも、AIが書類全体のリスクと契約期限を抽出します。
                 </div>
                 <div style="display:flex;gap:10px;justify-content:flex-end;">
                     <button onclick="document.getElementById('reanalyze-confirm-overlay').remove()"
                         style="padding:9px 20px;border:1px solid #ddd;border-radius:6px;background:#fff;color:#5e544d;font-size:14px;cursor:pointer;">キャンセル</button>
-                    <button onclick="document.getElementById('reanalyze-confirm-overlay').remove();window.app.runFullAnalysis('${contractId}', '${docAId}', '${docBId}')"
-                        style="padding:9px 22px;border:none;border-radius:6px;background:#c5a059;color:#fff;font-size:14px;font-weight:600;cursor:pointer;">
+                    <button onclick="document.getElementById('reanalyze-confirm-overlay').remove();window.app.runReanalyze('${contractId}', { userTriggered: true })"
+                        style="padding:9px 22px;border:none;border-radius:6px;background:#0b2d62;color:#fff;font-size:14px;font-weight:600;cursor:pointer;">
                         <i class="fa-solid fa-play" style="margin-right:6px;"></i>解析する
                     </button>
                 </div>
             </div>`;
         document.body.appendChild(overlay);
         overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
-    }
-
-    /**
-     * Run both single-doc reanalysis (risk + deadline) and diff pair analysis if a pair is selected.
-     */
-    runFullAnalysis(contractId, docAId, docBId) {
-        if (docAId && docBId) {
-            // 文書ペアが選択されている場合は差分解析のみ実行（差分解析にリスク・期限取得も含まれるため）
-            this.runDiffAnalyze(contractId, docAId, docBId);
-        } else {
-            // 単体解析のみ実行
-            this.runReanalyze(contractId, { userTriggered: true });
-        }
-    }
-
-    /**
-     * Execute diff pair analysis between two selected documents.
-     */
-    runDiffAnalyze(contractId, docAId, docBId) {
-        const docs = dbService.getDocumentsByContractId(contractId);
-        const sourceDoc = docs.find(d => String(d.id) === String(docAId));
-        const targetDoc = docs.find(d => String(d.id) === String(docBId));
-        if (!sourceDoc || !targetDoc) {
-            Notify.error('比較文書が見つかりません');
-            return;
-        }
-        this.analyzeDocumentPair(contractId, sourceDoc, targetDoc, { force: true, userTriggered: true });
     }
 
     /**
@@ -3861,6 +4194,8 @@ class DashboardApp {
                     || updatedContract.renewal_deadline
                     || updatedContract.contract_start
                 );
+                const changeCount = (updatedContract.ai_changes || []).filter(Boolean).length;
+                const changeSuffix = changeCount > 0 ? `　修正案${changeCount}件あり。` : '';
                 if (aiFailed) {
                     if (normalizedData.errorCode === 'AI_RATE_LIMITED') {
                         Notify.warning('現在アクセスが集中しています。数分後にもう一度お試しください。');
@@ -3868,10 +4203,9 @@ class DashboardApp {
                         Notify.error('AI解析に失敗しました。消費はしていませんので、再度解析してください。');
                     }
                 } else if (hasDeadline) {
-                    Notify.success('解析完了。期限情報を期限・アラート管理に格納しました');
+                    Notify.success(`解析完了。期限情報を期限・アラート管理に格納しました。${changeSuffix}`);
                 } else {
-                    // 解析は成功したが期限が見つからなかったケース
-                    Notify.success('解析が完了しました。この書類には期限に関する記述は見つかりませんでした。');
+                    Notify.success(`解析完了。${changeSuffix}`);
                 }
             } catch (err) {
                 const raw = String(err?.message || '');
@@ -4167,7 +4501,7 @@ class DashboardApp {
             const active = sortKey === key;
             const nextDir = active && sortDir === 'asc' ? 'desc' : 'asc';
             const arrow = active ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '';
-            return `<th style="padding:10px 12px;text-align:left;font-size:12px;color:${active ? '#c5a059' : '#8a7a6a'};font-weight:600;cursor:pointer;white-space:nowrap;${extraStyle}"
+            return `<th style="padding:10px 12px;text-align:left;font-size:12px;color:${active ? '#0b2d62' : '#8a7a6a'};font-weight:600;cursor:pointer;white-space:nowrap;${extraStyle}"
                 onclick="window.app.navigate('deadlines', {query:'${query}',filterRange:'${filterRange}',sortKey:'${key}',sortDir:'${nextDir}'})">${label}${arrow}</th>`;
         };
 
@@ -4188,7 +4522,7 @@ class DashboardApp {
             const daysBadge = noDate
                 ? `<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">
                     <button onclick="event.stopPropagation();window.app.showDeadlineInputModal('${c.id}')"
-                        style="background:#fff;border:1.5px dashed #c5a059;color:#c5a059;border-radius:20px;padding:3px 0;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;width:90px;text-align:center;">
+                        style="background:#fff;border:1.5px dashed #0b2d62;color:#0b2d62;border-radius:20px;padding:3px 0;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;width:90px;text-align:center;">
                         <i class="fa-solid fa-plus" style="margin-right:4px;font-size:10px;"></i>期限を入力
                     </button>
                     <button id="btn-deadline-reanalyze-${c.id}" onclick="event.stopPropagation();window.app.runDeadlineReanalyze('${c.id}', { userTriggered: true })"
@@ -4210,7 +4544,7 @@ class DashboardApp {
             const active = filterRange === range;
             const count = counts[range];
             return `<button onclick="window.app.navigate('deadlines', {query:'${query}',filterRange:'${range}',sortKey:'${sortKey}',sortDir:'${sortDir}'})"
-                style="padding:7px 14px;border:1px solid ${active ? '#c5a059' : '#ddd'};border-radius:6px;background:${active ? '#c5a059' : '#fff'};color:${active ? '#fff' : '#5e544d'};font-size:13px;font-weight:${active ? '700' : '400'};cursor:pointer;display:flex;align-items:center;gap:6px;">
+                style="padding:7px 14px;border:1px solid ${active ? '#0b2d62' : '#ddd'};border-radius:6px;background:${active ? '#0b2d62' : '#fff'};color:${active ? '#fff' : '#5e544d'};font-size:13px;font-weight:${active ? '700' : '400'};cursor:pointer;display:flex;align-items:center;gap:6px;">
                 ${icon} ${label}${count > 0 ? ` <span style="background:${active ? 'rgba(255,255,255,0.3)' : '#f0ede8'};color:${active ? '#fff' : '#7a6a5a'};border-radius:10px;padding:1px 7px;font-size:11px;">${count}</span>` : ''}
             </button>`;
         };
@@ -4229,17 +4563,7 @@ class DashboardApp {
                         style="padding:8px 12px 8px 36px;border:1px solid #ddd;border-radius:4px;width:100%;font-size:13px;box-sizing:border-box;"
                         oninput="window.app.navigate('deadlines', {query:this.value,filterRange:'${filterRange}',sortKey:'${sortKey}',sortDir:'${sortDir}'})">
                 </div>
-                <div class="mobile-only" style="width:100%;margin-top:8px;">
-                    <select onchange="window.app.navigate('deadlines', {query:'${query}',filterRange:this.value,sortKey:'${sortKey}',sortDir:'${sortDir}'})"
-                            style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;font-size:14px;background:#fff;color:#5e544d;">
-                        <option value="all" ${filterRange === 'all' ? 'selected' : ''}>期限表示: すべて (${counts.all})</option>
-                        <option value="urgent" ${filterRange === 'urgent' ? 'selected' : ''}>7日以内 (${counts.urgent})</option>
-                        <option value="warning" ${filterRange === 'warning' ? 'selected' : ''}>30日以内 (${counts.warning})</option>
-                        <option value="upcoming" ${filterRange === 'upcoming' ? 'selected' : ''}>90日以内 (${counts.upcoming})</option>
-                        <option value="nodate" ${filterRange === 'nodate' ? 'selected' : ''}>期限未設定 (${counts.nodate})</option>
-                    </select>
-                </div>
-                <div class="pc-only flex gap-sm items-center flex-wrap">
+                <div class="flex gap-sm items-center flex-wrap">
                     ${tabBtn('all', 'すべて', '')}
                     ${tabBtn('urgent', '7日以内', '')}
                     ${tabBtn('warning', '30日以内', '')}
@@ -4265,15 +4589,12 @@ class DashboardApp {
             </table>
         </div>
         <div class="text-muted" style="font-size:13px;margin-top:12px;">全 ${counts.all} 件中 ${sorted.length} 件を表示
-            ${counts.nodate > 0 ? `<span style="margin-left:16px;"><i class="fa-solid fa-circle-info" style="color:#c5a059;margin-right:4px;"></i>期限未設定 ${counts.nodate} 件：契約書を解析するとAIが自動で期限を抽出します。失敗した解析回数は消耗しません。</span>` : ''}
+            ${counts.nodate > 0 ? `<span style="margin-left:16px;"><i class="fa-solid fa-circle-info" style="color:#0b2d62;margin-right:4px;"></i>期限未設定 ${counts.nodate} 件：契約書を解析するとAIが自動で期限を抽出します。失敗した解析回数は消耗しません。</span>` : ''}
         </div>`;
 
-        const lockOverlay = deadlineLocked ? `<div style="position:fixed;top:0;right:0;bottom:0;left:240px;display:flex;align-items:center;justify-content:center;background:rgba(245,247,250,0.85);backdrop-filter:blur(3px);z-index:1000;"><div style="background:#fff;border-radius:12px;padding:32px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,0.13);max-width:300px;width:90%;"><i class="fa-solid fa-crown" style="color:#c19b4a;font-size:2rem;margin-bottom:12px;display:block;"></i><div style="display:inline-block;background:#f3f0ea;color:#c5a059;border:1px solid #e8d9b8;border-radius:10px;padding:3px 12px;font-size:11px;font-weight:700;margin-bottom:12px;">Business / Proプラン限定</div><div style="font-weight:700;font-size:15px;margin-bottom:8px;color:#2b2623;">期限・アラート管理</div><p style="font-size:12px;color:#888;line-height:1.6;margin-bottom:20px;">契約期限の自動抽出・アラート通知はBusinessプラン以上でご利用いただけます。</p><button onclick="window.app.navigate('plan')" style="width:100%;padding:10px;border:none;border-radius:8px;background:#c5a059;color:#fff;font-size:13px;font-weight:700;cursor:pointer;">アップグレードする</button></div></div>` : '';
+        const lockOverlay = deadlineLocked ? `<div style="position:fixed;top:0;right:0;bottom:0;left:240px;display:flex;align-items:center;justify-content:center;background:rgba(245,247,250,0.85);backdrop-filter:blur(3px);z-index:1000;"><div style="background:#fff;border-radius:12px;padding:32px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,0.13);max-width:300px;width:90%;"><i class="fa-solid fa-crown" style="color:#0b2d62;font-size:2rem;margin-bottom:12px;display:block;"></i><div style="display:inline-block;background:#eef4fb;color:#0b2d62;border:1px solid rgba(6, 31, 69, 0.18);border-radius:10px;padding:3px 12px;font-size:11px;font-weight:700;margin-bottom:12px;">Business / Proプラン限定</div><div style="font-weight:700;font-size:15px;margin-bottom:8px;color:#2b2623;">期限・アラート管理</div><p style="font-size:12px;color:#888;line-height:1.6;margin-bottom:20px;">契約期限の自動抽出・アラート通知はBusinessプラン以上でご利用いただけます。</p><button onclick="window.app.navigate('plan')" style="width:100%;padding:10px;border:none;border-radius:8px;background:#0b2d62;color:#fff;font-size:13px;font-weight:700;cursor:pointer;">アップグレードする</button></div></div>` : '';
 
-        return `
-            <div class="plan-view-container">
-                <div style="position:relative;">${pageHtml}${lockOverlay}</div>
-            </div>`;
+        return `<div style="position:relative;">${pageHtml}${lockOverlay}</div>`;
     }
 
     ensureDiffLibrary() {
@@ -4323,10 +4644,11 @@ class DashboardApp {
         regBtn.style.display = (canOperate && canShowOnView) ? 'inline-flex' : 'none';
     }
 
-    updateActiveMenu(viewId = this.currentView) {
+    updateActiveMenu(viewId = this.currentView, params = null) {
+        const diffTargetId = viewId === 'diff' ? normalizeDiffContractId(params) : null;
         const groupedViewId = ['sign', 'sign-editor', 'sign-recipient', 'sign-viewer'].includes(viewId)
             ? 'sign'
-            : viewId === 'diff' ? 'contracts' : viewId;
+            : (viewId === 'diff' && diffTargetId ? 'contracts' : viewId);
         const navItems = document.querySelectorAll('.nav-item');
         navItems.forEach((item) => item.classList.remove('active'));
         navItems.forEach((item) => {
@@ -4336,47 +4658,24 @@ class DashboardApp {
             }
         });
 
-        const isSubMenuView = ['history', 'deadlines', 'plan', 'notifications', 'mcp', 'team'].includes(viewId);
-        const mobileMenuOpen = document.getElementById('mobile-menu-panel')?.classList.contains('is-open');
-
         document.querySelectorAll('.mobile-bottom-nav .bottom-nav-item').forEach((item) => {
-            const isMenuBtn = item.id === 'bnav-menu' || item.id === 'bnav-menu-bottom' || item.getAttribute('data-mobile-action') === 'menu';
-            if (isMenuBtn) {
-                // Keep gold if menu is open OR if we are in a sub-view that came from the menu
-                item.classList.toggle('active', !!mobileMenuOpen || isSubMenuView);
-                return;
-            }
             const targetView = item.getAttribute('data-mobile-view');
-            // If menu is open or in a sub-view, others shouldn't be active (except the menu icon itself)
-            const isActive = !mobileMenuOpen && !isSubMenuView && targetView && (targetView === groupedViewId);
-            item.classList.toggle('active', isActive);
+            item.classList.toggle('active', targetView === groupedViewId);
         });
     }
 
     toggleMobileMenu(forceOpen = null) {
-        if (this._menuToggleLock) return;
-        
         const panel = document.getElementById('mobile-menu-panel');
         if (!panel) return;
 
-        const isCurrentlyOpen = panel.classList.contains('is-open');
-        const shouldBeOpen = (forceOpen !== null) ? forceOpen : !isCurrentlyOpen;
-
-        // Prevent redundant toggles or rapid fire
-        if (isCurrentlyOpen === shouldBeOpen) return;
-
-        this._menuToggleLock = true;
-        setTimeout(() => { this._menuToggleLock = false; }, 350); // Faster response
-
-        const shouldOpen = shouldBeOpen;
-        this._mobileMenuOpen = shouldOpen; // Track state explicitly
+        const shouldOpen = typeof forceOpen === 'boolean'
+            ? forceOpen
+            : !panel.classList.contains('is-open');
 
         panel.classList.toggle('is-open', shouldOpen);
-        document.querySelectorAll('.mobile-menu-button, #bnav-menu, #bnav-menu-bottom, [data-mobile-action="menu"]').forEach((button) => {
+        document.querySelectorAll('.mobile-menu-button, #bnav-menu').forEach((button) => {
             button.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
         });
-
-        this.updateActiveMenu();
     }
 
     closeMobileMenu() {
@@ -4384,10 +4683,18 @@ class DashboardApp {
     }
 
     syncContractsInBackground(onSynced) {
+        // Throttling: prevent sync more than once every 30 seconds
+        const now = Date.now();
+        if (this._lastSyncTime && (now - this._lastSyncTime) < 30000) {
+            this.log('Skipping background sync (throttled)');
+            return;
+        }
+
         if (!this.contractSyncPromise) {
+            this._lastSyncTime = now;
             this.contractSyncPromise = dbService.syncContractsFromApi()
                 .catch((error) => {
-                    console.warn('Background contract sync failed:', error);
+                    this.log('Background contract sync failed:', error);
                     return null;
                 })
                 .finally(() => {
@@ -4400,38 +4707,113 @@ class DashboardApp {
         });
     }
 
+    async downloadOriginalFile(contractId) {
+        const viewer = window.signViewer;
+        const targetId = contractId || (viewer && viewer._currentRequest?.contract_id);
+        if (!targetId) {
+            Notify.error('対象の契約が見つかりません');
+            return;
+        }
+        let contract = dbService.getContractById(targetId);
+        // dbService が contract を持ってない (file-based storage が backend 再起動で失われた等) 場合、
+        // viewer 上に保持されている contract から fallback する
+        if (!contract && viewer && viewer._contract && String(viewer._contract.id) === String(targetId)) {
+            contract = viewer._contract;
+        }
+        if (!contract) {
+            Notify.error('契約データが見つかりませんでした');
+            return;
+        }
+        const originalPath = contract.original_file_path || contract.original_file_url;
+        if (!originalPath) {
+             Notify.error('原本ファイルが見つかりません');
+             return;
+        }
+        let downloadUrl = resolveBackendAssetUrl(originalPath);
+        // resolveBackendAssetUrl が空文字 or 相対 path を返した場合は元の originalPath を使い、
+        // backend URL を prefix する (例: "uploads/..." → "http://localhost:3001/uploads/...")
+        if (!downloadUrl || !/^https?:\/\//i.test(downloadUrl)) {
+            const rawPath = downloadUrl || originalPath;
+            const normalizedPath = rawPath.startsWith('/') ? rawPath : '/' + rawPath;
+            const base = (typeof window !== 'undefined' && window.__DOCX_PDF_SERVICE_URL__)
+                ? String(window.__DOCX_PDF_SERVICE_URL__).replace(/\/$/, '')
+                : '';
+            if (base) downloadUrl = base + normalizedPath;
+        }
+        const filename = contract.original_filename || `original_${targetId}.docx`;
+        // DOCX (=ZIP) magic 'PK\x03\x04' チェック: HTML が docx として DL され Word 「破損」エラーになる事を防ぐ
+        const isValidDocxBlob = async (blob) => {
+            if (!(blob instanceof Blob) || blob.size < 4) return false;
+            try {
+                const bytes = new Uint8Array(await blob.slice(0, 4).arrayBuffer());
+                return bytes[0] === 0x50 && bytes[1] === 0x4B && (bytes[2] === 0x03 || bytes[2] === 0x05 || bytes[2] === 0x07);
+            } catch (_) { return false; }
+        };
+        try {
+            Notify.success('ダウンロードを開始します...');
+            const res = await fetch(downloadUrl);
+            const blob = await res.blob();
+            if (!(await isValidDocxBlob(blob))) {
+                console.error('[Dashboard] downloadOriginalFile got non-DOCX blob from:', downloadUrl);
+                Notify.error('取得したファイルがDOCX形式ではありません。バックエンド接続を確認してください。');
+                return;
+            }
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            setTimeout(() => URL.revokeObjectURL(link.href), 10000);
+        } catch (e) {
+            console.error('Download error:', e);
+            window.open(downloadUrl, '_blank');
+        }
+    }
+
     async init() {
-        if (this._appInitialized) return;
-        this._appInitialized = true;
         try {
             console.log('Dashboard App Initializing...');
             const initStartMs = performance.now();
             if ('scrollRestoration' in window.history) {
                 window.history.scrollRestoration = 'manual';
             }
-            this.mainContent.innerHTML = renderDashboardOverview(this);
+            try {
+                this.mainContent.innerHTML = renderDashboardOverview(this);
+            } catch (renderError) {
+                console.error('Initial dashboard render failed:', renderError);
+                // Fallback to minimal skeleton if even the v2 renderer fails
+                this.mainContent.innerHTML = '<div class="p-md text-muted">読み込み中...</div>';
+            }
             const planNav = document.getElementById('nav-plan');
             if (planNav) planNav.style.display = '';
 
             // Get current user UID first for data isolation.
-            // On localhost with local API, skip Firebase auth. With prodApi=1, require real auth.
-            try {
-                if (!shouldUseLocalDevAuthBypass()) {
-                    const user = await waitForAuthStateReady(auth);
-                    if (user) {
-                        dbService.setCurrentUser(user.uid);
+            if (isLocalHostEnvironment()) {
+                console.log("Dashboard: Local development mode (Bypass Auth)");
+                dbService.setCurrentUser('owner_dev');
+            } else {
+                try {
+                    if (!shouldUseLocalDevAuthBypass()) {
+                        const user = await waitForAuthStateReady(auth);
+                        if (user) dbService.setCurrentUser(user.uid);
                     }
+                } catch (e) {
+                    console.warn('Auth ready wait failed:', e);
                 }
-            } catch (e) {
-                console.warn('Could not get UID for data isolation:', e);
             }
 
             dbService.init();
+            this.mainContent.innerHTML = renderDashboardOverview(this);
             this.bindEvents();
             this.registration.init();
 
-            // UIを初期想定（Pro）で更新
-            this.updateSubscriptionUI();
+            // UIを初期想定（Pro/Owner）で更新
+            if (isLocalHostEnvironment()) {
+                this.updateSubscriptionUI({ status: 'active', plan: 'pro' });
+            } else {
+                this.updateSubscriptionUI();
+            }
 
             const urlParams = new URLSearchParams(window.location.search);
             const shouldStartPayment = urlParams.get('start_payment') === '1';
@@ -4439,10 +4821,18 @@ class DashboardApp {
             const paymentBilling = urlParams.get('billing');
             // Critical UI first: route immediately, data bootstrap in background
             const hash = window.location.hash;
+            const validViews = ['contracts', 'diff', 'diff-check', 'deadlines', 'settings', 'plan', 'upload', 'dashboard'];
             if (hash && hash.startsWith('#diff/')) {
                 const contractId = parseInt(hash.replace('#diff/', ''), 10);
                 if (!isNaN(contractId)) {
                     this.navigate('diff', contractId);
+                } else {
+                    this.navigate('dashboard');
+                }
+            } else if (hash && hash.length > 1) {
+                const view = hash.replace('#', '').split('/')[0];
+                if (validViews.includes(view)) {
+                    this.navigate(view === 'diff' ? 'diff-check' : view);
                 } else {
                     this.navigate('dashboard');
                 }
@@ -4496,8 +4886,7 @@ class DashboardApp {
 
             const fbConfig = await import('./firebase-config.js');
             const auth = fbConfig.auth;
-            let user = auth.currentUser;
-
+            const user = auth.currentUser;
 
             if (user) {
                 this.currentUser = user; // Store for later use
@@ -4713,9 +5102,7 @@ class DashboardApp {
         try {
             const authModule = await import('./auth.js');
             const token = await authModule.getIdToken();
-            const _h = window.location.hostname;
-            const _isLocal = _h === 'localhost' || _h === '127.0.0.1' || _h.startsWith('192.168.') || _h.startsWith('10.');
-            if (token || _isLocal) {
+            if (token) {
                 await this.fetchSubscriptionStatus(token);
             }
         } catch (error) {
@@ -4725,8 +5112,7 @@ class DashboardApp {
 
     async fetchSubscriptionStatus(token) {
         // ローカル環境ではデフォルトで 'owner' プランを適用（全機能解放・全機能無制限）
-        const _h = window.location.hostname;
-        const _isLocalEnv = _h === 'localhost' || _h === '127.0.0.1' || _h === '[::1]' || _h.endsWith('.local') || _h.startsWith('192.168.') || _h.startsWith('10.') || /^172\.(1[6-9]|2\d|3[01])\./.test(_h);
+        const _isLocalEnv = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '[::1]' || window.location.hostname.endsWith('.local');
         let forcedPlan = _isLocalEnv ? (new URLSearchParams(window.location.search).get('forcePlan') || 'owner') : null;
         
         if (forcedPlan) {
@@ -4780,6 +5166,10 @@ class DashboardApp {
     }
 
     async fetchPaymentStatus(token) {
+        if (isLocalHostEnvironment() && String(aiService.API_BASE || '').includes('127.0.0.1:3001')) {
+            this.paymentStatus = { hasPaymentMethod: false };
+            return;
+        }
         try {
             const apiUrl = `${aiService.API_BASE}/payment/status`;
 
@@ -4807,6 +5197,16 @@ class DashboardApp {
         }
 
         const previousConfig = this.paymentConfig;
+        if (isLocalHostEnvironment() && String(aiService.API_BASE || '').includes('127.0.0.1:3001')) {
+            if (!previousConfig) {
+                this.paymentConfig = null;
+                this.paymentPlanAvailability = null;
+                this.hasAnnualBillingPlans = null;
+                this.stripeEnabled = false;
+                this.stripePublishableKey = '';
+            }
+            return previousConfig || null;
+        }
 
         try {
             const response = await fetch(`${aiService.API_BASE}/payment/config`);
@@ -4903,7 +5303,7 @@ class DashboardApp {
         <div class="modal-content" style="max-width:480px;">
             <div class="modal-header">
                 <h3 style="margin:0; font-size:1.1rem;">
-                    <i class="fa-solid fa-credit-card" style="margin-right:8px; color:#B8860B;"></i>お支払い方法を登録
+                    <i class="fa-solid fa-credit-card" style="margin-right:8px; color:#0b2d62;"></i>お支払い方法を登録
                 </h3>
                 ${forcePayment ? '' : '<button class="btn-close" onclick="document.getElementById(\'stripe-modal-overlay\').remove()">&times;</button>'}
             </div>
@@ -4912,9 +5312,9 @@ class DashboardApp {
                     <div style="font-size:0.8rem; color:#888; margin-bottom:4px;">選択プラン</div>
                     <div style="font-size:1.1rem; font-weight:700; color:#24292E;">${planNames[targetPlan] || targetPlan}</div>
                     <div style="font-size:0.8rem; color:#8a6f40; margin-top:4px;">請求サイクル: ${billingLabel}</div>
-                    <div style="font-size:1.3rem; font-weight:700; color:#B8860B; margin-top:4px;">${planPrices[cycle]?.[targetPlan] || ''}</div>
+                    <div style="font-size:1.3rem; font-weight:700; color:#0b2d62; margin-top:4px;">${planPrices[cycle]?.[targetPlan] || ''}</div>
                 </div>
-                <button class="btn-dashboard full-width" style="background:#B8860B; color:#fff; border:none; font-weight:700;" onclick="window.app.startStripeCheckout('${targetPlan}', '${cycle}', ${forcePayment ? 'true' : 'false'})">
+                <button class="btn-dashboard full-width" style="background:#0b2d62; color:#fff; border:none; font-weight:700;" onclick="window.app.startStripeCheckout('${targetPlan}', '${cycle}', ${forcePayment ? 'true' : 'false'})">
                     お支払いを登録する
                 </button>
             </div>
@@ -5069,7 +5469,7 @@ class DashboardApp {
             paypal.Buttons({
                 style: {
                     shape: 'rect',
-                    color: 'gold',
+                    color: 'blue',
                     layout: 'vertical',
                     label: 'pay'
                 },
@@ -5140,7 +5540,7 @@ class DashboardApp {
         <div class="modal-content" style="max-width:480px;">
             <div class="modal-header">
                 <h3 style="margin:0; font-size:1.1rem;">
-                    <i class="fa-solid fa-credit-card" style="margin-right:8px; color:#c19b4a;"></i>お支払い方法を登録
+                    <i class="fa-solid fa-credit-card" style="margin-right:8px; color:#0b2d62;"></i>お支払い方法を登録
                 </h3>
                 ${forcePayment ? '' : '<button class="btn-close" onclick="document.getElementById(\'paypal-modal-overlay\').remove()">&times;</button>'}
             </div>
@@ -5149,7 +5549,7 @@ class DashboardApp {
                     <div style="font-size:0.8rem; color:#888; margin-bottom:4px;">選択プラン</div>
                     <div style="font-size:1.1rem; font-weight:700; color:#24292E;">${planNames[plan] || plan}</div>
                     <div style="font-size:0.8rem; color:#8a6f40; margin-top:4px;">請求サイクル: ${billingLabel}</div>
-                    <div style="font-size:1.3rem; font-weight:700; color:#c19b4a; margin-top:4px;">${planPrices[cycle]?.[plan] || ''}</div>
+                    <div style="font-size:1.3rem; font-weight:700; color:#0b2d62; margin-top:4px;">${planPrices[cycle]?.[plan] || ''}</div>
                 </div>
                 <p style="font-size:0.82rem; color:#666; margin-bottom:16px; text-align:center;">
                     クレジットカード/デビットカードで決済できます。
@@ -5265,6 +5665,39 @@ class DashboardApp {
         return false;
     }
 
+    renderSettingsShell(activeTab = 'notifications', contentHtml = '', plan = 'free') {
+        const tabs = [
+            { id: 'notifications', label: '通知設定', icon: 'fa-bell' },
+            { id: 'team', label: 'チーム管理', icon: 'fa-users' },
+            { id: 'plan', label: 'プラン管理', icon: 'fa-credit-card' },
+            { id: 'mcp', label: 'MCP連携', icon: 'fa-plug' }
+        ];
+
+        return `
+            <div class="settings-wrapper">
+                <aside class="settings-aside">
+                    <div class="settings-aside-title">設定メニュー</div>
+                    ${tabs.map(t => `
+                        <div class="settings-tab-btn ${activeTab === t.id ? 'active' : ''}" onclick="window.app.switchSettingsTab('${t.id}')">
+                            <i class="fa-solid ${t.icon}"></i>
+                            <span>${t.label}</span>
+                        </div>
+                    `).join('')}
+                    
+                    <div style="margin-top:auto; padding-top:24px; border-top:1px solid #e2e8f0;">
+                        <div class="settings-tab-btn" style="color:#d73a49" onclick="window.app.handleLogout()">
+                            <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                            <span>ログアウト</span>
+                        </div>
+                    </div>
+                </aside>
+                <main class="settings-main">
+                    ${contentHtml}
+                </main>
+            </div>
+        `;
+    }
+
     renderNotificationSettings(settings, apiBase = '', plan = 'pro') {
         const emailEnabled = settings?.email?.crawlAlert !== false;
         const slack = settings?.slack || {};
@@ -5274,10 +5707,10 @@ class DashboardApp {
         const teamName = slack.teamName || '';
         const deadlineEmailEnabled = settings?.email?.deadlineAlert !== false;
         const deadlineSlackEnabled = settings?.slack?.deadlineAlert !== false && slackConnected;
-        const crawlerLocked = plan !== 'pro' && plan !== 'owner';
+        const crawlerLocked = plan !== 'pro';
         const deadlineLocked = plan === 'free';
-        const lockOverlayCrawler = '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(245,247,250,0.82);backdrop-filter:blur(2px);border-radius:8px;z-index:1"><div style="background:#fff;border-radius:10px;padding:24px 32px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.1);max-width:280px"><i class=\'fa-solid fa-crown\' style=\'color:#c19b4a;font-size:1.8rem;margin-bottom:10px;display:block\'></i><div style=\'font-weight:700;font-size:15px;margin-bottom:8px\'>Proプラン限定</div><p style=\'font-size:12px;color:#888;line-height:1.6;margin-bottom:16px\'>クローラー通知はProプランの機能です</p><button class=\'btn-dashboard btn-primary-action\' style=\'width:100%;padding:10px;font-size:13px\' onclick=\'window.app.navigate("plan")\'>アップグレードする</button></div></div>';
-        const lockOverlayDeadline = '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(245,247,250,0.82);backdrop-filter:blur(2px);border-radius:8px;z-index:1"><div style="background:#fff;border-radius:10px;padding:24px 32px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.1);max-width:280px"><i class=\'fa-solid fa-crown\' style=\'color:#c19b4a;font-size:1.8rem;margin-bottom:10px;display:block\'></i><div style=\'font-weight:700;font-size:15px;margin-bottom:8px\'>Starterプラン以上限定</div><p style=\'font-size:12px;color:#888;line-height:1.6;margin-bottom:16px\'>期限アラート通知はStarterプラン以上の機能です</p><button class=\'btn-dashboard btn-primary-action\' style=\'width:100%;padding:10px;font-size:13px\' onclick=\'window.app.navigate("plan")\'>アップグレードする</button></div></div>';
+        const lockOverlayCrawler = '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(245,247,250,0.82);backdrop-filter:blur(2px);border-radius:8px;z-index:1"><div style="background:#fff;border-radius:10px;padding:24px 32px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.1);max-width:280px"><i class=\'fa-solid fa-crown\' style=\'color:#0b2d62;font-size:1.8rem;margin-bottom:10px;display:block\'></i><div style=\'font-weight:700;font-size:15px;margin-bottom:8px\'>Proプラン限定</div><p style=\'font-size:12px;color:#888;line-height:1.6;margin-bottom:16px\'>クローラー通知はProプランの機能です</p><button class=\'btn-dashboard btn-primary-action\' style=\'width:100%;padding:10px;font-size:13px\' onclick=\'window.app.navigate("plan")\'>アップグレードする</button></div></div>';
+        const lockOverlayDeadline = '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(245,247,250,0.82);backdrop-filter:blur(2px);border-radius:8px;z-index:1"><div style="background:#fff;border-radius:10px;padding:24px 32px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.1);max-width:280px"><i class=\'fa-solid fa-crown\' style=\'color:#0b2d62;font-size:1.8rem;margin-bottom:10px;display:block\'></i><div style=\'font-weight:700;font-size:15px;margin-bottom:8px\'>Starterプラン以上限定</div><p style=\'font-size:12px;color:#888;line-height:1.6;margin-bottom:16px\'>期限アラート通知はStarterプラン以上の機能です</p><button class=\'btn-dashboard btn-primary-action\' style=\'width:100%;padding:10px;font-size:13px\' onclick=\'window.app.navigate("plan")\'>アップグレードする</button></div></div>';
 
         const slackStatus = slackConnected
             ? `<div style="display:flex;align-items:center;gap:8px;margin-top:12px;padding:10px 14px;background:#f0faf4;border:1px solid #b7dfc7;border-radius:6px">
@@ -5293,127 +5726,158 @@ class DashboardApp {
                </div>`
             : '';
 
-        return `
-            <div class="plan-view-container">
-                <div class="page-title">通知設定</div>
-                <div class="plan-section">
-                <div style="position:relative">
+        const notificationsHtml = `
+            <div class="settings-section-header">
+                <h2 class="settings-section-title">通知設定</h2>
+                <p class="settings-section-desc">クローラーの変更検知や契約期限のアラート通知先を設定します</p>
+            </div>
+            
+            <div style="position:relative">
                 <div style="margin-bottom:28px">
-                    <h2 class="section-title" style="margin-bottom:6px">クローラー通知設定</h2>
-                    <p style="color:var(--text-muted);font-size:13px;margin:0">URLクローリングで変更が検知された際の通知先を設定します</p>
+                    <h3 style="font-size:15px; font-weight:700; color:#0f172a; margin-bottom:12px;">クローラー通知</h3>
                 </div>
 
                 <div style="display:flex;flex-direction:column;gap:12px;max-width:640px">
-
-                    <!-- メール通知 -->
-                    <div style="background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:8px;padding:20px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px">
+                    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:20px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px">
                         <div style="display:flex;align-items:center;gap:14px">
-                            <div style="width:36px;height:36px;border-radius:8px;background:var(--color-primary-dim);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                                <i class="fa-solid fa-envelope" style="color:var(--color-primary);font-size:15px"></i>
+                            <div style="width:36px;height:36px;border-radius:8px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                                <i class="fa-solid fa-envelope" style="color:#0b2d62;font-size:15px"></i>
                             </div>
                             <div>
-                                <div style="font-weight:600;font-size:14px;color:var(--text-main);margin-bottom:2px">メール通知</div>
-                                <div style="font-size:12px;color:var(--text-muted)">変更検知時に登録メールアドレスへ通知</div>
+                                <div style="font-weight:600;font-size:14px;color:#1e293b;margin-bottom:2px">メール通知</div>
+                                <div style="font-size:12px;color:#64748b">変更検知時に登録メールアドレスへ通知</div>
                             </div>
                         </div>
                         <label class="toggle-switch" style="flex-shrink:0">
-                            <input type="checkbox" id="notif-email-toggle" ${emailEnabled ? 'checked' : ''}
-                                onchange="window.app.saveNotificationSettings()">
+                            <input type="checkbox" id="notif-email-toggle" ${emailEnabled ? 'checked' : ''} onchange="window.app.saveNotificationSettings()">
                             <span class="toggle-slider"></span>
                         </label>
                     </div>
 
-                    <!-- Slack通知 -->
-                    <div style="background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:8px;padding:20px 24px">
+                    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:20px 24px">
                         <div style="display:flex;align-items:center;justify-content:space-between;gap:16px">
                             <div style="display:flex;align-items:center;gap:14px">
-                                <div style="width:36px;height:36px;border-radius:8px;background:var(--color-primary-dim);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                                    <i class="fa-brands fa-slack" style="color:var(--color-primary);font-size:16px"></i>
+                                <div style="width:36px;height:36px;border-radius:8px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                                    <i class="fa-brands fa-slack" style="color:#0b2d62;font-size:16px"></i>
                                 </div>
                                 <div>
-                                    <div style="font-weight:600;font-size:14px;color:var(--text-main);margin-bottom:2px">Slack通知</div>
-                                    <div style="font-size:12px;color:var(--text-muted)">変更検知時に指定チャンネルへ通知</div>
+                                    <div style="font-weight:600;font-size:14px;color:#1e293b;margin-bottom:2px">Slack通知</div>
+                                    <div style="font-size:12px;color:#64748b">変更検知時に指定チャンネルへ通知</div>
                                 </div>
                             </div>
                             ${slackConnected
                                 ? `<label class="toggle-switch" style="flex-shrink:0">
-                                    <input type="checkbox" id="notif-slack-toggle" ${slackEnabled ? 'checked' : ''}
-                                        onchange="window.app.saveNotificationSettings()">
+                                    <input type="checkbox" id="notif-slack-toggle" ${slackEnabled ? 'checked' : ''} onchange="window.app.saveNotificationSettings()">
                                     <span class="toggle-slider"></span>
                                 </label>`
-                                : `<button onclick="window.app.connectSlack()"
-                                    style="display:inline-flex;align-items:center;gap:7px;padding:8px 16px;background:#4a154b;color:#fff;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:600;flex-shrink:0;transition:opacity .2s"
-                                    onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
+                                : `<button onclick="window.app.connectSlack()" style="display:inline-flex;align-items:center;gap:7px;padding:8px 16px;background:#4a154b;color:#fff;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:600;flex-shrink:0;">
                                     <i class="fa-brands fa-slack"></i>連携する
                                 </button>`}
                         </div>
                         ${slackStatus}
                     </div>
-
                 </div>
                 ${crawlerLocked ? lockOverlayCrawler : ''}
-                </div>
+            </div>
 
-                <!-- 期限アラート通知 -->
-                <div style="position:relative;margin-top:36px">
+            <div style="position:relative;margin-top:36px">
                 <div style="margin-bottom:12px">
-                    <h2 class="section-title" style="margin-bottom:6px">期限アラート通知</h2>
-                    <p style="color:var(--text-muted);font-size:13px;margin:0">契約の期限（30日前・7日前・当日）に通知します</p>
+                    <h3 style="font-size:15px; font-weight:700; color:#0f172a; margin-bottom:12px;">期限アラート通知</h3>
                 </div>
 
                 <div style="display:flex;flex-direction:column;gap:12px;max-width:640px">
-
-                    <!-- 期限アラート: メール -->
-                    <div style="background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:8px;padding:20px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px">
+                    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:20px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px">
                         <div style="display:flex;align-items:center;gap:14px">
-                            <div style="width:36px;height:36px;border-radius:8px;background:var(--color-primary-dim);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                                <i class="fa-solid fa-envelope" style="color:var(--color-primary);font-size:15px"></i>
+                            <div style="width:36px;height:36px;border-radius:8px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                                <i class="fa-solid fa-envelope" style="color:#0b2d62;font-size:15px"></i>
                             </div>
                             <div>
-                                <div style="font-weight:600;font-size:14px;color:var(--text-main);margin-bottom:2px">メール通知（期限アラート）</div>
-                                <div style="font-size:12px;color:var(--text-muted)">契約期限の30日前・7日前・当日に登録メールへ送信</div>
+                                <div style="font-weight:600;font-size:14px;color:#1e293b;margin-bottom:2px">メール通知（期限アラート）</div>
+                                <div style="font-size:12px;color:#64748b">契約期限の30日前・7日前・当日に登録メールへ送信</div>
                             </div>
                         </div>
                         <label class="toggle-switch" style="flex-shrink:0">
-                            <input type="checkbox" id="notif-deadline-email-toggle" ${deadlineEmailEnabled ? 'checked' : ''}
-                                onchange="window.app.saveNotificationSettings()">
+                            <input type="checkbox" id="notif-deadline-email-toggle" ${deadlineEmailEnabled ? 'checked' : ''} onchange="window.app.saveNotificationSettings()">
                             <span class="toggle-slider"></span>
                         </label>
                     </div>
 
-                    <!-- 期限アラート: Slack -->
-                    <div style="background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:8px;padding:20px 24px">
+                    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:20px 24px">
                         <div style="display:flex;align-items:center;justify-content:space-between;gap:16px">
                             <div style="display:flex;align-items:center;gap:14px">
-                                <div style="width:36px;height:36px;border-radius:8px;background:var(--color-primary-dim);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                                    <i class="fa-brands fa-slack" style="color:var(--color-primary);font-size:16px"></i>
+                                <div style="width:36px;height:36px;border-radius:8px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                                    <i class="fa-brands fa-slack" style="color:#0b2d62;font-size:16px"></i>
                                 </div>
                                 <div>
-                                    <div style="font-weight:600;font-size:14px;color:var(--text-main);margin-bottom:2px">Slack通知（期限アラート）</div>
-                                    <div style="font-size:12px;color:var(--text-muted)">${slackConnected ? `連携済チャンネル（${channelName}）へ期限アラートを送信` : '期限アラートをSlackへ通知します'}</div>
+                                    <div style="font-weight:600;font-size:14px;color:#1e293b;margin-bottom:2px">Slack通知（期限アラート）</div>
+                                    <div style="font-size:12px;color:#64748b">${slackConnected ? `連携済チャンネル（${channelName}）へ期限アラートを送信` : '期限アラートをSlackへ通知します'}</div>
                                 </div>
                             </div>
                             ${slackConnected
                                 ? `<label class="toggle-switch" style="flex-shrink:0">
-                                    <input type="checkbox" id="notif-deadline-slack-toggle" ${deadlineSlackEnabled ? 'checked' : ''}
-                                        onchange="window.app.saveNotificationSettings()">
+                                    <input type="checkbox" id="notif-deadline-slack-toggle" ${deadlineSlackEnabled ? 'checked' : ''} onchange="window.app.saveNotificationSettings()">
                                     <span class="toggle-slider"></span>
                                 </label>`
-                                : `<button onclick="window.app.connectSlack()"
-                                    style="display:inline-flex;align-items:center;gap:7px;padding:8px 16px;background:#4a154b;color:#fff;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:600;flex-shrink:0;transition:opacity .2s"
-                                    onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
+                                : `<button onclick="window.app.connectSlack()" style="display:inline-flex;align-items:center;gap:7px;padding:8px 16px;background:#4a154b;color:#fff;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:600;flex-shrink:0;">
                                     <i class="fa-brands fa-slack"></i>連携する
                                 </button>`}
                         </div>
-                        ${slackConnected ? '' : ''}
                     </div>
-
                 </div>
                 ${deadlineLocked ? lockOverlayDeadline : ''}
-                </div>
             </div>
-        </div>
         `;
+
+        return this.renderSettingsShell('notifications', notificationsHtml, plan);
+    }
+
+    async switchSettingsTab(tabId) {
+        const main = this.mainContent;
+        if (!main) return;
+        
+        // Hide global header title when in settings shell for cleaner look
+        const header = document.querySelector('.page-header');
+        if (header) header.style.display = 'none';
+
+        if (tabId === 'notifications') {
+            await this.loadAndRenderNotificationSettings();
+        } else if (tabId === 'team') {
+            // Show skeleton while loading team module
+            main.innerHTML = this.renderSettingsShell('team', `<div style="padding:40px; text-align:center;"><i class="fa-solid fa-spinner fa-spin" style="font-size:24px; color:#cbd5e1;"></i></div>`, this.subscription?.plan);
+            
+            try {
+                const html = await navigateLazy('team', {
+                    app: this,
+                    dbService,
+                    DASHBOARD_CACHE_KEYS,
+                    escapeHtmlText,
+                    formatDisplayTimestamp,
+                    params: null
+                });
+                main.innerHTML = this.renderSettingsShell('team', html, this.subscription?.plan);
+                // The team module will handle its own initialization once its HTML is in the DOM
+            } catch (err) {
+                console.error('Failed to load team module:', err);
+                main.innerHTML = this.renderSettingsShell('team', `<div class="p-md text-danger">チーム管理の読み込みに失敗しました。</div>`, this.subscription?.plan);
+            }
+        } else if (tabId === 'plan') {
+            const planHtml = Views.plan(null, this);
+            main.innerHTML = this.renderSettingsShell('plan', planHtml, this.subscription?.plan);
+        } else if (tabId === 'mcp') {
+            const mcpHtml = Views.mcp();
+            main.innerHTML = this.renderSettingsShell('mcp', mcpHtml, this.subscription?.plan);
+            
+            // Re-run the data fetching logic for MCP
+            try {
+                const data = await dbService.getMcpApiKey();
+                this.mcpKey = data?.mcpApiKey || '';
+                this.mcpKeyMasked = data?.maskedKey || '未発行';
+                this.mcpHasKey = Boolean(data?.hasKey || data?.mcpApiKey);
+                this.renderMcpKeyCard();
+            } catch (error) {
+                console.error('Failed to refresh MCP keys:', error);
+            }
+        }
     }
 
     async saveNotificationSettings() {
@@ -5505,6 +5969,10 @@ class DashboardApp {
         if (!main) return;
 
         const plan = this.subscription?.plan || 'free';
+        // Reset header display if needed
+        const header = document.querySelector('.page-header');
+        if (header) header.style.display = 'none';
+
         if (plan === 'free') {
             main.innerHTML = this.renderNotificationSettings({}, '', plan);
             return;
@@ -5514,37 +5982,33 @@ class DashboardApp {
         const urlParams = new URLSearchParams(window.location.search);
         const slackConnected = urlParams.get('slack_connected');
         const slackError = urlParams.get('slack_error');
-        const slackChannel = urlParams.get('channel');
         if (slackConnected === '1') {
             Notify.success('Slack連携が完了しました');
             history.replaceState(null, '', window.location.pathname);
         } else if (slackError) {
-            Notify.error(`Slack連携に失敗しました: ${decodeURIComponent(slackError)}`);
+            Notify.error(decodeURIComponent(slackError));
             history.replaceState(null, '', window.location.pathname);
         }
 
-        main.innerHTML = '<div style="padding:40px;color:#888;">読み込み中...</div>';
-
+        let settings = {};
         let apiBase = '';
         try {
             apiBase = (await import('./api-base.js')).getApiBaseUrl();
-        } catch (_) { /* fallback to empty */ }
-
-        try {
             const authModule = await import('./auth.js');
             const token = await authModule.getIdToken();
-            if (!token) {
-                // ローカル開発環境などトークンなしの場合はデフォルト設定を表示
-                main.innerHTML = this.renderNotificationSettings({}, apiBase, plan);
-                return;
+            if (token) {
+                const res = await fetch(`${apiBase}/api/notifications/settings`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                // backend returns data.settings or data.data depending on endpoint version
+                if (data.success) {
+                    settings = data.settings || data.data || {};
+                }
             }
-            const res = await fetch(`${apiBase}/api/notifications/settings`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const data = await res.json();
-            const settings = data.success ? data.data : {};
             main.innerHTML = this.renderNotificationSettings(settings, apiBase, plan);
         } catch (err) {
+            console.error('Failed to load settings:', err);
             main.innerHTML = this.renderNotificationSettings({}, apiBase, plan);
         }
     }
@@ -5631,39 +6095,19 @@ class DashboardApp {
             'owner': 'Owner'
         };
 
-        const usagePercent = Math.min(100, (sub.usageCount / sub.usageLimit) * 100);
         const planName = planNames[sub.plan] || sub.plan;
         const billingCycleLabel = sub.billingCycle === 'annual' ? '年額' : '月額';
 
-        let upgradeAdvice = '';
-        if (sub.usageCount >= sub.usageLimit) {
-            if (sub.plan === 'free') {
-                upgradeAdvice = '<div class="upgrade-advice">月間上限に達しました。Starter以上のプランにすると解析回数が増えます。</div>';
-            } else if (sub.plan === 'starter') {
-                upgradeAdvice = '<div class="upgrade-advice">月間上限に達しました。翌月まで待つか、Business以上のプランにすると回数が増えます。</div>';
-            } else if (sub.plan === 'business') {
-                upgradeAdvice = '<div class="upgrade-advice">月間上限に達しました。翌月まで待つか、Proプランにアップグレードすると回数が増えます。</div>';
-            } else if (sub.plan === 'pro') {
-                upgradeAdvice = '<div class="upgrade-advice">月間上限に達しました。翌月までお待ちいただくか、追加枠についてお問い合わせください。</div>';
-            } else if (sub.plan === 'owner') {
-                upgradeAdvice = ''; // Owner has no limit message
-            }
-        }
-
         let statusHtml = `
-        <div class="plan-status-card">
-            <div class="plan-badge plan-badge-${sub.plan}">${planName}（${billingCycleLabel}）</div>
-            <div class="plan-info-text">
-                AI解析: <strong style="${(sub.usageLimit >= 999999 || sub.plan === 'owner') ? '' : ((({'free':3,'starter':50,'business':120,'pro':400}[sub.plan] || sub.usageLimit) - sub.usageCount) <= 1 ? 'color:#f59e0b;' : '')}">${sub.usageCount}</strong> / ${(sub.usageLimit >= 999999 || sub.plan === 'owner') ? '無制限' : ({'free':3,'starter':50,'business':120,'pro':400}[sub.plan] || sub.usageLimit) + '回'}
-                <br>電子署名: <strong>${sub.signUsageCount || 0}</strong> / ${(sub.signUsageLimit >= 999999 || sub.plan === 'pro' || sub.plan === 'owner') ? '無制限' : `${{'free':10,'starter':25,'business':100}[sub.plan] || sub.signUsageLimit || 0}回`}
-                ${sub.renewalDate ? `<br><span style="font-size:0.75rem; opacity:0.8;">次回更新: <strong>${new Date(sub.renewalDate).toLocaleDateString('ja-JP')}</strong></span>` : ''}
+        <div class="plan-info-box">
+            <div class="plan-title">${planName}（${billingCycleLabel}）</div>
+            <div class="usage-item">
+                AI解析: <strong>${sub.usageCount}</strong> / ${(sub.usageLimit >= 999999 || sub.plan === 'pro' || sub.plan === 'owner') ? '無制限' : ({'free':3,'starter':50,'business':120}[sub.plan] || sub.usageLimit) + '回'}
             </div>
-            ${upgradeAdvice}
-            ${this.isSignLimitReached() ? `
-                <div style="margin-top:10px; padding:8px 10px; background:rgba(234,67,53,0.08); border:1px solid rgba(234,67,53,0.2); border-radius:6px; font-size:0.72rem; color:#c2410c;">
-                    今月の電子署名上限に達しました。翌月までお待ちいただくか、上位プランへのアップグレードをご検討ください。
-                </div>
-            ` : ''}
+            <div class="usage-item">
+                電子署名: <strong>${sub.signUsageCount || 0}</strong> / ${(sub.signUsageLimit >= 999999 || sub.plan === 'pro' || sub.plan === 'owner') ? '無制限' : `${{'free':10,'starter':25,'business':100}[sub.plan] || sub.signUsageLimit || 0}回`}
+            </div>
+            ${sub.renewalDate ? `<div class="usage-item" style="opacity:0.6; margin-top:8px; font-size:11px;">次回更新: ${new Date(sub.renewalDate).toLocaleDateString('ja-JP')}</div>` : ''}
         </div>
         `;
 
@@ -5679,7 +6123,7 @@ class DashboardApp {
         const navTeam = document.querySelector('.nav-item[onclick*="navigate(\'team\')"]');
         if (navTeam) {
             navTeam.classList.remove('feature-locked');
-            navTeam.style.display = 'flex';
+            navTeam.style.display = 'grid';
         }
 
         // Notification Settings: Pro only (Unlock for Owner)
@@ -5705,6 +6149,7 @@ class DashboardApp {
         const toggle = document.getElementById('sidebar-toggle');
         const sidebar = document.getElementById('app-sidebar');
         const overlay = document.getElementById('sidebar-overlay');
+        const collapseToggle = document.getElementById('sidebar-collapse-toggle');
 
         const closeSidebar = () => {
             sidebar?.classList.remove('active');
@@ -5723,20 +6168,35 @@ class DashboardApp {
             overlay.addEventListener('click', closeSidebar);
         }
 
+        if (sidebar && collapseToggle) {
+            const applyCollapsedState = (collapsed) => {
+                if (typeof window.__diffsenseApplySidebarCollapse === 'function') {
+                    window.__diffsenseApplySidebarCollapse(collapsed);
+                    return;
+                }
+                sidebar.classList.toggle('is-collapsed', collapsed);
+                document.body.classList.toggle('sidebar-is-collapsed', collapsed);
+                collapseToggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+                collapseToggle.setAttribute('aria-label', collapsed ? 'メニューを展開する' : 'メニューを折りたたむ');
+                collapseToggle.innerHTML = collapsed
+                    ? '<i class="fa-solid fa-angles-right"></i>'
+                    : '<i class="fa-solid fa-angles-left"></i>';
+            };
+            const savedCollapsed = localStorage.getItem('diffsense_sidebar_collapsed') === '1';
+            applyCollapsedState(savedCollapsed);
+            collapseToggle.addEventListener('click', (event) => {
+                event.stopPropagation();
+                const nextCollapsed = !sidebar.classList.contains('is-collapsed');
+                applyCollapsedState(nextCollapsed);
+                localStorage.setItem('diffsense_sidebar_collapsed', nextCollapsed ? '1' : '0');
+            });
+        }
+
         if (!this.mobileBottomNavBound) {
             this.mobileBottomNavBound = true;
             document.addEventListener('click', (event) => {
                 const button = event.target?.closest?.('.mobile-bottom-nav .bottom-nav-item');
                 if (!button) return;
-
-                if (this._navActionLock) {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    event.stopImmediatePropagation();
-                    return;
-                }
-                this._navActionLock = true;
-                setTimeout(() => { this._navActionLock = false; }, 350);
 
                 const view = button.getAttribute('data-mobile-view');
                 const action = button.getAttribute('data-mobile-action');
@@ -5786,6 +6246,12 @@ class DashboardApp {
         }
     }
 
+    showRegistrationModal(options = {}) {
+        if (this.registration && typeof this.registration.open === 'function') {
+            this.registration.open(options);
+        }
+    }
+
     async renderViewContent(viewId, renderParams = null) {
         if (viewId === 'dashboard') {
             this.mainContent.innerHTML = renderDashboardOverview(this);
@@ -5793,32 +6259,261 @@ class DashboardApp {
         }
 
         if (routes[viewId]) {
-            const html = await navigateLazy(viewId, {
-                app: this,
-                dbService,
-                DASHBOARD_CACHE_KEYS,
-                escapeHtmlText,
-                formatDisplayTimestamp,
-                params: renderParams
-            });
+            let html = '';
+            let module = null;
+            try {
+                const loader = routes[viewId];
+                module = await loader();
+                html = await navigateLazy(viewId, {
+                    app: this,
+                    dbService,
+                    DASHBOARD_CACHE_KEYS,
+                    escapeHtmlText,
+                    formatDisplayTimestamp,
+                    normalizeChangesForDisplay,
+                    params: renderParams
+                });
+            } catch (err) {
+                console.error('Lazy loader failed:', err);
+            }
             if (typeof html !== 'string') {
                 throw new Error('Dashboard module did not return HTML');
             }
             this.mainContent.innerHTML = html;
+
+            // --- Fast Render Hook: Execute heavy rendering logic asynchronously after DOM update ---
+            if (module && typeof module.afterRender === 'function') {
+                setTimeout(() => {
+                    try {
+                        module.afterRender({
+                            app: this,
+                            dbService,
+                            DASHBOARD_CACHE_KEYS,
+                            escapeHtmlText,
+                            formatDisplayTimestamp,
+                            normalizeChangesForDisplay,
+                            params: renderParams
+                        });
+                    } catch (e) {
+                        console.error('afterRender execution failed:', e);
+                    }
+                }, 10);
+            }
             return true;
         }
 
         if (!Views[viewId]) return false;
         this.mainContent.innerHTML = Views[viewId](renderParams, this);
+
+        // --- Analysis Dashboard (V3) Document Viewer Integration ---
+        if (viewId === 'diff' && this.activeDetailTab === 'original') {
+            (async () => {
+                // --- ⑧ 無限ローディング防止 ---
+                const loadingTimeout = setTimeout(() => {
+                    const toolbar = document.getElementById('v3-viewer-toolbar');
+                    if (toolbar && toolbar.innerHTML.includes('契約書を表示中')) {
+                        console.warn('[Dashboard] Rendering timeout reached. Removing loading indicator.');
+                        toolbar.innerHTML = '<div style="flex:1; display:flex; align-items:center; justify-content:center; font-size:14px; color:#e11d48;"><i class="fa-solid fa-circle-exclamation" style="margin-right:8px;"></i> 読み込みがタイムアウトしました。再試行してください。</div>';
+                    }
+                }, 8000); // 8秒でタイムアウト（PDF.jsは少し時間がかかるため余裕を持たせる）
+
+                try {
+                    console.log('[Dashboard] View context:', { viewId, activeTab: this.activeDetailTab, renderParams });
+                    const contractId = (typeof renderParams === 'object' ? renderParams?.id : renderParams);
+                    console.log('[Dashboard] Dynamically importing SignViewer for Contract:', contractId);
+
+                    const module = await import('/js/sign-viewer.js?v=20260531_free_plan_default_fix');
+                    const SignViewer = module.SignViewer || module.default || module;
+                    console.log('[Dashboard] SignViewer module loaded:', !!SignViewer);
+
+                    const repairWhenPdfReady = (event) => {
+                        if (Number(event?.detail?.contractId) !== Number(contractId)) return;
+                        void this.repairContractClausesFromViewerPdfAndRefresh(contractId, SignViewer, 'pdf-ready');
+                    };
+                    window.addEventListener('diffsense:pdf-ready', repairWhenPdfReady);
+                    await SignViewer.initForContract(this, contractId, 'v3-pdf-sheet', { forceMode: 'original' });
+                    window.removeEventListener('diffsense:pdf-ready', repairWhenPdfReady);
+                    const repaired = await this.repairContractClausesFromViewerPdfAndRefresh(contractId, SignViewer, 'initial');
+                    if (!repaired) {
+                        this.schedulePdfClauseRepair(contractId, SignViewer);
+                    }
+                    clearTimeout(loadingTimeout); // 成功したらタイマー解除
+                } catch (e) {
+                    clearTimeout(loadingTimeout);
+                    console.error('[Dashboard] SignViewer initialization FAILED:', e);
+                    Notify.error('ビューワーの起動に失敗しました。再読み込みをお試しください。');
+                } finally {
+                    this.setLoading(false);
+                }
+            })();
+        }
+
         return true;
     }
 
-    async navigate(viewId, params = null) {
-        // Prevent redundant navigation to the same view (unless it's contracts/deadlines/plan/mcp which need re-renders for filters/tabs)
-        if (this.currentView === viewId && !['contracts', 'deadlines', 'plan', 'mcp'].includes(viewId) && !params) {
-            console.log(`Skipped redundant navigation to ${viewId}`);
-            return;
+    toggleFullscreenViewer() {
+        const target = document.querySelector('.analysis-v3-split-layout');
+        if (!target) return;
+
+        const isNowFullscreen = target.classList.toggle('is-fullscreen');
+        
+        if (isNowFullscreen) {
+            document.body.style.overflow = 'hidden';
+            
+            // Add ESC key listener for accessibility
+            const handleEsc = (e) => {
+                if (e.key === 'Escape' && target.classList.contains('is-fullscreen')) {
+                    target.classList.remove('is-fullscreen');
+                    document.body.style.overflow = '';
+                    window.removeEventListener('keydown', handleEsc);
+                    window.dispatchEvent(new Event('resize'));
+                }
+            };
+            window.addEventListener('keydown', handleEsc);
+        } else {
+            document.body.style.overflow = '';
         }
+
+        // Trigger resize to allow PDF.js to re-calculate viewport if needed
+        window.dispatchEvent(new Event('resize'));
+        
+        // Trigger SignViewer UI update to reflect fullscreen state in toolbar
+        if (window.signViewer && typeof window.signViewer.renderDashboardUI === 'function') {
+            window.signViewer.renderDashboardUI();
+        }
+    }
+
+    /**
+     * ビューワーのローディング表示を制御する
+     */
+    setLoading(isLoading) {
+        const toolbar = document.getElementById('v3-viewer-toolbar');
+        if (!toolbar) return;
+
+        if (isLoading) {
+            if (!toolbar.innerHTML.includes('契約書を表示中')) {
+                toolbar.innerHTML = `
+                    <div style="flex:1; display:flex; align-items:center; justify-content:center; gap:10px; font-size:14px; color:var(--v3-text-sub);">
+                        <i class="fa-solid fa-spinner fa-spin"></i>
+                        <span>契約書を表示中...</span>
+                    </div>
+                `;
+            }
+        } else {
+            if (toolbar.innerHTML.includes('契約書を表示中')) {
+                toolbar.innerHTML = '';
+                if (window.signViewer && typeof window.signViewer.renderDashboardUI === 'function') {
+                    window.signViewer.renderDashboardUI();
+                }
+            }
+        }
+    }
+
+    /**
+     * DOCXファイルをPDFに変換する（サーバーサイドAPI呼び出し）
+     */
+    async convertDocxToPdf(contractId) {
+        console.log('[Dashboard] Converting DOCX to PDF for:', contractId);
+        const res = await fetch(toApiUrl('/api/contracts/convert-docx'), {
+            method: "POST",
+            body: JSON.stringify({ contractId }),
+            headers: { "Content-Type": "application/json" }
+        });
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(`変換API失敗: ${res.status} ${errorText}`);
+        }
+
+        return await res.json(); // Expected: { url: "..." }
+    }
+
+    async repairContractClausesFromViewerPdf(contractId, signViewerModule = null) {
+        const normalizedId = normalizeDiffContractId(contractId);
+        if (!normalizedId) return false;
+        const viewer = signViewerModule || window.SignViewer || window.signViewer;
+        if (!viewer || typeof viewer.extractCurrentPdfText !== 'function') return false;
+        const contract = dbService.getContractById(normalizedId);
+        if (!contract) return false;
+
+        let pdfText = '';
+        try {
+            pdfText = await viewer.extractCurrentPdfText();
+        } catch (error) {
+            console.warn('PDF clause repair extraction failed:', error);
+            return false;
+        }
+        if (!pdfText || pdfText.length < 20) return false;
+
+        const repairedContent = buildStructuredContentFromClauses(parseContractIntoClauses(pdfText), {
+            title: contract.name || '',
+            version: ''
+        });
+        if (!repairedContent || !Array.isArray(repairedContent.articles)) return false;
+
+        const currentArticles = contract.original_content && typeof contract.original_content === 'object' && Array.isArray(contract.original_content.articles)
+            ? contract.original_content.articles
+            : [];
+        if (!isArticleCoverageBetter(repairedContent.articles, currentArticles)) return false;
+
+        const updated = dbService.updateContract(normalizedId, {
+            original_content: repairedContent,
+            pdf_raw_text: pdfText,
+            extracted_text_length: pdfText.length,
+            clause_repaired_at: new Date().toISOString()
+        });
+        if (!updated) return false;
+
+        const repairedCoverage = getArticleCoverage(repairedContent.articles);
+        const previousCoverage = getArticleCoverage(currentArticles);
+        console.info('PDF clause repair applied', {
+            contractId: normalizedId,
+            previous: previousCoverage,
+            repaired: repairedCoverage
+        });
+        return true;
+    }
+
+    async repairContractClausesFromViewerPdfAndRefresh(contractId, signViewerModule = null, source = 'manual') {
+        const normalizedId = normalizeDiffContractId(contractId);
+        if (!normalizedId) return false;
+        if (this.pdfClauseRepairInFlight.has(normalizedId)) return false;
+
+        this.pdfClauseRepairInFlight.add(normalizedId);
+        try {
+            const repaired = await this.repairContractClausesFromViewerPdf(normalizedId, signViewerModule);
+            if (!repaired) return false;
+            console.info('PDF clause repair refreshing diff view', { contractId: normalizedId, source });
+            if (this.currentView === 'diff' && Number(this.currentViewParams) === Number(normalizedId)) {
+                await this.renderViewContent('diff', normalizedId);
+            }
+            return true;
+        } finally {
+            this.pdfClauseRepairInFlight.delete(normalizedId);
+        }
+    }
+
+    schedulePdfClauseRepair(contractId, signViewerModule = null) {
+        const normalizedId = normalizeDiffContractId(contractId);
+        if (!normalizedId) return;
+
+        const previousTimers = this.pdfClauseRepairTimers.get(normalizedId) || [];
+        previousTimers.forEach((timerId) => window.clearTimeout(timerId));
+
+        const delays = [250, 1000, 2500];
+        const timers = delays.map((delay) => window.setTimeout(async () => {
+            if (this.currentView !== 'diff' || Number(this.currentViewParams) !== Number(normalizedId)) return;
+            const repaired = await this.repairContractClausesFromViewerPdfAndRefresh(normalizedId, signViewerModule, `retry-${delay}`);
+            if (repaired) {
+                const activeTimers = this.pdfClauseRepairTimers.get(normalizedId) || [];
+                activeTimers.forEach((timerId) => window.clearTimeout(timerId));
+                this.pdfClauseRepairTimers.delete(normalizedId);
+            }
+        }, delay));
+        this.pdfClauseRepairTimers.set(normalizedId, timers);
+    }
+
+    async navigate(viewId, params = null) {
         console.log(`Navigating to ${viewId}`, params);
 
         this.resetExecutionState(viewId);
@@ -5830,18 +6525,41 @@ class DashboardApp {
 
         if (viewId === 'diff') {
             const normalizedDiffId = normalizeDiffContractId(params);
-            const docs = normalizedDiffId ? dbService.getDocumentsByContractId(normalizedDiffId) : [];
-            if (!normalizedDiffId || docs.length === 0) {
-                console.warn('Diff navigation blocked', {
-                    type: 'diff_navigation_blocked',
-                    contractId: normalizedDiffId || null,
-                    documentCount: docs.length,
-                    timestamp: Date.now()
+            if (!normalizedDiffId) {
+                await this.navigate('diff-check');
+                return;
+            }
+            if (!dbService.getContractById(normalizedDiffId)) {
+                try {
+                    await dbService.syncContractsFromApi();
+                } catch (error) {
+                    console.warn('Diff navigation contract sync failed:', error);
+                }
+            }
+            if (!dbService.getContractById(normalizedDiffId)) {
+                console.warn('Diff navigation blocked: Contract not found after sync', {
+                    contractId: normalizedDiffId
                 });
-                this.clearHistoryComparisonContext(normalizedDiffId);
-                this.clearDocumentCompareState(normalizedDiffId);
                 this.resetExecutionState('contracts');
-                this.setDetailActiveTab('original');
+                this.currentView = 'contracts';
+                this.mainContent.classList.remove('is-detail-view');
+                this.updateActiveMenu('contracts');
+                this.updateRegistrationButtonVisibility('contracts');
+                await this.renderViewContent('contracts', { page: this.currentPage, ...this.filters });
+                Notify.warning('契約データを確認できなかったため、契約一覧に戻しました。');
+                return;
+            }
+            const docs = normalizedDiffId ? dbService.getDocumentsByContractId(normalizedDiffId) : [];
+            const isNewlyCreated = normalizedDiffId && String(normalizedDiffId).length > 10; // Heuristic for Date.now() IDs
+
+            // Check if it's a newly created contract and we are navigating to it
+            if (docs.length === 0 && !isNewlyCreated) {
+                console.warn('Diff navigation blocked: No documents found and not a new contract', {
+                    contractId: normalizedDiffId,
+                    docsCount: docs.length,
+                    isNewlyCreated
+                });
+                this.resetExecutionState('contracts');
                 this.currentView = 'contracts';
                 this.mainContent.classList.remove('is-detail-view');
                 this.updateActiveMenu('contracts');
@@ -5850,10 +6568,16 @@ class DashboardApp {
                 Notify.warning('表示できる文書がないため、契約一覧に戻しました。');
                 return;
             }
-            if (docs.length < 2) {
+            const openedFromContractsList = params && typeof params === 'object' && params.source === 'contracts';
+            if (docs.length < 2 && !isNewlyCreated) {
                 this.clearHistoryComparisonContext(normalizedDiffId);
                 this.clearDocumentCompareState(normalizedDiffId);
-                this.setDetailActiveTab('original');
+                const contract = dbService.getContractById(normalizedDiffId);
+                if (!openedFromContractsList && contract && (contract.ai_final_document || (contract.ai_changes && contract.ai_changes.length > 0))) {
+                    this.setDetailActiveTab('diff');
+                } else {
+                    this.setDetailActiveTab('original');
+                }
             }
             this.currentContractId = normalizedDiffId;
         }
@@ -5868,98 +6592,60 @@ class DashboardApp {
 
         // --- FIX: Update UI state early before any branches return ---
         this.currentView = viewId;
-        this.updateActiveMenu(viewId);
+        this.updateActiveMenu(viewId, params);
         this.updateRegistrationButtonVisibility(viewId);
+
+        // URLハッシュを更新（リロード時に同じビューに戻れるように）
+        try {
+            const hashDiffId = viewId === 'diff' ? normalizeDiffContractId(params) : null;
+            const newHash = viewId === 'diff' && hashDiffId
+                ? `#diff/${hashDiffId}`
+                : viewId === 'diff-check' ? '#diff'
+                : viewId !== 'dashboard' ? `#${viewId}` : location.pathname + location.search;
+            history.replaceState(null, '', newHash);
+        } catch (_) { /* ignore */ }
         
         // Toggle Fluid Layout Mode for Detail View
         if (viewId === 'diff') {
             this.mainContent.classList.add('is-detail-view');
-            // [scroll-fix] モバイル詳細画面: #app-mainのoverflow:hiddenを解除してスクロール可能にする
-            document.getElementById('app-main')?.classList.add('has-detail-view');
         } else {
             this.mainContent.classList.remove('is-detail-view');
-            // [scroll-fix] 詳細画面を離れたらクラスを除去して通常状態に戻す
-            document.getElementById('app-main')?.classList.remove('has-detail-view');
         }
 
-        if (viewId !== 'contracts') {
+        if (viewId !== 'contracts' && viewId !== 'diff') {
             this.searchQuery = "";
             this.currentPage = 1;
         }
 
         if (viewId === 'sign') {
-            // シェルを即時同期描画（スケルトン不要）
-            this.mainContent.innerHTML = `
-                <div class="sign-container">
-                    <div class="sign-header">
-                        <div class="sign-title">
-                            <h1>署名管理</h1>
-                            <p>契約済み書類や未解析の書類から、電子署名の依頼を開始・管理できます</p>
-                        </div>
-                    </div>
-                    <div class="sign-tabs">
-                        <button class="sign-tab active" onclick="window.signUI&&window.signUI.switchTab('new-request')">署名依頼の新規作成</button>
-                        <button class="sign-tab" onclick="window.signUI&&window.signUI.switchTab('sent-requests')">送信済み一覧</button>
-                        <button class="sign-tab" onclick="window.signUI&&window.signUI.switchTab('completed-requests')">完了一覧</button>
-                    </div>
-                    <div class="filter-bar mb-md">
-                        <div class="flex flex-wrap gap-md items-center">
-                            <div style="position:relative; flex:1; min-width:250px;">
-                                <i class="fa-solid fa-magnifying-glass" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:#999;"></i>
-                                <input type="text" id="sign-search" placeholder="書類名・送信者・署名者で検索..."
-                                       style="padding:8px 12px 8px 36px; border:1px solid #ddd; border-radius:4px; width:100%; font-size:13px;"
-                                       oninput="window.signUI&&window.signUI.updateFilter('query', this.value)">
-                            </div>
-                            <div class="flex gap-sm items-center">
-                                <span class="text-muted" style="font-size:12px;">並び順:</span>
-                                <select onchange="window.signUI&&window.signUI.updateFilter('sortBy', this.value)" style="padding:6px 8px; border:1px solid #ddd; border-radius:4px; font-size:13px;">
-                                    <option value="date_desc">最新順</option>
-                                    <option value="date_asc">古い順</option>
-                                    <option value="name_asc">書類名 A-Z</option>
-                                    <option value="name_desc">書類名 Z-A</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="sign-list-card">
-                        <table class="sign-table">
-                            <thead id="sign-table-head"></thead>
-                            <tbody id="sign-list-body">
-                                <tr><td colspan="6" style="text-align:center;padding:40px;color:#999;">読み込み中...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>`;
-            // sign-ui.js をバックグラウンドでロードしてリスト描画
-            import('./sign-ui.js?v=20260428_v1').then(({ SignUI }) => {
-                if (this.currentView !== 'sign') return;
-                SignUI.selectedDocIds.clear();
-                SignUI.refreshList(this);
-                this.syncContractsInBackground(() => {
-                    if (this.currentView === 'sign') SignUI.refreshList(this);
-                });
+            this.renderInitialSkeleton('sign');
+            console.trace('Routing to sign');
+            this.mainContent.innerHTML = await SignUI.renderSignView(this);
+            SignUI.refreshList(this);
+            this.syncContractsInBackground(() => {
+                if (this.currentView === 'sign') {
+                    SignUI.refreshList(this);
+                }
             });
             return;
         }
 
         if (viewId === 'sign-viewer') {
-            const { SignUI } = await import('./sign-ui.js?v=20260428_v1');
-            const { SignViewer } = await import('./sign-viewer.js?v=20260407_final_v10');
+            const module = await import('/js/sign-viewer.js?v=20260531_free_plan_default_fix');
+            const SignViewer = module.SignViewer || module.default || module;
             this.mainContent.innerHTML = await SignUI.renderSignViewer(this, params);
             await SignViewer.init(this, params);
             return;
         }
         
         if (viewId === 'sign-editor') {
-            const { SignUI } = await import('./sign-ui.js?v=20260428_v1');
-            const { SignEditor } = await import('./sign-editor.js?v=20260427_v4');
+            const { SignEditor } = await import('./sign-editor.js?v=20260519_sign_storage_fix_v2');
             this.mainContent.innerHTML = await SignUI.renderSignEditor(this, params);
             await SignEditor.init(this, params);
             return;
         }
 
         if (viewId === 'sign-recipient') {
-            const { SignUI } = await import('./sign-ui.js?v=20260428_v1');
             const { SignRecipient } = await import('./sign-recipient.js?v=20260407_overflow');
             this.mainContent.innerHTML = await SignUI.renderSignRecipient(this, params);
             await SignRecipient.init(this, params);
@@ -6012,9 +6698,12 @@ class DashboardApp {
                 return;
             }
             renderParams = normalizedDiffId;
+            const openedFromContractsList = params && typeof params === 'object' && params.source === 'contracts';
             // Auto-switch to 'original' tab for new contracts (no history)
             const isNewContract = normalizedDiffId !== this.currentViewParams;
-            if (isNewContract && !this.historyComparisonContext) {
+            if (openedFromContractsList && !this.historyComparisonContext) {
+                this.setDetailActiveTab('original');
+            } else if (isNewContract && !this.historyComparisonContext) {
                 const _c = dbService.getContractById(normalizedDiffId);
                 const historyCount = (_c && Array.isArray(_c.history)) ? _c.history.length : 0;
                 
@@ -6036,6 +6725,20 @@ class DashboardApp {
                         try {
                             window.scrollTo(0, 0);
                             this.mainContent.innerHTML = Views.diff(this.currentViewParams, this);
+
+                            // Re-init SignViewer if we switched to original tab within diff
+                            if (this.activeDetailTab === 'original') {
+                                (async () => {
+                                    try {
+                                        const module = await import('/js/sign-viewer.js?v=20260531_free_plan_default_fix');
+                                        const SignViewer = module.SignViewer || module.default || module;
+                                        await SignViewer.initForContract(this, this.currentViewParams, 'v3-pdf-sheet');
+                                    } catch (e) {
+                                        console.error('[Dashboard] SignViewer re-init failed:', e);
+                                    }
+                                })();
+                            }
+
                             this.resetDetailPaneScroll();
                             this.enforceDetailScrollLayout();
                             this.setupClauseNavAutoSync();
@@ -6079,21 +6782,6 @@ class DashboardApp {
             return;
         }
 
-        const navMap = {
-            'dashboard': 0, 'contracts': 1, 'history': 2, 'sign': 3, 'team': 4, 'plan': 5
-        };
-
-        // Update active menu state
-        // (Moved to top of navigate)
-        const navItems = document.querySelectorAll('.nav-item');
-        // Find by content or click handler match
-        navItems.forEach(item => {
-            const onclick = item.getAttribute('onclick');
-            if (onclick && onclick.includes(`navigate('${viewId}')`)) {
-                item.classList.add('active');
-            }
-        });
-
         if (Views[viewId] || routes[viewId]) {
             try {
                 const rendered = await this.renderViewContent(viewId, renderParams);
@@ -6103,6 +6791,7 @@ class DashboardApp {
                     'dashboard': 'ダッシュボード',
                     'plan': 'プラン管理',
                     'contracts': '契約・規約管理',
+                    'diff-check': '差分チェック',
                     'diff': '解析詳細',
                     'history': '履歴・ログ',
                     'team': 'チーム設定',
@@ -6185,20 +6874,6 @@ class DashboardApp {
         }
     }
 
-    closeModal(modalId) {
-        const modal = document.getElementById(modalId);
-        if (modal) {
-            modal.classList.add('closing');
-            modal.classList.remove('active');
-            setTimeout(() => {
-                if (!modal.classList.contains('active')) {
-                    modal.style.display = 'none';
-                    modal.classList.remove('closing');
-                }
-            }, 400);
-        }
-    }
-
     setDashboardFilter(filter) {
         this.dashboardFilter = filter;
         const filteredItems = dbService.getFilteredContracts(filter);
@@ -6215,10 +6890,16 @@ class DashboardApp {
         const tableBody = document.getElementById('dashboard-table-body');
         if (tableBody) {
             const rows = filteredItems.length > 0 ? filteredItems.slice(0, 10).map(c => {
-                let riskBadgeClass = 'badge-neutral';
-                if (c.risk_level === 'High') riskBadgeClass = 'badge-danger';
-                else if (c.risk_level === 'Medium') riskBadgeClass = 'badge-warning';
-                else if (c.risk_level === 'Low') riskBadgeClass = 'badge-success';
+                const rlRaw = String(c.risk_level || 'Low');
+                const bClass = rlRaw.toLowerCase().includes('high') || rlRaw.includes('高') ? 'high' : (rlRaw.toLowerCase().includes('medium') || rlRaw.includes('中') ? 'medium' : 'low');
+                const riskPalette = {
+                    high: { bg: '#fee2e2', color: '#b91c1c', border: '#fecaca' },
+                    medium: { bg: '#fef3c7', color: '#b45309', border: '#fde68a' },
+                    low: { bg: '#dcfce7', color: '#15803d', border: '#bbf7d0' }
+                };
+                const p = riskPalette[bClass] || riskPalette.low;
+                const riskLabelMap = { 'high': '高', 'medium': '中', 'low': '低' };
+                const bText = riskLabelMap[bClass] || '低';
 
                 const statusBadge = renderContractStatusBadge(c.status);
 
@@ -6228,7 +6909,7 @@ class DashboardApp {
 
                 return `
         <tr onclick="window.app.navigate('diff', ${c.id})">
-            <td><span class="badge ${riskBadgeClass}">${c.risk_level}</span></td>
+            <td><span class="v3-badge-risk ${bClass}" style="background:${p.bg}; color:${p.color}; border:1px solid ${p.border};">${bText}</span></td>
             <td class="col-name" title="${escapeHtmlText(c.name)}">${escapeHtmlText(c.name)}</td>
             <td>${c.last_updated_at}</td>
             <td>${statusBadge}</td>
@@ -6249,6 +6930,20 @@ class DashboardApp {
     }
 
     // --- Action Handlers ---
+    
+    openContractFromRow(contractId) {
+        this.openContractById(contractId);
+    }
+
+    openContractById(contractId) {
+        this.setDetailActiveTab('analysis');
+        this.navigate('diff', contractId);
+    }
+
+
+
+
+
 
     updateFilter(key, value) {
         this.filters[key] = value;
@@ -6259,6 +6954,345 @@ class DashboardApp {
             this.searchTimeout = setTimeout(() => this.navigate('contracts'), 300);
         } else {
             this.navigate('contracts');
+        }
+    }
+
+    jumpToClause(index) {
+        const target = document.getElementById(`clause-row-${index}`);
+        if (!target) return;
+        const headerOffset = 300;
+        const elementPosition = target.getBoundingClientRect().top;
+        const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+        window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+    }
+
+    toggleClauseDetail(event, element) {
+        event?.stopPropagation?.();
+        if (!element) return;
+        const content = element.querySelector('.v3-clause-expanded-content');
+        const chevron = element.querySelector('.fa-chevron-right');
+        if (!content) return;
+        const isExpanded = element.getAttribute('data-expanded') === 'true';
+        if (isExpanded) {
+            element.setAttribute('data-expanded', 'false');
+            element.classList.remove('is-expanded');
+            element.setAttribute('aria-expanded', 'false');
+            content.style.setProperty('display', 'none', 'important');
+            element.style.setProperty('background', '#f8fafc', 'important');
+            element.style.setProperty('border-color', '#e2e8f0', 'important');
+            if (chevron) chevron.style.setProperty('transform', 'rotate(0deg)', 'important');
+            return;
+        }
+        element.setAttribute('data-expanded', 'true');
+        element.classList.add('is-expanded');
+        element.setAttribute('aria-expanded', 'true');
+        content.style.setProperty('display', 'block', 'important');
+        element.style.setProperty('background', '#ffffff', 'important');
+        element.style.setProperty('border-color', '#3b82f6', 'important');
+        if (chevron) chevron.style.setProperty('transform', 'rotate(90deg)', 'important');
+    }
+
+    updateDiffFilter(type, checked) {
+        if (!this.diffFilters) {
+            this.diffFilters = { added: true, removed: true, changed: true };
+        }
+        this.diffFilters[type] = checked;
+        this.navigate('diff-check');
+    }
+
+    updateDiffSelection(type, value) {
+        if (type === 'old') this.selectedOldFile = value || '';
+        if (type === 'new') this.selectedNewFile = value || '';
+        this.isAnalyzed = false;
+        if (this.currentContractId) {
+            this.clearAiAnalysisState(this.currentContractId);
+        }
+        this.navigate('diff-check');
+    }
+
+    clearAiAnalysisState(id) {
+        if (!id) return;
+        try {
+            if (window.aiAnalysisStates) delete window.aiAnalysisStates[id];
+            sessionStorage.removeItem('diff-check-ai-state:' + id);
+            const lastSaved = sessionStorage.getItem('diff-check-ai-state:last');
+            if (lastSaved) {
+                const lastState = JSON.parse(lastSaved);
+                if (String(lastState?.contractId) === String(id)) {
+                    sessionStorage.removeItem('diff-check-ai-state:last');
+                }
+            }
+        } catch(e){}
+    }
+
+    async onContractDrop(contractId, target = 'old') {
+        if (!contractId) {
+            Notify.warning('契約書を取得できませんでした。もう一度ドラッグしてください。');
+            return;
+        }
+
+        const contract = dbService.getContractById(contractId);
+        if (!contract) {
+            Notify.warning('選択した契約書が見つかりませんでした。');
+            return;
+        }
+
+        const docs = dbService.getDocumentsMetaByContractId(contractId);
+        const latestDoc = docs.find(doc => String(doc.id).endsWith('-current')) || docs[docs.length - 1] || null;
+        if (!latestDoc) {
+            Notify.warning('この契約書の資料データが見つかりませんでした。');
+            return;
+        }
+
+        if (target === 'new') {
+            this.newContractId = contractId;
+            this.selectedNewFile = latestDoc.id;
+        } else {
+            this.oldContractId = contractId;
+            this.selectedOldFile = latestDoc.id;
+        }
+        this.isAnalyzed = false;
+        this.clearAiAnalysisState(contractId);
+
+        this.currentContractId = contractId;
+        await this.navigate('diff-check', contractId);
+    }
+
+    async startDiffCheckFromContract(contractId) {
+        if (!contractId) return;
+        const docs = dbService.getDocumentsMetaByContractId(contractId);
+        const sourceDoc = docs.find(doc => doc.is_current) || docs[docs.length - 1] || null;
+        this.currentContractId = contractId;
+        this.oldContractId = contractId;
+        this.newContractId = null;
+        this.selectedOldFile = sourceDoc?.id || `contract-${contractId}-current`;
+        this.selectedNewFile = null;
+        this.isAnalyzed = false;
+        this.clearAiAnalysisState(contractId);
+        await this.navigate('diff-check', { id: contractId, source: 'contracts' });
+    }
+
+    handleDiffContractDrop(event, target = 'old') {
+        const transfer = event?.dataTransfer;
+        if (!transfer) {
+            Notify.warning('契約書を取得できませんでした。もう一度ドラッグしてください。');
+            return;
+        }
+
+        let contractId = '';
+        const jsonPayload = transfer.getData('application/json');
+        if (jsonPayload) {
+            try {
+                contractId = JSON.parse(jsonPayload)?.id || '';
+            } catch (_) {
+                contractId = '';
+            }
+        }
+
+        if (!contractId) {
+            contractId = transfer.getData('text/plain') || '';
+        }
+
+        this.onContractDrop(contractId, target);
+    }
+
+    findDiffCheckDocumentById(docId) {
+        if (!docId) return null;
+        const contracts = dbService.getContracts();
+        for (const contract of contracts) {
+            const docs = dbService.getDocumentsByContractId(contract.id);
+            const doc = docs.find(item => String(item.id) === String(docId));
+            if (doc) {
+                return { ...doc, contract };
+            }
+        }
+        return null;
+    }
+
+    dismissDiffCheckStatusPopup() {
+        document.getElementById('diff-check-status-popup')?.remove();
+    }
+
+    showDiffCheckStatusPopup(state = 'analyzing', progress = 10) {
+        let overlay = document.getElementById('diff-check-status-popup');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'diff-check-status-popup';
+            overlay.style.cssText = 'position:fixed;inset:0;z-index:9600;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,0.22);font-family:Inter, "Noto Sans JP", sans-serif;';
+            document.body.appendChild(overlay);
+        }
+
+        const safeProgress = Math.max(8, Math.min(100, Number(progress || 10)));
+        const isComplete = state === 'complete';
+
+        overlay.innerHTML = `
+            <div style="width:min(600px, calc(100vw - 32px)); background:#fff; border:1px solid ${isComplete ? '#dcfce7' : '#e2e8f0'}; border-radius:12px; box-shadow:0 18px 48px rgba(15,23,42,0.18); padding:28px; text-align:${isComplete ? 'center' : 'left'}; position:relative;">
+                <button onclick="window.app.dismissDiffCheckStatusPopup()" aria-label="閉じる"
+                    style="position:absolute; top:12px; right:12px; width:28px; height:28px; border:none; border-radius:6px; background:transparent; color:#94a3b8; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:14px;">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+                ${isComplete ? `
+                    <div style="width:48px; height:48px; border-radius:14px; background:#dcfce7; color:#16a34a; display:flex; align-items:center; justify-content:center; font-size:20px; margin:0 auto 14px;">
+                        <i class="fa-solid fa-circle-check"></i>
+                    </div>
+                    <div style="font-size:16px; font-weight:800; color:#1e293b; margin-bottom:8px;">差分チェックが完了しました</div>
+                    <div style="font-size:12px; color:#64748b; line-height:1.6; font-weight:600; margin-bottom:18px;">
+                        差分チェック画面で内容を確認できます。必要に応じて右側のAI差分解析を実行してください。
+                    </div>
+                    <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+                        <button onclick="window.app.dismissDiffCheckStatusPopup()"
+                            style="padding:10px 16px; border:none; border-radius:8px; background:#0b2d62; color:#fff; font-size:12px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:8px;">
+                            <i class="fa-solid fa-eye"></i> 差分チェックを見る
+                        </button>
+                    </div>
+                ` : `
+                    <div style="display:flex; align-items:center; gap:14px; margin-bottom:18px; padding-right:24px;">
+                        <div style="width:44px; height:44px; border-radius:12px; background:#eff6ff; color:#0b2d62; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0;">
+                            <i class="fa-solid fa-circle-notch fa-spin"></i>
+                        </div>
+                        <div>
+                            <div style="font-size:16px; font-weight:800; color:#1e293b; margin-bottom:4px;">差分チェック中です</div>
+                            <div style="font-size:12px; color:#64748b; font-weight:600;">選択した比較元と比較先を読み取り、差分表示を作成しています。</div>
+                        </div>
+                    </div>
+                    <div style="height:8px; background:#e2e8f0; border-radius:999px; overflow:hidden; margin-bottom:18px;">
+                        <div style="width:${safeProgress}%; height:100%; background:linear-gradient(90deg, #38bdf8 0%, #3b82f6 45%, #22c55e 100%); border-radius:999px; transition:width 0.45s ease; box-shadow:0 0 10px rgba(59,130,246,0.28);"></div>
+                    </div>
+                    <div style="display:grid; gap:9px; font-size:12px; font-weight:700;">
+                        <div style="display:flex; align-items:center; gap:8px; color:${safeProgress >= 18 ? '#16a34a' : '#64748b'};">
+                            <i class="fa-solid ${safeProgress >= 18 ? 'fa-circle-check' : 'fa-circle'}"></i> 比較対象を確認
+                        </div>
+                        <div style="display:flex; align-items:center; gap:8px; color:${safeProgress >= 52 ? '#16a34a' : (safeProgress >= 18 ? '#0b2d62' : '#64748b')};">
+                            <i class="fa-solid ${safeProgress >= 52 ? 'fa-circle-check' : (safeProgress >= 18 ? 'fa-circle-notch fa-spin' : 'fa-circle')}"></i> 新旧文書の差分を抽出
+                        </div>
+                        <div style="display:flex; align-items:center; gap:8px; color:${safeProgress >= 82 ? '#16a34a' : (safeProgress >= 52 ? '#0b2d62' : '#64748b')};">
+                            <i class="fa-solid ${safeProgress >= 82 ? 'fa-circle-check' : (safeProgress >= 52 ? 'fa-circle-notch fa-spin' : 'fa-circle')}"></i> 差分サマリーを更新
+                        </div>
+                    </div>
+                `}
+            </div>
+        `;
+    }
+
+    async startAnalysis() {
+        if (this.isAnalyzing) return;
+        const oldDoc = this.findDiffCheckDocumentById(this.selectedOldFile);
+        const newDoc = this.findDiffCheckDocumentById(this.selectedNewFile);
+        if (!oldDoc || !newDoc) {
+            Notify.warning('比較元と比較先の資料を選択してください。');
+            return;
+        }
+        if (String(oldDoc.id) === String(newDoc.id)) {
+            Notify.warning('比較元と比較先には別の資料を選択してください。');
+            return;
+        }
+
+        const targetContract = newDoc.contract || oldDoc.contract;
+        const targetContractId = targetContract?.id || this.currentContractId || this.newContractId || this.oldContractId;
+        if (!targetContractId) {
+            Notify.warning('差分チェック対象の契約書を特定できませんでした。');
+            return;
+        }
+
+        if (window.aiAnalysisStates) {
+            delete window.aiAnalysisStates[targetContractId];
+        }
+        try {
+            sessionStorage.removeItem(`diff-check-ai-state:${targetContractId}`);
+            const lastState = JSON.parse(sessionStorage.getItem('diff-check-ai-state:last') || 'null');
+            if (String(lastState?.contractId) === String(targetContractId)) {
+                sessionStorage.removeItem('diff-check-ai-state:last');
+            }
+        } catch (error) {
+            console.warn('AI差分解析状態のクリアに失敗しました:', error);
+        }
+
+        this.isAnalyzing = true;
+        this.isAnalyzed = false;
+        this.showDiffCheckStatusPopup('analyzing', 8);
+        for (const progress of [24, 48, 72, 92]) {
+            await new Promise(resolve => setTimeout(resolve, 180));
+            if (!this.isAnalyzing) return;
+            this.showDiffCheckStatusPopup('analyzing', progress);
+        }
+
+        this.isAnalyzing = false;
+        this.isAnalyzed = true;
+        this.diffAnalysisProgress = 0;
+        dbService.touchRecentDiff?.(oldDoc.id, newDoc.id, targetContractId);
+        this.showDiffCheckStatusPopup('complete', 100);
+        await this.navigate('diff-check', targetContractId);
+    }
+
+    setDiffLayout(layout) {
+        this.diffLayout = layout;
+        this.navigate('diff-check');
+    }
+
+    toggleNotificationsList() {
+        this.showNotificationsList = !this.showNotificationsList;
+        if (this.currentView === 'diff-check') {
+            this.navigate('diff-check');
+        }
+    }
+
+    formatTimeAgo(value) {
+        const date = value ? new Date(value) : null;
+        if (!date || Number.isNaN(date.getTime())) return '';
+        const diffMs = Date.now() - date.getTime();
+        const minutes = Math.max(0, Math.floor(diffMs / 60000));
+        if (minutes < 1) return 'たった今';
+        if (minutes < 60) return `${minutes}分前`;
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) return `${hours}時間前`;
+        const days = Math.floor(hours / 24);
+        return `${days}日前`;
+    }
+
+    markAsReadAndNavigate(id, contractId) {
+        this.notifications = (this.notifications || []).filter(n => String(n.id) !== String(id));
+        this.showNotificationsList = false;
+        const nextId = normalizeDiffContractId(contractId);
+        if (nextId) {
+            this.navigate('diff', nextId);
+        } else {
+            this.navigate('diff-check');
+        }
+    }
+
+    postMemo() {
+        const input = document.getElementById('memo-input');
+        if (!input || !input.value.trim()) return;
+        input.value = '';
+    }
+
+    addDiffMemo() {
+        const input = document.getElementById('diff-memo-input');
+        if (!input || !input.value.trim()) return;
+        const text = input.value.trim();
+        input.value = '';
+
+        if (this.selectedOldFile && this.selectedNewFile && typeof dbService.saveDiffMemo === 'function') {
+            dbService.saveDiffMemo(this.selectedOldFile, this.selectedNewFile, this.currentContractId, text);
+        }
+
+        const memoList = document.getElementById('diff-memo-list');
+        if (memoList) {
+            if (memoList.innerHTML.includes('共有メモはありません')) {
+                memoList.innerHTML = '';
+            }
+            const memoEl = document.createElement('div');
+            memoEl.style.cssText = 'padding:10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:8px; font-size:12px; color:#334155; line-height:1.4;';
+            const escapedText = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+            memoEl.innerHTML = `
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-weight:700; color:#64748b; font-size:10px;">
+                    <span>あなた</span>
+                    <span>たった今</span>
+                </div>
+                <div style="white-space:pre-wrap; word-break:break-all;">${escapedText}</div>
+            `;
+            memoList.appendChild(memoEl);
+            memoList.scrollTop = memoList.scrollHeight;
         }
     }
 
@@ -6475,6 +7509,43 @@ class DashboardApp {
         this.setActiveClauseNavItem(clauseId);
     }
 
+    scrollToClauseInViewer(idx, articleNum) {
+        const sheet = document.getElementById('v3-pdf-sheet');
+        if (!sheet) return;
+        const doScroll = () => {
+            const searchText = String(articleNum || `第${idx + 1}条`).replace(/\s+/g, '');
+            const candidates = sheet.querySelectorAll('p, div, span, td, h1, h2, h3, h4');
+            let target = null;
+            for (const el of candidates) {
+                if (el.children.length > 0) continue;
+                const t = el.textContent.replace(/\s+/g, '');
+                if (t && t.includes(searchText)) { target = el; break; }
+            }
+            if (!target) target = document.getElementById(`clause-${idx}`);
+            if (!target) return;
+            const scrollArea = document.querySelector('.v3-viewer-main');
+            if (scrollArea) {
+                const areaRect = scrollArea.getBoundingClientRect();
+                const targetRect = target.getBoundingClientRect();
+                scrollArea.scrollBy({ top: targetRect.top - areaRect.top - 120, behavior: 'smooth' });
+            } else {
+                target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            setTimeout(() => {
+                target.classList.remove('v3-clause-highlight');
+                void target.offsetWidth;
+                target.classList.add('v3-clause-highlight');
+                setTimeout(() => target.classList.remove('v3-clause-highlight'), 1600);
+            }, 400);
+        };
+        if (window.signViewer && window.signViewer._viewMode !== 'original') {
+            window.signViewer.switchViewMode('original');
+            setTimeout(doScroll, 800);
+        } else {
+            doScroll();
+        }
+    }
+
     toggleMobileClauseNav(trigger) {
         const root = trigger?.closest('.contract-structured-container') || document.querySelector('.contract-structured-container');
         const nav = root ? root.querySelector('.clause-nav') : null;
@@ -6506,41 +7577,38 @@ class DashboardApp {
         }
 
         const isMobileDetailLayout = typeof window.matchMedia === 'function'
-            && window.matchMedia('(max-width: 900px)').matches;
+            && window.matchMedia('(max-width: 1024px)').matches;
         if (isMobileDetailLayout) {
-            // #app-content をスクロールコンテナとして保持（fixed の親 #app-main に対する 100% 高さを維持）
-            this.mainContent.style.display = 'flex';
-            this.mainContent.style.flexDirection = 'column';
-            this.mainContent.style.minHeight = '0';
-            this.mainContent.style.height = '100%';
-            this.mainContent.style.overflowY = 'auto';
+            this.mainContent.style.display = 'block';
+            this.mainContent.style.flexDirection = '';
+            this.mainContent.style.minHeight = '';
+            this.mainContent.style.height = 'auto';
+            this.mainContent.style.overflowY = 'visible';
             this.mainContent.style.overflowX = 'hidden';
 
             const detailContainer = this.mainContent.querySelector('.detail-split-container');
             if (detailContainer) {
-                detailContainer.style.display = 'flex';
-                detailContainer.style.flexDirection = 'column';
-                detailContainer.style.flex = '1 1 auto';
-                detailContainer.style.minHeight = '0';
-                detailContainer.style.height = '100%';
+                detailContainer.style.display = 'block';
+                detailContainer.style.flexDirection = '';
+                detailContainer.style.flex = '';
+                detailContainer.style.minHeight = '';
+                detailContainer.style.height = 'auto';
             }
 
             const detailBody = this.mainContent.querySelector('.detail-split-body');
             if (detailBody) {
-                detailBody.style.display = 'flex';
-                detailBody.style.flexDirection = 'column';
-                detailBody.style.flex = '1 1 auto';
-                detailBody.style.minHeight = '0';
+                detailBody.style.display = 'block';
+                detailBody.style.flex = '';
+                detailBody.style.minHeight = '';
                 detailBody.style.height = 'auto';
-                detailBody.style.overflowY = 'auto';
-                detailBody.style.overflowX = 'hidden';
+                detailBody.style.overflow = 'visible';
             }
 
             this.mainContent.querySelectorAll('.detail-split-body .pane').forEach((pane) => {
-                pane.style.display = 'block';
+                pane.style.display = 'flex';
+                pane.style.flexDirection = 'column';
                 pane.style.flex = 'none';
                 pane.style.minHeight = '';
-                pane.style.height = 'auto';
                 pane.style.overflow = 'visible';
             });
 
@@ -6834,47 +7902,6 @@ class DashboardApp {
         })();
     }
 
-    showVersionUploadNotice(onConfirm) {
-        const existing = document.getElementById('version-upload-notice-overlay');
-        if (existing) existing.remove();
-
-        const overlay = document.createElement('div');
-        overlay.id = 'version-upload-notice-overlay';
-        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9500;display:flex;align-items:center;justify-content:center;padding:16px;';
-        overlay.innerHTML = `
-            <div style="background:#fff;border-radius:12px;padding:26px 30px;width:430px;max-width:94vw;box-shadow:0 8px 32px rgba(0,0,0,0.18);">
-                <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:18px;">
-                    <div style="width:40px;height:40px;border-radius:10px;background:#fff4df;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                        <i class="fa-solid fa-cloud-arrow-up" style="color:#c5a059;font-size:18px;"></i>
-                    </div>
-                    <div>
-                        <div style="font-size:15px;font-weight:700;color:#2b2623;margin-bottom:6px;">新しいバージョンを取り込みますか？</div>
-                        <div style="font-size:13px;color:#5e544d;line-height:1.7;">
-                            資料を選択して取り込むと、差分判定・AIリスク解析・期限取得が開始されます。<br>
-                            <strong style="color:#c5a059;">解析回数を1回消費します。</strong>
-                        </div>
-                    </div>
-                </div>
-                <div style="background:#f8f6f3;border-radius:8px;padding:12px 14px;margin-bottom:20px;font-size:12px;color:#7a6a5a;line-height:1.6;">
-                    <i class="fa-solid fa-circle-info" style="color:#c5a059;margin-right:6px;"></i>
-                    ファイルを選ぶ前に中止する場合は「キャンセル」を押してください。
-                </div>
-                <div style="display:flex;gap:10px;justify-content:flex-end;">
-                    <button type="button" class="version-upload-cancel" style="padding:9px 18px;border:1px solid #ddd;border-radius:6px;background:#fff;color:#5e544d;font-size:14px;cursor:pointer;">キャンセル</button>
-                    <button type="button" class="version-upload-ok" style="padding:9px 22px;border:none;border-radius:6px;background:#c5a059;color:#fff;font-size:14px;font-weight:600;cursor:pointer;">はい</button>
-                </div>
-            </div>`;
-
-        const close = () => overlay.remove();
-        overlay.querySelector('.version-upload-cancel').addEventListener('click', close);
-        overlay.querySelector('.version-upload-ok').addEventListener('click', () => {
-            close();
-            if (typeof onConfirm === 'function') onConfirm();
-        });
-        overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
-        document.body.appendChild(overlay);
-    }
-
     uploadNewVersion(id) {
         if (!this.ensurePaymentAccess('新しいバージョン解析')) {
             return;
@@ -6899,14 +7926,13 @@ class DashboardApp {
             return;
         }
 
-        const openFilePicker = () => {
-            // それ以外（PDF/Word）はファイル選択ダイアログを表示
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = '.pdf,.docx';
+        // それ以外（PDF/Word）はファイル選択ダイアログを表示
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.pdf,.docx';
 
-            // input.click() をトリガーする前にイベントハンドラを設定
-            input.onchange = async (e) => {
+        // input.click() をトリガーする前にイベントハンドラを設定
+        input.onchange = async (e) => {
             const file = e.target.files[0];
             if (!file) return;
 
@@ -6956,20 +7982,23 @@ class DashboardApp {
                         console.warn("Token pre-refresh failed:", e);
                     }
 
-                    // PDFをBase64に変換
-                    const base64Data = await aiService.convertFileToBase64(file);
+                    const analysisInput = await aiService.prepareAnalysisSource({
+                        method: analysisMethod,
+                        file,
+                        source: file.name
+                    });
 
                     // 旧バージョンのテキストを取得
                     const previousVersion = contract.original_content;
                     const isFirstUpload = !previousVersion;
 
-                    // AI解析を実行（前バージョンなし＝初回取り込みはAIをスキップ）
+                    // AI解析を実行（初回取り込みでもAI解析を行うように修正）
                     const result = await aiService.analyzeContract(
                         id,
-                        analysisMethod,
-                        base64Data,
+                        analysisInput.method,
+                        analysisInput.source,
                         previousVersion,
-                        isFirstUpload ? { skipAI: true, userTriggered: true } : { userTriggered: true }
+                        { ...analysisInput.options, userTriggered: true }
                     );
 
                     // ローディング削除
@@ -6990,8 +8019,9 @@ class DashboardApp {
                             extractedTextHash: result.data.extractedTextHash,
                             extractedTextLength: result.data.extractedTextLength,
                             sourceType: result.data.sourceType,
-                            pdfStoragePath: String(result.data.sourceType || '').toUpperCase() === 'DOCX' ? null : result.data.pdfStoragePath,
-                            pdfUrl: String(result.data.sourceType || '').toUpperCase() === 'DOCX' ? null : result.data.pdfUrl,
+                            pdfStoragePath: result.data.pdfStoragePath,
+                            pdfUrl: result.data.pdfUrl,
+                            originalFilePath: result.data.originalFilePath || result.data.original_file_path,
                             doc: result.data.doc || null,
                             status: '未確認',
                             originalFilename: file.name
@@ -7069,11 +8099,8 @@ class DashboardApp {
             await performAnalysis();
         };
 
-            // ファイル選択ダイアログを表示
-            input.click();
-        };
-
-        this.showVersionUploadNotice(openFilePicker);
+        // ファイル選択ダイアログを表示
+        input.click();
     }
 
     /**
@@ -7204,7 +8231,7 @@ class DashboardApp {
 
         modal.innerHTML = `
                     <div style="background:white; width:90%; max-width:450px; border-radius:12px; padding:32px; text-align:center; box-shadow:0 10px 40px rgba(0,0,0,0.1); animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);">
-                        <div style="width:60px; height:60px; background:#f9f9f9; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 20px; color:#c5a059; font-size:30px;">
+                        <div style="width:60px; height:60px; background:#f9f9f9; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 20px; color:#0b2d62; font-size:30px;">
                             <i class="fa-solid fa-check"></i>
                         </div>
                         <h3 style="margin:0 0 12px; color:#24292E; font-size:20px; font-weight:700;">${title}</h3>
@@ -7387,15 +8414,15 @@ class DashboardApp {
         modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:11000;animation:fadeIn 0.3s;';
         modal.innerHTML = `
             <div style="background:white;width:90%;max-width:420px;border-radius:12px;padding:32px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,0.2);animation:slideUp 0.3s cubic-bezier(0.16,1,0.3,1);">
-                <div style="width:60px;height:60px;background:#f3f0ea;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;color:#c5a059;font-size:28px;">
+                <div style="width:60px;height:60px;background:#eef4fb;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;color:#0b2d62;font-size:28px;">
                     <i class="fa-solid fa-crown"></i>
                 </div>
-                <div style="display:inline-block;background:#f3f0ea;color:#c5a059;border:1px solid #e8d9b8;border-radius:10px;padding:3px 12px;font-size:11px;font-weight:700;margin-bottom:12px;">Business / Proプラン限定</div>
+                <div style="display:inline-block;background:#eef4fb;color:#0b2d62;border:1px solid rgba(6, 31, 69, 0.18);border-radius:10px;padding:3px 12px;font-size:11px;font-weight:700;margin-bottom:12px;">Business / Proプラン限定</div>
                 <h3 style="margin:0 0 12px;color:#24292E;font-size:18px;font-weight:700;">期限・アラート管理</h3>
                 <p style="margin:0 0 24px;color:#586069;font-size:13px;line-height:1.7;">契約期限の自動抽出・アラート通知はBusinessプラン以上でご利用いただけます。</p>
                 <div style="display:flex;gap:10px;">
                     <button style="flex:1;padding:10px;border:1px solid #ddd;border-radius:8px;background:#fff;color:#666;font-size:13px;cursor:pointer;" onclick="document.getElementById('business-upgrade-modal').remove()">閉じる</button>
-                    <button style="flex:1;padding:10px;border:none;border-radius:8px;background:#c5a059;color:#fff;font-size:13px;font-weight:700;cursor:pointer;" onclick="document.getElementById('business-upgrade-modal').remove();window.app.navigate('plan')">プランを見る</button>
+                    <button style="flex:1;padding:10px;border:none;border-radius:8px;background:#0b2d62;color:#fff;font-size:13px;font-weight:700;cursor:pointer;" onclick="document.getElementById('business-upgrade-modal').remove();window.app.navigate('plan')">プランを見る</button>
                 </div>
             </div>`;
         document.body.appendChild(modal);
@@ -7410,15 +8437,15 @@ class DashboardApp {
         modal.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:11000; animation: fadeIn 0.3s;';
         modal.innerHTML = `
             <div style="background:white; width:90%; max-width:420px; border-radius:12px; padding:32px; text-align:center; box-shadow:0 10px 40px rgba(0,0,0,0.2); animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);">
-                <div style="width:60px; height:60px; background:#f3f0ea; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 20px; color:#c5a059; font-size:28px;">
+                <div style="width:60px; height:60px; background:#eef4fb; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 20px; color:#0b2d62; font-size:28px;">
                     <i class="fa-solid fa-satellite-dish"></i>
                 </div>
-                <div style="display:inline-block; background:#f3f0ea; color:#c5a059; border:1px solid #e8d9b8; border-radius:10px; padding:3px 12px; font-size:11px; font-weight:700; margin-bottom:12px;">Proプラン限定</div>
+                <div style="display:inline-block; background:#eef4fb; color:#0b2d62; border:1px solid rgba(6, 31, 69, 0.18); border-radius:10px; padding:3px 12px; font-size:11px; font-weight:700; margin-bottom:12px;">Proプラン限定</div>
                 <h3 style="margin:0 0 12px; color:#24292E; font-size:18px; font-weight:700;">定期URL監視・Slack／メール通知</h3>
                 <p style="margin:0 0 24px; color:#586069; font-size:13px; line-height:1.7;">${message}</p>
                 <div style="display:flex; gap:10px;">
                     <button style="flex:1; padding:10px; border:1px solid #ddd; border-radius:8px; background:#fff; color:#666; font-size:13px; cursor:pointer;" onclick="document.getElementById('pro-upgrade-modal').remove()">閉じる</button>
-                    <button style="flex:1; padding:10px; border:none; border-radius:8px; background:#c5a059; color:#fff; font-size:13px; font-weight:700; cursor:pointer;" onclick="document.getElementById('pro-upgrade-modal').remove(); window.app.registration?.close(); window.app.navigate('plan')">Proプランを見る</button>
+                    <button style="flex:1; padding:10px; border:none; border-radius:8px; background:#0b2d62; color:#fff; font-size:13px; font-weight:700; cursor:pointer;" onclick="document.getElementById('pro-upgrade-modal').remove(); window.app.registration?.close(); window.app.navigate('plan')">Proプランを見る</button>
                 </div>
             </div>`;
         document.body.appendChild(modal);
@@ -7568,7 +8595,7 @@ class DashboardApp {
             Notify.warning('閲覧のみの権限では監視設定を変更できません');
             return;
         }
-        if (enabled && this.subscription?.plan !== 'pro' && this.subscription?.plan !== 'owner') {
+        if (enabled && this.subscription?.plan !== 'pro') {
             this.showAlertModal('プラン制限', '定期URL監視（自動チェック）はProプラン限定の機能です。', 'warning');
             return;
         }
@@ -7760,9 +8787,13 @@ class DashboardApp {
                     if (!response.ok) throw new Error('PDF原本の取得に失敗しました');
                     const blob = await response.blob();
                     const file = new File([blob], contract.original_filename || 'contract.pdf', { type: blob.type || 'application/pdf' });
-                    const base64 = await aiService.convertFileToBase64(file);
+                    const analysisInput = await aiService.prepareAnalysisSource({
+                        method: 'pdf',
+                        file,
+                        source: file.name
+                    });
                     requestedRemoteAnalysis = true;
-                    const result = await aiService.analyzeContract(contractId, 'pdf', base64, historyItem.content, { userTriggered: true });
+                    const result = await aiService.analyzeContract(contractId, analysisInput.method, analysisInput.source, historyItem.content, { ...analysisInput.options, userTriggered: true });
                     if (!result.success) throw new Error(result.error || '比較解析に失敗しました');
                     comparisonContext.analysis = result.data;
                 }
@@ -7913,7 +8944,6 @@ class DashboardApp {
             changes: []
         };
         let requestedRemoteAnalysis = false;
-        let loadingNotify = null;
 
         try {
             // Check Usage Limit (Only for manual, non-cached analysis)
@@ -7926,11 +8956,7 @@ class DashboardApp {
                 }
             }
             if (!silent) {
-                loadingNotify = Notify.info('比較元と比較先の差分リスクを解析中...', {
-                    title: '差分リスク解析中',
-                    position: 'center',
-                    duration: 0
-                });
+                Notify.info('AI差分解析を実行中...');
             }
 
             const sourceType = String(contract?.source_type || '').toUpperCase();
@@ -7950,9 +8976,13 @@ class DashboardApp {
                 if (!response.ok) throw new Error('PDF原本の取得に失敗しました');
                 const blob = await response.blob();
                 const file = new File([blob], targetDoc.document_name || contract.original_filename || 'contract.pdf', { type: blob.type || 'application/pdf' });
-                const base64 = await aiService.convertFileToBase64(file);
+                const analysisInput = await aiService.prepareAnalysisSource({
+                    method: 'pdf',
+                    file,
+                    source: file.name
+                });
                 requestedRemoteAnalysis = true;
-                const result = await aiService.analyzeContract(contractId, 'pdf', base64, sourceDoc.content, { userTriggered: true });
+                const result = await aiService.analyzeContract(contractId, analysisInput.method, analysisInput.source, sourceDoc.content, { ...analysisInput.options, userTriggered: true });
                 if (!result.success) throw new Error(result.error || '差分解析に失敗しました');
                 Object.assign(diffPayload, result.data || {});
             } else {
@@ -7976,13 +9006,6 @@ class DashboardApp {
                 created_at: new Date().toISOString()
             });
             if (isCurrentVsLatestHistoryPair(docs, sourceDoc, targetDoc)) {
-                const deadlineFields = {};
-                if (diffPayload.expiry_date !== undefined) deadlineFields.expiry_date = diffPayload.expiry_date;
-                if (diffPayload.renewal_deadline !== undefined) deadlineFields.renewal_deadline = diffPayload.renewal_deadline;
-                if (diffPayload.contract_start !== undefined) deadlineFields.contract_start = diffPayload.contract_start;
-                if (diffPayload.auto_renewal !== undefined) deadlineFields.auto_renewal = diffPayload.auto_renewal;
-                if (diffPayload.date_confidence !== undefined) deadlineFields.date_confidence = diffPayload.date_confidence;
-                if (diffPayload.contract_category !== undefined) deadlineFields.contract_category = diffPayload.contract_category;
                 dbService.updateContractAnalysis(contractId, {
                     summary: diffPayload.summary,
                     riskLevel: diffPayload.riskLevel,
@@ -7990,13 +9013,8 @@ class DashboardApp {
                     changes: Array.isArray(diffPayload.changes) ? diffPayload.changes : [],
                     isFallback: diffPayload.isFallback === true,
                     aiFailed: diffPayload.aiFailed === true,
-                    aiSucceeded: !diffPayload.aiFailed,
-                    status: '未確認',
-                    ...deadlineFields
+                    status: '未確認'
                 });
-            }
-            if (!silent) {
-                Notify.success('差分AI解析が完了しました。');
             }
             if (requestedRemoteAnalysis) {
                 await this.refreshSubscriptionStatusSafe();
@@ -8015,8 +9033,6 @@ class DashboardApp {
             } else if (!silent) {
                 Notify.error(`AI解析中にエラーが発生しました: ${error.message}`);
             }
-        } finally {
-            if (loadingNotify?.close) loadingNotify.close();
         }
     }
 
@@ -8109,7 +9125,7 @@ class DashboardApp {
 
 
     exportCSV() {
-        if (this.subscription?.plan !== 'pro' && this.subscription?.plan !== 'owner') return;
+        if (this.subscription?.plan !== 'pro') return;
 
         // Get filters from current state
         const filters = this.filters || {};
@@ -8244,8 +9260,8 @@ class DashboardApp {
             container.innerHTML = `
                             <div style="padding: 40px; line-height: 1.6;">
                                 <!-- Section: Header -->
-                                <div style="border-bottom: 2px solid #c19b4a; padding-bottom: 10px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end;">
-                                    <h1 style="margin: 0; color: #c19b4a; font-size: 24px;">DIFFsense AI解析レポート</h1>
+                                <div style="border-bottom: 2px solid #0b2d62; padding-bottom: 10px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end;">
+                                    <h1 style="margin: 0; color: #0b2d62; font-size: 24px;">DIFFsense AI解析レポート</h1>
                                     <span style="font-size: 12px; color: #888;">出力日: ${analysisDate}</span>
                                 </div>
 
@@ -8261,19 +9277,19 @@ class DashboardApp {
 
                                 <!-- Section: AI Summary -->
                                 <div style="margin-bottom: 20px;">
-                                    <h2 style="font-size: 18px; border-left: 4px solid #c19b4a; padding-left: 10px; margin: 0 0 15px;">【解析要約】</h2>
+                                    <h2 style="font-size: 18px; border-left: 4px solid #0b2d62; padding-left: 10px; margin: 0 0 15px;">【解析要約】</h2>
                                     <div style="white-space: pre-wrap;">${contract.ai_summary || '解析データなし'}</div>
                                 </div>
 
                                 <!-- Section: Risk Reason -->
                                 <div style="margin-bottom: 20px;">
-                                    <h2 style="font-size: 18px; border-left: 4px solid #c19b4a; padding-left: 10px; margin: 0 0 15px;">【AIリスク判定結果・理由】</h2>
+                                    <h2 style="font-size: 18px; border-left: 4px solid #0b2d62; padding-left: 10px; margin: 0 0 15px;">【AIリスク判定結果・理由】</h2>
                                     <div style="white-space: pre-wrap;">${contract.ai_risk_reason || '判定データなし'}</div>
                                 </div>
 
                                 <!-- Section: Each change as separate section -->
                                 <div style="margin-bottom: 10px;">
-                                    <h2 style="font-size: 18px; border-left: 4px solid #c19b4a; padding-left: 10px; margin: 0 0 15px;">【主要な差分箇所】</h2>
+                                    <h2 style="font-size: 18px; border-left: 4px solid #0b2d62; padding-left: 10px; margin: 0 0 15px;">【主要な差分箇所】</h2>
                                 </div>
                                 ${(contract.ai_changes || []).map(c => `
                     <div style="margin-bottom: 15px; border: 1px solid #eee; border-radius: 4px;">
@@ -8291,7 +9307,7 @@ class DashboardApp {
 
                                 <!-- Section: Original Content -->
                                 <div style="margin-bottom: 20px;">
-                                    <h2 style="font-size: 18px; border-left: 4px solid #c19b4a; padding-left: 10px; margin: 0 0 15px;">【原本（全文）】</h2>
+                                    <h2 style="font-size: 18px; border-left: 4px solid #0b2d62; padding-left: 10px; margin: 0 0 15px;">【原本（全文）】</h2>
                                     <div style="white-space: pre-wrap; background: #fafafa; padding: 20px; font-size: 12px; border: 1px solid #eee;">${contract.original_content || '原本データはありません'}</div>
                                 </div>
 
@@ -8391,11 +9407,6 @@ class DashboardApp {
     }
 
     async showAnalysisLimitError(error = {}) {
-        // ローカル/LAN環境のownerプランはAPI上限エラーを無視する
-        const _h = window.location.hostname;
-        const _isLocalOwner = (_h === 'localhost' || _h === '127.0.0.1' || _h === '[::1]' || _h.endsWith('.local') || _h.startsWith('192.168.') || _h.startsWith('10.')) && this.subscription?.plan === 'owner';
-        if (_isLocalOwner) return;
-
         let cu = error.currentUsage;
         let lim = error.limit;
         let next = error.nextPlan;
@@ -8514,12 +9525,28 @@ class DashboardApp {
 }
 
 // Global App Instance
-window.app = new DashboardApp();
-document.addEventListener('DOMContentLoaded', () => {
-    window.app.init();
-    // sign-ui.js をバックグラウンドで事前評価（署名管理クリック時に即時使用可能にする）
-    setTimeout(() => import('./sign-ui.js?v=20260428_v1').catch(() => {}), 1500);
-});
+try {
+    window.app = new DashboardApp();
+    const runPendingNavigation = () => {
+        const pending = window.__pendingDashboardNavigation;
+        if (!pending || !pending.view || !window.app || typeof window.app.navigate !== 'function') return;
+        window.__pendingDashboardNavigation = null;
+        window.app.navigate(pending.view, pending.params ?? null);
+    };
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+            window.app.init()
+                .then(runPendingNavigation)
+                .catch(e => console.error('App init failed:', e));
+        });
+    } else {
+        window.app.init()
+            .then(runPendingNavigation)
+            .catch(e => console.error('App init failed:', e));
+    }
+} catch (e) {
+    console.error('Critical: DashboardApp creation failed:', e);
+}
 
 
 

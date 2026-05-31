@@ -301,20 +301,13 @@
     background: var(--color-primary);
     border-color: var(--color-primary);
     color: #fff;
-    box-shadow: none;
+    box-shadow: 0 4px 12px rgba(11, 45, 98, 0.15);
 }
 
 .btn-sign-primary:hover {
-    background: #9e8047;
-    border-color: #9e8047;
-}
-
-.btn-sign-primary:disabled {
-    background: #e0e0e0 !important;
-    border-color: #d0d0d0 !important;
-    color: #a0a0a0 !important;
-    cursor: not-allowed !important;
-    box-shadow: none !important;
+    background: var(--color-navy-hover);
+    border-color: var(--color-navy-hover);
+    transform: translateY(-1px);
 }
 
 .sign-page-switcher {
@@ -529,6 +522,8 @@
 .sign-editor-sidebar {
     --sign-bg-light: #f8f9fa;
     --sign-border: #e0e0e0;
+    --sign-primary: var(--color-primary, #0b2d62);
+    --sign-text-muted: #64748b;
 }
 
 .sign-editor-sidebar-body {
@@ -614,6 +609,18 @@
 .recipient-edit-row {
     transition: all 0.2s ease;
     border: 1px solid #eee;
+    box-sizing: border-box;
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+.recipient-edit-row input,
+.sign-editor-sidebar input,
+.sign-editor-sidebar select,
+.sign-editor-sidebar textarea {
+    box-sizing: border-box !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
 }
 
 .recipient-edit-row:focus-within {
@@ -847,4 +854,18 @@
 .sign-editor-viewport .docx-wrapper *,
 .sign-editor-viewport .docx-virtual-page-layer * {
     color: #1a1a1a !important;
+}
+
+/* Keep DOCX pages inside their white page frame in signature management only. */
+.sign-editor-viewport .editor-page-shell,
+.sign-editor-viewport .editor-page-wrapper,
+.sign-editor-viewport .docx-wrapper > section,
+#sign-viewer-content #pdf-viewer-scroll .editor-page-shell,
+#sign-viewer-content #pdf-viewer-scroll .editor-page-wrapper,
+#sign-viewer-content #pdf-viewer-scroll .docx-wrapper > section {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    clip-path: inset(0) !important;
+    contain: paint;
 }

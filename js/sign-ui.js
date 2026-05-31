@@ -3,9 +3,9 @@
  * Facilitates selecting documents from the contract pool for signature.
  */
 
-import { dbService } from './db-service.js';
+import { dbService } from './db-service.js?v=20260519_sign_storage_fix_v2';
 import { Notify } from './notify.js';
-import { getIdToken } from './auth.js';
+import { getIdToken } from './auth.js?v=20260510_auth_ready_fix';
 import { toApiUrl } from './api-base-safe.js?v=20260329_api_base_safe1';
 
 export const SignUI = {
@@ -16,6 +16,8 @@ export const SignUI = {
         sortBy: 'date_desc'
     },
     localDummyContracts: [],
+    _contractSyncPromise: null,
+    _lastContractSyncTime: 0,
 
     isCompletedRequest(request) {
         return String(request?.status || '').toLowerCase() === 'completed';
@@ -364,20 +366,19 @@ export const SignUI = {
     },
 
     /**
-     * Refreshes the list based on the active tab (Optimistic Rendering)
+     * Refreshes the list based on the active tab
      */
-    refreshList(app) {
+    async refreshList(app) {
         const listBody = document.getElementById('sign-list-body');
         const tableHead = document.getElementById('sign-table-head');
         if (!listBody || !tableHead) return;
 
-        // Note: No 'await' here to allow immediate shell rendering
         if (this.currentTab === 'new-request') {
-            this.renderNewRequestTab(tableHead, listBody);
+            await this.renderNewRequestTab(tableHead, listBody);
         } else if (this.currentTab === 'completed-requests') {
-            this.renderCompletedRequestsTab(tableHead, listBody);
+            await this.renderCompletedRequestsTab(tableHead, listBody);
         } else {
-            this.renderSentRequestsTab(tableHead, listBody);
+            await this.renderSentRequestsTab(tableHead, listBody);
         }
     },
 
@@ -385,8 +386,6 @@ export const SignUI = {
      * Tab 1: New Request (From Contracts)
      */
     async renderNewRequestTab(tableHead, listBody) {
-        const table = listBody.closest('table');
-        if (table) table.classList.add('sign-request-table');
         tableHead.innerHTML = `
             <tr>
                 <th>書類名</th>
@@ -394,25 +393,12 @@ export const SignUI = {
                 <th>解析ステータス</th>
                 <th>リスク</th>
                 <th>最終更新</th>
-                <th style="width:180px; text-align:right;">操作</th>
+                <th style="width:180px; text-align:left;">操作</th>
             </tr>
         `;
 
-        // 1. Initial render from cache
-        const initialContracts = await this.ensureLocalDummyContracts();
-        this._renderNewRequestList(initialContracts, listBody);
-
-        // 2. Background sync (Optional: only if needed or periodically)
-        dbService.syncContractsFromApi().then(async () => {
-            if (this.currentTab === 'new-request') {
-                const updated = await this.ensureLocalDummyContracts();
-                this._renderNewRequestList(updated, listBody);
-            }
-        }).catch(err => console.warn('Background sync failed:', err));
-    },
-
-    _renderNewRequestList(allContracts, listBody) {
-        const contracts = this.applyContractFiltersAndSort(allContracts);
+        const contracts = this.applyContractFiltersAndSort(await this.ensureLocalDummyContracts());
+        this.syncContractsForNewRequestTab();
         
         if (contracts.length === 0) {
             const hasFilter = Boolean(String(this.filters.query || '').trim());
@@ -451,7 +437,7 @@ export const SignUI = {
                     </td>
                     <td><span class="badge ${riskClass}">${riskLabel}</span></td>
                     <td>${updatedAt}</td>
-                    <td style="text-align:right;" onclick="event.stopPropagation()">
+                    <td style="text-align:left;" onclick="event.stopPropagation()">
                         <button class="btn-dashboard btn-primary-action" style="font-size:12px; min-width:140px; justify-content:center;${startDisabled ? ' opacity:0.5; cursor:not-allowed;' : ''}" onclick="window.signUI.startSingleRequest(${c.id})" ${startDisabled ? 'disabled' : ''} title="${!signable ? 'PDF原本または本文プレビューがある書類のみ署名依頼できます' : ''}">
                             署名依頼を開始
                         </button>
@@ -461,37 +447,41 @@ export const SignUI = {
         }).join('');
     },
 
+    syncContractsForNewRequestTab() {
+        const now = Date.now();
+        if (this._contractSyncPromise || (now - this._lastContractSyncTime) < 30000) return;
+
+        this._lastContractSyncTime = now;
+        this._contractSyncPromise = dbService.syncContractsFromApi()
+            .then(() => {
+                if (this.currentTab === 'new-request' && document.getElementById('sign-list-body')) {
+                    this.refreshList();
+                }
+            })
+            .catch((error) => {
+                console.warn('署名管理の契約一覧同期に失敗しました:', error);
+            })
+            .finally(() => {
+                this._contractSyncPromise = null;
+            });
+    },
+
     /**
      * Tab 2: Sent Requests (Tracking)
      */
     async renderSentRequestsTab(tableHead, listBody) {
-        const table = listBody.closest('table');
-        if (table) table.classList.add('sign-request-table');
         tableHead.innerHTML = `
             <tr>
                 <th>書類名</th>
-                <th>宛先</th>
+                <th>送信者</th>
                 <th>ステータス</th>
                 <th>作成日</th>
-                <th style="text-align:right;">アクション</th>
+                <th>アクション</th>
             </tr>
         `;
 
-        // 1. Initial render from cache
-        const cached = JSON.parse(localStorage.getItem(dbService.KEYS.SIGN_REQUESTS) || '[]');
-        this._renderSentRequestsList(cached, listBody);
-
-        // 2. Background sync
-        dbService.getSignRequests().then(updated => {
-            if (this.currentTab === 'sent-requests') {
-                this._renderSentRequestsList(updated, listBody);
-            }
-        }).catch(err => console.warn('Background sync failed:', err));
-    },
-
-    _renderSentRequestsList(allRequests, listBody) {
         const requests = this.applyRequestFiltersAndSort(
-            (allRequests || []).filter((request) => !this.isTerminalRequest(request))
+            (await dbService.getSignRequests()).filter((request) => !this.isTerminalRequest(request))
         );
 
         if (requests.length === 0) {
@@ -510,8 +500,8 @@ export const SignUI = {
                     <td>${this.escapeHtml(r.sender)}</td>
                     <td><span class="sign-badge ${statusMeta.className}">${statusMeta.label}</span></td>
                     <td>${dateStr}</td>
-                    <td style="text-align:right;">
-                        <div style="display:flex; gap:8px; justify-content:flex-end;">
+                    <td>
+                        <div style="display:flex; gap:8px;">
                             ${this.isDraftRequest(r) ? `
                                 <button class="btn-dashboard" onclick="window.app.navigate('sign-editor', ${r.id})">
                                     <i class="fa-solid fa-pen-nib"></i> 配置
@@ -537,33 +527,18 @@ export const SignUI = {
     },
 
     async renderCompletedRequestsTab(tableHead, listBody) {
-        const table = listBody.closest('table');
-        if (table) table.classList.add('sign-request-table');
         tableHead.innerHTML = `
             <tr>
                 <th>書類名</th>
-                <th>宛先</th>
+                <th>送信者</th>
                 <th>ステータス</th>
                 <th>完了日</th>
-                <th style="text-align:right;">アクション</th>
+                <th>アクション</th>
             </tr>
         `;
 
-        // 1. Initial render from cache
-        const cached = JSON.parse(localStorage.getItem(dbService.KEYS.SIGN_REQUESTS) || '[]');
-        this._renderCompletedRequestsList(cached, listBody);
-
-        // 2. Background sync
-        dbService.getSignRequests().then(updated => {
-            if (this.currentTab === 'completed-requests') {
-                this._renderCompletedRequestsList(updated, listBody);
-            }
-        }).catch(err => console.warn('Background sync failed:', err));
-    },
-
-    _renderCompletedRequestsList(allRequests, listBody) {
         const requests = this.applyRequestFiltersAndSort(
-            (allRequests || []).filter((request) => this.isTerminalRequest(request))
+            (await dbService.getSignRequests()).filter((request) => this.isTerminalRequest(request))
         );
 
         if (requests.length === 0) {
@@ -581,8 +556,8 @@ export const SignUI = {
                     <td>${this.escapeHtml(r.sender)}</td>
                     <td><span class="sign-badge ${statusMeta.className}">${statusMeta.label}</span></td>
                     <td>${completedDate}</td>
-                    <td style="text-align:right;">
-                        <div style="display:flex; gap:8px; justify-content:flex-end;">
+                    <td>
+                        <div style="display:flex; gap:8px;">
                             <button class="btn-dashboard" style="font-size:11px;" onclick="window.app.navigate('sign-viewer', ${r.id})">詳細</button>
                         </div>
                     </td>
@@ -766,19 +741,6 @@ export const SignUI = {
             if (submitBtn) {
                 submitBtn.textContent = selectedCount === 1 ? '下書きを作成して配置へ' : '下書きを作成';
                 submitBtn.onclick = () => this.submitBatchRequest();
-                
-                // --- Mobile Validation Logic ---
-                if (window.innerWidth <= 900) {
-                    submitBtn.disabled = true;
-                    // Add listener to the list container for delegated input events
-                    const listContainer = document.getElementById('recipients-input-list');
-                    if (listContainer && !listContainer._boundValidation) {
-                        listContainer._boundValidation = true;
-                        listContainer.addEventListener('input', () => this.updateSignSubmitButtonState());
-                    }
-                } else {
-                    submitBtn.disabled = false;
-                }
             }
             console.log("SignUI: Modal should now be visible.");
         } else {
@@ -876,38 +838,7 @@ export const SignUI = {
                 </div>
             `;
             list.appendChild(row);
-            
-            // Trigger validation check if on mobile
-            if (window.innerWidth <= 900) {
-                this.updateSignSubmitButtonState();
-            }
         }
-    },
-
-    /**
-     * Mobile-only: Updates the state of the "Next" button based on recipient inputs
-     */
-    updateSignSubmitButtonState() {
-        if (window.innerWidth > 900) return;
-        
-        const modal = document.getElementById('sign-upload-modal');
-        const submitBtn = modal ? modal.querySelector('.btn-sign-primary') : null;
-        if (!submitBtn) return;
-
-        const recipientRows = document.querySelectorAll('.recipient-input-row');
-        let allValid = recipientRows.length > 0;
-
-        recipientRows.forEach(row => {
-            const email = String(row.querySelector('.ri-email-input')?.value || '').trim();
-            const name = String(row.querySelector('.ri-name-input')?.value || '').trim();
-            
-            // Check if both fields are filled and email is valid format
-            if (!email || !name || !this.validateEmail(email)) {
-                allValid = false;
-            }
-        });
-
-        submitBtn.disabled = !allValid;
     },
 
     escapeHtml(str) {
@@ -927,10 +858,33 @@ export const SignUI = {
             pdf_storage_path: contract.pdf_storage_path || '',
             original_file_url: contract.original_file_url || '',
             original_file_path: contract.original_file_path || '',
-            original_content: contract.original_content || '',
+            original_content: '',
             source_url: contract.source_url || '',
             original_filename: contract.original_filename || ''
         };
+    },
+
+    compactSignRequestSnapshots() {
+        try {
+            const key = dbService.KEYS.SIGN_REQUESTS;
+            const requests = JSON.parse(localStorage.getItem(key) || '[]');
+            const compacted = requests.map((request) => {
+                const next = { ...request };
+                ['document_snapshot', 'contract_snapshot'].forEach((snapshotKey) => {
+                    if (next[snapshotKey]?.original_content) {
+                        next[snapshotKey] = { ...next[snapshotKey], original_content: '' };
+                    }
+                });
+                return next;
+            });
+            if (typeof dbService.saveSignRequestsCache === 'function') {
+                dbService.saveSignRequestsCache(compacted);
+            } else {
+                localStorage.setItem(key, JSON.stringify(compacted));
+            }
+        } catch (error) {
+            console.warn('署名依頼キャッシュの軽量化に失敗しました:', error);
+        }
     },
 
     /**
@@ -948,8 +902,7 @@ export const SignUI = {
             // For now, optimize for the first selected document
             const contract = selected[0];
             
-            // Create a draft request
-            const draft = await dbService.addSignRequest({
+            const draftPayload = {
                 contractId: contract.id,
                 contract_id: contract.id, // For consistency across components
                 recipients: [], // Empty for now, filled in editor
@@ -957,7 +910,17 @@ export const SignUI = {
                 document_snapshot: this.buildDocumentSnapshot(contract),
                 sender: '山田 太郎', // Mock current user
                 status: 'pending'
-            });
+            };
+
+            // Create a draft request
+            let draft;
+            try {
+                draft = await dbService.addSignRequest(draftPayload);
+            } catch (error) {
+                console.warn('Sign draft creation failed. Compacting sign cache and retrying:', error);
+                this.compactSignRequestSnapshots();
+                draft = await dbService.addSignRequest(draftPayload);
+            }
 
             if (draft) {
                 this._lastDraft = draft; // Pass to editor via object reference if possible, or use global
@@ -966,7 +929,8 @@ export const SignUI = {
                 window.app.navigate('sign-editor', draft.id);
             }
         } catch (error) {
-            Notify.error('エディタの起動に失敗しました');
+            console.error('Sign editor startup failed:', error);
+            Notify.error('エディタの起動に失敗しました。書類データを確認してもう一度お試しください。');
         }
     },
 
@@ -1046,7 +1010,7 @@ export const SignUI = {
             if (!this.ensureContractsSignable([contract])) return;
 
             try {
-                const draft = await dbService.addSignRequest({
+                const draftPayload = {
                     contractId: contract.id,
                     contract_id: contract.id,
                     document_name: contract.name,
@@ -1054,7 +1018,16 @@ export const SignUI = {
                     sender: '山田 太郎',
                     recipients,
                     status: 'pending'
-                });
+                };
+
+                let draft;
+                try {
+                    draft = await dbService.addSignRequest(draftPayload);
+                } catch (storageError) {
+                    if (storageError?.name !== 'QuotaExceededError') throw storageError;
+                    this.compactSignRequestSnapshots();
+                    draft = await dbService.addSignRequest(draftPayload);
+                }
 
                 if (!draft) {
                     Notify.error('署名依頼の作成に失敗しました');
@@ -1094,44 +1067,44 @@ export const SignUI = {
      */
     renderSignEditor(app, requestId) {
         return `
-            <div class="sign-editor-container" data-mobile-step="1" style="display:flex; height:calc(100vh - 64px); background:#f0f2f5; overflow:hidden;">
+            <div class="sign-editor-container" style="display:flex; height:calc(100vh - 64px); background:#f0f2f5; overflow:hidden;">
                 <!-- Left Sidebar: Recipients & Tools -->
                 <div class="sign-editor-sidebar" style="width:340px; background:#fff; border-right:1px solid #ddd; display:flex; flex-direction:column; box-shadow:2px 0 12px rgba(0,0,0,0.08); z-index:100;">
                     <div style="padding:24px; border-bottom:1px solid #eee;">
-                        <button class="btn-viewer-back" onclick="window.app.navigate('sign')" title="戻る" style="margin-bottom:16px;">
-                            <i class="fa-solid fa-chevron-left"></i>
+                        <button class="btn-dashboard" onclick="window.app.navigate('sign')" style="margin-bottom:16px; font-size:12px; background:none; border:none; padding:0; color:#666;">
+                            <i class="fa-solid fa-chevron-left"></i> 戻る
                         </button>
-                        <h2 style="font-size:18px; margin:0; color:#111827 !important; font-weight:700;">この契約に署名を依頼する</h2>
+                        <h2 style="font-size:18px; margin:0; color:#0b2d62 !important; font-weight:700;">この契約に署名を依頼する</h2>
                     </div>
 
                     <div class="sign-editor-sidebar-body">
                         <!-- Section 1: Recipients -->
                         <div class="editor-sidebar-section sign-editor-sidebar-section is-recipient">
-                            <label style="display:block; font-size:11px; font-weight:700; color:#999; margin-bottom:16px; text-transform:uppercase; letter-spacing:1px;">宛先設定</label>
+                            <label style="display:block; font-size:11px; font-weight:800; color:#0b2d62 !important; margin-bottom:16px; text-transform:uppercase; letter-spacing:1px; opacity:0.8;">宛先設定</label>
                             <div id="editor-recipients-list" class="sign-editor-recipient-list">
                                 <!-- Recipient rows injected here by SignEditor -->
                             </div>
-                            <button class="btn-dashboard" onclick="window.SignEditor.addRecipientRow()" style="width:100%; border:1px dashed #ccc; background:#fafafa; font-size:11px; margin-top:12px; border-radius:8px; height:36px;">
-                                <i class="fa-solid fa-plus"></i> 署名者を追加
+                            <button class="btn-dashboard" onclick="window.SignEditor.addRecipientRow()" style="width:100%; border:1px solid #0b2d62 !important; background:#fff !important; color:#0b2d62 !important; font-size:13px; margin-top:12px; border-radius:12px; height:44px; font-weight:700 !important; display:flex; align-items:center; justify-content:center; gap:8px; transition:all 0.2s;">
+                                <i class="fa-solid fa-plus" style="color:#0b2d62 !important;"></i> 署名者を追加
                             </button>
                         </div>
 
                         <div class="sign-editor-sidebar-divider"></div>
 
-                        <!-- Section 2: Fields (PC only, mobile では sign-mobile-step2-bar のボタンで代替) -->
-                        <div class="editor-sidebar-section sign-editor-sidebar-section sign-editor-field-tools-section">
-                            <label style="display:block; font-size:11px; font-weight:700; color:#999; margin-bottom:16px; text-transform:uppercase; letter-spacing:1px;">フィールド配置</label>
+                        <!-- Section 2: Fields -->
+                        <div class="editor-sidebar-section sign-editor-sidebar-section">
+                            <label style="display:block; font-size:11px; font-weight:800; color:#0b2d62 !important; margin-bottom:16px; text-transform:uppercase; letter-spacing:1px; opacity:0.8;">フィールド配置</label>
                             <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-                                <button class="btn-dashboard field-tool" id="tool-signature" onclick="window.SignEditor.setTool('signature')" style="height:auto; padding:16px; flex-direction:column; gap:8px; border-radius:12px; cursor:grab;">
-                                    <i class="fa-solid fa-signature" style="font-size:20px; color:var(--sign-primary);"></i>
-                                    <span style="font-size:12px; font-weight:600;">署名枠</span>
+                                <button class="btn-dashboard field-tool" id="tool-signature" onclick="window.SignEditor.setTool('signature')" style="height:auto; padding:18px 12px; flex-direction:column; gap:10px; border-radius:14px; cursor:grab; border:1px solid #ddd !important; background:#fff !important; box-shadow:0 4px 12px rgba(0,0,0,0.05);">
+                                    <i class="fa-solid fa-signature" style="font-size:22px; color:#0b2d62 !important; display:block; margin-bottom:4px;"></i>
+                                    <span style="font-size:12px; font-weight:700; color:#0b2d62 !important; display:block;">署名枠</span>
                                 </button>
-                                <button class="btn-dashboard field-tool" id="tool-date" onclick="window.SignEditor.setTool('date')" style="height:auto; padding:16px; flex-direction:column; gap:8px; border-radius:12px; cursor:grab;">
-                                    <i class="fa-regular fa-calendar" style="font-size:20px; color:var(--sign-primary);"></i>
-                                    <span style="font-size:12px; font-weight:600;">日付枠</span>
+                                <button class="btn-dashboard field-tool" id="tool-date" onclick="window.SignEditor.setTool('date')" style="height:auto; padding:18px 12px; flex-direction:column; gap:10px; border-radius:14px; cursor:grab; border:1px solid #ddd !important; background:#fff !important; box-shadow:0 4px 12px rgba(0,0,0,0.05);">
+                                    <i class="fa-regular fa-calendar" style="font-size:22px; color:#0b2d62 !important; display:block; margin-bottom:4px;"></i>
+                                    <span style="font-size:12px; font-weight:700; color:#0b2d62 !important; display:block;">日付枠</span>
                                 </button>
                             </div>
-                            <p style="font-size:11px; color:#888; margin-top:16px; line-height:1.6; background:#f8f9fa; padding:12px; border-radius:8px; border:1px solid #eee;">
+                            <p style="font-size:11px; color:#0b2d62 !important; margin-top:16px; line-height:1.6; background:rgba(11, 45, 98, 0.05) !important; padding:12px; border-radius:8px; border:1px solid rgba(11, 45, 98, 0.1) !important; font-weight:700;">
                                 ドラッグアンドドロップで配置してください。
                             </p>
                         </div>
@@ -1145,83 +1118,16 @@ export const SignUI = {
                         </div>
                     </div>
 
-                    <!-- Bottom Action (PC only) -->
-                    <div class="sign-editor-pc-actions" style="padding:24px; border-top:1px solid #eee; background:#fff;">
-                        <button id="sign-editor-preview-toggle" class="btn-dashboard" onclick="window.SignEditor.openRecipientPreview()" style="width:100%; height:46px; font-size:14px; font-weight:600; border-radius:12px; margin-bottom:12px; justify-content:center;">
-                            受信者プレビュー
-                        </button>
-                        <button id="sign-editor-send-btn" class="btn-sign btn-sign-primary" onclick="window.SignEditor.saveAndSend()" style="width:100%; min-height:46px; font-size:15px;">
+                    <!-- Bottom Action -->
+                    <div style="padding:24px; border-top:1px solid #eee; background:#fff;">
+                        <button id="sign-editor-send-btn" class="btn-sign btn-sign-primary" onclick="window.SignEditor.saveAndSend()" style="width:100%; min-height:48px; font-size:15px; border-radius:14px; font-weight:700;">
                             この内容で署名依頼を送信 <i class="fa-solid fa-paper-plane" style="margin-left:8px;"></i>
-                        </button>
-                    </div>
-
-                    <!-- Mobile Step 1: 次へボタン (常時表示・入力完了で活性化) -->
-                    <div class="sign-mobile-next-btn" id="sign-mobile-next-wrap">
-                        <button id="sign-mobile-next-btn" disabled
-                            onclick="document.querySelector('.sign-editor-container').dataset.mobileStep='2';">
-                            次へ：書類で枠を設置する <i class="fa-solid fa-chevron-right"></i>
                         </button>
                     </div>
                 </div>
 
                 <!-- Center: PDF Viewer -->
                 <div class="sign-editor-viewport" style="flex:1; min-width:0; min-height:0; position:relative; overflow:auto; padding:24px 40px 40px; background:#dfe1e5;">
-
-                    <!-- Mobile Step 2: 浮遊ツールバー
-                         ツールボタンは pointerdown で startPointerDrag を直接呼び出す
-                         → 指をボタンから書類へドラッグして離すと枠が配置される -->
-                    <!-- Mobile: 送信確認ポップアップ (is-openクラスで表示) -->
-                    <div id="sign-mobile-confirm" class="sign-mobile-confirm">
-                        <div class="sign-mobile-confirm-overlay" onclick="document.getElementById('sign-mobile-confirm').classList.remove('is-open');"></div>
-                        <div class="sign-mobile-confirm-sheet">
-                            <div class="sign-mobile-confirm-handle"></div>
-                            <p class="sign-mobile-confirm-title">署名依頼を送信しますか？</p>
-                            <p class="sign-mobile-confirm-desc">設定した宛先へ署名依頼メールを送信します。<br>この操作は取り消せません。</p>
-                            
-                            <div style="padding: 0 8px;">
-                                <button class="sign-mob-btn sign-mobile-confirm-send-btn"
-                                    style="background: var(--sign-primary); color: #fff; width: 100%; height: 56px; border-radius: 16px; font-size: 17px; font-weight: 800; border: none; margin-bottom: 16px;"
-                                    onclick="document.getElementById('sign-mobile-confirm').classList.remove('is-open');window.SignEditor&&window.SignEditor.saveAndSend();">
-                                    署名依頼を送信する <i class="fa-solid fa-paper-plane" style="margin-left: 8px;"></i>
-                                </button>
-                                
-                                <button class="sign-mob-btn sign-mobile-confirm-cancel-btn"
-                                    style="background: #f3f4f6; color: #4b5563; width: 100%; height: 50px; border-radius: 12px; font-size: 15px; font-weight: 600; border: none;"
-                                    onclick="document.getElementById('sign-mobile-confirm').classList.remove('is-open');">
-                                    キャンセル
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="sign-mobile-step2-bar" style="display:flex; gap:8px; padding:8px; background:#fff; border-top:1px solid #eee; height:80px !important;">
-                        <button class="sign-mob-btn sign-mob-back" onclick="document.querySelector('.sign-editor-container').dataset.mobileStep='1';" style="flex: 1; flex-direction: column; gap: 4px; font-size: 11px; background: #f8f9fa; border: 1px solid #eee; border-radius: 12px; height: 100%;">
-                            <i class="fa-solid fa-chevron-left" style="font-size: 18px; color: #333;"></i> <span>戻る</span>
-                        </button>
-                        
-                        <button class="sign-mob-btn sign-mob-tool" id="mob-tool-signature"
-                            style="flex: 1; flex-direction: column; gap: 4px; font-size: 11px; background: #fff; border: 1px solid #eee; border-radius: 12px; height: 100%;"
-                            onclick="if(window.SignEditor) window.SignEditor.setTool('signature');"
-                            onpointerdown="event.preventDefault(); if(window.SignEditor) window.SignEditor.startPointerDrag({mode:'new',type:'signature',pointerId:event.pointerId,originEvent:event});">
-                            <i class="fa-solid fa-signature" style="font-size: 18px; color: #333;"></i>
-                            <span>署名</span>
-                        </button>
-                        <button class="sign-mob-btn sign-mob-tool" id="mob-tool-date"
-                            style="flex: 1; flex-direction: column; gap: 4px; font-size: 11px; background: #fff; border: 1px solid #eee; border-radius: 12px; height: 100%;"
-                            onclick="if(window.SignEditor) window.SignEditor.setTool('date');"
-                            onpointerdown="event.preventDefault(); if(window.SignEditor) window.SignEditor.startPointerDrag({mode:'new',type:'date',pointerId:event.pointerId,originEvent:event});">
-                            <i class="fa-regular fa-calendar" style="font-size: 18px; color: #333;"></i>
-                            <span>日付</span>
-                        </button>
-
-                        <button class="sign-mob-btn sign-mob-send" id="mob-send-btn" disabled
-                            style="flex: 1; flex-direction: column; gap: 4px; font-size: 11px; background: var(--sign-primary); color: #fff; border-radius: 12px; font-weight: 700; height: 100%; border: none;"
-                            onclick="document.getElementById('sign-mobile-confirm').classList.add('is-open');">
-                            <i class="fa-solid fa-paper-plane" style="font-size: 18px;"></i>
-                            <span>送信</span>
-                        </button>
-                    </div>
-
                     <div id="sign-editor-preview-toolbar" style="position:sticky; top:0; z-index:6; display:flex; justify-content:flex-end; margin:0 0 16px;">
                         <div style="display:inline-flex; align-items:center; gap:8px; padding:8px 10px; border-radius:999px; background:rgba(255,255,255,0.92); box-shadow:0 8px 20px rgba(15,23,42,0.12); backdrop-filter:blur(8px);">
                             <button id="sign-editor-zoom-out" class="btn-pdf-tool" type="button" onclick="window.SignEditor?.zoomOut()" aria-label="縮小">
@@ -1304,106 +1210,81 @@ export const SignUI = {
             return `<div class="sign-container"><div class="badge-danger">依頼が見つかりません</div></div>`;
         }
 
-        // --- Data Integrity Check & Fallback ---
-        if (!request.document_snapshot && request.contract_id) {
-            const contract = dbService.getContractById(request.contract_id);
-            if (contract) {
-                request.document_snapshot = this.buildDocumentSnapshot(contract);
-            }
-        }
-
         const dateStr = this.formatDateTime(request.created_at);
-        const isMobile = window.innerWidth <= 900;
-        const openAttr = isMobile ? 'open' : '';
         
         return `
-            <div class="sign-container sign-viewer-container">
-                <div class="sign-viewer-header">
-                    <button class="btn-viewer-back" onclick="window.app.navigate('sign')" title="戻る">
-                        <i class="fa-solid fa-chevron-left"></i>
-                    </button>
-                    <div class="sign-viewer-title-area">
-                        <h1>署名状況の詳細</h1>
-                        <p class="document-meta">
-                            <span class="doc-name">${this.escapeHtml(request.document_name)}</span>
-                            <span class="divider">|</span>
-                            <span class="created-at">${dateStr} 作成</span>
-                        </p>
+            <div class="sign-container" style="display:flex; flex-direction:column; height:calc(100vh - 112px); min-height:0; overflow:hidden;">
+                <div class="sign-header">
+                    <div class="sign-title">
+                        <div style="display:flex; align-items:center; gap:16px;">
+                            <button class="btn-dashboard" onclick="window.app.navigate('sign')" style="padding: 4px 8px; border: none; background: transparent; font-size: 18px; color: var(--text-main); cursor: pointer;">
+                                <i class="fa-solid fa-arrow-left"></i>
+                            </button>
+                            <h1 style="margin:0;">署名状況の詳細</h1>
+                        </div>
+                        <p>${this.escapeHtml(request.document_name)} - ${dateStr} 作成</p>
+                    </div>
+                    <div class="sign-actions">
                     </div>
                 </div>
 
-                <div class="sign-viewer-grid">
-                    <div class="sign-viewer-preview-pane">
-                        <div id="sign-viewer-content" class="sign-preview-box">
-                            <div class="preview-placeholder">
-                                <i class="fa-solid fa-file-pdf"></i>
-                                <p>ドキュメント・プレビュー</p>
-                                <span class="engine-status">PDF表示エンジンを読み込み中...</span>
+                <div style="display:grid; grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr); gap:24px; flex:1; min-height:0; overflow:hidden;">
+                    <div style="display:flex; flex-direction:column; gap:14px; min-height:0;">
+                        <div id="sign-viewer-content" class="sign-list-card" style="padding:0; flex:1; min-height:0; height:100%; display:flex; align-items:center; justify-content:center; background:#f0f0f0; border-radius:var(--radius-md); overflow:hidden;">
+                            <div style="text-align:center; color:var(--text-muted);">
+                                <i class="fa-solid fa-file-pdf" style="font-size:64px; margin-bottom:16px;"></i>
+                                <p>ドキュメント・プレビュー<br>(PDF表示エンジンを読み込み中)</p>
                             </div>
                         </div>
                     </div>
 
-                    <div class="sign-viewer-detail-pane">
-                        <details class="detail-card signer-card" ${openAttr}>
-                            <summary class="card-title">
-                                <i class="fa-solid fa-users-line"></i> 署名者の状況
-                                <i class="fa-solid fa-chevron-down mobile-only" style="margin-left:auto; font-size:14px; opacity:0.5;"></i>
-                            </summary>
-                            <div class="card-body">
-                                <div class="recipient-timeline">
-                                    ${request.recipients.map((rec, idx) => {
-                                        const status = this.getRecipientStatusMeta(rec);
-                                        return `
-                                        <div class="recipient-item">
-                                            <div class="recipient-avatar">
-                                                <i class="fa-solid fa-user"></i>
-                                            </div>
-                                            <div class="recipient-info">
-                                                <div class="name-row">
-                                                    <span class="name">${this.escapeHtml(rec.display_name || rec.name || rec.email)}</span>
-                                                    <span class="status-badge ${status.className}">${status.label}</span>
-                                                </div>
-                                                <div class="email">${this.escapeHtml(rec.email)}</div>
-                                                ${rec.signed_at || rec.signedAt ? `
-                                                    <div class="timestamp">
-                                                        <i class="fa-solid fa-check-double"></i> 
-                                                        署名: ${this.escapeHtml(this.formatDateTimeWithSeconds(rec.signed_at || rec.signedAt))}
-                                                    </div>
-                                                ` : ''}
-                                            </div>
-                                        </div>
-                                    `;}).join('')}
-                                </div>
-                                
-                                <div class="detail-actions">
-                                    ${this.isCompletedRequest(request) ? `
-                                        <button class="btn-viewer-action primary" onclick='window.signUI.downloadCompletedDocument(${JSON.stringify(String(request.id))})'>
-                                            <i class="fa-solid fa-download"></i> 文書をダウンロード
-                                        </button>
-                                    ` : ''}
-                                    ${request.completion_certificate_url ? `
-                                        <a class="btn-viewer-action secondary" href="${this.escapeHtml(request.completion_certificate_url)}" target="_blank">
-                                            <i class="fa-solid fa-certificate"></i> 完了証明書を開く
-                                        </a>
-                                    ` : ''}
-                                </div>
-                            </div>
-                        </details>
-
-                        <details class="detail-card audit-card" ${openAttr}>
-                            <summary class="card-title">
-                                <i class="fa-solid fa-shield-halved"></i> 監査証跡
-                                <i class="fa-solid fa-chevron-down mobile-only" style="margin-left:auto; font-size:14px; opacity:0.5;"></i>
-                            </summary>
-                            <div class="card-body">
-                                <div id="audit-events-list" class="audit-timeline">
-                                    <div class="loading-status">
-                                        <div class="shimmer"></div>
-                                        <span>記録を照会中...</span>
+                    <div class="sign-viewer-detail-card" style="min-height:0; overflow:auto; background:var(--bg-surface); border:1px solid var(--border-subtle); border-radius:var(--radius-md); box-shadow:0 2px 4px rgba(0, 0, 0, 0.02); padding:24px;">
+                        <h3 style="font-size:16px; margin-bottom:16px; padding-bottom:12px; border-bottom:1px solid var(--border-subtle);">
+                            <i class="fa-solid fa-users-line"></i> 署名者の状況
+                        </h3>
+                        <div id="viewer-recipient-list">
+                            ${request.recipients.map((rec, idx) => {
+                                const recipientStatusMeta = this.getRecipientStatusMeta(rec);
+                                return `
+                                <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 0; border-bottom:1px solid #f9f9f9;">
+                                    <div>
+                                        <div style="font-weight:600; font-size:14px;">${this.escapeHtml(rec.display_name || rec.name || rec.email)}</div>
+                                        <div style="font-size:11px; color:#888;">${this.escapeHtml(rec.email)}</div>
+                                        ${rec.signed_at ? `<div style="font-size:11px; color:#888; margin-top:4px;">署名日時: ${this.escapeHtml(this.formatDateTimeWithSeconds(rec.signed_at))}</div>` : ''}
+                                        ${rec.signedAt ? `<div style="font-size:11px; color:#888; margin-top:4px;">署名日時: ${this.escapeHtml(this.formatDateTimeWithSeconds(rec.signedAt))}</div>` : ''}
+                                        ${rec.declinedAt ? `<div style="font-size:11px; color:#888; margin-top:4px;">辞退日時: ${this.escapeHtml(this.formatDateTimeWithSeconds(rec.declinedAt))}</div>` : ''}
+                                        ${rec.consented_at ? `<div style="font-size:11px; color:#888; margin-top:2px;">同意確認: ${this.escapeHtml(this.formatDateTimeWithSeconds(rec.consented_at))}</div>` : ''}
                                     </div>
+                                    <span class="sign-badge ${recipientStatusMeta.className}" style="font-size:10px;">
+                                        ${recipientStatusMeta.label}
+                                    </span>
                                 </div>
+                            `;}).join('')}
+                        </div>
+                        
+                        <div style="margin-top:24px; padding-top:24px; border-top:1px solid var(--border-subtle);">
+                            ${this.isCompletedRequest(request) ? `
+                                <button class="btn-dashboard btn-primary-action" type="button" style="width:100%; justify-content:center; text-decoration:none; min-height:48px; font-size:14px; padding:12px 16px;" onclick='window.signUI.downloadCompletedDocument(${JSON.stringify(String(request.id))})'>
+                                    <i class="fa-solid fa-download"></i> ダウンロード
+                                </button>
+                            ` : ''}
+                            ${request.completion_certificate_url ? `
+                                <a class="btn-dashboard" style="width:100%; justify-content:center; text-decoration:none; margin-top:10px;" href="${this.escapeHtml(request.completion_certificate_url)}" target="_blank" rel="noopener noreferrer">
+                                    <i class="fa-solid fa-certificate"></i> 完了証明書を開く
+                                </a>
+                            ` : ''}
+                            ${this.isDraftRequest(request) ? `<p style="font-size:11px; color:#888; text-align:center; margin-top:12px;">※作成中の依頼は編集画面から配置を見直せます</p>` : ''}
+                        </div>
+
+                        <div style="margin-top:24px; padding-top:24px; border-top:1px solid var(--border-subtle);">
+                            <h3 style="font-size:14px; margin-bottom:12px;">
+                                <i class="fa-solid fa-shield-halved"></i> 監査証跡
+                            </h3>
+                            <div id="audit-events-list">
+                                <div style="font-size:12px; color:var(--text-muted);">読み込み中...</div>
                             </div>
-                        </details>
+                        </div>
+
                     </div>
                 </div>
             </div>

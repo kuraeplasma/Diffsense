@@ -1,0 +1,11 @@
+/site.webmanifest
+  Content-Type: application/manifest+json; charset=utf-8
+  Cache-Control: public, max-age=3600
+
+/favicon.ico
+  Content-Type: image/vnd.microsoft.icon
+  Cache-Control: public, max-age=3600
+
+/favicon-diffsense.png
+  Content-Type: image/png
+  Cache-Control: public, max-age=3600

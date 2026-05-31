@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>修正案カード ギャラリー | DIFFsense ローカル検証</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+<style>
+  body { margin:0; background:#f1f5f9; font-family:'Inter','Hiragino Sans','Noto Sans JP',system-ui,sans-serif; color:#0f172a; padding:32px 24px; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  .sub { font-size:13px; color:#64748b; margin-bottom:24px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(420px,1fr)); gap:24px; }
+  .col-head { font-size:11px; font-weight:900; letter-spacing:0.1em; color:#475569; text-transform:uppercase; margin:0 0 8px; }
+  .legend { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:24px; }
+  .chip { font-size:12px; font-weight:800; padding:4px 12px; border-radius:8px; color:#fff; }
+  .chip.add { background:#6366f1; }
+  .chip.mod { background:#3b82f6; }
+  .chip.del { background:#ef4444; }
+  .chip.clar { background:#06b6d4; }
+  .strike-old { text-decoration:line-through; text-decoration-color:#ef4444; text-decoration-thickness:2px; }
+</style>
+</head>
+<body>
+<h1>修正案カード ギャラリー</h1>
+<div class="sub">追記 / 修正 / 削除 / 明確化 の4UIパターンを並べたローカル検証ページ。<code>sign-viewer.js</code> 内 <code>_buildSuggestionList</code> 付近の DOM テンプレートを抜粋して、純粋にスタイル確認用に並列表示しています。</div>
+<div class="legend">
+  <span class="chip add"><i class="fa-solid fa-plus"></i> 追記案 (ADD)</span>
+  <span class="chip mod"><i class="fa-solid fa-pen-nib"></i> 修正案 (MODIFY)</span>
+  <span class="chip del"><i class="fa-solid fa-trash-can"></i> 削除案 (DELETE)</span>
+  <span class="chip clar"><i class="fa-solid fa-sparkles"></i> 明確化 (MODIFY × 明確化キーワード)</span>
+</div>
+<div class="grid" id="grid"></div>
+
+<script>
+const SAMPLES = [
+  {
+    label: '追記案', icon: 'fa-solid fa-plus', badge: '#6366f1', accent: '#6366f1',
+    target: '追加先', section: '第9条（補償）', priority: '高', priorityColor: '#ef4444',
+    risk: '損害賠償の範囲が定義されておらず、損害が拡大した場合の責任分担が不明確。',
+    oldText: '',
+    proposalIntro: 'このリスクを抑えるため、次の条項を追加することを提案します。',
+    newText: '甲及び乙は、本契約に違反して相手方に損害を与えたときは、相手方に対し、当該違反と相当因果関係のある通常の損害を賠償するものとする。',
+    impact: '損害賠償範囲の明確化により、想定外の責任拡大を抑止できます。',
+    isDel: false,
+  },
+  {
+    label: '修正案', icon: 'fa-solid fa-pen-nib', badge: '#3b82f6', accent: '#3b82f6',
+    target: '対象条項', section: '第7条（乙の表明保証）', priority: '中', priorityColor: '#f59e0b',
+    risk: '乙の表明保証範囲が広範で、軽微な違反でも責任を負う構造になっている。',
+    oldText: '乙は、本契約締結時及びクロージング時において、自己に関するすべての事実について真実かつ正確であることを表明し、保証する。',
+    proposalIntro: 'このリスクを抑えるため、次の文言へ修正することを提案します。',
+    newText: '乙は、本契約締結時及びクロージング時において、別紙に列挙する事項について、知る限り真実かつ正確であることを表明し、保証する。',
+    impact: '表明保証範囲を別紙列挙＋knowledge qualifier で限定し、乙の責任を合理的範囲に抑制。',
+    isDel: false,
+  },
+  {
+    label: '削除案', icon: 'fa-solid fa-trash-can', badge: '#ef4444', accent: '#ef4444',
+    target: '対象条項', section: '第12条（解除）', priority: '中', priorityColor: '#f59e0b',
+    risk: '解除条項が広範であり、乙に不利。催告なしに解除される場合がある点に注意。',
+    oldText: '乙が次の各号の一に該当したときは、甲は催告をしないで、直ちに本契約を解除することができるものとする。\n１．２ヶ月分以上賃料の支払いを怠ったとき\n２．賃料の支払いをしばしば遅延し、その遅延が本契約における甲乙間の信頼関係を著しく害すると認められるとき\n３．長期間の不在となるなど賃貸借契約の意思が認められなくなったとき',
+    proposalIntro: 'このリスクを回避するため、次の文言を削除することを提案します。',
+    newText: '',
+    impact: '催告なし即時解除の条項を削除し、乙に弁明・是正の機会を確保。',
+    isDel: true,
+  },
+  {
+    label: '明確化', icon: 'fa-solid fa-sparkles', badge: '#06b6d4', accent: '#06b6d4',
+    target: '対象条項', section: '第4条（クロージング手続）', priority: '低', priorityColor: '#64748b',
+    risk: '「速やかに」の解釈が曖昧であり、当事者間で履行期の認識齟齬が生じる懸念がある。',
+    oldText: '甲及び乙は、本契約締結後速やかに、クロージングに必要な書類を交付するものとする。',
+    proposalIntro: 'このリスクを抑えるため、次の文言へ修正することを提案します。',
+    newText: '甲及び乙は、本契約締結日から起算して10営業日以内に、クロージングに必要な書類を相互に交付するものとする。',
+    impact: '履行期を10営業日に明確化し、解釈の余地を排除。',
+    isDel: false,
+  },
+];
+
+function escText(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
+
+function card(c, i){
+  return `
+  <div>
+    <p class="col-head">${c.label} (パターン${i+1})</p>
+    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:16px; overflow:hidden; box-shadow:0 8px 30px rgba(0,0,0,0.04);">
+      <div style="background:#fcfdfe; padding:16px 24px; border-bottom:1px solid #f1f5f9; display:flex; align-items:center; justify-content:space-between;">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div style="background:${c.badge}; color:#fff; padding:4px 12px; border-radius:8px; font-size:11px; font-weight:900; display:flex; align-items:center; gap:6px; box-shadow:0 2px 8px ${c.badge}30;">
+            <i class="${c.icon}"></i> ${c.label} ${i + 1}
+          </div>
+          <span style="font-size:15px; font-weight:800; color:#0f172a;">${c.target}: <span style="color:${c.badge};">${c.section}</span></span>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px; font-size:12px; font-weight:800; color:#64748b; background:#f1f5f9; padding:4px 12px; border-radius:20px;">
+          重要度 <span style="color:${c.priorityColor};">${c.priority}</span>
+        </div>
+      </div>
+      <div style="padding:24px; border-left:6px solid #f59e0b; background:linear-gradient(90deg, #fffbeb 0%, #ffffff 100%);">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+          <i class="fa-solid fa-triangle-exclamation" style="color:#d97706; font-size:16px;"></i>
+          <span style="font-size:13px; font-weight:900; color:#92400e; text-transform:uppercase; letter-spacing:0.06em;">検出したリスクと背景</span>
+        </div>
+        <div style="font-size:15px; color:#334155; line-height:1.8; font-weight:500;">${escText(c.risk)}</div>
+      </div>
+      <div style="display:flex; flex-direction:column; border-top:1px solid #f1f5f9;">
+        <div style="padding:20px 24px; border-left:6px solid #cbd5e1; background:#fafafa; border-bottom:1px solid #f1f5f9;">
+          <div style="font-size:12px; font-weight:800; color:#64748b; margin-bottom:8px; display:flex; align-items:center; gap:8px;">
+            <i class="fa-solid fa-file-contract"></i> ${c.oldText ? '修正前（原文）' : '現状の課題'}
+          </div>
+          <div style="font-size:14px; color:#64748b; line-height:1.7;">
+            ${c.oldText ? escText(c.oldText) : `<span style="color:#94a3b8; font-style:italic;">この箇所には適切なリーガル保護条項が欠落しています。</span>`}
+          </div>
+        </div>
+        <div style="padding:24px; border-left:6px solid ${c.accent}; background:linear-gradient(90deg, ${c.accent}0d 0%, #ffffff 100%);">
+          <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+            <i class="fa-regular fa-lightbulb" style="color:${c.accent}; font-size:18px; font-weight:900;"></i>
+            <span style="font-size:13px; font-weight:900; color:${c.accent}; text-transform:uppercase; letter-spacing:0.06em;">提案する法的修正</span>
+          </div>
+          <div style="font-size:13px; color:${c.accent}; background:#fff; padding:12px 16px; border-radius:10px; border:1px dashed ${c.accent}40; margin-bottom:16px; line-height:1.6; font-weight:500;">
+            ${escText(c.proposalIntro)}
+          </div>
+          ${c.isDel
+            ? `<div style="font-size:15px; color:#7f1d1d; line-height:1.9; padding:24px; background:#fef2f2; border:1px solid #fecaca; border-radius:12px; white-space:pre-wrap;">
+                 <div style="font-size:12px; font-weight:800; color:#b91c1c; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+                   <i class="fa-solid fa-strikethrough"></i> 削除される文言
+                 </div>
+                 <div class="strike-old">${escText(c.oldText)}</div>
+               </div>`
+            : `<div style="font-size:15px; color:#0f172a; line-height:1.9; padding:24px; background:#fff; border:1px solid #e2e8f0; border-radius:12px; box-shadow:inset 0 2px 8px rgba(0,0,0,0.02); white-space:pre-wrap;">${escText(c.newText)}</div>`
+          }
+          ${c.impact ? `
+          <div style="margin-top:20px; display:flex; align-items:flex-start; gap:12px; padding:14px 20px; background:#f0f9ff; border-radius:10px; border:1px solid #e0f2fe;">
+            <i class="fa-solid fa-shield-check" style="color:#0ea5e9; font-size:16px; margin-top:3px;"></i>
+            <div style="font-size:14px; color:#0369a1; line-height:1.6;">
+              <span style="font-weight:900; display:block; margin-bottom:2px;">期待される効果：</span> ${escText(c.impact)}
+            </div>
+          </div>` : ''}
+        </div>
+      </div>
+      <div style="padding:16px 24px; background:#fcfdfe; border-top:1px solid #f1f5f9; display:flex; justify-content:flex-end; align-items:center; gap:20px;">
+        <button style="background:#0b2d62; color:#fff; border:none; padding:12px 32px; border-radius:12px; font-size:14px; font-weight:900; cursor:pointer; box-shadow:0 4px 12px rgba(11,45,98,0.25);">
+          この修正を反映
+        </button>
+      </div>
+    </div>
+  </div>`;
+}
+
+document.getElementById('grid').innerHTML = SAMPLES.map((c,i) => card(c,i)).join('');
+</script>
+</body>
+</html>

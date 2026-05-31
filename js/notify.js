@@ -237,12 +237,31 @@ const Notify = (() => {
         info:    'お知らせ',
     };
 
+    // 同時表示上限とキュー
+    const MAX_VISIBLE = 2;
+    let _activeCount = 0;
+    const _queue = [];
+
+    function _flushQueue() {
+        if (_queue.length === 0 || _activeCount >= MAX_VISIBLE) return;
+        const { message, opts } = _queue.shift();
+        _showToast(message, opts);
+    }
+
     /**
-     * トースト通知を表示
+     * トースト通知を表示（同時最大2件、超過分はキュー）
      * @param {string} message
      * @param {object} opts - { type:'success'|'error'|'warning'|'info', title, duration }
      */
     function toast(message, opts = {}) {
+        if (_activeCount >= MAX_VISIBLE) {
+            _queue.push({ message, opts });
+            return { el: null, close: () => {} };
+        }
+        return _showToast(message, opts);
+    }
+
+    function _showToast(message, opts = {}) {
         injectStyles();
         const type = opts.type || 'info';
         const title = opts.title || TITLES[type];
@@ -268,6 +287,7 @@ const Notify = (() => {
 
         const container = getContainer(position);
         container.appendChild(el);
+        _activeCount++;
 
         // Animate in
         requestAnimationFrame(() => {
@@ -277,7 +297,11 @@ const Notify = (() => {
         const remove = () => {
             el.classList.remove('show');
             el.classList.add('hide');
-            setTimeout(() => el.remove(), 350);
+            setTimeout(() => {
+                el.remove();
+                _activeCount = Math.max(0, _activeCount - 1);
+                _flushQueue();
+            }, 350);
         };
 
         el.querySelector('.ds-toast-close').onclick = remove;

@@ -14,15 +14,11 @@ function normalizeBaseUrl(value) {
 }
 
 const PROD_API_BASE_URL = 'https://api-qf37m5ba2q-an.a.run.app';
-const LOCAL_API_BASE_URL = 'http://localhost:3001';
+const LOCAL_API_BASE_URL = 'http://127.0.0.1:3001';
 const API_BASE_STORAGE_KEY = 'diffsense_api_base';
 
 export function isLocalHostEnvironment() {
-    const h = window.location.hostname;
-    const params = new URLSearchParams(window.location.search);
-    const isLocal = h === 'localhost' || h === '127.0.0.1' || h.includes('192.168.') || h.includes('10.') || h.includes('172.') || params.get('bypass') === '1';
-    console.log('[DEBUG] isLocalHostEnvironment:', { hostname: h, isLocal, bypass: params.get('bypass') });
-    return isLocal;
+    return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 }
 
 function syncApiBaseOverrideFromUrl() {
@@ -69,33 +65,13 @@ function shouldIgnoreExplicitBase(explicitBase) {
     }
 }
 
-/**
- * LAN IP経由アクセス時に localhost API URLを現在のホスト名にリマップ
- * 例: http://localhost:3001 → http://192.168.1.3:3001
- * スマホ(192.168.x.x)からlocalhost:3001に接続してもスマホ自身のlocalhostになるため
- */
-function remapLocalhostForLan(apiUrl) {
-    const h = window.location.hostname;
-    if (h === 'localhost' || h === '127.0.0.1' || h === '[::1]') return apiUrl;
-    const isLan = h.startsWith('192.168.') || h.startsWith('10.') || h.startsWith('172.');
-    if (!isLan) return apiUrl;
-    try {
-        const parsed = new URL(apiUrl);
-        if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
-            parsed.hostname = h;
-            return parsed.toString().replace(/\/$/, '');
-        }
-    } catch { /* noop */ }
-    return apiUrl;
-}
-
 export function getApiBaseUrl() {
     syncApiBaseOverrideFromUrl();
     const params = new URLSearchParams(window.location.search);
     const hasRuntimeApiOverride = Boolean(window.__DIFFSENSE_API_BASE__ || params.get('apiBase'));
 
     // 1. Check window.API_BASE (from env.js)
-    if (window.API_BASE) return remapLocalhostForLan(normalizeBaseUrl(window.API_BASE));
+    if (window.API_BASE) return normalizeBaseUrl(window.API_BASE);
 
     // 2. Check explicit overrides
     const explicit = readExplicitApiBase();
@@ -112,7 +88,7 @@ export function getApiBaseUrl() {
         }
     }
 
-
+    if (isLocalHostEnvironment() && params.get('localApi') === '1') return LOCAL_API_BASE_URL;
     return PROD_API_BASE_URL;
 }
 
@@ -154,7 +130,7 @@ export function resolveBackendAssetUrl(value) {
 
     // Only convert bare filenames (no directory separators) to /uploads/ paths.
     // GCS paths like "contracts/123/file.pdf" must NOT be converted.
-    if (/\.pdf($|[?#])/i.test(normalized) && !normalized.includes('/')) {
+    if (/\.(pdf|docx?)($|[?#])/i.test(normalized) && !normalized.includes('/')) {
         const filename = normalized.split('/').pop();
         if (filename) {
             return toApiUrl(`/uploads/${filename}`);

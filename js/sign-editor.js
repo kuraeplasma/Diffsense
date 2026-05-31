@@ -2,11 +2,11 @@
  * SignEditor - Mock Document Editor for Field Placement
  */
 import { Notify } from './notify.js';
-import { dbService } from './db-service.js';
+import { dbService } from './db-service.js?v=20260519_sign_storage_fix_v2';
 import { buildSignDocumentPreviewHtml } from './sign-document-preview.js?v=20260407_linefix';
-import { isDocxFileName, renderDocxPreviewPages, wrapPreviewPageShell } from './sign-docx-preview.js?v=20260407_final_v10';
+import { isDocxFileName, renderDocxPreviewPages, wrapPreviewPageShell } from './sign-docx-preview.js?v=20260511_docx_dom_fix_v5';
 import { resolveBackendAssetUrl, toApiUrl } from './api-base-safe.js?v=20260329_api_base_safe1';
-import { getIdToken } from './auth.js';
+import { getIdToken } from './auth.js?v=20260510_auth_ready_fix';
 
 export const SignEditor = {
     _currentRequest: null,
@@ -282,23 +282,6 @@ export const SignEditor = {
             sendButton.style.opacity = '1';
             sendButton.style.cursor = 'pointer';
         }
-
-        // Mobile "Next" button validation
-        const nextButton = document.getElementById('sign-mobile-next-btn');
-        if (nextButton) {
-            const isMobile = window.innerWidth <= 900;
-            if (isMobile) {
-                const ok = this._recipients.length > 0 && this._recipients.every(r => 
-                    (r.name || '').trim() && 
-                    (r.email || '').trim() && 
-                    this.validateEmail(r.email)
-                );
-                nextButton.disabled = !ok;
-            } else {
-                nextButton.disabled = false;
-            }
-        }
-
         return validations;
     },
 
@@ -696,34 +679,18 @@ export const SignEditor = {
     },
 
     updateToolUI() {
-        const tools = [
-            { id: 'tool-signature', type: 'signature' },
-            { id: 'tool-date', type: 'date' },
-            { id: 'mob-tool-signature', type: 'signature' },
-            { id: 'mob-tool-date', type: 'date' }
-        ];
-
-        tools.forEach(({ id, type }) => {
-            const btn = document.getElementById(id);
-            if (!btn) return;
-            const isActive = this._addMode === type;
-            
-            if (id.startsWith('mob-')) {
-                // Mobile style
-                btn.style.background = isActive ? 'var(--color-primary-dim, rgba(197, 160, 89, 0.1))' : '#fff';
-                btn.style.borderColor = isActive ? 'var(--sign-primary)' : '#eee';
-                const icon = btn.querySelector('i');
-                const text = btn.querySelector('span');
-                if (icon) icon.style.color = isActive ? 'var(--sign-primary)' : '#333';
-                if (text) text.style.color = isActive ? 'var(--sign-primary)' : '#333';
-            } else {
-                // PC style
-                btn.style.background = isActive ? 'var(--sign-bg-light, rgba(197, 160, 89, 0.05))' : '';
-                btn.style.borderColor = isActive ? 'var(--sign-primary)' : '';
-            }
-            btn.disabled = this._inlinePreviewMode;
-            btn.style.opacity = this._inlinePreviewMode ? '0.55' : '1';
-        });
+        const sigBtn = document.getElementById('tool-signature');
+        const dateBtn = document.getElementById('tool-date');
+        
+        if (sigBtn) sigBtn.style.background = this._addMode === 'signature' ? 'var(--sign-bg-light)' : '';
+        if (sigBtn) sigBtn.style.borderColor = this._addMode === 'signature' ? 'var(--sign-primary)' : '';
+        
+        if (dateBtn) dateBtn.style.background = this._addMode === 'date' ? 'var(--sign-bg-light)' : '';
+        if (dateBtn) dateBtn.style.borderColor = this._addMode === 'date' ? 'var(--sign-primary)' : '';
+        if (sigBtn) sigBtn.disabled = this._inlinePreviewMode;
+        if (dateBtn) dateBtn.disabled = this._inlinePreviewMode;
+        if (sigBtn) sigBtn.style.opacity = this._inlinePreviewMode ? '0.55' : '1';
+        if (dateBtn) dateBtn.style.opacity = this._inlinePreviewMode ? '0.55' : '1';
         
         const viewport = document.querySelector('.sign-editor-viewport');
         if (viewport) viewport.style.cursor = this._inlinePreviewMode ? 'default' : (this._addMode ? 'copy' : '');
@@ -1114,6 +1081,17 @@ export const SignEditor = {
             this._totalPages = pages.length;
             this._activePage = Math.min(this._activePage || 1, this._totalPages || 1);
             pages.forEach((pageWrapper, index) => {
+                const shell = pageWrapper.closest?.('.editor-page-shell') || pageWrapper.parentElement || pageWrapper;
+                shell.style.overflow = 'hidden';
+                shell.style.background = '#fff';
+                shell.style.boxSizing = 'border-box';
+                pageWrapper.style.overflow = 'hidden';
+                pageWrapper.style.boxSizing = 'border-box';
+                pageWrapper.querySelectorAll?.('section, .docx-section, .editor-page-wrapper').forEach((node) => {
+                    node.style.maxWidth = '100%';
+                    node.style.boxSizing = 'border-box';
+                    node.style.overflow = 'hidden';
+                });
                 pageWrapper.style.transformOrigin = 'top left';
                 this.decoratePageWrapper(pageWrapper, index + 1);
             });
@@ -1574,16 +1552,6 @@ export const SignEditor = {
             }
             wrapper.appendChild(div);
         });
-        
-        // Update mobile send button state
-        this.updateMobileSendButtonState();
-    },
-
-    updateMobileSendButtonState() {
-        const sendBtn = document.getElementById('mob-send-btn');
-        if (!sendBtn) return;
-        const hasFields = this._fields.length > 0;
-        sendBtn.disabled = !hasFields;
     },
 
     removeField(id) {

@@ -4,9 +4,9 @@
 import { Notify } from './notify.js';
 import { dbService } from './db-service.js';
 import { buildSignDocumentPreviewHtml } from './sign-document-preview.js?v=20260402_signpreview_plain1';
-import { isDocxFileName, renderDocxPreviewPages, wrapPreviewPageShell } from './sign-docx-preview.js?v=20260407_final_v10';
+import { isDocxFileName, renderDocxPreviewPages, wrapPreviewPageShell } from './sign-docx-preview.js?v=20260511_docx_dom_fix_v5';
 import { getApiBaseUrl, resolveBackendAssetUrl, toApiUrl } from './api-base-safe.js?v=20260329_api_base_safe1';
-import { getIdToken } from './auth.js';
+import { getIdToken } from './auth.js?v=20260510_auth_ready_fix';
 
 const API_BASE = getApiBaseUrl();
 
