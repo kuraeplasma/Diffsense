@@ -2764,6 +2764,13 @@ ${urlSection}
             return;
         }
 
+        const usageCount = Number(this.app?.subscription?.usageCount || 0);
+        const usageLimit = Number(this.app?.subscription?.usageLimit);
+        if (Number.isFinite(usageLimit) && usageLimit > 0 && usageCount >= usageLimit) {
+            await this.app.showAnalysisLimitError({ currentUsage: usageCount, limit: usageLimit });
+            return;
+        }
+
         // 取り込みモーダルを閉じ、解析開始の瞬間にプレミアム・オーバーレイ（すりガラス）を生成
         this.close();
         
@@ -3031,6 +3038,10 @@ ${urlSection}
 
             if (result.success) {
                 const data = result.data;
+                if (this.isAnalysisLimitPayload(data)) {
+                    await this.handleAnalysisLimitReached(data);
+                    return;
+                }
                 if (this.isAiAnalysisFailedPayload(data)) {
                     // 429等でAIが簡易解析(フォールバック)を返した場合は失敗扱いにせず、
                     // 簡易解析として保存し後で再解析できるようにする（赤いエラー画面を出さない）。
@@ -3162,11 +3173,19 @@ ${urlSection}
                 Notify.success('解析が完了しました');
 
             } else {
+                if (this.isAnalysisLimitPayload(result)) {
+                    await this.handleAnalysisLimitReached(result);
+                    return;
+                }
                 throw new Error(result.error || 'AI解析に失敗しました');
             }
 
         } catch (error) {
             console.error('Stepped Analysis Error:', error);
+            if (this.isAnalysisLimitError(error)) {
+                await this.handleAnalysisLimitReached(error);
+                return;
+            }
             const recovered = await this.recoverTextExtractionOnly(contractId, error);
             if (recovered) {
                 updateStep(1, 'completed');
@@ -3186,7 +3205,25 @@ ${urlSection}
         const summary = String(data.summary || '').trim();
         return data.aiSucceeded === false
             || data.isFallback === true
-            || /AI解析に失敗|AI分析に失敗|解析中にエラーが発生|上限に達しました/.test(summary);
+            || /AI解析に失敗|AI分析に失敗|解析中にエラーが発生/.test(summary);
+    }
+
+    isAnalysisLimitPayload(data = {}) {
+        const code = String(data.code || data.errorCode || '').trim();
+        const message = String(data.message || data.error || data.summary || '').trim();
+        return code === 'ANALYSIS_LIMIT_EXCEEDED'
+            || /上限に達しました|上限.*使い切りました|limit.*exceed/i.test(message);
+    }
+
+    isAnalysisLimitError(error = {}) {
+        return this.isAnalysisLimitPayload(error);
+    }
+
+    async handleAnalysisLimitReached(error = {}) {
+        this.cleanupProgressUI();
+        await this.app.refreshSubscriptionStatusSafe();
+        this.app.navigate('contracts');
+        await this.app.showAnalysisLimitError(error);
     }
 
     async recoverTextExtractionOnly(contractId, originalError = null, options = {}) {
@@ -6097,6 +6134,16 @@ class DashboardApp {
 
         const planName = planNames[sub.plan] || sub.plan;
         const billingCycleLabel = sub.billingCycle === 'annual' ? '年額' : '月額';
+        const aiUsageCount = Number(sub.usageCount || 0);
+        const aiUsageLimit = Number(sub.usageLimit || 0);
+        const hasAiLimit = Number.isFinite(aiUsageLimit) && aiUsageLimit > 0 && aiUsageLimit < 999999 && sub.plan !== 'pro' && sub.plan !== 'owner';
+        const aiLimitReached = hasAiLimit && aiUsageCount >= aiUsageLimit;
+        const nextPlanLabels = {
+            free: 'Starterプランで月50回まで利用できます',
+            trial: 'Starterプランで月50回まで利用できます',
+            starter: 'Businessプランで月120回まで利用できます',
+            business: 'Proプランで月400回まで利用できます'
+        };
 
         let statusHtml = `
         <div class="plan-info-box">
@@ -6104,6 +6151,14 @@ class DashboardApp {
             <div class="usage-item">
                 AI解析: <strong>${sub.usageCount}</strong> / ${(sub.usageLimit >= 999999 || sub.plan === 'pro' || sub.plan === 'owner') ? '無制限' : ({'free':3,'starter':50,'business':120}[sub.plan] || sub.usageLimit) + '回'}
             </div>
+            ${aiLimitReached ? `
+                <div class="usage-item" style="margin-top:6px;color:#fca5a5;font-weight:700;">
+                    <i class="fa-solid fa-triangle-exclamation" style="margin-right:6px;"></i>AI解析の上限に達しました
+                </div>
+                <button type="button" onclick="window.app.showAnalysisLimitError()" style="margin-top:8px;padding:6px 10px;border:1px solid rgba(252,165,165,.45);border-radius:8px;background:rgba(127,29,29,.28);color:#fee2e2;font-size:12px;font-weight:700;cursor:pointer;">
+                    ${nextPlanLabels[sub.plan] || 'プランを確認する'}
+                </button>
+            ` : ''}
             <div class="usage-item">
                 電子署名: <strong>${sub.signUsageCount || 0}</strong> / ${(sub.signUsageLimit >= 999999 || sub.plan === 'pro' || sub.plan === 'owner') ? '無制限' : `${{'free':10,'starter':25,'business':100}[sub.plan] || sub.signUsageLimit || 0}回`}
             </div>
@@ -6322,7 +6377,7 @@ class DashboardApp {
                     const contractId = (typeof renderParams === 'object' ? renderParams?.id : renderParams);
                     console.log('[Dashboard] Dynamically importing SignViewer for Contract:', contractId);
 
-                    const module = await import('/js/sign-viewer.js?v=20260601_pdf_client_fallback');
+                    const module = await import('/js/sign-viewer.js?v=20260601_analysis_limit_ui');
                     const SignViewer = module.SignViewer || module.default || module;
                     console.log('[Dashboard] SignViewer module loaded:', !!SignViewer);
 
@@ -6631,7 +6686,7 @@ class DashboardApp {
         }
 
         if (viewId === 'sign-viewer') {
-            const module = await import('/js/sign-viewer.js?v=20260601_pdf_client_fallback');
+            const module = await import('/js/sign-viewer.js?v=20260601_analysis_limit_ui');
             const SignViewer = module.SignViewer || module.default || module;
             this.mainContent.innerHTML = await SignUI.renderSignViewer(this, params);
             await SignViewer.init(this, params);
@@ -6730,7 +6785,7 @@ class DashboardApp {
                             if (this.activeDetailTab === 'original') {
                                 (async () => {
                                     try {
-                                        const module = await import('/js/sign-viewer.js?v=20260601_pdf_client_fallback');
+                                        const module = await import('/js/sign-viewer.js?v=20260601_analysis_limit_ui');
                                         const SignViewer = module.SignViewer || module.default || module;
                                         await SignViewer.initForContract(this, this.currentViewParams, 'v3-pdf-sheet');
                                     } catch (e) {
