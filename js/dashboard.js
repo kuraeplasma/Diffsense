@@ -1447,7 +1447,7 @@ const Views = {
             {
                 id: 'starter',
                 name: 'Starter',
-                prices: { monthly: 1480, annual: 14800 },
+                prices: { monthly: 2980, annual: 29800 },
                 features: [
                     'Word / PDF / URL 登録：無制限',
                     'AI差分チェック：月50回まで',
@@ -1461,25 +1461,25 @@ const Views = {
             {
                 id: 'business',
                 name: 'Business',
-                prices: { monthly: 4980, annual: 49800 },
+                prices: { monthly: 9800, annual: 98000 },
                 features: [
                     'Word / PDF / URL 登録：無制限',
-                    'AI差分チェック：月120回まで',
-                    '電子署名機能：月100件まで',
+                    'AI差分チェック：月150回まで',
+                    '電子署名機能：月150件まで',
                     'AI要約・リスク判定',
                     '法的影響・懸念点の詳細解説',
                     '差分ハイライト、分析ログ',
-                    'チーム管理・3人',
+                    'チーム管理・5人',
                     'PDF エクスポート'
                 ]
             },
             {
                 id: 'pro',
                 name: 'Pro',
-                prices: { monthly: 9800, annual: 98000 },
+                prices: { monthly: 19800, annual: 198000 },
                 features: [
                     'Word / PDF / URL 登録：無制限',
-                    'AI差分チェック：月400回まで',
+                    'AI差分チェック：月500回まで',
                     '電子署名機能：無制限',
                     'AI要約・リスク判定',
                     '法的影響・懸念点の詳細解説',
@@ -5329,8 +5329,8 @@ class DashboardApp {
         const planNames = { starter: 'Starter', business: 'Business', pro: 'Pro' };
         const billingLabel = cycle === 'annual' ? '年額（一括）' : '月額';
         const planPrices = {
-            monthly: { starter: '¥1,480 / 月（税込）', business: '¥4,980 / 月（税込）', pro: '¥9,800 / 月（税込）' },
-            annual: { starter: '¥14,800 / 年（税込）', business: '¥49,800 / 年（税込）', pro: '¥98,000 / 年（税込）' }
+            monthly: { starter: '¥2,980 / 月（税込）', business: '¥9,800 / 月（税込）', pro: '¥19,800 / 月（税込）' },
+            annual: { starter: '¥29,800 / 年（税込）', business: '¥98,000 / 年（税込）', pro: '¥198,000 / 年（税込）' }
         };
 
         const overlay = document.createElement('div');
@@ -5566,8 +5566,8 @@ class DashboardApp {
         const cycle = billingCycle === 'annual' ? 'annual' : 'monthly';
         const billingLabel = cycle === 'annual' ? '年額（一括）' : '月額';
         const planPrices = {
-            monthly: { starter: '¥1,480 / 月（税込）', business: '¥4,980 / 月（税込）', pro: '¥9,800 / 月（税込）' },
-            annual: { starter: '¥14,800 / 年（税込）', business: '¥49,800 / 年（税込）', pro: '¥98,000 / 年（税込）' }
+            monthly: { starter: '¥2,980 / 月（税込）', business: '¥9,800 / 月（税込）', pro: '¥19,800 / 月（税込）' },
+            annual: { starter: '¥29,800 / 年（税込）', business: '¥98,000 / 年（税込）', pro: '¥198,000 / 年（税込）' }
         };
 
         const overlay = document.createElement('div');
@@ -6141,8 +6141,8 @@ class DashboardApp {
         const nextPlanLabels = {
             free: 'Starterプランで月50回まで利用できます',
             trial: 'Starterプランで月50回まで利用できます',
-            starter: 'Businessプランで月120回まで利用できます',
-            business: 'Proプランで月400回まで利用できます'
+            starter: 'Businessプランで月150回まで利用できます',
+            business: 'Proプランで月500回まで利用できます'
         };
 
         let statusHtml = `
@@ -6377,7 +6377,7 @@ class DashboardApp {
                     const contractId = (typeof renderParams === 'object' ? renderParams?.id : renderParams);
                     console.log('[Dashboard] Dynamically importing SignViewer for Contract:', contractId);
 
-                    const module = await import('/js/sign-viewer.js?v=20260601_limit_modal_pricing');
+                    const module = await import('/js/sign-viewer.js?v=20260601_stripe_lp_pricing');
                     const SignViewer = module.SignViewer || module.default || module;
                     console.log('[Dashboard] SignViewer module loaded:', !!SignViewer);
 
@@ -6686,7 +6686,7 @@ class DashboardApp {
         }
 
         if (viewId === 'sign-viewer') {
-            const module = await import('/js/sign-viewer.js?v=20260601_limit_modal_pricing');
+            const module = await import('/js/sign-viewer.js?v=20260601_stripe_lp_pricing');
             const SignViewer = module.SignViewer || module.default || module;
             this.mainContent.innerHTML = await SignUI.renderSignViewer(this, params);
             await SignViewer.init(this, params);
@@ -6785,7 +6785,7 @@ class DashboardApp {
                             if (this.activeDetailTab === 'original') {
                                 (async () => {
                                     try {
-                                        const module = await import('/js/sign-viewer.js?v=20260601_limit_modal_pricing');
+                                        const module = await import('/js/sign-viewer.js?v=20260601_stripe_lp_pricing');
                                         const SignViewer = module.SignViewer || module.default || module;
                                         await SignViewer.initForContract(this, this.currentViewParams, 'v3-pdf-sheet');
                                     } catch (e) {
@@ -9475,10 +9475,10 @@ class DashboardApp {
         if (!next) {
             const plan = this.subscription?.plan || 'free';
             const nextPlanMap = {
-                'free': { name: 'Starter', limit: 50, price: '¥1,480' },
-                'trial': { name: 'Starter', limit: 50, price: '¥1,480' },
-                'starter': { name: 'Business', limit: 120, price: '¥4,980' },
-                'business': { name: 'Pro', limit: 400, price: '¥9,800' },
+                'free': { name: 'Starter', limit: 50, price: '¥2,980' },
+                'trial': { name: 'Starter', limit: 50, price: '¥2,980' },
+                'starter': { name: 'Business', limit: 150, price: '¥9,800' },
+                'business': { name: 'Pro', limit: 500, price: '¥19,800' },
                 'pro': null
             };
             next = nextPlanMap[plan];
