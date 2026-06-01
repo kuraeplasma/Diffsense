@@ -1,5 +1,5 @@
 const AdmZip = require('adm-zip');
-const { XMLParser } = require('fast-xml-parser');
+const { XMLParser, XMLValidator } = require('fast-xml-parser');
 const { execFile } = require('child_process');
 const { promisify } = require('util');
 const fs = require('fs');
@@ -406,9 +406,41 @@ class DocxService {
 
     _escapeXmlText(value) {
         return String(value || '')
+            .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '')
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;');
+    }
+
+    _validateWordDocumentXml(xml) {
+        const source = String(xml || '');
+        if (!source.trim()) throw new Error('Invalid docx: word/document.xml is empty');
+
+        const validation = XMLValidator.validate(source);
+        if (validation !== true) {
+            const message = validation?.err
+                ? `${validation.err.msg} at line ${validation.err.line}, column ${validation.err.col}`
+                : 'word/document.xml is not well-formed XML';
+            throw new Error(`Invalid generated docx: ${message}`);
+        }
+
+        const parsed = this.parser.parse(source);
+        const body = this._extractBodyNode(parsed);
+        if (!Array.isArray(body)) {
+            throw new Error('Invalid generated docx: document body not found');
+        }
+    }
+
+    _validateDocxPackage(buffer) {
+        const zip = new AdmZip(buffer);
+        if (!zip.getEntry('[Content_Types].xml')) {
+            throw new Error('Invalid generated docx: [Content_Types].xml not found');
+        }
+        const entry = zip.getEntry('word/document.xml');
+        if (!entry) {
+            throw new Error('Invalid generated docx: word/document.xml not found');
+        }
+        this._validateWordDocumentXml(entry.getData().toString('utf8'));
     }
 
     _stripXmlTags(xml) {
@@ -594,8 +626,11 @@ class DocxService {
             insertedCount += 1;
         }
 
+        this._validateWordDocumentXml(xml);
         zip.updateFile('word/document.xml', Buffer.from(xml, 'utf8'));
-        return { buffer: zip.toBuffer(), insertedCount, requestedCount: normalizedRevisions.length, skipped };
+        const outputBuffer = zip.toBuffer();
+        this._validateDocxPackage(outputBuffer);
+        return { buffer: outputBuffer, insertedCount, requestedCount: normalizedRevisions.length, skipped };
     }
     /**
      * Convert DOCX file to PDF using LibreOffice/soffice.
