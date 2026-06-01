@@ -209,7 +209,11 @@
     <link rel="apple-touch-icon" sizes="256x256" href="/favicon-diffsense.png?v=20260521_logo">
     <link rel="manifest" href="/site.webmanifest?v=20260521_logo">
     <meta name="theme-color" content="#06142b">
-    <script>window.__DOCX_PDF_SERVICE_URL__ = 'http://127.0.0.1:3001';</script>
+    <script>
+      if (!window.__DOCX_PDF_SERVICE_URL__ && window.API_BASE) {
+        window.__DOCX_PDF_SERVICE_URL__ = String(window.API_BASE).replace(/\/$/, '');
+      }
+    </script>
 </head>
 
 <body>
