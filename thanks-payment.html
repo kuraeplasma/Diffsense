@@ -29,8 +29,8 @@
             const plan = params.get('plan') || 'starter';
             const billing = params.get('billing') === 'annual' ? 'annual' : 'monthly';
             const prices = {
-                monthly: { starter: 1480, business: 4980, pro: 9800 },
-                annual: { starter: 14800, business: 49800, pro: 98000 }
+                monthly: { starter: 2980, business: 9800, pro: 19800 },
+                annual: { starter: 29800, business: 98000, pro: 198000 }
             };
             const conversionValue = prices[billing]?.[plan] || prices.monthly.starter;
 
@@ -291,10 +291,10 @@
         const planNames = { starter: 'Starter', business: 'Business', pro: 'Pro' };
         const billingLabels = { monthly: '月額', annual: '年額' };
         const planPrices = {
-            monthly: { starter: '¥1,480 / 月（税込）', business: '¥4,980 / 月（税込）', pro: '¥9,800 / 月（税込）' },
-            annual: { starter: '¥14,800 / 年（税込）', business: '¥49,800 / 年（税込）', pro: '¥98,000 / 年（税込）' }
+            monthly: { starter: '¥2,980 / 月（税込）', business: '¥9,800 / 月（税込）', pro: '¥19,800 / 月（税込）' },
+            annual: { starter: '¥29,800 / 年（税込）', business: '¥98,000 / 年（税込）', pro: '¥198,000 / 年（税込）' }
         };
-        const planLimits = { starter: '月50回', business: '月120回', pro: '月400回' };
+        const planLimits = { starter: '月50回', business: '月150回', pro: '月500回' };
 
         localStorage.setItem('diffsense_selected_plan', plan);
         localStorage.setItem('diffsense_selected_billing_cycle', billing);
