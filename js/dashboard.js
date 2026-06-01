@@ -6377,7 +6377,7 @@ class DashboardApp {
                     const contractId = (typeof renderParams === 'object' ? renderParams?.id : renderParams);
                     console.log('[Dashboard] Dynamically importing SignViewer for Contract:', contractId);
 
-                    const module = await import('/js/sign-viewer.js?v=20260601_analysis_limit_ui');
+                    const module = await import('/js/sign-viewer.js?v=20260601_limit_modal_pricing');
                     const SignViewer = module.SignViewer || module.default || module;
                     console.log('[Dashboard] SignViewer module loaded:', !!SignViewer);
 
@@ -6686,7 +6686,7 @@ class DashboardApp {
         }
 
         if (viewId === 'sign-viewer') {
-            const module = await import('/js/sign-viewer.js?v=20260601_analysis_limit_ui');
+            const module = await import('/js/sign-viewer.js?v=20260601_limit_modal_pricing');
             const SignViewer = module.SignViewer || module.default || module;
             this.mainContent.innerHTML = await SignUI.renderSignViewer(this, params);
             await SignViewer.init(this, params);
@@ -6785,7 +6785,7 @@ class DashboardApp {
                             if (this.activeDetailTab === 'original') {
                                 (async () => {
                                     try {
-                                        const module = await import('/js/sign-viewer.js?v=20260601_analysis_limit_ui');
+                                        const module = await import('/js/sign-viewer.js?v=20260601_limit_modal_pricing');
                                         const SignViewer = module.SignViewer || module.default || module;
                                         await SignViewer.initForContract(this, this.currentViewParams, 'v3-pdf-sheet');
                                     } catch (e) {
@@ -9488,10 +9488,10 @@ class DashboardApp {
         let okText = 'プランを表示';
         
         if (next) {
-            message += `<br><br>${next.name}プラン（${next.price}/月）にアップグレードすると、月${next.limit}回まで解析できます。`;
+            message += `\n\n${next.name}プラン（${next.price}/月）にアップグレードすると、月${next.limit}回まで解析できます。`;
             okText = '今すぐアップグレード';
         } else {
-            message += `<br><br>来月までお待ちいただくか、より上位のプランについてお問い合わせください。`;
+            message += `\n\n来月までお待ちいただくか、より上位のプランについてお問い合わせください。`;
         }
 
         const confirmed = await Notify.confirm(message, {
@@ -9499,7 +9499,7 @@ class DashboardApp {
             type: 'warning',
             okText: okText,
             cancelText: '閉じる',
-            okStyle: 'primary'
+            okStyle: 'info'
         });
 
         if (confirmed) {
