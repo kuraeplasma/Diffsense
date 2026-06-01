@@ -8,6 +8,32 @@ import { buildSignDocumentPreviewHtml } from './sign-document-preview.js?v=20260
 import { isDocxFileName, renderDocxPreviewPages, wrapPreviewPageShell, renderDocxPreviewAsEditor } from './sign-docx-preview.js?v=20260517_center_pages_fix';
 import { resolveBackendAssetUrl, toApiUrl } from './api-base-safe.js?v=20260329_api_base_safe1';
 
+const externalScriptPromises = new Map();
+
+function loadExternalScriptOnce(src, isReady) {
+    if (typeof isReady === 'function' && isReady()) return Promise.resolve();
+    if (externalScriptPromises.has(src)) return externalScriptPromises.get(src);
+
+    const promise = new Promise((resolve, reject) => {
+        const existing = Array.from(document.scripts || []).find(script => script.src === src);
+        if (existing) {
+            existing.addEventListener('load', () => resolve(), { once: true });
+            existing.addEventListener('error', () => reject(new Error(`Failed to load ${src}`)), { once: true });
+            if (typeof isReady === 'function' && isReady()) resolve();
+            return;
+        }
+
+        const script = document.createElement('script');
+        script.src = src;
+        script.async = true;
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error(`Failed to load ${src}`));
+        document.head.appendChild(script);
+    });
+    externalScriptPromises.set(src, promise);
+    return promise;
+}
+
 // Dashboard boundary markers:
 // 修正案 card copy keeps 検出したリスク / 提案する条文 / このリスクを抑えるため / 反映済み（最終版で確認）.
 // Final preview/export controls keep 元に戻す / 最終版プレビュー / PDF出力 / _normalizeFinalLayoutText.
@@ -7184,16 +7210,86 @@ export const SignViewer = {
         const serviceUrl = (typeof window !== 'undefined' && window.__DOCX_PDF_SERVICE_URL__)
             ? String(window.__DOCX_PDF_SERVICE_URL__).replace(/\/$/, '')
             : '';
-        if (!serviceUrl) return null;
+        if (!serviceUrl) return await this._generateFinalPdfInBrowser(text);
 
         const html = this._buildFinalPreviewHtml(text);
-        const resp = await fetch(`${serviceUrl}/api/convert/html-to-pdf`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ html })
-        });
-        if (resp.ok) return await resp.blob();
-        return null;
+        try {
+            const resp = await fetch(`${serviceUrl}/api/convert/html-to-pdf`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ html })
+            });
+            if (resp.ok) return await resp.blob();
+            console.warn('[SignViewer] Server HTML-to-PDF failed, using browser PDF fallback:', resp.status);
+        } catch (error) {
+            console.warn('[SignViewer] Server HTML-to-PDF unavailable, using browser PDF fallback:', error);
+        }
+        return await this._generateFinalPdfInBrowser(text);
+    },
+
+    async _ensureBrowserPdfLibraries() {
+        await Promise.all([
+            loadExternalScriptOnce(
+                'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+                () => typeof window.jspdf !== 'undefined'
+            ),
+            loadExternalScriptOnce(
+                'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
+                () => typeof window.html2canvas !== 'undefined'
+            )
+        ]);
+        return Boolean(window.jspdf?.jsPDF && window.html2canvas);
+    },
+
+    async _generateFinalPdfInBrowser(text) {
+        if (!(await this._ensureBrowserPdfLibraries())) return null;
+
+        const html = this._buildFinalPreviewHtml(text);
+        const parsed = new DOMParser().parseFromString(html, 'text/html');
+        const styleHtml = Array.from(parsed.querySelectorAll('style')).map(style => style.outerHTML).join('\n');
+        const host = document.createElement('div');
+        host.setAttribute('aria-hidden', 'true');
+        host.style.cssText = [
+            'position:fixed',
+            'left:-10000px',
+            'top:0',
+            'width:210mm',
+            'background:#fff',
+            'z-index:-1',
+            'pointer-events:none'
+        ].join(';');
+        host.innerHTML = `${styleHtml}<div class="v3-browser-pdf-root">${parsed.body?.innerHTML || ''}</div>`;
+        document.body.appendChild(host);
+
+        try {
+            if (document.fonts?.ready) await document.fonts.ready.catch(() => {});
+            const pages = Array.from(host.querySelectorAll('.v3-editor-page'));
+            if (!pages.length) return null;
+
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            for (let i = 0; i < pages.length; i += 1) {
+                const page = pages[i];
+                page.style.boxShadow = 'none';
+                page.style.margin = '0';
+                const canvas = await window.html2canvas(page, {
+                    scale: 2,
+                    useCORS: true,
+                    logging: false,
+                    backgroundColor: '#ffffff',
+                    windowWidth: page.scrollWidth,
+                    windowHeight: page.scrollHeight
+                });
+                if (i > 0) pdf.addPage();
+                pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, 210, 297, undefined, 'FAST');
+            }
+            return pdf.output('blob');
+        } catch (error) {
+            console.error('[SignViewer] Browser PDF fallback failed:', error);
+            return null;
+        } finally {
+            host.remove();
+        }
     },
 
     async renderHandEditMode(container, contentOverride = null) {

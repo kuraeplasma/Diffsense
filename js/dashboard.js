@@ -6322,7 +6322,7 @@ class DashboardApp {
                     const contractId = (typeof renderParams === 'object' ? renderParams?.id : renderParams);
                     console.log('[Dashboard] Dynamically importing SignViewer for Contract:', contractId);
 
-                    const module = await import('/js/sign-viewer.js?v=20260531_free_plan_default_fix');
+                    const module = await import('/js/sign-viewer.js?v=20260601_pdf_client_fallback');
                     const SignViewer = module.SignViewer || module.default || module;
                     console.log('[Dashboard] SignViewer module loaded:', !!SignViewer);
 
@@ -6631,7 +6631,7 @@ class DashboardApp {
         }
 
         if (viewId === 'sign-viewer') {
-            const module = await import('/js/sign-viewer.js?v=20260531_free_plan_default_fix');
+            const module = await import('/js/sign-viewer.js?v=20260601_pdf_client_fallback');
             const SignViewer = module.SignViewer || module.default || module;
             this.mainContent.innerHTML = await SignUI.renderSignViewer(this, params);
             await SignViewer.init(this, params);
@@ -6730,7 +6730,7 @@ class DashboardApp {
                             if (this.activeDetailTab === 'original') {
                                 (async () => {
                                     try {
-                                        const module = await import('/js/sign-viewer.js?v=20260531_free_plan_default_fix');
+                                        const module = await import('/js/sign-viewer.js?v=20260601_pdf_client_fallback');
                                         const SignViewer = module.SignViewer || module.default || module;
                                         await SignViewer.initForContract(this, this.currentViewParams, 'v3-pdf-sheet');
                                     } catch (e) {
